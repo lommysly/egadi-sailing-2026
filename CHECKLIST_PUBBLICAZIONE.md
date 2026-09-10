@@ -17,6 +17,7 @@ Ultimo aggiornamento: 10 settembre 2026.
 - [x] Invito personale WhatsApp: link con codice casuale, accesso diretto, conferma di salvataggio e area personale separata per il partecipante.
 - [x] Più voci per persona, incluse spese facoltative aggiungibili in un secondo momento.
 - [x] Bacheca privata per barca: regole versionate, orari operativi, comunicazioni dello skipper e conferma di lettura dell'equipaggio.
+- [x] Unica pagina pubblica Meteo & Passage Plan, con file dati separato e prompt operativo per aggiornamenti progressivi.
 
 ## Da verificare prima di raccogliere dati reali
 
@@ -27,6 +28,7 @@ Ultimo aggiornamento: 10 settembre 2026.
 - [ ] Confronto del PDF con il modello effettivamente richiesto dal charter / Capitaneria.
 - [ ] Definizione della procedura pratica per i contributi: istruzioni, causale e verifica manuale dello skipper.
 - [ ] Informativa privacy definitiva: titolare, contatto, basi giuridiche, tempi di cancellazione e procedura di consegna del PDF.
+- [ ] Compilare il primo briefing T−30 con fonti, data/ora di emissione e dati astronomici verificati; non pubblicare previsioni spacciandole per affidabili oltre la finestra utile.
 
 ## Materiali editoriali
 

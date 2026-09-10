@@ -4,7 +4,9 @@ Sito pubblico statico e futura area privata per skipper ed equipaggi. Il progett
 
 ## Stato attuale
 
-- `index.html`: sito pubblico, passage plan flessibile e presentazione della flotta.
+- `index.html`: sito pubblico, presentazione della flotta e collegamento al briefing comune.
+- `passage-plan.html`: unica pagina pubblica per meteo e Passage Plan, alimentata da `passage-plan-data.js`.
+- `PASSAGE_PLAN_PROMPT.md`: modello per aggiornare il briefing a T−30, T−10, T−5, T−72/48 e durante il viaggio.
 - `area.html`: area skipper con Google Sign-In via finestra popup, registrazione barca, Crew List, bacheca di bordo, inviti WhatsApp e richieste di contributo solo descrittive.
 - `participant.html`: compilazione della Crew List dal link WhatsApp personale; dopo il salvataggio compare una conferma e la persona viene portata nella propria area.
 - `my-area.html`: area personale con riepilogo dei dati inviati, bacheca della barca, regole e richieste dedicate.

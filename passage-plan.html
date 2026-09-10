@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Meteo e Passage Plan aggiornabile per Egadi Sailing Experience, 8–11 ottobre 2026." />
+  <title>Meteo & Passage Plan · Egadi Sailing Experience</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="area-page">
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Egadi Sailing Experience, home"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
+    <nav class="site-nav always-visible" aria-label="Navigazione principale"><a href="index.html">Torna al sito</a><a href="area.html">Area skipper</a></nav>
+  </header>
+
+  <main class="area-main passage-plan-main">
+    <section class="area-hero">
+      <p class="eyebrow">Marsala · Levanzo · Marettimo · Favignana · 8—11 ottobre 2026</p>
+      <h1>Meteo &amp;<br /><em>Passage Plan.</em></h1>
+      <p>Un solo quadro per tutta la flotta: rotta prevista, finestre di navigazione e condizioni che possono modificarla. L’ultima decisione resta sempre allo skipper della barca.</p>
+    </section>
+
+    <section class="passage-status" aria-label="Stato del briefing">
+      <div><span>Stato</span><strong id="planStatus">Caricamento</strong></div>
+      <div><span>Finestra</span><strong id="planPhase">—</strong></div>
+      <div><span>Affidabilità</span><strong id="planConfidence">—</strong></div>
+    </section>
+
+    <section class="passage-introduction">
+      <p id="planSummary">Caricamento del Passage Plan.</p>
+      <p id="planUpdatedAt" class="passage-updated"></p>
+      <p id="planSources" class="passage-source"></p>
+    </section>
+
+    <section id="dailyPlan" class="passage-day-list" aria-live="polite"></section>
+
+    <section class="passage-safety">
+      <p class="eyebrow">Come leggerlo</p>
+      <h2>Il meteo orienta.<br />La sicurezza decide.</h2>
+      <p>Il piano indica vento, mare, temperature, correnti e luce per aiutare l’equipaggio a prepararsi. Non sostituisce gli avvisi ufficiali, le ordinanze locali, il controllo reale in banchina o la valutazione nautica dello skipper.</p>
+      <p><strong>Prossime pubblicazioni:</strong> quadro di pianificazione a un mese; tendenza a dieci giorni; briefing operativo a cinque giorni; conferme quotidiane nelle 72 ore precedenti e durante il viaggio.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><p>8—11 ottobre 2026 · Marsala</p></div>
+    <div><a href="index.html#rotta">Itinerario</a><a href="area.html">Area skipper</a><a href="privacy.html">Privacy e dati</a></div>
+  </footer>
+  <script src="passage-plan-data.js"></script>
+  <script src="passage-plan.js"></script>
+</body>
+</html>
