@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOrganizer() {
+      return signedIn() && request.auth.uid in get(/databases/$(database)/documents/events/egadi-2026).data.organizerIds;
+    }
+
+    function isSkipper(boatId) {
+      return signedIn() && get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid;
+    }
+
+    match /events/egadi-2026 {
+      allow read: if signedIn();
+      allow write: if isOrganizer();
+    }
+
+    match /boats/{boatId} {
+      allow read: if isOrganizer() || resource.data.skipperId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.skipperId == request.auth.uid;
+      allow update: if isOrganizer() || isSkipper(boatId);
+      allow delete: if isOrganizer();
+
+      match /members/{memberId} {
+        allow read: if isOrganizer() || isSkipper(boatId);
+        allow create: if isOrganizer() || isSkipper(boatId);
+        allow update: if isOrganizer() || isSkipper(boatId);
+        allow delete: if isOrganizer() || isSkipper(boatId);
+      }
+
+      match /paymentRequests/{requestId} {
+        allow read: if isOrganizer() || isSkipper(boatId);
+        allow create, update: if isOrganizer() || isSkipper(boatId);
+        allow delete: if isOrganizer();
+      }
+    }
+  }
+}
