@@ -28,7 +28,7 @@ Ultimo aggiornamento: 10 settembre 2026.
 - [ ] Confronto del PDF con il modello effettivamente richiesto dal charter / Capitaneria.
 - [ ] Definizione della procedura pratica per i contributi: istruzioni, causale e verifica manuale dello skipper.
 - [ ] Informativa privacy definitiva: titolare, contatto, basi giuridiche, tempi di cancellazione e procedura di consegna del PDF.
-- [ ] Compilare il primo briefing T−30 con fonti, data/ora di emissione e dati astronomici verificati; non pubblicare previsioni spacciandole per affidabili oltre la finestra utile.
+- [x] Pubblicato il primo briefing T−27 con fonti, dati astronomici verificati e distinzione esplicita fra pianificazione e previsioni operative.
 
 ## Materiali editoriali
 
