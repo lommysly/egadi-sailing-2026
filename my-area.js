@@ -77,7 +77,8 @@ function renderBriefing() {
   document.querySelector('#participantRulesTitle').textContent = activeBriefing.rulesTitle || 'Regole di bordo';
   document.querySelector('#participantRulesText').textContent = activeBriefing.rulesText;
   const version = activeBriefing.rulesVersion || 1;
-  const accepted = activeRuleAcceptance?.rulesVersion === version;
+  const accepted = activeRuleAcceptance?.rulesVersion === version
+    && activeRuleAcceptance?.acceptedBy === auth.currentUser?.uid;
   document.querySelector('#participantRulesStatus').textContent = accepted ? `Hai confermato la lettura delle regole, versione ${version}.` : `Leggi le regole e conferma la versione ${version} prima della partenza.`;
   document.querySelector('#acceptRulesButton').hidden = accepted;
 }

@@ -76,7 +76,7 @@ export function buildCapitaneriaPrintHtml({ boat, members }) {
     <div><p class="label">Partenza</p><p class="value">8 ottobre 2026 - ore 15:00</p></div>
     <div><p class="label">Porto di rientro</p><p class="value">Marsala</p></div>
     <div><p class="label">Rientro previsto</p><p class="value">11 ottobre 2026 - entro le 18:00</p></div>
-    <div><p class="label">Persone a bordo</p><p class="value">${members.length}</p></div>
+    <div><p class="label">Persone nella Crew List</p><p class="value">${members.length}</p></div>
   </section>
   <div class="section">Composizione equipaggio</div>
   <table><thead><tr><th>#</th><th>Cognome e nome</th><th>Sesso</th><th>Data nascita</th><th>Luogo nascita</th><th>Nazionalita</th><th>Tipo documento</th><th>N. documento</th><th>Scadenza</th><th>Ruolo a bordo</th></tr></thead><tbody>${rows}</tbody></table>

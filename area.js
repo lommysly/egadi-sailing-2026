@@ -148,6 +148,35 @@ function normalizeMember(id, member) {
   return { id, ...member, firstName, lastName: lastNameParts.join(' ') };
 }
 
+function crewSeatLimit() {
+  const capacity = Number(activeBoat?.capacity);
+  return Number.isInteger(capacity) && capacity > 0 ? capacity : 0;
+}
+
+function allocatedCrewSeatCount() {
+  const seatIds = new Set(activeInvites.map((invite) => invite.id));
+  activeMembers.forEach((member) => seatIds.add(member.id));
+  return seatIds.size;
+}
+
+function isCrewCapacityReached() {
+  return allocatedCrewSeatCount() >= crewSeatLimit();
+}
+
+function renderCapacityStatus() {
+  const status = document.querySelector('#capacityStatus');
+  if (!status) return;
+  const limit = crewSeatLimit();
+  const allocated = allocatedCrewSeatCount();
+  if (!activeBoat || !limit) {
+    status.textContent = 'Definisci i posti equipaggio della barca prima di inviare gli inviti.';
+    return;
+  }
+  const available = Math.max(0, limit - allocated);
+  status.textContent = 'Posti equipaggio: ' + allocated + ' di ' + limit + ' occupati o riservati. '
+    + (available ? available + ' ancora disponibili.' : 'Nessun posto ancora disponibile.');
+}
+
 function resetMemberForm() {
   const form = document.querySelector('#memberForm');
   form.reset();
@@ -191,11 +220,14 @@ function updateCharterReadiness() {
   const readiness = document.querySelector('#charterReadiness');
   const incomplete = activeMembers.filter((member) => !isCharterReady(member));
   const boatMissing = !isBoatReadyForPdf(activeBoat);
-  generatePdfButton.disabled = !activeBoat || activeMembers.length === 0 || incomplete.length > 0 || boatMissing;
+  const overCapacity = activeBoat && activeMembers.length > crewSeatLimit();
+  generatePdfButton.disabled = !activeBoat || activeMembers.length === 0 || incomplete.length > 0 || boatMissing || overCapacity;
   readiness.textContent = !activeBoat
     ? 'Registra prima la barca per preparare il PDF.'
     : boatMissing
       ? 'Completa bandiera e comandante della barca per attivare il PDF.'
+      : overCapacity
+        ? 'La Crew List supera i posti equipaggio indicati per la barca.'
       : activeMembers.length === 0
         ? 'Aggiungi almeno una persona per preparare il PDF.'
     : incomplete.length
@@ -208,6 +240,7 @@ function renderMembers() {
   if (!activeMembers.length) {
     list.innerHTML = '<p class="empty-state">Nessuna persona ancora inserita.</p>';
     renderPaymentRecipientOptions();
+    renderCapacityStatus();
     updateCharterReadiness();
     return;
   }
@@ -217,6 +250,7 @@ function renderMembers() {
     return `<article class="member-row"><div><strong>${escapeHtml(memberName(member))}</strong><span>${escapeHtml(member.role || 'Crew')} · ${escapeHtml(status)}</span></div><button class="text-button" type="button" data-edit-member="${escapeHtml(member.id)}">Modifica</button></article>`;
   }).join('');
   renderPaymentRecipientOptions();
+  renderCapacityStatus();
   updateCharterReadiness();
 }
 
@@ -225,6 +259,7 @@ function renderInvites() {
   if (!activeInvites.length) {
     list.innerHTML = '<p class="empty-state">Nessun link personale creato.</p>';
     renderPaymentRecipientOptions();
+    renderCapacityStatus();
     return;
   }
   list.innerHTML = activeInvites.map((invite) => {
@@ -233,6 +268,7 @@ function renderInvites() {
     return `<article class="invite-row"><div><strong>${escapeHtml(invite.displayName)}</strong><span>${escapeHtml(status)} · ${escapeHtml(invite.whatsappNumber)}</span></div><div class="payment-action"><button class="text-button" type="button" data-copy-invite="${escapeHtml(invite.id)}">Copia link</button><button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(invite.id)}">Apri WhatsApp</button></div></article>`;
   }).join('');
   renderPaymentRecipientOptions();
+  renderCapacityStatus();
 }
 
 function renderPayments(snapshot) {
@@ -298,7 +334,7 @@ function subscribeToBoat(boat) {
   registerSection.hidden = true;
   dashboard.hidden = false;
   document.querySelector('#boatTitle').textContent = boat.name;
-  document.querySelector('#boatMeta').textContent = `${boat.model} · ${boat.capacity} posti · ${boat.homePort}`;
+  document.querySelector('#boatMeta').textContent = boat.model + ' · ' + boat.capacity + ' posti equipaggio · ' + boat.homePort;
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
   stopInviteSubscription?.();
@@ -412,6 +448,10 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
 document.querySelector('#inviteForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!activeBoat || !auth.currentUser) return;
+  if (isCrewCapacityReached()) {
+    setMessage(document.querySelector('#inviteFormMessage'), 'Hai già riservato tutti i posti equipaggio indicati per questa barca.', true);
+    return;
+  }
   const form = event.currentTarget;
   const fields = new FormData(form);
   const displayName = fields.get('displayName').trim();
@@ -449,6 +489,10 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
 document.querySelector('#memberForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!activeBoat) return;
+  if (!editingMemberId && isCrewCapacityReached()) {
+    setMessage(document.querySelector('#memberFormMessage'), 'Hai già riservato tutti i posti equipaggio indicati per questa barca.', true);
+    return;
+  }
   const form = event.currentTarget;
   const fields = new FormData(form);
   const submitButton = form.querySelector('button[type="submit"]');
@@ -546,7 +590,7 @@ document.querySelector('#announcementForm').addEventListener('submit', async (ev
   }
 });
 document.querySelector('#generatePdfButton').addEventListener('click', () => {
-  if (!activeBoat || !isBoatReadyForPdf(activeBoat) || activeMembers.some((member) => !isCharterReady(member))) return;
+  if (!activeBoat || !isBoatReadyForPdf(activeBoat) || activeMembers.length > crewSeatLimit() || activeMembers.some((member) => !isCharterReady(member))) return;
   try {
     openCapitaneriaPdf({ boat: activeBoat, members: activeMembers });
     setMessage(document.querySelector('#memberFormMessage'), 'Si apre la stampa: scegli “Salva come PDF” per scaricare il foglio.');

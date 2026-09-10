@@ -41,7 +41,7 @@
         <div class="form-grid">
           <label>Nome della barca<input name="name" autocomplete="off" required maxlength="70" placeholder="Es. Isla 40 - nome da confermare" /></label>
           <label>Modello / tipo<input name="model" autocomplete="off" required maxlength="100" placeholder="Es. Fountaine Pajot Isla 40" /></label>
-          <label>Posti disponibili<input name="capacity" type="number" required min="1" max="30" inputmode="numeric" placeholder="Decide lo skipper" /></label>
+          <label>Posti equipaggio<input name="capacity" type="number" required min="1" max="30" inputmode="numeric" placeholder="Decide lo skipper" /><small class="field-hint">Numero massimo di persone della Crew List; lo skipper non viene conteggiato.</small></label>
           <label>Porto di partenza<input name="homePort" autocomplete="off" required maxlength="80" value="Marsala" /></label>
           <label>Bandiera<input name="flag" autocomplete="off" required maxlength="60" value="Italiana" /></label>
           <label>Comandante / skipper<input name="skipperName" autocomplete="name" required maxlength="100" /></label>
@@ -58,6 +58,7 @@
 
     <section id="dashboard" class="section dashboard" hidden>
       <div class="dashboard-heading"><div><p class="eyebrow">Spazio skipper</p><h2 id="boatTitle">La mia barca</h2><p id="boatMeta"></p></div><div class="dashboard-actions"><button id="editBoatButton" class="button button-ghost" type="button">Modifica questa barca</button></div></div>
+      <p id="capacityStatus" class="capacity-status" aria-live="polite"></p>
       <div class="dashboard-grid">
         <article class="dashboard-panel"><p class="eyebrow">Crew List</p><h3>Persone a bordo</h3><p class="panel-lead">Il percorso normale è inviare un link personale: ogni partecipante completa da sé i dati necessari al charter e appare qui nella Crew List.</p><details class="manual-entry"><summary>Inserimento manuale · solo eccezione</summary><p class="panel-lead">Usalo soltanto se una persona non può aprire il proprio invito WhatsApp.</p><form id="memberForm" class="compact-form">
           <div class="form-grid"><label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" /></label><label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" /></label></div>
@@ -77,10 +78,16 @@
     <section class="section contribution-note">
       <p class="eyebrow">Contributi tra amici</p>
       <h2>Il sito non incassa denaro.</h2>
+      <ol class="payment-workflow">
+        <li>Prepara una richiesta personale con importo, causale e istruzioni.</li>
+        <li>Copia il messaggio e invialo direttamente alla persona.</li>
+        <li>La persona effettua il contributo fuori dal sito e avvisa lo skipper.</li>
+        <li>Lo skipper verifica l'accredito reale e solo allora lo segna come verificato.</li>
+      </ol>
       <p>Lo skipper può comunicare un importo personale e le istruzioni per PayPal, Satispay, Revolut o bonifico. Il pagamento è esterno al sito e viene confermato manualmente solo dopo l'accredito reale.</p>
     </section>
   </main>
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="privacy.html">Privacy e dati</a></div></footer>
-  <script type="module" src="area.js?v=20260910-board"></script>
+  <script type="module" src="area.js?v=20260911-safety"></script>
 </body>
 </html>

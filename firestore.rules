@@ -22,7 +22,20 @@ service cloud.firestore {
 
     function isBoatParticipant(boatId) {
       return signedIn()
-        && exists(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid));
+        && exists(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid))
+        && get(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid)).data.userId == request.auth.uid
+        && get(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid)).data.boatId == boatId
+        && get(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid)).data.inviteId is string
+        && isInviteHolder(boatId, get(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid)).data.inviteId);
+    }
+
+    function isValidRuleAcceptance(boatId, inviteId) {
+      return isInviteHolder(boatId, inviteId)
+        && request.resource.data.inviteId == inviteId
+        && request.resource.data.acceptedBy == request.auth.uid
+        && request.resource.data.rulesVersion is int
+        && exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
+        && request.resource.data.rulesVersion == get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion;
     }
 
     function canClaimInvite() {
@@ -92,22 +105,13 @@ service cloud.firestore {
       match /ruleAcceptances/{inviteId} {
         allow get: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, inviteId);
         allow list: if isOrganizer() || isSkipper(boatId);
-        allow create: if isOrganizer() || isSkipper(boatId) || (isInviteHolder(boatId, inviteId)
-          && request.resource.data.inviteId == inviteId
-          && request.resource.data.acceptedBy == request.auth.uid);
-        allow update: if isOrganizer() || isSkipper(boatId) || (isInviteHolder(boatId, inviteId)
-          && resource.data.inviteId == inviteId
-          && resource.data.acceptedBy == request.auth.uid
-          && request.resource.data.inviteId == inviteId
-          && request.resource.data.acceptedBy == request.auth.uid);
+        allow create, update: if isOrganizer() || isSkipper(boatId) || isValidRuleAcceptance(boatId, inviteId);
         allow delete: if isOrganizer() || isSkipper(boatId);
 
         match /history/{versionId} {
           allow get: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, inviteId);
           allow list: if isOrganizer() || isSkipper(boatId);
-          allow create, update: if isOrganizer() || isSkipper(boatId) || (isInviteHolder(boatId, inviteId)
-            && request.resource.data.inviteId == inviteId
-            && request.resource.data.acceptedBy == request.auth.uid);
+          allow create, update: if isOrganizer() || isSkipper(boatId) || isValidRuleAcceptance(boatId, inviteId);
           allow delete: if isOrganizer() || isSkipper(boatId);
         }
       }

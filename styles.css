@@ -52,6 +52,11 @@ a { color:inherit; }
 .dashboard-panel h3 { margin:0 0 18px; font:600 2rem/.95 "Fraunces",serif; letter-spacing:-.05em; }
 .dashboard-panel h4 { margin:26px 0 12px; font:600 1.42rem/.98 "Fraunces",serif; letter-spacing:-.035em; }
 .panel-lead { margin:0 0 18px; line-height:1.5; font-size:.9rem; }
+.field-hint { color:rgba(7,59,76,.68); font-size:.72rem; font-weight:400; line-height:1.35; }
+.capacity-status { margin:-18px 0 22px; color:#416b6d; font-size:.86rem; line-height:1.45; }
+.payment-workflow { max-width:700px; margin:24px 0 0; padding-left:22px; line-height:1.7; }
+.payment-workflow li::marker { color:#82e4df; font-weight:700; }
+.photo-credit a { color:inherit; text-decoration:underline; text-decoration-color:var(--sun); text-underline-offset:3px; }
 .compact-form { display:grid; gap:14px; }
 .compact-form .button { margin-top:3px; }
 .invite-panel { margin-top:28px; padding:22px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }

@@ -13,6 +13,8 @@ Sito pubblico statico e futura area privata per skipper ed equipaggi. Il progett
 - `crew.html`: istruzioni per recuperare il proprio invito chiedendo allo skipper di reinviarlo.
 - `privacy.html`: principi da completare con informativa definitiva prima della raccolta dati.
 - `firestore.rules`: regole di accesso pubblicate per il progetto Firebase; skipper e organizzatore vedono solo le barche autorizzate.
+- `FIRESTORE_RULES_TEST_MATRIX.md`: casi fittizi da provare nel Playground o nell'emulatore prima del test live.
+- `CONTRIBUTI_OPERATIVI.md`, `PRIVACY_DA_COMPLETARE.md` e `MEDIA_REGISTER_TEMPLATE.md`: procedure e materiali da completare prima dell'uso reale.
 
 ## Firebase creato
 
@@ -53,29 +55,31 @@ boats/{boatId}
       inviteId, acceptedBy, rulesVersion, acceptedAt
 ```
 
-Non inserire in Firestore credenziali PayPal, Satispay, Revolut, carte o coordinate bancarie. Le richieste di contributo mostrano solo istruzioni dello skipper nella pagina privata e restano `in_attesa_di_verifica` fino alla conferma manuale.
+Non inserire in Firestore credenziali PayPal, Satispay, Revolut, carte o coordinate bancarie. Le richieste di contributo mostrano solo istruzioni dello skipper nella pagina privata e restano `requested` fino alla conferma manuale.
 
-Il pulsante `Genera Crew List PDF` apre un foglio A4 orizzontale prestampato per charter / eventuali controlli dell'autorita marittima. Lo skipper sceglie `Salva come PDF` dalla finestra di stampa: il file non viene inviato dal sito e si attiva solo quando sono completi i dati della barca, di ogni persona e la relativa conferma di condivisione. Prima della consegna, verificare con il charter se richiede un proprio modello o ulteriori campi.
+Il pulsante `Genera Crew List PDF` apre un foglio A4 orizzontale prestampato per charter / eventuali controlli dell'autorita marittima. Lo skipper sceglie `Salva come PDF` dalla finestra di stampa: il file non viene inviato dal sito e si attiva solo quando sono completi i dati della barca, di ogni persona e la relativa conferma di condivisione. Il comandante è nell'intestazione e nella firma, mentre il conteggio indica le persone nella Crew List: prima della consegna, verificare con il charter se il comandante deve comparire anche come riga o se richiede un proprio modello o ulteriori campi.
 
 I dati della barca, incluso il nome, sono modificabili dallo skipper con `Modifica questa barca`; la stessa Crew List e le richieste personali restano associate alla barca esistente. Il PDF non richiede il porto di iscrizione della barca.
+
+`capacity` indica i posti destinati all'equipaggio, escluso lo skipper. L'interfaccia conta inviti e membri unici e non consente di aggiungere oltre quel numero; il controllo è operativo e non sostituisce la valutazione nautica dello skipper né un vincolo atomico lato server.
 
 Ogni skipper gestisce una sola barca e la relativa Crew List; per le nuove registrazioni l'identificativo della barca coincide con l'UID dello skipper, così le regole Firestore impediscono una seconda barca. Lo skipper può aggiornare i dati operativi, ma non può trasferire la barca a un altro account né cambiarne l'evento associato.
 
 ## Bacheca di bordo
 
-Lo skipper pubblica per la propria barca le regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Ogni partecipante vede solo la bacheca della barca associata al proprio invito. Quando le regole cambiano, la versione aumenta e il partecipante deve confermare di nuovo la lettura. Le conferme precedenti non vengono sovrascritte lato skipper: resta registrata l'ultima versione accettata per ogni invito.
+Lo skipper pubblica per la propria barca le regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Ogni partecipante vede solo la bacheca della barca associata al proprio invito. Quando le regole cambiano, la versione aumenta e il partecipante deve confermare di nuovo la lettura. Se lo stesso link viene riaperto da un altro browser, l'accesso corrente passa al nuovo browser e quello precedente non può più leggere bacheca, anagrafica o richieste; la nuova sessione deve confermare le regole a suo nome.
 
 ## Limiti e privacy
 
 - Questa struttura non e' un sistema di pagamento: non chiama API dei provider e non riceve webhook. Lo skipper può definire importo, causale, eventuale scadenza e istruzioni, quindi copiare un messaggio da inviare manualmente. Per ogni persona può creare più richieste, comprese voci facoltative come assicurazione, cena, porto o cambusa.
 - Solo lo skipper può segnare una richiesta come verificata, dopo aver controllato l'accredito reale fuori dal sito. Un click non attiva né dimostra un pagamento.
-- Per documenti, dati sanitari, titolare del trattamento e tempi di cancellazione serve una decisione esplicita e un'informativa completa prima dell'uso reale.
+- Per documenti, dati sanitari, titolare del trattamento e tempi di cancellazione serve una decisione esplicita e un'informativa completa prima dell'uso reale. La matrice da chiudere è in `PRIVACY_DA_COMPLETARE.md`.
 - Non usare `localStorage` per dati di crew o documenti.
 
 ## Da fare prima dell'uso con partecipanti
 
-Ogni invito personale ha un codice casuale a 192 bit nel link e viene legato alla sessione tecnica aperta da chi lo utilizza. Il link associa già quella persona alla barca e allo skipper corretti; il partecipante non deve scegliere un account. Può leggere e aggiornare soltanto la propria anagrafica, bacheca e richieste; skipper e organizzatore mantengono l'accesso operativo alla barca. Se perde il messaggio WhatsApp, lo skipper può reinviare lo stesso link dall'area della barca. Il link non va inoltrato.
+Ogni invito personale ha un codice casuale a 192 bit nel link e viene legato alla sessione tecnica aperta da chi lo utilizza. Il link associa già quella persona alla barca e allo skipper corretti; il partecipante non deve scegliere un account. Può leggere e aggiornare soltanto la propria anagrafica, bacheca e richieste; skipper e organizzatore mantengono l'accesso operativo alla barca. Se perde il messaggio WhatsApp, lo skipper può reinviare lo stesso link dall'area della barca. Il link è una chiave personale: se viene aperto da un altro browser, quell'accesso diventa quello corrente e il precedente perde l'accesso ai contenuti. Non inoltrarlo.
 
 ## Pubblicazione
 
-Il sito pubblico puo' essere pubblicato su GitHub Pages. Prima di mettere online l'area privata: versione nel repository, test delle Security Rules, verifica da un account skipper e da un account crew separati, quindi lettura finale del sito realmente pubblicato.
+Il sito pubblico puo' essere pubblicato su GitHub Pages. Prima di usare l'area privata con dati reali: versione nel repository, test delle Security Rules, certificato HTTPS valido, verifica da un account skipper e da un account crew separati, quindi lettura finale del sito realmente pubblicato.

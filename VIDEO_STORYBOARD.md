@@ -42,4 +42,23 @@ Testo a schermo: `una flotta, molti equipaggi, lo stesso mare`.
 
 Montaggio nell'ordine Marsala → Levanzo → Marettimo → Favignana → rientro. Aprire con 2 secondi di silenzio e mare, alternare momenti larghi e dettagli, chiudere sul rientro a Marsala con il titolo `Egadi Sailing Experience · 8-11 ottobre 2026`.
 
+### Timecode di montaggio · 55 secondi
+
+| Durata | Sequenza |
+| --- | --- |
+| 00:00–00:02 | Mare e suono ambiente, senza testo. |
+| 00:02–00:14 | Capitolo 01: Marsala e Levanzo, con il testo previsto. |
+| 00:14–00:32 | Capitolo 02: Marettimo, con il testo previsto. |
+| 00:32–00:47 | Capitolo 03: Favignana, con il testo previsto. |
+| 00:47–00:55 | Rientro verso Marsala, titolo finale e sfumatura del suono. |
+
+Il film principale usa gli stessi capitoli delle tre clip verticali, ma non deve essere una loro semplice somma: l'apertura e il rientro sono necessari per dare un inizio e una chiusura al racconto.
+
+## Prima di montare e pubblicare
+
+- Per ogni ripresa annotare proprietario, data, luogo, consenso immagine e licenza nel registro media del progetto.
+- Se una persona è riconoscibile, usare il filmato soltanto dopo avere ottenuto la relativa autorizzazione; in caso contrario scegliere inquadrature non identificabili.
+- Conservare prova della licenza della musica e degli eventuali effetti sonori. Non usare l'audio della piattaforma social come prova di licenza per la home.
+- Esportare una versione home MP4 H.264 1920×1080 sotto 10 MB, un poster separato e tre verticali 1080×1920 da 12–18 secondi. Verificare testo, margini sicuri e riproduzione su telefono prima del caricamento.
+
 Esportazione: MP4 H.264, 1920×1080 per la home; versioni 1080×1920 senza testo ai bordi per verticale. Per non rallentare il sito, la home deve usare una versione compressa sotto i 10 MB e un'immagine poster separata.

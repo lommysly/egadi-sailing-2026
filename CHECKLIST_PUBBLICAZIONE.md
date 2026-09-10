@@ -1,6 +1,6 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 10 settembre 2026.
+Ultimo aggiornamento: 11 settembre 2026.
 
 ## Pronto nel progetto
 
@@ -10,23 +10,29 @@ Ultimo aggiornamento: 10 settembre 2026.
 - [x] Il proprietario e l'evento di una barca non sono modificabili dallo skipper; solo l'organizzatore può correggerli.
 - [x] Crew List in formato stampabile A4 orizzontale, da salvare come PDF dallo skipper.
 - [x] Il PDF resta disattivato se un documento scade prima della fine dell'evento, l'11 ottobre 2026.
-- [x] Regole Firestore compilate e pubblicate nel progetto `egadi-sailing-2026` il 10 settembre 2026.
+- [x] Regole Firestore iniziali compilate e pubblicate nel progetto `egadi-sailing-2026` il 10 settembre 2026.
+- [x] Correzione predisposta nel sorgente: se un invito WhatsApp viene aperto da un nuovo browser, la vecchia sessione non può più leggere dati della barca; la nuova sessione deve confermare le regole a proprio nome.
+- [x] Capienza esplicita dei posti equipaggio: l'interfaccia conta inviti e membri unici, non aggiunge oltre il limite e ricorda che lo skipper non è conteggiato.
 - [x] Storyboard video presente in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
 - [x] Nessun pagamento online, API di pagamento o dato bancario nel sito.
 - [x] Richieste personali con importo, causale, scadenza facoltativa e messaggio copiabile per l'invio manuale.
+- [x] Procedura operativa per i contributi documentata in `CONTRIBUTI_OPERATIVI.md`: richiesta, invio manuale, accredito esterno e verifica skipper.
 - [x] Invito personale WhatsApp: link con codice casuale, accesso diretto, conferma di salvataggio e area personale separata per il partecipante.
 - [x] Più voci per persona, incluse spese facoltative aggiungibili in un secondo momento.
 - [x] Bacheca privata per barca: regole versionate, orari operativi, comunicazioni dello skipper e conferma di lettura dell'equipaggio.
 - [x] Unica pagina pubblica Meteo & Passage Plan, con file dati separato e prompt operativo per aggiornamenti progressivi.
+- [x] Crediti delle foto Commons corretti con autore, fonte e licenza; nessuna foto o video di terzi è stata scaricata nel repository.
+- [x] Matrice di test delle regole e registri pronti per media e privacy: `FIRESTORE_RULES_TEST_MATRIX.md`, `MEDIA_REGISTER_TEMPLATE.md`, `PRIVACY_DA_COMPLETARE.md`.
 
 ## Da verificare prima di raccogliere dati reali
 
 - [ ] Test Google Sign-In skipper e invito WhatsApp diretto per un partecipante sul dominio pubblico.
-- [ ] Test delle regole: skipper della propria barca, organizzatore e account estraneo senza accesso.
+- [ ] Pubblicare la correzione delle regole Firestore e provare nel Playground/emulatore i casi senza dati personali della matrice.
+- [ ] Test delle regole live: skipper della propria barca, organizzatore e account estraneo senza accesso.
 - [ ] Invio WhatsApp di prova, apertura del link personale, compilazione di una Crew List autorizzata e prova di stampa `Salva come PDF`.
 - [ ] Test della bacheca: pubblicazione skipper, lettura partecipante, conferma regole e nuova conferma dopo una modifica.
 - [ ] Confronto del PDF con il modello effettivamente richiesto dal charter / Capitaneria.
-- [ ] Definizione della procedura pratica per i contributi: istruzioni, causale e verifica manuale dello skipper.
+- [x] Definizione della procedura pratica per i contributi: istruzioni, causale e verifica manuale dello skipper.
 - [ ] Informativa privacy definitiva: titolare, contatto, basi giuridiche, tempi di cancellazione e procedura di consegna del PDF.
 - [x] Pubblicato il primo briefing T−27 con fonti, dati astronomici verificati e distinzione esplicita fra pianificazione e previsioni operative.
 
@@ -41,5 +47,7 @@ Ultimo aggiornamento: 10 settembre 2026.
 ## Pubblicazione tecnica
 
 - [x] GitHub Pages ripristinato con un build standard il 10 settembre 2026.
-- [ ] Leggere il sito pubblico dopo il deploy e verificare inviti WhatsApp, area personale e richieste facoltative.
-- [ ] Come ultimo passaggio, configurare `egadi.thatsablast.it`: record DNS, dominio personalizzato GitHub Pages, HTTPS e dominio autorizzato in Firebase Authentication.
+- [ ] Pubblicare questa versione su `main` e rileggere il sito pubblico dopo il deploy.
+- [ ] Verificare inviti WhatsApp, area personale e richieste facoltative su dominio HTTPS con account autorizzati e dati di prova approvati.
+- [x] Configurati record DNS, dominio personalizzato GitHub Pages e dominio autorizzato in Firebase Authentication per `egadi.thatsablast.it`.
+- [ ] Attendere e verificare il certificato HTTPS valido per `egadi.thatsablast.it`; fino ad allora non raccogliere dati reali né eseguire test autenticati sul dominio personalizzato.
