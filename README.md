@@ -39,6 +39,8 @@ Non inserire in Firestore credenziali PayPal, Satispay, Revolut, carte o coordin
 
 Il pulsante `Genera Crew List PDF` apre un foglio A4 orizzontale prestampato per charter / eventuali controlli dell'autorita marittima. Lo skipper sceglie `Salva come PDF` dalla finestra di stampa: il file non viene inviato dal sito e si attiva solo quando sono completi i dati della barca, di ogni persona e la relativa conferma di condivisione. Prima della consegna, verificare con il charter se richiede un proprio modello o ulteriori campi.
 
+I dati della barca, incluso il nome, sono modificabili dallo skipper con `Modifica questa barca`; la stessa Crew List e le richieste personali restano associate alla barca esistente.
+
 ## Limiti e privacy
 
 - Questa struttura non e' un sistema di pagamento: non chiama API dei provider e non riceve webhook.

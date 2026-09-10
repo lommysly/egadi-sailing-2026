@@ -48,7 +48,7 @@
           <label>Comandante / skipper<input name="skipperName" autocomplete="name" required maxlength="100" /></label>
         </div>
         <label>Nota operativa facoltativa<textarea name="note" maxlength="400" placeholder="Es. configurazione cabine, preferenze cambusa o dettaglio per la crew"></textarea></label>
-        <div class="form-actions"><button class="button button-primary" type="submit">Registra la barca</button><p id="boatFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
+        <div class="form-actions"><button id="boatSubmitButton" class="button button-primary" type="submit">Registra la barca</button><button id="cancelBoatEdit" class="text-button" type="button" hidden>Annulla modifica</button><p id="boatFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
       </form>
       <div class="steps-grid">
         <div><span>1</span><h3>Registra</h3><p>Nome, modello, posti, porto, skipper e contatto operativo.</p></div>
@@ -58,7 +58,7 @@
     </section>
 
     <section id="dashboard" class="section dashboard" hidden>
-      <div class="dashboard-heading"><div><p class="eyebrow">Spazio skipper</p><h2 id="boatTitle">La mia barca</h2><p id="boatMeta"></p></div><button id="newBoatButton" class="button button-ghost" type="button">Aggiungi una barca</button></div>
+      <div class="dashboard-heading"><div><p class="eyebrow">Spazio skipper</p><h2 id="boatTitle">La mia barca</h2><p id="boatMeta"></p></div><div class="dashboard-actions"><button id="editBoatButton" class="button button-ghost" type="button">Modifica questa barca</button><button id="newBoatButton" class="button button-ghost" type="button">Aggiungi una barca</button></div></div>
       <div class="dashboard-grid">
         <article class="dashboard-panel"><p class="eyebrow">Crew List</p><h3>Persone a bordo</h3><p class="panel-lead">I campi contrassegnati servono al file del charter. Inseriscili solo dopo aver ricevuto conferma dalla persona interessata.</p><form id="memberForm" class="compact-form">
           <div class="form-grid"><label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" /></label><label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" /></label></div>

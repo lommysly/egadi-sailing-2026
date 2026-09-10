@@ -21,6 +21,7 @@ let stopBoatSubscription = null;
 let stopMemberSubscription = null;
 let stopPaymentSubscription = null;
 let creatingBoat = false;
+let editingBoatId = null;
 let editingMemberId = null;
 
 function setMessage(element, message, isError = false) {
@@ -36,6 +37,7 @@ function resetPrivateView() {
   activeBoat = null;
   activeMembers = [];
   creatingBoat = false;
+  editingBoatId = null;
   editingMemberId = null;
   stopBoatSubscription?.();
   stopMemberSubscription?.();
@@ -68,6 +70,31 @@ function resetMemberForm() {
 function setBoatFormDefaults(user) {
   const skipperField = document.querySelector('#boatForm [name="skipperName"]');
   if (skipperField && !skipperField.value) skipperField.value = user?.displayName || '';
+}
+
+function resetBoatForm(user) {
+  const form = document.querySelector('#boatForm');
+  form.reset();
+  editingBoatId = null;
+  document.querySelector('#boatSubmitButton').textContent = 'Registra la barca';
+  document.querySelector('#cancelBoatEdit').hidden = true;
+  setBoatFormDefaults(user);
+}
+
+function openBoatEdit() {
+  if (!activeBoat) return;
+  const form = document.querySelector('#boatForm');
+  for (const [field, value] of Object.entries(activeBoat)) {
+    const input = form.elements.namedItem(field);
+    if (input) input.value = value ?? '';
+  }
+  creatingBoat = true;
+  editingBoatId = activeBoat.id;
+  document.querySelector('#boatSubmitButton').textContent = 'Salva modifiche';
+  document.querySelector('#cancelBoatEdit').hidden = false;
+  dashboard.hidden = true;
+  registerSection.hidden = false;
+  registerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function updateCharterReadiness() {
@@ -173,12 +200,21 @@ signInButton.addEventListener('click', async () => {
 
 document.querySelector('#signOutButton').addEventListener('click', () => signOut(auth));
 document.querySelector('#newBoatButton').addEventListener('click', () => {
-  activeBoat = null;
   creatingBoat = true;
   dashboard.hidden = true;
   registerSection.hidden = false;
-  setBoatFormDefaults(auth.currentUser);
+  resetBoatForm(auth.currentUser);
   registerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+document.querySelector('#editBoatButton').addEventListener('click', openBoatEdit);
+document.querySelector('#cancelBoatEdit').addEventListener('click', () => {
+  creatingBoat = false;
+  resetBoatForm(auth.currentUser);
+  if (activeBoat) {
+    registerSection.hidden = true;
+    dashboard.hidden = false;
+  }
 });
 
 document.querySelector('#boatForm').addEventListener('submit', async (event) => {
@@ -195,15 +231,23 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
       name: fields.get('name').trim(), model: fields.get('model').trim(), capacity: Number(fields.get('capacity')),
       homePort: fields.get('homePort').trim(), flag: fields.get('flag').trim(), registrationPort: fields.get('registrationPort').trim(),
       skipperName: fields.get('skipperName').trim(), note: fields.get('note').trim(), skipperId: user.uid,
-      eventId, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      eventId, updatedAt: serverTimestamp(),
     };
-    const boatReference = await addDoc(collection(db, 'boats'), boatData);
-    activeBoat = { id: boatReference.id, ...boatData };
-    creatingBoat = false;
-    subscribeToBoat(activeBoat);
-    form.reset();
-    setBoatFormDefaults(user);
-    setMessage(document.querySelector('#boatFormMessage'), 'Barca registrata.');
+    if (editingBoatId) {
+      await updateDoc(doc(db, 'boats', editingBoatId), boatData);
+      activeBoat = { ...activeBoat, ...boatData };
+      creatingBoat = false;
+      resetBoatForm(user);
+      subscribeToBoat(activeBoat);
+      setMessage(document.querySelector('#boatFormMessage'), 'Dati della barca aggiornati.');
+    } else {
+      const boatReference = await addDoc(collection(db, 'boats'), { ...boatData, createdAt: serverTimestamp() });
+      activeBoat = { id: boatReference.id, ...boatData };
+      creatingBoat = false;
+      subscribeToBoat(activeBoat);
+      resetBoatForm(user);
+      setMessage(document.querySelector('#boatFormMessage'), 'Barca registrata.');
+    }
   } catch (error) {
     setMessage(document.querySelector('#boatFormMessage'), 'Non riesco a registrare la barca. Verifica le regole Firestore.', true);
   } finally {
