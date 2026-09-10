@@ -27,7 +27,6 @@ service cloud.firestore {
 
     function canClaimInvite() {
       return signedIn()
-        && resource.data.participantUid == null
         && request.resource.data.participantUid == request.auth.uid
         && request.resource.data.status == 'opened'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantUid', 'status', 'acceptedAt']);
@@ -47,8 +46,9 @@ service cloud.firestore {
       allow delete: if isOrganizer();
 
       match /invites/{inviteId} {
-        allow get: if signedIn() && (isOrganizer() || isSkipper(boatId)
-          || resource.data.participantUid == null || resource.data.participantUid == request.auth.uid);
+        // Il codice a 192 bit nel link WhatsApp è la chiave personale dell'invito.
+        // Gli inviti non sono elencabili: si può leggere solo conoscendo il codice esatto.
+        allow get: if signedIn();
         allow list: if isOrganizer() || isSkipper(boatId);
         allow create: if (isOrganizer() || isSkipper(boatId)) && request.resource.data.boatId == boatId;
         allow delete: if isOrganizer() || isSkipper(boatId);

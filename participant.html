@@ -18,10 +18,10 @@
 
     <section id="invalidLink" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Link non valido</p><h2>Serve il tuo invito personale.</h2><p>Apri il collegamento ricevuto dallo skipper su WhatsApp.</p></article></section>
 
-    <section id="signInSection" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Accesso personale</p><h2>Conferma la tua email</h2><p>Il link WhatsApp è personale. Inserisci la tua email: riceverai un collegamento monouso per aprire la tua scheda. La pagina resta qui finché non apri il link ricevuto.</p><form id="participantEmailForm" class="compact-form"><label>Email<input id="participantEmail" name="email" type="email" autocomplete="email" required maxlength="160" placeholder="nome@esempio.it" /></label><button class="button button-primary" type="submit">Invia link di accesso</button></form><form id="participantEmailCompleteForm" class="compact-form" hidden><label>Conferma la stessa email<input id="participantEmailConfirm" name="email" type="email" autocomplete="email" required maxlength="160" placeholder="nome@esempio.it" /></label><button class="button button-primary" type="submit">Apri la mia area</button></form><button id="participantChangeAccount" class="text-button" type="button" hidden>Esci dall’account aperto e usa l’email</button><p id="participantAuthMessage" class="form-message" role="status" aria-live="polite"></p></article></section>
+    <section id="signInSection" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Invito personale</p><h2>Apro la tua area</h2><p>Questo collegamento ricevuto su WhatsApp è la tua chiave personale. Non devi registrarti né aspettare email.</p><p id="participantAuthMessage" class="form-message" role="status" aria-live="polite"></p></article></section>
 
     <section id="participantDashboard" class="section dashboard" hidden>
-      <div class="dashboard-heading"><div><p class="eyebrow">Il tuo spazio</p><h2 id="participantTitle">La mia scheda</h2><p id="participantStatus"></p></div><button id="participantSignOutButton" class="text-button" type="button">Esci</button></div>
+      <div class="dashboard-heading"><div><p class="eyebrow">Il tuo spazio</p><h2 id="participantTitle">La mia scheda</h2><p id="participantStatus"></p></div><button id="participantSignOutButton" class="text-button" type="button">Torna al sito</button></div>
       <div class="dashboard-grid">
         <article class="dashboard-panel board-panel"><p class="eyebrow">Bacheca della tua barca</p><h3>Prima di salpare</h3><p id="participantBriefingEmpty" class="panel-lead">Lo skipper non ha ancora pubblicato regole e orari per questa barca.</p><div id="participantBriefing" hidden><div id="participantSchedule" class="schedule-list"></div><div class="board-divider"></div><h4 id="participantRulesTitle">Regole di bordo</h4><p id="participantRulesText" class="rules-text"></p><div class="rules-acceptance"><p id="participantRulesStatus" class="panel-lead"></p><button id="acceptRulesButton" class="button button-primary" type="button">Confermo di aver letto le regole</button><p id="participantRulesMessage" class="form-message" role="status" aria-live="polite"></p></div></div><div class="board-divider"></div><h4>Comunicazioni dello skipper</h4><div id="participantAnnouncementList" class="announcement-list" aria-live="polite"></div></article>
         <article class="dashboard-panel"><p class="eyebrow">Per la Crew List</p><h3>Anagrafica personale</h3><p class="panel-lead">Questi dati saranno visibili allo skipper e all’organizzazione soltanto per preparare la Crew List.</p><form id="participantForm" class="compact-form">
@@ -39,6 +39,6 @@
     </section>
   </main>
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="privacy.html">Privacy e dati</a></div></footer>
-  <script type="module" src="participant.js?v=20260910-email-access"></script>
+  <script type="module" src="participant.js?v=20260910-whatsapp-access"></script>
 </body>
 </html>

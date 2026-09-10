@@ -14,13 +14,13 @@ Ultimo aggiornamento: 10 settembre 2026.
 - [x] Storyboard video presente in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
 - [x] Nessun pagamento online, API di pagamento o dato bancario nel sito.
 - [x] Richieste personali con importo, causale, scadenza facoltativa e messaggio copiabile per l'invio manuale.
-- [ ] Invito personale WhatsApp: link con codice casuale, conferma email monouso e anagrafica compilata direttamente dal partecipante.
+- [ ] Invito personale WhatsApp: link con codice casuale, accesso diretto e anagrafica compilata direttamente dal partecipante.
 - [x] Più voci per persona, incluse spese facoltative aggiungibili in un secondo momento.
 - [x] Bacheca privata per barca: regole versionate, orari operativi, comunicazioni dello skipper e conferma di lettura dell'equipaggio.
 
 ## Da verificare prima di raccogliere dati reali
 
-- [ ] Test Google Sign-In skipper e link monouso via email per un partecipante sul dominio pubblico.
+- [ ] Test Google Sign-In skipper e invito WhatsApp diretto per un partecipante sul dominio pubblico.
 - [ ] Test delle regole: skipper della propria barca, organizzatore e account estraneo senza accesso.
 - [ ] Invio WhatsApp di prova, apertura del link personale, compilazione di una Crew List autorizzata e prova di stampa `Salva come PDF`.
 - [ ] Test della bacheca: pubblicazione skipper, lettura partecipante, conferma regole e nuova conferma dopo una modifica.

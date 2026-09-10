@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
-import { getAuth, isSignInWithEmailLink, onAuthStateChanged, sendSignInLinkToEmail, signInWithEmailLink, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
@@ -9,7 +9,6 @@ const db = getFirestore(app);
 const inviteId = new URLSearchParams(window.location.search).get('invite') || '';
 const boatId = new URLSearchParams(window.location.search).get('boat') || '';
 const isValidInviteId = /^[a-f0-9]{48}$/.test(inviteId) && /^[A-Za-z0-9_-]{1,128}$/.test(boatId);
-const isEmailLink = isSignInWithEmailLink(auth, window.location.href);
 let activeInvite = null;
 let activeBriefing = null;
 let activeRuleAcceptance = null;
@@ -17,6 +16,7 @@ let stopPaymentSubscription = null;
 let stopBriefingSubscription = null;
 let stopAnnouncementSubscription = null;
 let stopAcceptanceSubscription = null;
+let isStartingDirectAccess = false;
 
 function setMessage(element, message, isError = false) {
   element.textContent = message;
@@ -24,34 +24,27 @@ function setMessage(element, message, isError = false) {
 }
 
 function getAuthErrorMessage(error) {
-  if (error.code === 'auth/unauthorized-domain') return 'Questo indirizzo del sito non è ancora autorizzato in Firebase.';
-  if (error.code === 'auth/operation-not-allowed') return 'L’accesso via email non è ancora abilitato nel progetto Firebase.';
-  return 'Accesso non completato. Riprova tra poco.';
+  if (error.code === 'auth/operation-not-allowed') return 'L’accesso diretto dell’equipaggio non è ancora abilitato. Avvisa lo skipper.';
+  return 'Non riesco ad aprire il tuo invito. Riprova dal link WhatsApp.';
 }
 
-function participantEntryUrl() {
-  const url = new URL('participant.html', window.location.href);
-  url.searchParams.set('invite', inviteId);
-  url.searchParams.set('boat', boatId);
-  return url.toString();
-}
-
-function emailSettings() {
-  return { url: participantEntryUrl(), handleCodeInApp: true };
-}
-
-function isEmailUser(user) {
-  return user?.providerData?.some((provider) => provider.providerId === 'password');
-}
-
-function showEmailAccess(message = '') {
+function showDirectAccess(message = 'Apro il tuo invito personale…', isError = false) {
   document.querySelector('#invalidLink').hidden = true;
   document.querySelector('#participantDashboard').hidden = true;
   document.querySelector('#signInSection').hidden = false;
-  document.querySelector('#participantEmailForm').hidden = isEmailLink;
-  document.querySelector('#participantEmailCompleteForm').hidden = !isEmailLink;
-  document.querySelector('#participantChangeAccount').hidden = true;
-  if (message) setMessage(document.querySelector('#participantAuthMessage'), message);
+  setMessage(document.querySelector('#participantAuthMessage'), message, isError);
+}
+
+async function startDirectAccess() {
+  if (isStartingDirectAccess) return;
+  isStartingDirectAccess = true;
+  showDirectAccess();
+  try {
+    await signInAnonymously(auth);
+  } catch (error) {
+    isStartingDirectAccess = false;
+    showDirectAccess(getAuthErrorMessage(error), true);
+  }
 }
 
 function formatCurrency(amount) {
@@ -159,27 +152,20 @@ async function openParticipantArea(user) {
   const signInSection = document.querySelector('#signInSection');
   const dashboard = document.querySelector('#participantDashboard');
   const inviteReference = doc(db, 'boats', boatId, 'invites', inviteId);
-  if (!activeInvite.participantUid) {
+  if (activeInvite.participantUid !== user.uid) {
     await updateDoc(inviteReference, { participantUid: user.uid, status: 'opened', acceptedAt: serverTimestamp() });
     activeInvite = { ...activeInvite, participantUid: user.uid, status: 'opened' };
-  }
-  if (activeInvite.participantUid !== user.uid) {
-    signInSection.hidden = true;
-    dashboard.hidden = true;
-    document.querySelector('#invalidLink').hidden = false;
-    return;
   }
   signInSection.hidden = true;
   dashboard.hidden = false;
   document.querySelector('#participantTitle').textContent = activeInvite.displayName || 'La mia scheda';
-  document.querySelector('#participantStatus').textContent = `Accesso protetto per ${user.email || 'questo account'}.`;
+  document.querySelector('#participantStatus').textContent = 'Accesso personale dal tuo invito WhatsApp.';
   await setDoc(doc(db, 'boats', boatId, 'participantAccess', user.uid), {
     inviteId, boatId, userId: user.uid, updatedAt: serverTimestamp(),
   }, { merge: true });
   const memberReference = doc(db, 'boats', boatId, 'members', inviteId);
   const memberSnapshot = await getDoc(memberReference);
   if (memberSnapshot.exists()) fillProfile(memberSnapshot.data());
-  else document.querySelector('#participantForm [name="email"]').value = user.email || '';
   resetParticipantSubscriptions();
   stopPaymentSubscription = onSnapshot(query(collection(db, 'boats', boatId, 'paymentRequests'), where('recipientId', '==', inviteId)), renderPayments, () => setMessage(document.querySelector('#participantFormMessage'), 'Non riesco a leggere le richieste personali.', true));
   stopBriefingSubscription = onSnapshot(doc(db, 'boats', boatId, 'briefing', 'board'), (snapshot) => {
@@ -193,38 +179,7 @@ async function openParticipantArea(user) {
   }, () => setMessage(document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la conferma delle regole.', true));
 }
 
-document.querySelector('#participantEmailForm').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const email = new FormData(form).get('email').trim();
-  const submitButton = form.querySelector('button[type="submit"]');
-  submitButton.disabled = true;
-  setMessage(document.querySelector('#participantAuthMessage'), 'Invio del link in corso…');
-  try {
-    await sendSignInLinkToEmail(auth, email, emailSettings());
-    setMessage(document.querySelector('#participantAuthMessage'), 'Richiesta accettata. Rimani qui, apri l’email ricevuta (controlla anche Spam) e conferma di nuovo lo stesso indirizzo per entrare. Se non arriva entro qualche minuto, riprova o avvisa lo skipper.');
-  } catch (error) {
-    setMessage(document.querySelector('#participantAuthMessage'), getAuthErrorMessage(error), true);
-  } finally {
-    submitButton.disabled = false;
-  }
-});
-document.querySelector('#participantEmailCompleteForm').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const email = new FormData(form).get('email').trim();
-  const submitButton = form.querySelector('button[type="submit"]');
-  submitButton.disabled = true;
-  try {
-    await signInWithEmailLink(auth, email, window.location.href);
-    window.history.replaceState({}, document.title, participantEntryUrl());
-  } catch (error) {
-    setMessage(document.querySelector('#participantAuthMessage'), 'Il link non è valido per questa email o è scaduto. Richiedine uno nuovo.', true);
-    submitButton.disabled = false;
-  }
-});
-document.querySelector('#participantChangeAccount').addEventListener('click', () => signOut(auth));
-document.querySelector('#participantSignOutButton').addEventListener('click', () => signOut(auth));
+document.querySelector('#participantSignOutButton').addEventListener('click', () => window.location.assign('index.html'));
 document.querySelector('#acceptRulesButton').addEventListener('click', async () => {
   if (!activeBriefing || !activeInvite || !auth.currentUser) return;
   const button = document.querySelector('#acceptRulesButton');
@@ -275,16 +230,7 @@ onAuthStateChanged(auth, async (user) => {
   }
   if (!user) {
     resetParticipantSubscriptions();
-    showEmailAccess(isEmailLink ? 'Conferma l’email a cui è arrivato il link.' : '');
-    return;
-  }
-  if (!isEmailUser(user)) {
-    resetParticipantSubscriptions();
-    showEmailAccess();
-    document.querySelector('#participantEmailForm').hidden = true;
-    document.querySelector('#participantEmailCompleteForm').hidden = true;
-    document.querySelector('#participantChangeAccount').hidden = false;
-    setMessage(document.querySelector('#participantAuthMessage'), 'Per l’equipaggio usa l’accesso via email, non l’account skipper.', true);
+    startDirectAccess();
     return;
   }
   try {
@@ -292,6 +238,7 @@ onAuthStateChanged(auth, async (user) => {
     if (!inviteSnapshot.exists() || inviteSnapshot.data().boatId !== boatId) throw new Error('Invito non disponibile.');
     activeInvite = { ...inviteSnapshot.data(), boatId };
     await openParticipantArea(user);
+    isStartingDirectAccess = false;
   } catch (error) {
     document.querySelector('#signInSection').hidden = true;
     document.querySelector('#participantDashboard').hidden = true;
