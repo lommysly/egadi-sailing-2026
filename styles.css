@@ -63,6 +63,10 @@ a { color:inherit; }
 .charter-export .panel-lead { margin:0; }
 .charter-export .button:disabled { cursor:not-allowed; opacity:.45; transform:none; }
 .member-list,.payment-list,.invite-list { display:grid; gap:10px; margin-top:24px; }
+.profile-summary dl { display:grid; gap:11px; margin:0 0 22px; }
+.profile-summary div { display:grid; gap:2px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+.profile-summary dt { color:rgba(17,45,56,.62); font:500 .68rem "DM Mono",monospace; letter-spacing:.04em; text-transform:uppercase; }
+.profile-summary dd { margin:0; line-height:1.4; }
 .member-row,.payment-row,.invite-row { display:flex; justify-content:space-between; gap:16px; padding:13px 0; border-top:1px solid var(--line); font-size:.84rem; }
 .member-row strong,.payment-row strong,.invite-row strong { display:block; }
 .member-row span,.payment-row span,.invite-row span { display:block; margin-top:3px; color:rgba(17,45,56,.7); }
