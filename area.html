@@ -39,12 +39,12 @@
       <div class="section-heading"><p class="eyebrow">Flusso skipper</p><h2>Prima la barca,<br />poi l'equipaggio.</h2></div>
       <form id="boatForm" class="private-form">
         <div class="form-grid">
-          <label>Nome della barca<input name="name" autocomplete="off" required maxlength="70" placeholder="Es. Alisea" /></label>
+          <label>Nome della barca<input name="name" autocomplete="off" required maxlength="70" placeholder="Es. Isla 40 - nome da confermare" /></label>
           <label>Modello / tipo<input name="model" autocomplete="off" required maxlength="100" placeholder="Es. Fountaine Pajot Isla 40" /></label>
           <label>Posti disponibili<input name="capacity" type="number" required min="1" max="30" inputmode="numeric" placeholder="Decide lo skipper" /></label>
           <label>Porto di partenza<input name="homePort" autocomplete="off" required maxlength="80" value="Marsala" /></label>
           <label>Bandiera<input name="flag" autocomplete="off" required maxlength="60" value="Italiana" /></label>
-          <label>Porto di iscrizione<input name="registrationPort" autocomplete="off" required maxlength="100" placeholder="Es. Palermo" /></label>
+          <label>Porto di iscrizione <span class="field-optional">(solo per PDF)</span><input name="registrationPort" autocomplete="off" maxlength="100" placeholder="Da verificare sui documenti della barca" /></label>
           <label>Comandante / skipper<input name="skipperName" autocomplete="name" required maxlength="100" /></label>
         </div>
         <label>Nota operativa facoltativa<textarea name="note" maxlength="400" placeholder="Es. configurazione cabine, preferenze cambusa o dettaglio per la crew"></textarea></label>
