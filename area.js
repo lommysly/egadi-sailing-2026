@@ -17,6 +17,7 @@ const signInButton = document.querySelector('#signInButton');
 const authMessage = document.querySelector('#authMessage');
 let activeBoat = null;
 let activeMembers = [];
+let skipperBoats = [];
 let stopBoatSubscription = null;
 let stopMemberSubscription = null;
 let stopPaymentSubscription = null;
@@ -36,6 +37,7 @@ function escapeHtml(value = '') {
 function resetPrivateView() {
   activeBoat = null;
   activeMembers = [];
+  skipperBoats = [];
   creatingBoat = false;
   editingBoatId = null;
   editingMemberId = null;
@@ -46,6 +48,7 @@ function resetPrivateView() {
   stopMemberSubscription = null;
   stopPaymentSubscription = null;
   dashboard.hidden = true;
+  document.querySelector('#boatSwitcher').hidden = true;
   registerSection.hidden = true;
 }
 
@@ -150,10 +153,26 @@ function renderPayments(snapshot) {
   }).join('');
 }
 
+function renderBoatSwitcher() {
+  const switcher = document.querySelector('#boatSwitcher');
+  const choices = document.querySelector('#boatChoices');
+  if (skipperBoats.length < 2) {
+    switcher.hidden = true;
+    choices.innerHTML = '';
+    return;
+  }
+  switcher.hidden = false;
+  choices.innerHTML = skipperBoats.map((boat) => {
+    const isActive = boat.id === activeBoat?.id;
+    return `<button class="boat-choice${isActive ? ' is-active' : ''}" type="button" data-select-boat="${escapeHtml(boat.id)}" aria-pressed="${isActive}"><strong>${escapeHtml(boat.name)}</strong><span>${escapeHtml(boat.model || 'Barca')}</span></button>`;
+  }).join('');
+}
+
 function subscribeToBoat(boat) {
   activeBoat = boat;
   registerSection.hidden = true;
   dashboard.hidden = false;
+  renderBoatSwitcher();
   document.querySelector('#boatTitle').textContent = boat.name;
   document.querySelector('#boatMeta').textContent = `${boat.model} · ${boat.capacity} posti · ${boat.homePort}`;
   stopMemberSubscription?.();
@@ -168,7 +187,8 @@ function subscribeToBoat(boat) {
 function loadSkipperArea(user) {
   const boatQuery = query(collection(db, 'boats'), where('skipperId', '==', user.uid));
   stopBoatSubscription = onSnapshot(boatQuery, (snapshot) => {
-    const boats = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    const boats = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort((first, second) => String(first.name || '').localeCompare(String(second.name || ''), 'it'));
+    skipperBoats = boats;
     if (creatingBoat) {
       return;
     }
@@ -178,6 +198,7 @@ function loadSkipperArea(user) {
       subscribeToBoat(boats[0]);
     } else {
       dashboard.hidden = true;
+      renderBoatSwitcher();
       registerSection.hidden = false;
     }
   }, () => {
@@ -208,6 +229,12 @@ document.querySelector('#newBoatButton').addEventListener('click', () => {
 });
 
 document.querySelector('#editBoatButton').addEventListener('click', openBoatEdit);
+document.querySelector('#boatChoices').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-select-boat]');
+  if (!button || creatingBoat) return;
+  const boat = skipperBoats.find((candidate) => candidate.id === button.dataset.selectBoat);
+  if (boat && boat.id !== activeBoat?.id) subscribeToBoat(boat);
+});
 document.querySelector('#cancelBoatEdit').addEventListener('click', () => {
   creatingBoat = false;
   resetBoatForm(auth.currentUser);

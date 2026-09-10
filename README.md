@@ -41,6 +41,8 @@ Il pulsante `Genera Crew List PDF` apre un foglio A4 orizzontale prestampato per
 
 I dati della barca, incluso il nome, sono modificabili dallo skipper con `Modifica questa barca`; la stessa Crew List e le richieste personali restano associate alla barca esistente. Il PDF non richiede il porto di iscrizione della barca.
 
+Se uno skipper registra piu' barche, nell'area privata compare il selettore `Le mie barche`: ogni scelta apre esclusivamente la Crew List e le richieste della barca selezionata.
+
 ## Limiti e privacy
 
 - Questa struttura non e' un sistema di pagamento: non chiama API dei provider e non riceve webhook.
