@@ -18,7 +18,7 @@
 
     <section id="invalidLink" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Link non valido</p><h2>Serve il tuo invito personale.</h2><p>Apri il collegamento ricevuto dallo skipper su WhatsApp.</p></article></section>
 
-    <section id="signInSection" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Accesso protetto</p><h2>Entra con Google</h2><p>Il link è personale. L’accesso Google protegge la tua anagrafica e le richieste che ti riguardano.</p><button id="participantSignInButton" class="button button-primary" type="button">Continua con Google</button><p id="participantAuthMessage" class="form-message" role="status" aria-live="polite"></p></article></section>
+    <section id="signInSection" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Accesso personale</p><h2>Conferma la tua email</h2><p>Il link WhatsApp è personale. Inserisci la tua email: riceverai un collegamento monouso per aprire la tua scheda.</p><form id="participantEmailForm" class="compact-form"><label>Email<input id="participantEmail" name="email" type="email" autocomplete="email" required maxlength="160" placeholder="nome@esempio.it" /></label><button class="button button-primary" type="submit">Invia link di accesso</button></form><form id="participantEmailCompleteForm" class="compact-form" hidden><label>Conferma la stessa email<input id="participantEmailConfirm" name="email" type="email" autocomplete="email" required maxlength="160" placeholder="nome@esempio.it" /></label><button class="button button-primary" type="submit">Apri la mia area</button></form><button id="participantChangeAccount" class="text-button" type="button" hidden>Esci dall’account aperto e usa l’email</button><p id="participantAuthMessage" class="form-message" role="status" aria-live="polite"></p></article></section>
 
     <section id="participantDashboard" class="section dashboard" hidden>
       <div class="dashboard-heading"><div><p class="eyebrow">Il tuo spazio</p><h2 id="participantTitle">La mia scheda</h2><p id="participantStatus"></p></div><button id="participantSignOutButton" class="text-button" type="button">Esci</button></div>
@@ -39,6 +39,6 @@
     </section>
   </main>
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="privacy.html">Privacy e dati</a></div></footer>
-  <script type="module" src="participant.js?v=20260910-board"></script>
+  <script type="module" src="participant.js?v=20260910-email-access"></script>
 </body>
 </html>

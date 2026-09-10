@@ -70,9 +70,11 @@ service cloud.firestore {
 
       match /participantAccess/{userId} {
         allow get: if isOrganizer() || isSkipper(boatId) || (signedIn() && userId == request.auth.uid);
-        allow list: if isOrganizer() || isSkipper(boatId);
+        allow list: if isOrganizer() || isSkipper(boatId) || (signedIn() && resource.data.userId == request.auth.uid);
         allow create, update: if signedIn() && userId == request.auth.uid
           && request.resource.data.inviteId is string
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.boatId == boatId
           && isInviteHolder(boatId, request.resource.data.inviteId);
         allow delete: if isOrganizer() || isSkipper(boatId);
       }

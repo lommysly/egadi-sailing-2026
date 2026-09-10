@@ -6,7 +6,8 @@ Sito pubblico statico e futura area privata per skipper ed equipaggi. Il progett
 
 - `index.html`: sito pubblico, passage plan flessibile e presentazione della flotta.
 - `area.html`: area skipper con Google Sign-In via finestra popup, registrazione barca, Crew List, bacheca di bordo, inviti WhatsApp e richieste di contributo solo descrittive.
-- `participant.html`: spazio personale aperto dal link WhatsApp, protetto dall'accesso Google attuale, per leggere la bacheca, completare l'anagrafica e vedere le richieste dedicate.
+- `participant.html`: spazio personale aperto dal link WhatsApp: l'equipaggio conferma la propria email con un link monouso, poi legge la bacheca, completa l'anagrafica e vede le richieste dedicate.
+- `crew.html`: rientro dell'equipaggio senza il vecchio messaggio WhatsApp, tramite email già verificata.
 - `privacy.html`: principi da completare con informativa definitiva prima della raccolta dati.
 - `firestore.rules`: regole di accesso pubblicate per il progetto Firebase; skipper e organizzatore vedono solo le barche autorizzate.
 
@@ -14,7 +15,7 @@ Sito pubblico statico e futura area privata per skipper ed equipaggi. Il progett
 
 Il progetto Firebase separato `egadi-sailing-2026` e l'app web sono stati creati senza account di fatturazione. Firestore e' nella regione Milano (`europe-west8`) con protezione dall'eliminazione attiva.
 
-1. Attivare Firebase Authentication con Google. L'accesso passwordless via email è un miglioramento separato da configurare e testare prima di sostituire Google per l'equipaggio.
+1. Attivare Firebase Authentication con Google per skipper e organizzazione. Per l'equipaggio, attivare anche `Email/Password` e `Email link (passwordless sign-in)` nella console Firebase.
 2. Accedere una prima volta con l'account organizzatore e annotarne l'UID dalla console Firebase Authentication.
 3. Creare dalla console il documento `events/egadi-2026` con il campo `organizerIds`, un array che contiene esclusivamente quell'UID. La configurazione iniziale e' gia' stata eseguita per l'organizzatore corrente.
 4. Testare le Security Rules nel simulatore: organizzazione, skipper della propria barca e utente estraneo. Le regole presenti non danno accesso diretto ai partecipanti.
@@ -35,7 +36,7 @@ boats/{boatId}
   invites/{inviteId}
     boatId, displayName, whatsappNumber, participantUid, status, createdAt
   participantAccess/{userId}
-    inviteId, updatedAt
+    inviteId, boatId, userId, updatedAt
   paymentRequests/{requestId}
     recipientId, amount, reason, isOptional, dueDate, instructions, status, createdAt
   briefing/board
@@ -70,7 +71,7 @@ Lo skipper pubblica per la propria barca le regole di bordo, ritrovo, imbarco, p
 
 ## Da fare prima dell'uso con partecipanti
 
-Ogni invito personale ha un codice casuale a 192 bit nel link e viene legato al primo account Google che lo apre. Il partecipante può leggere e aggiornare soltanto la propria anagrafica e le proprie richieste; skipper e organizzatore mantengono l'accesso operativo alla barca.
+Ogni invito personale ha un codice casuale a 192 bit nel link e viene legato alla prima email confermata che lo apre. Il partecipante può leggere e aggiornare soltanto la propria anagrafica, bacheca e richieste; skipper e organizzatore mantengono l'accesso operativo alla barca. Se perde il messaggio WhatsApp, può chiedere un nuovo link da `crew.html` usando la stessa email: il sito ritrova soltanto le aree a lui associate.
 
 ## Pubblicazione
 
