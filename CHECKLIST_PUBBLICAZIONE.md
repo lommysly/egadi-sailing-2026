@@ -11,7 +11,7 @@ Ultimo aggiornamento: 11 settembre 2026.
 - [x] Crew List in formato stampabile A4 orizzontale, da salvare come PDF dallo skipper.
 - [x] Il PDF resta disattivato se un documento scade prima della fine dell'evento, l'11 ottobre 2026.
 - [x] Regole Firestore iniziali compilate e pubblicate nel progetto `egadi-sailing-2026` il 10 settembre 2026.
-- [x] Correzione predisposta nel sorgente: se un invito WhatsApp viene aperto da un nuovo browser, la vecchia sessione non può più leggere dati della barca; la nuova sessione deve confermare le regole a proprio nome.
+- [x] Correzione delle regole Firestore pubblicata l'11 settembre 2026: se un invito WhatsApp viene aperto da un nuovo browser, la vecchia sessione non può più leggere dati della barca; la nuova sessione deve confermare le regole a proprio nome.
 - [x] Capienza esplicita dei posti equipaggio: l'interfaccia conta inviti e membri unici, non aggiunge oltre il limite e ricorda che lo skipper non è conteggiato.
 - [x] Storyboard video presente in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
 - [x] Nessun pagamento online, API di pagamento o dato bancario nel sito.
@@ -27,7 +27,7 @@ Ultimo aggiornamento: 11 settembre 2026.
 ## Da verificare prima di raccogliere dati reali
 
 - [ ] Test Google Sign-In skipper e invito WhatsApp diretto per un partecipante sul dominio pubblico.
-- [ ] Pubblicare la correzione delle regole Firestore e provare nel Playground/emulatore i casi senza dati personali della matrice.
+- [ ] Provare nel Playground/emulatore i casi senza dati personali della matrice delle regole pubblicate.
 - [ ] Test delle regole live: skipper della propria barca, organizzatore e account estraneo senza accesso.
 - [ ] Invio WhatsApp di prova, apertura del link personale, compilazione di una Crew List autorizzata e prova di stampa `Salva come PDF`.
 - [ ] Test della bacheca: pubblicazione skipper, lettura partecipante, conferma regole e nuova conferma dopo una modifica.
@@ -47,7 +47,7 @@ Ultimo aggiornamento: 11 settembre 2026.
 ## Pubblicazione tecnica
 
 - [x] GitHub Pages ripristinato con un build standard il 10 settembre 2026.
-- [ ] Pubblicare questa versione su `main` e rileggere il sito pubblico dopo il deploy.
+- [x] Versione pubblicata su `main` e riletta in HTTP senza autenticazione; il JavaScript pubblico espone `area.js?v=20260911-safety`.
 - [ ] Verificare inviti WhatsApp, area personale e richieste facoltative su dominio HTTPS con account autorizzati e dati di prova approvati.
-- [x] Configurati record DNS, dominio personalizzato GitHub Pages e dominio autorizzato in Firebase Authentication per `egadi.thatsablast.it`.
-- [ ] Attendere e verificare il certificato HTTPS valido per `egadi.thatsablast.it`; fino ad allora non raccogliere dati reali né eseguire test autenticati sul dominio personalizzato.
+- [x] Configurati file `CNAME`, dominio personalizzato GitHub Pages e dominio autorizzato in Firebase Authentication per `egadi.thatsablast.it`; il sito risponde in HTTP.
+- [ ] Risolvere lo stato GitHub Pages “DNS check in progress” e verificare il certificato HTTPS valido per `egadi.thatsablast.it`; fino ad allora non raccogliere dati reali né eseguire test autenticati sul dominio personalizzato.
