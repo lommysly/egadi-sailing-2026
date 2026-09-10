@@ -31,7 +31,7 @@ export function isCharterReady(member) {
 }
 
 export function isBoatReadyForPdf(boat) {
-  return Boolean(boat?.name && boat?.flag && boat?.registrationPort && boat?.skipperName);
+  return Boolean(boat?.name && boat?.flag && boat?.skipperName);
 }
 
 export function buildCapitaneriaPrintHtml({ boat, members }) {
@@ -55,7 +55,7 @@ export function buildCapitaneriaPrintHtml({ boat, members }) {
   * { box-sizing:border-box; } body { margin:0; color:#102d3a; font-family:Arial,sans-serif; font-size:8.5px; }
   .page { max-width:277mm; margin:0 auto; } .header { display:flex; justify-content:space-between; gap:18px; align-items:start; padding-bottom:10px; border-bottom:2px solid #0c5260; }
   h1 { margin:0 0 3px; font-size:17px; letter-spacing:.04em; } .subtitle { margin:0; color:#526b73; font-size:9px; } .mark { color:#0c5260; font-weight:700; text-align:right; font-size:10px; }
-  .meta { display:grid; grid-template-columns:repeat(5,1fr); margin:14px 0 16px; border:1px solid #b7c9ce; } .meta div { min-height:44px; padding:7px 8px; border-right:1px solid #b7c9ce; } .meta div:last-child { border-right:0; }
+  .meta { display:grid; grid-template-columns:repeat(4,1fr); margin:14px 0 16px; border:1px solid #b7c9ce; } .meta-route { grid-template-columns:repeat(5,1fr); } .meta div { min-height:44px; padding:7px 8px; border-right:1px solid #b7c9ce; } .meta div:last-child { border-right:0; }
   .label { margin-bottom:4px; color:#5c808b; font-size:7px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; } .value { color:#123b46; font-size:9px; font-weight:700; }
   .section { padding:6px 8px; color:white; background:#0c5260; font-size:8px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
   table { width:100%; border-collapse:collapse; } thead { display:table-header-group; background:#e4f0f1; } tr { break-inside:avoid; page-break-inside:avoid; } th { padding:6px 5px; color:#164955; border:1px solid #b7c9ce; font-size:6.8px; letter-spacing:.04em; text-align:left; text-transform:uppercase; } td { padding:6px 5px; border:1px solid #d1dde0; vertical-align:top; } tbody tr:nth-child(even) { background:#f5f9f9; } .num { width:6mm; text-align:center; } .name { min-width:28mm; font-weight:700; }
@@ -67,10 +67,9 @@ export function buildCapitaneriaPrintHtml({ boat, members }) {
     <div><p class="label">Imbarcazione</p><p class="value">${escapeHtml(boat.name)}</p></div>
     <div><p class="label">Modello</p><p class="value">${escapeHtml(boat.model)}</p></div>
     <div><p class="label">Bandiera</p><p class="value">${escapeHtml(boat.flag)}</p></div>
-    <div><p class="label">Porto di iscrizione</p><p class="value">${escapeHtml(boat.registrationPort)}</p></div>
     <div><p class="label">Comandante / Skipper</p><p class="value">${escapeHtml(boat.skipperName)}</p></div>
   </section>
-  <section class="meta">
+  <section class="meta meta-route">
     <div><p class="label">Porto di partenza</p><p class="value">Marsala</p></div>
     <div><p class="label">Partenza</p><p class="value">8 ottobre 2026 - ore 15:00</p></div>
     <div><p class="label">Porto di rientro</p><p class="value">Marsala</p></div>

@@ -106,7 +106,7 @@ function updateCharterReadiness() {
   readiness.textContent = !activeBoat
     ? 'Registra prima la barca per preparare il PDF.'
     : boatMissing
-      ? 'Completa bandiera, porto di iscrizione e comandante della barca per attivare il PDF.'
+      ? 'Completa bandiera e comandante della barca per attivare il PDF.'
       : activeMembers.length === 0
         ? 'Aggiungi almeno una persona per preparare il PDF.'
     : incomplete.length
@@ -229,7 +229,7 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
   try {
     const boatData = {
       name: fields.get('name').trim(), model: fields.get('model').trim(), capacity: Number(fields.get('capacity')),
-      homePort: fields.get('homePort').trim(), flag: fields.get('flag').trim(), registrationPort: fields.get('registrationPort').trim(),
+      homePort: fields.get('homePort').trim(), flag: fields.get('flag').trim(),
       skipperName: fields.get('skipperName').trim(), note: fields.get('note').trim(), skipperId: user.uid,
       eventId, updatedAt: serverTimestamp(),
     };
