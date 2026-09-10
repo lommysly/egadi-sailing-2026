@@ -22,7 +22,9 @@ service cloud.firestore {
     match /boats/{boatId} {
       allow read: if isOrganizer() || resource.data.skipperId == request.auth.uid;
       allow create: if signedIn() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid;
-      allow update: if isOrganizer() || isSkipper(boatId);
+      allow update: if isOrganizer() || (isSkipper(boatId)
+        && request.resource.data.skipperId == resource.data.skipperId
+        && request.resource.data.eventId == resource.data.eventId);
       allow delete: if isOrganizer();
 
       match /members/{memberId} {

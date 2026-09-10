@@ -41,7 +41,7 @@ Il pulsante `Genera Crew List PDF` apre un foglio A4 orizzontale prestampato per
 
 I dati della barca, incluso il nome, sono modificabili dallo skipper con `Modifica questa barca`; la stessa Crew List e le richieste personali restano associate alla barca esistente. Il PDF non richiede il porto di iscrizione della barca.
 
-Ogni skipper gestisce una sola barca e la relativa Crew List; per le nuove registrazioni l'identificativo della barca coincide con l'UID dello skipper, così le regole Firestore impediscono una seconda barca. I dati possono sempre essere aggiornati dall'area privata.
+Ogni skipper gestisce una sola barca e la relativa Crew List; per le nuove registrazioni l'identificativo della barca coincide con l'UID dello skipper, così le regole Firestore impediscono una seconda barca. Lo skipper può aggiornare i dati operativi, ma non può trasferire la barca a un altro account né cambiarne l'evento associato.
 
 ## Limiti e privacy
 
