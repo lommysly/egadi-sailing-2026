@@ -339,6 +339,8 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
   }
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
+  const whatsappWindow = window.open('', '_blank');
+  if (whatsappWindow) whatsappWindow.opener = null;
   const inviteId = createInviteId();
   const invite = { id: inviteId, boatId: activeBoat.id, displayName, whatsappNumber, participantUid: null, status: 'sent' };
   try {
@@ -346,9 +348,14 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
       ...invite, createdAt: serverTimestamp(), createdBy: auth.currentUser.uid,
     });
     form.reset();
-    setMessage(document.querySelector('#inviteFormMessage'), 'Link personale creato: apro WhatsApp con il messaggio già pronto.');
-    window.open(whatsappUrl(invite), '_blank', 'noopener');
+    if (whatsappWindow) {
+      whatsappWindow.location.replace(whatsappUrl(invite));
+      setMessage(document.querySelector('#inviteFormMessage'), 'Link personale creato: WhatsApp è aperto con il messaggio già pronto.');
+    } else {
+      setMessage(document.querySelector('#inviteFormMessage'), 'Link personale creato: apri WhatsApp dalla scheda dell’invito.');
+    }
   } catch (error) {
+    whatsappWindow?.close();
     setMessage(document.querySelector('#inviteFormMessage'), 'Non riesco a creare il link personale.', true);
   } finally {
     submitButton.disabled = false;
