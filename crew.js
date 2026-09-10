@@ -57,9 +57,10 @@ emailForm.addEventListener('submit', async (event) => {
   const email = new FormData(emailForm).get('email').trim();
   const submitButton = emailForm.querySelector('button[type="submit"]');
   submitButton.disabled = true;
+  setMessage('Invio del link in corso…');
   try {
     await sendSignInLinkToEmail(auth, email, emailSettings());
-    setMessage('Link inviato. Apri l’email e poi conferma di nuovo il tuo indirizzo per entrare.');
+    setMessage('Richiesta accettata. Rimani qui, apri l’email ricevuta (controlla anche Spam) e conferma di nuovo lo stesso indirizzo per entrare. Se non arriva entro qualche minuto, riprova o apri il link WhatsApp originale.');
   } catch (error) {
     setMessage('Non riesco a inviare il link. Verifica l’email e riprova.', true);
   } finally {

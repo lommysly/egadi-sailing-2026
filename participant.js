@@ -199,9 +199,10 @@ document.querySelector('#participantEmailForm').addEventListener('submit', async
   const email = new FormData(form).get('email').trim();
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
+  setMessage(document.querySelector('#participantAuthMessage'), 'Invio del link in corso…');
   try {
     await sendSignInLinkToEmail(auth, email, emailSettings());
-    setMessage(document.querySelector('#participantAuthMessage'), 'Link inviato. Apri l’email e conferma di nuovo il tuo indirizzo per entrare.');
+    setMessage(document.querySelector('#participantAuthMessage'), 'Richiesta accettata. Rimani qui, apri l’email ricevuta (controlla anche Spam) e conferma di nuovo lo stesso indirizzo per entrare. Se non arriva entro qualche minuto, riprova o avvisa lo skipper.');
   } catch (error) {
     setMessage(document.querySelector('#participantAuthMessage'), getAuthErrorMessage(error), true);
   } finally {
