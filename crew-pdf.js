@@ -9,6 +9,7 @@ const requiredCharterFields = [
   'documentNumber',
   'documentExpiry',
 ];
+const eventEndDate = '2026-10-11';
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
@@ -22,6 +23,7 @@ function formatDate(value) {
 
 export function getMissingCharterFields(member) {
   const missing = requiredCharterFields.filter((field) => !String(member[field] || '').trim());
+  if (member.documentExpiry && String(member.documentExpiry) < eventEndDate) missing.push('documentExpiry');
   if (!member.charterConsent) missing.push('charterConsent');
   return missing;
 }

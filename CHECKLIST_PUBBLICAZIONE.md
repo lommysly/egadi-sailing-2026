@@ -9,6 +9,7 @@ Ultimo aggiornamento: 10 settembre 2026.
 - [x] Un solo skipper, una sola barca: le nuove registrazioni usano l'UID dello skipper anche come ID della barca e le regole Firestore bloccano una seconda creazione.
 - [x] Il proprietario e l'evento di una barca non sono modificabili dallo skipper; solo l'organizzatore può correggerli.
 - [x] Crew List in formato stampabile A4 orizzontale, da salvare come PDF dallo skipper.
+- [x] Il PDF resta disattivato se un documento scade prima della fine dell'evento, l'11 ottobre 2026.
 - [x] Regole Firestore compilate e pubblicate nel progetto `egadi-sailing-2026` il 10 settembre 2026.
 - [x] Storyboard video presente in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
 - [x] Nessun pagamento online, API di pagamento o dato bancario nel sito.
