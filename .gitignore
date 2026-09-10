@@ -1,3 +1,5 @@
 firebase-debug.log
 .firebase/
 .DS_Store
+.playwright-cli/
+output/

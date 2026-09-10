@@ -2,7 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/fireba
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithRedirect, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
-import { downloadCharterCsv, getMissingCharterFields, isCharterReady } from './crew-export.js';
+import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js';
 
 const eventId = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
@@ -65,16 +65,26 @@ function resetMemberForm() {
   document.querySelector('#cancelMemberEdit').hidden = true;
 }
 
+function setBoatFormDefaults(user) {
+  const skipperField = document.querySelector('#boatForm [name="skipperName"]');
+  if (skipperField && !skipperField.value) skipperField.value = user?.displayName || '';
+}
+
 function updateCharterReadiness() {
-  const exportButton = document.querySelector('#exportCharterButton');
+  const generatePdfButton = document.querySelector('#generatePdfButton');
   const readiness = document.querySelector('#charterReadiness');
   const incomplete = activeMembers.filter((member) => !isCharterReady(member));
-  exportButton.disabled = activeMembers.length === 0 || incomplete.length > 0;
-  readiness.textContent = activeMembers.length === 0
-    ? 'Aggiungi almeno una persona per preparare il file.'
+  const boatMissing = !isBoatReadyForPdf(activeBoat);
+  generatePdfButton.disabled = !activeBoat || activeMembers.length === 0 || incomplete.length > 0 || boatMissing;
+  readiness.textContent = !activeBoat
+    ? 'Registra prima la barca per preparare il PDF.'
+    : boatMissing
+      ? 'Completa bandiera, porto di iscrizione e comandante della barca per attivare il PDF.'
+      : activeMembers.length === 0
+        ? 'Aggiungi almeno una persona per preparare il PDF.'
     : incomplete.length
       ? `${incomplete.length} ${incomplete.length === 1 ? 'persona ha' : 'persone hanno'} dati mancanti o consenso da confermare.`
-      : 'Crew List completa: il file CSV è pronto per il charter.';
+      : 'Crew List completa: il PDF è pronto per il charter.';
 }
 
 function renderMembers() {
@@ -167,6 +177,7 @@ document.querySelector('#newBoatButton').addEventListener('click', () => {
   creatingBoat = true;
   dashboard.hidden = true;
   registerSection.hidden = false;
+  setBoatFormDefaults(auth.currentUser);
   registerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
@@ -182,7 +193,8 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
   try {
     const boatData = {
       name: fields.get('name').trim(), model: fields.get('model').trim(), capacity: Number(fields.get('capacity')),
-      homePort: fields.get('homePort').trim(), note: fields.get('note').trim(), skipperId: user.uid,
+      homePort: fields.get('homePort').trim(), flag: fields.get('flag').trim(), registrationPort: fields.get('registrationPort').trim(),
+      skipperName: fields.get('skipperName').trim(), note: fields.get('note').trim(), skipperId: user.uid,
       eventId, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
     };
     const boatReference = await addDoc(collection(db, 'boats'), boatData);
@@ -190,6 +202,7 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
     creatingBoat = false;
     subscribeToBoat(activeBoat);
     form.reset();
+    setBoatFormDefaults(user);
     setMessage(document.querySelector('#boatFormMessage'), 'Barca registrata.');
   } catch (error) {
     setMessage(document.querySelector('#boatFormMessage'), 'Non riesco a registrare la barca. Verifica le regole Firestore.', true);
@@ -248,10 +261,14 @@ document.querySelector('#memberList').addEventListener('click', (event) => {
 });
 
 document.querySelector('#cancelMemberEdit').addEventListener('click', resetMemberForm);
-document.querySelector('#exportCharterButton').addEventListener('click', () => {
-  if (!activeBoat || activeMembers.some((member) => !isCharterReady(member))) return;
-  downloadCharterCsv({ boat: activeBoat, skipperName: document.querySelector('#accountName').textContent, members: activeMembers });
-  setMessage(document.querySelector('#memberFormMessage'), 'File CSV preparato per il download.');
+document.querySelector('#generatePdfButton').addEventListener('click', () => {
+  if (!activeBoat || !isBoatReadyForPdf(activeBoat) || activeMembers.some((member) => !isCharterReady(member))) return;
+  try {
+    openCapitaneriaPdf({ boat: activeBoat, members: activeMembers });
+    setMessage(document.querySelector('#memberFormMessage'), 'Si apre la stampa: scegli “Salva come PDF” per scaricare il foglio.');
+  } catch (error) {
+    setMessage(document.querySelector('#memberFormMessage'), 'Impossibile aprire la stampa. Consenti le finestre popup e riprova.', true);
+  }
 });
 
 document.querySelector('#paymentForm').addEventListener('submit', async (event) => {
@@ -302,6 +319,7 @@ onAuthStateChanged(auth, async (user) => {
   document.querySelector('#accountName').textContent = user.displayName || 'Skipper';
   document.querySelector('#accountEmail').textContent = user.email || '';
   document.querySelector('#accountUid').textContent = user.uid;
+  setBoatFormDefaults(user);
   try {
     const eventSnapshot = await getDoc(doc(db, 'events', eventId));
     const isOrganizer = eventSnapshot.exists() && (eventSnapshot.data().organizerIds || []).includes(user.uid);

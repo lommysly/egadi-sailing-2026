@@ -37,7 +37,7 @@ boats/{boatId}
 
 Non inserire in Firestore credenziali PayPal, Satispay, Revolut, carte o coordinate bancarie. Le richieste di contributo mostrano solo istruzioni dello skipper nella pagina privata e restano `in_attesa_di_verifica` fino alla conferma manuale.
 
-Il pulsante `Scarica Crew List CSV` genera sul dispositivo dello skipper un file compatibile con Excel, delimitato da punto e virgola, con le informazioni normalmente richieste dal charter. Il file non viene inviato dal sito e si attiva solo quando ogni persona ha i dati obbligatori e la conferma di condivisione per il charter.
+Il pulsante `Genera Crew List PDF` apre un foglio A4 orizzontale prestampato per charter / eventuali controlli dell'autorita marittima. Lo skipper sceglie `Salva come PDF` dalla finestra di stampa: il file non viene inviato dal sito e si attiva solo quando sono completi i dati della barca, di ogni persona e la relativa conferma di condivisione. Prima della consegna, verificare con il charter se richiede un proprio modello o ulteriori campi.
 
 ## Limiti e privacy
 
