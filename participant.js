@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { collection, doc, getDoc, getFirestore, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
 const app = initializeApp(firebaseConfig);
@@ -12,6 +12,12 @@ const inviteId = new URLSearchParams(window.location.search).get('invite') || ''
 const boatId = new URLSearchParams(window.location.search).get('boat') || '';
 const isValidInviteId = /^[a-f0-9]{48}$/.test(inviteId) && /^[A-Za-z0-9_-]{1,128}$/.test(boatId);
 let activeInvite = null;
+let activeBriefing = null;
+let activeRuleAcceptance = null;
+let stopPaymentSubscription = null;
+let stopBriefingSubscription = null;
+let stopAnnouncementSubscription = null;
+let stopAcceptanceSubscription = null;
 
 function setMessage(element, message, isError = false) {
   element.textContent = message;
@@ -30,6 +36,13 @@ function formatCurrency(amount) {
 
 function formatDate(value) {
   return new Intl.DateTimeFormat('it-IT').format(new Date(`${value}T00:00:00`));
+}
+
+function formatDateTime(value) {
+  if (!value) return '';
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
 function escapeHtml(value = '') {
@@ -61,6 +74,63 @@ function renderPayments(snapshot) {
   }).join('');
 }
 
+function renderBriefing() {
+  const empty = document.querySelector('#participantBriefingEmpty');
+  const briefing = document.querySelector('#participantBriefing');
+  const announcements = document.querySelector('#participantAnnouncementList');
+  if (!activeBriefing?.rulesText) {
+    empty.hidden = false;
+    briefing.hidden = true;
+    announcements.innerHTML = '<p class="empty-state">Nessuna comunicazione al momento.</p>';
+    return;
+  }
+  empty.hidden = true;
+  briefing.hidden = false;
+  const schedule = [
+    ['Ritrovo', activeBriefing.meetingPoint],
+    ['Imbarco', formatDateTime(activeBriefing.boardingAt)],
+    ['Partenza', formatDateTime(activeBriefing.departureAt)],
+    ['Rientro', formatDateTime(activeBriefing.returnAt)],
+    ['Nota operativa', activeBriefing.scheduleNote],
+  ].filter(([, value]) => value);
+  document.querySelector('#participantSchedule').innerHTML = schedule.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+  document.querySelector('#participantRulesTitle').textContent = activeBriefing.rulesTitle || 'Regole di bordo';
+  document.querySelector('#participantRulesText').textContent = activeBriefing.rulesText;
+  const version = activeBriefing.rulesVersion || 1;
+  const accepted = activeRuleAcceptance?.rulesVersion === version;
+  document.querySelector('#participantRulesStatus').textContent = accepted
+    ? `Hai confermato la lettura delle regole, versione ${version}.`
+    : `Leggi le regole e conferma la versione ${version} prima della partenza.`;
+  document.querySelector('#acceptRulesButton').hidden = accepted;
+}
+
+function renderAnnouncements(snapshot) {
+  const list = document.querySelector('#participantAnnouncementList');
+  if (snapshot.empty) {
+    list.innerHTML = '<p class="empty-state">Nessuna comunicazione al momento.</p>';
+    return;
+  }
+  list.innerHTML = snapshot.docs.map((item) => {
+    const announcement = item.data();
+    const date = formatDateTime(announcement.createdAt);
+    const important = announcement.isImportant ? '<span class="announcement-important">Importante</span>' : '';
+    return `<article class="announcement-row"><strong>${escapeHtml(announcement.title || 'Comunicazione dello skipper')}</strong><span>${escapeHtml(announcement.message || '')}</span><span class="announcement-meta">${important}${escapeHtml(date || 'Appena pubblicato')}</span></article>`;
+  }).join('');
+}
+
+function resetParticipantSubscriptions() {
+  stopPaymentSubscription?.();
+  stopBriefingSubscription?.();
+  stopAnnouncementSubscription?.();
+  stopAcceptanceSubscription?.();
+  stopPaymentSubscription = null;
+  stopBriefingSubscription = null;
+  stopAnnouncementSubscription = null;
+  stopAcceptanceSubscription = null;
+  activeBriefing = null;
+  activeRuleAcceptance = null;
+}
+
 async function openParticipantArea(user) {
   const signInSection = document.querySelector('#signInSection');
   const dashboard = document.querySelector('#participantDashboard');
@@ -79,10 +149,23 @@ async function openParticipantArea(user) {
   dashboard.hidden = false;
   document.querySelector('#participantTitle').textContent = activeInvite.displayName || 'La mia scheda';
   document.querySelector('#participantStatus').textContent = `Accesso protetto per ${user.email || 'questo account'}.`;
+  await setDoc(doc(db, 'boats', boatId, 'participantAccess', user.uid), {
+    inviteId, updatedAt: serverTimestamp(),
+  }, { merge: true });
   const memberReference = doc(db, 'boats', boatId, 'members', inviteId);
   const memberSnapshot = await getDoc(memberReference);
   if (memberSnapshot.exists()) fillProfile(memberSnapshot.data());
-  onSnapshot(query(collection(db, 'boats', boatId, 'paymentRequests'), where('recipientId', '==', inviteId)), renderPayments, () => setMessage(document.querySelector('#participantFormMessage'), 'Non riesco a leggere le richieste personali.', true));
+  resetParticipantSubscriptions();
+  stopPaymentSubscription = onSnapshot(query(collection(db, 'boats', boatId, 'paymentRequests'), where('recipientId', '==', inviteId)), renderPayments, () => setMessage(document.querySelector('#participantFormMessage'), 'Non riesco a leggere le richieste personali.', true));
+  stopBriefingSubscription = onSnapshot(doc(db, 'boats', boatId, 'briefing', 'board'), (snapshot) => {
+    activeBriefing = snapshot.exists() ? snapshot.data() : null;
+    renderBriefing();
+  }, () => setMessage(document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la bacheca di bordo.', true));
+  stopAnnouncementSubscription = onSnapshot(query(collection(db, 'boats', boatId, 'announcements'), orderBy('createdAt', 'desc')), renderAnnouncements, () => setMessage(document.querySelector('#participantRulesMessage'), 'Non riesco a leggere le comunicazioni.', true));
+  stopAcceptanceSubscription = onSnapshot(doc(db, 'boats', boatId, 'ruleAcceptances', inviteId), (snapshot) => {
+    activeRuleAcceptance = snapshot.exists() ? snapshot.data() : null;
+    renderBriefing();
+  }, () => setMessage(document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la conferma delle regole.', true));
 }
 
 document.querySelector('#participantSignInButton').addEventListener('click', async () => {
@@ -93,6 +176,25 @@ document.querySelector('#participantSignInButton').addEventListener('click', asy
   }
 });
 document.querySelector('#participantSignOutButton').addEventListener('click', () => signOut(auth));
+document.querySelector('#acceptRulesButton').addEventListener('click', async () => {
+  if (!activeBriefing || !activeInvite || !auth.currentUser) return;
+  const button = document.querySelector('#acceptRulesButton');
+  button.disabled = true;
+  try {
+    const rulesVersion = activeBriefing.rulesVersion || 1;
+    const acceptanceReference = doc(db, 'boats', boatId, 'ruleAcceptances', inviteId);
+    const historyReference = doc(db, 'boats', boatId, 'ruleAcceptances', inviteId, 'history', String(rulesVersion));
+    const batch = writeBatch(db);
+    const acceptance = { inviteId, acceptedBy: auth.currentUser.uid, rulesVersion, acceptedAt: serverTimestamp() };
+    batch.set(acceptanceReference, acceptance, { merge: true });
+    batch.set(historyReference, acceptance, { merge: true });
+    await batch.commit();
+    setMessage(document.querySelector('#participantRulesMessage'), 'Regole confermate.');
+  } catch (error) {
+    setMessage(document.querySelector('#participantRulesMessage'), 'Non riesco a confermare le regole. Riprova tra poco.', true);
+    button.disabled = false;
+  }
+});
 document.querySelector('#participantForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!activeInvite || !auth.currentUser) return;
@@ -123,6 +225,7 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
   if (!user) {
+    resetParticipantSubscriptions();
     document.querySelector('#invalidLink').hidden = true;
     document.querySelector('#participantDashboard').hidden = true;
     document.querySelector('#signInSection').hidden = false;

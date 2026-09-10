@@ -23,6 +23,7 @@
     <section id="participantDashboard" class="section dashboard" hidden>
       <div class="dashboard-heading"><div><p class="eyebrow">Il tuo spazio</p><h2 id="participantTitle">La mia scheda</h2><p id="participantStatus"></p></div><button id="participantSignOutButton" class="text-button" type="button">Esci</button></div>
       <div class="dashboard-grid">
+        <article class="dashboard-panel board-panel"><p class="eyebrow">Bacheca della tua barca</p><h3>Prima di salpare</h3><p id="participantBriefingEmpty" class="panel-lead">Lo skipper non ha ancora pubblicato regole e orari per questa barca.</p><div id="participantBriefing" hidden><div id="participantSchedule" class="schedule-list"></div><div class="board-divider"></div><h4 id="participantRulesTitle">Regole di bordo</h4><p id="participantRulesText" class="rules-text"></p><div class="rules-acceptance"><p id="participantRulesStatus" class="panel-lead"></p><button id="acceptRulesButton" class="button button-primary" type="button">Confermo di aver letto le regole</button><p id="participantRulesMessage" class="form-message" role="status" aria-live="polite"></p></div></div><div class="board-divider"></div><h4>Comunicazioni dello skipper</h4><div id="participantAnnouncementList" class="announcement-list" aria-live="polite"></div></article>
         <article class="dashboard-panel"><p class="eyebrow">Per la Crew List</p><h3>Anagrafica personale</h3><p class="panel-lead">Questi dati saranno visibili allo skipper e all’organizzazione soltanto per preparare la Crew List.</p><form id="participantForm" class="compact-form">
           <div class="form-grid"><label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" /></label><label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" /></label></div>
           <div class="form-grid"><label>Data di nascita *<input name="birthDate" type="date" required /></label><label>Luogo di nascita *<input name="birthPlace" required maxlength="100" /></label></div>
@@ -38,6 +39,6 @@
     </section>
   </main>
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="privacy.html">Privacy e dati</a></div></footer>
-  <script type="module" src="participant.js?v=20260910-google-selector"></script>
+  <script type="module" src="participant.js?v=20260910-board"></script>
 </body>
 </html>

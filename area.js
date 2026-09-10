@@ -20,10 +20,15 @@ let activeBoat = null;
 let activeMembers = [];
 let activePayments = [];
 let activeInvites = [];
+let activeBriefing = null;
+let activeAcceptances = [];
 let stopBoatSubscription = null;
 let stopMemberSubscription = null;
 let stopPaymentSubscription = null;
 let stopInviteSubscription = null;
+let stopBriefingSubscription = null;
+let stopAnnouncementSubscription = null;
+let stopAcceptanceSubscription = null;
 let creatingBoat = false;
 let editingBoatId = null;
 let editingMemberId = null;
@@ -48,6 +53,8 @@ function resetPrivateView() {
   activeMembers = [];
   activePayments = [];
   activeInvites = [];
+  activeBriefing = null;
+  activeAcceptances = [];
   creatingBoat = false;
   editingBoatId = null;
   editingMemberId = null;
@@ -55,10 +62,16 @@ function resetPrivateView() {
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
   stopInviteSubscription?.();
+  stopBriefingSubscription?.();
+  stopAnnouncementSubscription?.();
+  stopAcceptanceSubscription?.();
   stopBoatSubscription = null;
   stopMemberSubscription = null;
   stopPaymentSubscription = null;
   stopInviteSubscription = null;
+  stopBriefingSubscription = null;
+  stopAnnouncementSubscription = null;
+  stopAcceptanceSubscription = null;
   dashboard.hidden = true;
   registerSection.hidden = true;
 }
@@ -79,6 +92,21 @@ function formatCurrency(amount) {
 
 function formatDate(value) {
   return new Intl.DateTimeFormat('it-IT').format(new Date(`${value}T00:00:00`));
+}
+
+function formatDateTime(value) {
+  if (!value) return '';
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function toDateTimeLocal(value) {
+  if (!value) return '';
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function participantUrl(inviteId) {
@@ -229,6 +257,42 @@ function renderPayments(snapshot) {
   }).join('');
 }
 
+function renderBriefingForm() {
+  const form = document.querySelector('#briefingForm');
+  if (!activeBriefing || form.dataset.editing === 'true') return;
+  for (const [field, value] of Object.entries(activeBriefing)) {
+    const input = form.elements.namedItem(field);
+    if (!input) continue;
+    input.value = input.type === 'datetime-local' ? toDateTimeLocal(value) : value || '';
+  }
+  form.dataset.loadedVersion = String(activeBriefing.rulesVersion || 1);
+}
+
+function renderBriefingStatus() {
+  const status = document.querySelector('#briefingStatus');
+  if (!activeBriefing?.rulesText) {
+    status.textContent = 'Pubblica le regole per renderle disponibili all’equipaggio.';
+    return;
+  }
+  const version = activeBriefing.rulesVersion || 1;
+  const accepted = activeAcceptances.filter((item) => item.rulesVersion === version).length;
+  status.textContent = `Regole versione ${version} pubblicate. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} confermato la lettura.`;
+}
+
+function renderAnnouncements(snapshot) {
+  const list = document.querySelector('#announcementList');
+  if (snapshot.empty) {
+    list.innerHTML = '<p class="empty-state">Nessuna comunicazione pubblicata.</p>';
+    return;
+  }
+  list.innerHTML = snapshot.docs.map((item) => {
+    const announcement = item.data();
+    const date = formatDateTime(announcement.createdAt);
+    const important = announcement.isImportant ? '<span class="announcement-important">Importante</span>' : '';
+    return `<article class="announcement-row"><strong>${escapeHtml(announcement.title || 'Comunicazione dello skipper')}</strong><span>${escapeHtml(announcement.message || '')}</span><span class="announcement-meta">${important}${escapeHtml(date || 'Appena pubblicato')}</span></article>`;
+  }).join('');
+}
+
 function subscribeToBoat(boat) {
   activeBoat = boat;
   registerSection.hidden = true;
@@ -238,6 +302,9 @@ function subscribeToBoat(boat) {
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
   stopInviteSubscription?.();
+  stopBriefingSubscription?.();
+  stopAnnouncementSubscription?.();
+  stopAcceptanceSubscription?.();
   stopMemberSubscription = onSnapshot(collection(db, 'boats', boat.id, 'members'), (snapshot) => {
     activeMembers = snapshot.docs.map((item) => normalizeMember(item.id, item.data())).sort((first, second) => memberName(first).localeCompare(memberName(second), 'it'));
     renderMembers();
@@ -248,6 +315,16 @@ function subscribeToBoat(boat) {
     renderInvites();
     renderPayments({ empty: activePayments.length === 0, docs: activePayments.map((payment) => ({ id: payment.id, data: () => payment })) });
   }, () => setMessage(document.querySelector('#inviteFormMessage'), 'Impossibile leggere gli inviti personali.', true));
+  stopBriefingSubscription = onSnapshot(doc(db, 'boats', boat.id, 'briefing', 'board'), (snapshot) => {
+    activeBriefing = snapshot.exists() ? snapshot.data() : null;
+    renderBriefingForm();
+    renderBriefingStatus();
+  }, () => setMessage(document.querySelector('#briefingFormMessage'), 'Impossibile leggere la bacheca di bordo.', true));
+  stopAnnouncementSubscription = onSnapshot(query(collection(db, 'boats', boat.id, 'announcements'), orderBy('createdAt', 'desc')), renderAnnouncements, () => setMessage(document.querySelector('#announcementFormMessage'), 'Impossibile leggere le comunicazioni.', true));
+  stopAcceptanceSubscription = onSnapshot(collection(db, 'boats', boat.id, 'ruleAcceptances'), (snapshot) => {
+    activeAcceptances = snapshot.docs.map((item) => item.data());
+    renderBriefingStatus();
+  }, () => setMessage(document.querySelector('#briefingFormMessage'), 'Impossibile leggere le conferme delle regole.', true));
 }
 
 function loadSkipperArea(user) {
@@ -419,6 +496,55 @@ document.querySelector('#memberList').addEventListener('click', (event) => {
 });
 
 document.querySelector('#cancelMemberEdit').addEventListener('click', resetMemberForm);
+document.querySelector('#briefingForm').addEventListener('input', () => {
+  document.querySelector('#briefingForm').dataset.editing = 'true';
+});
+document.querySelector('#briefingForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!activeBoat || !auth.currentUser) return;
+  const form = event.currentTarget;
+  const fields = new FormData(form);
+  const submitButton = form.querySelector('button[type="submit"]');
+  const rulesTitle = fields.get('rulesTitle').trim();
+  const rulesText = fields.get('rulesText').trim();
+  const rulesChanged = !activeBriefing || rulesTitle !== (activeBriefing.rulesTitle || '') || rulesText !== (activeBriefing.rulesText || '');
+  const rulesVersion = activeBriefing ? (activeBriefing.rulesVersion || 1) + (rulesChanged ? 1 : 0) : 1;
+  submitButton.disabled = true;
+  setMessage(document.querySelector('#briefingFormMessage'), 'Pubblico la bacheca…');
+  try {
+    await setDoc(doc(db, 'boats', activeBoat.id, 'briefing', 'board'), {
+      rulesTitle, rulesText, rulesVersion, meetingPoint: fields.get('meetingPoint').trim(),
+      boardingAt: fields.get('boardingAt'), departureAt: fields.get('departureAt'), returnAt: fields.get('returnAt'),
+      scheduleNote: fields.get('scheduleNote').trim(), updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid,
+    }, { merge: true });
+    form.dataset.editing = '';
+    setMessage(document.querySelector('#briefingFormMessage'), rulesChanged && activeBriefing ? `Regole aggiornate: l’equipaggio dovrà confermare la versione ${rulesVersion}.` : 'Bacheca pubblicata.');
+  } catch (error) {
+    setMessage(document.querySelector('#briefingFormMessage'), 'Non riesco a pubblicare la bacheca.', true);
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+document.querySelector('#announcementForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!activeBoat || !auth.currentUser) return;
+  const form = event.currentTarget;
+  const fields = new FormData(form);
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    await addDoc(collection(db, 'boats', activeBoat.id, 'announcements'), {
+      title: fields.get('title').trim(), message: fields.get('message').trim(), isImportant: fields.get('isImportant') === 'on',
+      createdAt: serverTimestamp(), createdBy: auth.currentUser.uid,
+    });
+    form.reset();
+    setMessage(document.querySelector('#announcementFormMessage'), 'Comunicazione pubblicata per il tuo equipaggio.');
+  } catch (error) {
+    setMessage(document.querySelector('#announcementFormMessage'), 'Non riesco a pubblicare la comunicazione.', true);
+  } finally {
+    submitButton.disabled = false;
+  }
+});
 document.querySelector('#generatePdfButton').addEventListener('click', () => {
   if (!activeBoat || !isBoatReadyForPdf(activeBoat) || activeMembers.some((member) => !isCharterReady(member))) return;
   try {

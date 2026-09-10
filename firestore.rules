@@ -20,6 +20,11 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId)).data.participantUid == request.auth.uid;
     }
 
+    function isBoatParticipant(boatId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid));
+    }
+
     function canClaimInvite() {
       return signedIn()
         && resource.data.participantUid == null
@@ -61,6 +66,48 @@ service cloud.firestore {
         allow read: if isOrganizer() || isSkipper(boatId) || (resource.data.recipientId is string && isInviteHolder(boatId, resource.data.recipientId));
         allow create, update: if isOrganizer() || isSkipper(boatId);
         allow delete: if isOrganizer();
+      }
+
+      match /participantAccess/{userId} {
+        allow get: if isOrganizer() || isSkipper(boatId) || (signedIn() && userId == request.auth.uid);
+        allow list: if isOrganizer() || isSkipper(boatId);
+        allow create, update: if signedIn() && userId == request.auth.uid
+          && request.resource.data.inviteId is string
+          && isInviteHolder(boatId, request.resource.data.inviteId);
+        allow delete: if isOrganizer() || isSkipper(boatId);
+      }
+
+      match /briefing/{briefingId} {
+        allow read: if isOrganizer() || isSkipper(boatId) || isBoatParticipant(boatId);
+        allow create, update, delete: if isOrganizer() || isSkipper(boatId);
+      }
+
+      match /announcements/{announcementId} {
+        allow read: if isOrganizer() || isSkipper(boatId) || isBoatParticipant(boatId);
+        allow create, update, delete: if isOrganizer() || isSkipper(boatId);
+      }
+
+      match /ruleAcceptances/{inviteId} {
+        allow get: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, inviteId);
+        allow list: if isOrganizer() || isSkipper(boatId);
+        allow create: if isOrganizer() || isSkipper(boatId) || (isInviteHolder(boatId, inviteId)
+          && request.resource.data.inviteId == inviteId
+          && request.resource.data.acceptedBy == request.auth.uid);
+        allow update: if isOrganizer() || isSkipper(boatId) || (isInviteHolder(boatId, inviteId)
+          && resource.data.inviteId == inviteId
+          && resource.data.acceptedBy == request.auth.uid
+          && request.resource.data.inviteId == inviteId
+          && request.resource.data.acceptedBy == request.auth.uid);
+        allow delete: if isOrganizer() || isSkipper(boatId);
+
+        match /history/{versionId} {
+          allow get: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, inviteId);
+          allow list: if isOrganizer() || isSkipper(boatId);
+          allow create, update: if isOrganizer() || isSkipper(boatId) || (isInviteHolder(boatId, inviteId)
+            && request.resource.data.inviteId == inviteId
+            && request.resource.data.acceptedBy == request.auth.uid);
+          allow delete: if isOrganizer() || isSkipper(boatId);
+        }
       }
     }
   }

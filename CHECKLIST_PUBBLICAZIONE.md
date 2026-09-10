@@ -16,12 +16,14 @@ Ultimo aggiornamento: 10 settembre 2026.
 - [x] Richieste personali con importo, causale, scadenza facoltativa e messaggio copiabile per l'invio manuale.
 - [x] Invito personale WhatsApp: link con codice casuale, accesso Google e anagrafica compilata direttamente dal partecipante.
 - [x] Più voci per persona, incluse spese facoltative aggiungibili in un secondo momento.
+- [x] Bacheca privata per barca: regole versionate, orari operativi, comunicazioni dello skipper e conferma di lettura dell'equipaggio.
 
 ## Da verificare prima di raccogliere dati reali
 
 - [ ] Test Google Sign-In sul dominio pubblico con un account skipper reale e un account partecipante differente.
 - [ ] Test delle regole: skipper della propria barca, organizzatore e account estraneo senza accesso.
 - [ ] Invio WhatsApp di prova, apertura del link personale, compilazione di una Crew List autorizzata e prova di stampa `Salva come PDF`.
+- [ ] Test della bacheca: pubblicazione skipper, lettura partecipante, conferma regole e nuova conferma dopo una modifica.
 - [ ] Confronto del PDF con il modello effettivamente richiesto dal charter / Capitaneria.
 - [ ] Definizione della procedura pratica per i contributi: istruzioni, causale e verifica manuale dello skipper.
 - [ ] Informativa privacy definitiva: titolare, contatto, basi giuridiche, tempi di cancellazione e procedura di consegna del PDF.
