@@ -45,7 +45,7 @@ Ogni skipper gestisce una sola barca e la relativa Crew List; per le nuove regis
 
 ## Limiti e privacy
 
-- Questa struttura non e' un sistema di pagamento: non chiama API dei provider e non riceve webhook.
+- Questa struttura non e' un sistema di pagamento: non chiama API dei provider e non riceve webhook. Lo skipper può definire importo, causale, eventuale scadenza e istruzioni, quindi copiare un messaggio da inviare manualmente.
 - Solo lo skipper può segnare una richiesta come verificata, dopo aver controllato l'accredito reale fuori dal sito. Un click non attiva né dimostra un pagamento.
 - Per documenti, dati sanitari, titolare del trattamento e tempi di cancellazione serve una decisione esplicita e un'informativa completa prima dell'uso reale.
 - Non usare `localStorage` per dati di crew o documenti.

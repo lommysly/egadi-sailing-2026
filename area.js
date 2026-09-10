@@ -17,6 +17,7 @@ const signInButton = document.querySelector('#signInButton');
 const authMessage = document.querySelector('#authMessage');
 let activeBoat = null;
 let activeMembers = [];
+let activePayments = [];
 let stopBoatSubscription = null;
 let stopMemberSubscription = null;
 let stopPaymentSubscription = null;
@@ -36,6 +37,7 @@ function escapeHtml(value = '') {
 function resetPrivateView() {
   activeBoat = null;
   activeMembers = [];
+  activePayments = [];
   creatingBoat = false;
   editingBoatId = null;
   editingMemberId = null;
@@ -135,18 +137,21 @@ function renderMembers() {
 function renderPayments(snapshot) {
   const list = document.querySelector('#paymentList');
   if (snapshot.empty) {
+    activePayments = [];
     list.innerHTML = '<p class="empty-state">Nessuna richiesta preparata.</p>';
     return;
   }
-  list.innerHTML = snapshot.docs.map((item) => {
-    const payment = item.data();
+  activePayments = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  list.innerHTML = activePayments.map((payment) => {
     const member = activeMembers.find((candidate) => candidate.id === payment.memberId);
     const name = member ? memberName(member) : 'Persona della crew';
     const amount = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(payment.amount || 0);
+    const reason = payment.reason || 'Contributo weekend';
+    const dueDate = payment.dueDate ? ` · Entro ${new Intl.DateTimeFormat('it-IT').format(new Date(`${payment.dueDate}T00:00:00`))}` : '';
     const isVerified = payment.status === 'verified';
     const status = isVerified ? 'Accredito verificato' : 'In attesa di verifica';
-    const action = isVerified ? '' : `<button class="text-button" type="button" data-verify-payment="${escapeHtml(item.id)}">Conferma accredito</button>`;
-    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(payment.instructions)}</span></div><div class="payment-action"><span class="payment-status">${status}</span>${action}</div></article>`;
+    const action = isVerified ? '' : `<button class="text-button" type="button" data-verify-payment="${escapeHtml(payment.id)}">Conferma accredito</button>`;
+    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span><span>${escapeHtml(payment.instructions)}</span></div><div class="payment-action"><span class="payment-status">${status}</span><button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${action}</div></article>`;
   }).join('');
 }
 
@@ -316,7 +321,7 @@ document.querySelector('#paymentForm').addEventListener('submit', async (event) 
   submitButton.disabled = true;
   try {
     await addDoc(collection(db, 'boats', activeBoat.id, 'paymentRequests'), {
-      memberId: fields.get('memberId'), amount: Number(fields.get('amount')), instructions: fields.get('instructions').trim(),
+      memberId: fields.get('memberId'), amount: Number(fields.get('amount')), reason: fields.get('reason').trim(), dueDate: fields.get('dueDate'), instructions: fields.get('instructions').trim(),
       status: 'requested', createdAt: serverTimestamp(), createdBy: auth.currentUser.uid,
     });
     form.reset();
@@ -329,6 +334,22 @@ document.querySelector('#paymentForm').addEventListener('submit', async (event) 
 });
 
 document.querySelector('#paymentList').addEventListener('click', async (event) => {
+  const copyButton = event.target.closest('[data-copy-payment]');
+  if (copyButton) {
+    const payment = activePayments.find((candidate) => candidate.id === copyButton.dataset.copyPayment);
+    const member = activeMembers.find((candidate) => candidate.id === payment?.memberId);
+    if (!payment || !member) return;
+    const amount = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(payment.amount || 0);
+    const dueDate = payment.dueDate ? ` Entro il ${new Intl.DateTimeFormat('it-IT').format(new Date(`${payment.dueDate}T00:00:00`))}.` : '';
+    const message = `Ciao ${memberName(member)}, per ${payment.reason || 'il contributo del weekend'} la quota è ${amount}.${dueDate}\n\nIstruzioni: ${payment.instructions}\n\nDopo l'accredito avvisa lo skipper, così potrà verificarlo manualmente. Grazie!`;
+    try {
+      await navigator.clipboard.writeText(message);
+      setMessage(document.querySelector('#paymentFormMessage'), 'Messaggio copiato: puoi inviarlo tu su WhatsApp o dove preferisci.');
+    } catch (error) {
+      setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco a copiare il messaggio. Verifica i permessi del browser.', true);
+    }
+    return;
+  }
   const button = event.target.closest('[data-verify-payment]');
   if (!button || !activeBoat) return;
   button.disabled = true;

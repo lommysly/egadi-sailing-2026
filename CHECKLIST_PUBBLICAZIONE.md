@@ -13,6 +13,7 @@ Ultimo aggiornamento: 10 settembre 2026.
 - [x] Regole Firestore compilate e pubblicate nel progetto `egadi-sailing-2026` il 10 settembre 2026.
 - [x] Storyboard video presente in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
 - [x] Nessun pagamento online, API di pagamento o dato bancario nel sito.
+- [x] Richieste personali con importo, causale, scadenza facoltativa e messaggio copiabile per l'invio manuale.
 
 ## Da verificare prima di raccogliere dati reali
 
