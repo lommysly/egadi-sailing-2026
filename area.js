@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithRedirect, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js';
 
@@ -233,8 +233,8 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
       subscribeToBoat(activeBoat);
       setMessage(document.querySelector('#boatFormMessage'), 'Dati della barca aggiornati.');
     } else {
-      const boatReference = await addDoc(collection(db, 'boats'), { ...boatData, createdAt: serverTimestamp() });
-      activeBoat = { id: boatReference.id, ...boatData };
+      await setDoc(doc(db, 'boats', user.uid), { ...boatData, createdAt: serverTimestamp() });
+      activeBoat = { id: user.uid, ...boatData };
       creatingBoat = false;
       subscribeToBoat(activeBoat);
       resetBoatForm(user);
