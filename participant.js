@@ -7,6 +7,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
 const inviteId = new URLSearchParams(window.location.search).get('invite') || '';
 const boatId = new URLSearchParams(window.location.search).get('boat') || '';
 const isValidInviteId = /^[a-f0-9]{48}$/.test(inviteId) && /^[A-Za-z0-9_-]{1,128}$/.test(boatId);

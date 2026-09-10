@@ -9,6 +9,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
 const signInCard = document.querySelector('#signInCard');
 const accountCard = document.querySelector('#accountCard');
 const registerSection = document.querySelector('#registra-barca');
