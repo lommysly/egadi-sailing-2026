@@ -48,11 +48,6 @@ a { color:inherit; }
 .dashboard-heading h2 { margin:0; font:600 clamp(2.8rem,5vw,5.4rem)/.93 "Fraunces",serif; letter-spacing:-.06em; }
 .dashboard-heading p:last-child { margin:12px 0 0; }
 .dashboard-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; }
-.boat-switcher { margin:-14px 0 28px; padding:16px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-.boat-switcher .eyebrow { margin:0 0 10px; }
-.boat-choices { display:flex; flex-wrap:wrap; gap:9px; }
-.boat-choice { display:grid; min-width:150px; gap:3px; padding:10px 12px; color:var(--ink); border:1px solid var(--line); border-radius:10px; background:transparent; text-align:left; cursor:pointer; font:inherit; }
-.boat-choice strong { font-size:.86rem; }.boat-choice span { color:#5c808b; font-size:.74rem; }.boat-choice.is-active { color:white; border-color:var(--ink); background:var(--ink); }.boat-choice.is-active span { color:#cfe2e0; }
 .dashboard-panel { padding:28px; border-radius:18px; background:var(--paper); }
 .dashboard-panel h3 { margin:0 0 18px; font:600 2rem/.95 "Fraunces",serif; letter-spacing:-.05em; }
 .panel-lead { margin:0 0 18px; line-height:1.5; font-size:.9rem; }
@@ -73,5 +68,5 @@ a { color:inherit; }
 .payment-action { display:grid; justify-items:end; gap:7px; }
 .payment-action .text-button { font-size:.76rem; }
 .empty-state { margin:0; padding:15px 0; border-top:1px solid var(--line); color:rgba(17,45,56,.7); font-size:.85rem; }
-@media (max-width:800px) { .form-grid,.dashboard-grid { grid-template-columns:1fr; }.dashboard-heading { display:grid; align-items:start; }.dashboard-actions { justify-content:start; }.boat-choice { flex:1 1 150px; }.form-actions { display:grid; align-items:start; }.form-actions .form-message { margin:0; } }
+@media (max-width:800px) { .form-grid,.dashboard-grid { grid-template-columns:1fr; }.dashboard-heading { display:grid; align-items:start; }.dashboard-actions { justify-content:start; }.form-actions { display:grid; align-items:start; }.form-actions .form-message { margin:0; } }
 @media (max-width:800px) { .charter-export { display:grid; align-items:start; } }
