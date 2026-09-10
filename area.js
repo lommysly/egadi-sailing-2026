@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
-import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithRedirect, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { GoogleAuthProvider, getAuth, getRedirectResult, onAuthStateChanged, signInWithRedirect, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js';
@@ -30,6 +30,12 @@ let editingMemberId = null;
 function setMessage(element, message, isError = false) {
   element.textContent = message;
   element.classList.toggle('is-error', isError);
+}
+
+function getAuthErrorMessage(error) {
+  if (error.code === 'auth/unauthorized-domain') return 'Questo indirizzo del sito non è ancora autorizzato in Firebase.';
+  if (error.code === 'auth/operation-not-allowed') return 'L’accesso con Google non è abilitato nel progetto Firebase.';
+  return 'Accesso non completato. Riprova tra poco.';
 }
 
 function escapeHtml(value = '') {
@@ -274,6 +280,10 @@ signInButton.addEventListener('click', async () => {
   } finally {
     signInButton.disabled = false;
   }
+});
+
+getRedirectResult(auth).catch((error) => {
+  setMessage(authMessage, getAuthErrorMessage(error), true);
 });
 
 document.querySelector('#signOutButton').addEventListener('click', () => signOut(auth));

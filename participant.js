@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
-import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithRedirect, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { GoogleAuthProvider, getAuth, getRedirectResult, onAuthStateChanged, signInWithRedirect, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { collection, doc, getDoc, getFirestore, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
@@ -15,6 +15,12 @@ let activeInvite = null;
 function setMessage(element, message, isError = false) {
   element.textContent = message;
   element.classList.toggle('is-error', isError);
+}
+
+function getAuthErrorMessage(error) {
+  if (error.code === 'auth/unauthorized-domain') return 'Questo indirizzo del sito non è ancora autorizzato in Firebase.';
+  if (error.code === 'auth/operation-not-allowed') return 'L’accesso con Google non è abilitato nel progetto Firebase.';
+  return 'Accesso non completato. Riprova tra poco.';
 }
 
 function formatCurrency(amount) {
@@ -80,6 +86,10 @@ async function openParticipantArea(user) {
 
 document.querySelector('#participantSignInButton').addEventListener('click', () => signInWithRedirect(auth, provider));
 document.querySelector('#participantSignOutButton').addEventListener('click', () => signOut(auth));
+
+getRedirectResult(auth).catch((error) => {
+  setMessage(document.querySelector('#participantAuthMessage'), getAuthErrorMessage(error), true);
+});
 document.querySelector('#participantForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!activeInvite || !auth.currentUser) return;
