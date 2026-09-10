@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
-import { GoogleAuthProvider, getAuth, getRedirectResult, onAuthStateChanged, signInWithRedirect, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js';
@@ -274,16 +274,12 @@ signInButton.addEventListener('click', async () => {
   signInButton.disabled = true;
   setMessage(authMessage, 'Apro l’accesso Google…');
   try {
-    await signInWithRedirect(auth, provider);
+    await signInWithPopup(auth, provider);
   } catch (error) {
-    setMessage(authMessage, error.code === 'auth/popup-closed-by-user' ? 'Accesso annullato.' : 'Accesso non completato. Controlla che Google sia abilitato e riprova.', true);
+    setMessage(authMessage, error.code === 'auth/popup-closed-by-user' ? 'Accesso annullato.' : getAuthErrorMessage(error), true);
   } finally {
     signInButton.disabled = false;
   }
-});
-
-getRedirectResult(auth).catch((error) => {
-  setMessage(authMessage, getAuthErrorMessage(error), true);
 });
 
 document.querySelector('#signOutButton').addEventListener('click', () => signOut(auth));

@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
-import { GoogleAuthProvider, getAuth, getRedirectResult, onAuthStateChanged, signInWithRedirect, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { collection, doc, getDoc, getFirestore, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
@@ -84,12 +84,14 @@ async function openParticipantArea(user) {
   onSnapshot(query(collection(db, 'boats', boatId, 'paymentRequests'), where('recipientId', '==', inviteId)), renderPayments, () => setMessage(document.querySelector('#participantFormMessage'), 'Non riesco a leggere le richieste personali.', true));
 }
 
-document.querySelector('#participantSignInButton').addEventListener('click', () => signInWithRedirect(auth, provider));
-document.querySelector('#participantSignOutButton').addEventListener('click', () => signOut(auth));
-
-getRedirectResult(auth).catch((error) => {
-  setMessage(document.querySelector('#participantAuthMessage'), getAuthErrorMessage(error), true);
+document.querySelector('#participantSignInButton').addEventListener('click', async () => {
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    setMessage(document.querySelector('#participantAuthMessage'), error.code === 'auth/popup-closed-by-user' ? 'Accesso annullato.' : getAuthErrorMessage(error), true);
+  }
 });
+document.querySelector('#participantSignOutButton').addEventListener('click', () => signOut(auth));
 document.querySelector('#participantForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!activeInvite || !auth.currentUser) return;
