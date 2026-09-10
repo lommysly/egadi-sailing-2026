@@ -14,6 +14,20 @@ service cloud.firestore {
       return signedIn() && get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid;
     }
 
+    function isInviteHolder(boatId, inviteId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId))
+        && get(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId)).data.participantUid == request.auth.uid;
+    }
+
+    function canClaimInvite() {
+      return signedIn()
+        && resource.data.participantUid == null
+        && request.resource.data.participantUid == request.auth.uid
+        && request.resource.data.status == 'opened'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantUid', 'status', 'acceptedAt']);
+    }
+
     match /events/egadi-2026 {
       allow read: if signedIn();
       allow write: if isOrganizer();
@@ -27,15 +41,24 @@ service cloud.firestore {
         && request.resource.data.eventId == resource.data.eventId);
       allow delete: if isOrganizer();
 
+      match /invites/{inviteId} {
+        allow get: if signedIn() && (isOrganizer() || isSkipper(boatId)
+          || resource.data.participantUid == null || resource.data.participantUid == request.auth.uid);
+        allow list: if isOrganizer() || isSkipper(boatId);
+        allow create: if (isOrganizer() || isSkipper(boatId)) && request.resource.data.boatId == boatId;
+        allow delete: if isOrganizer() || isSkipper(boatId);
+        allow update: if isOrganizer() || isSkipper(boatId) || canClaimInvite();
+      }
+
       match /members/{memberId} {
-        allow read: if isOrganizer() || isSkipper(boatId);
-        allow create: if isOrganizer() || isSkipper(boatId);
-        allow update: if isOrganizer() || isSkipper(boatId);
+        allow read: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId);
+        allow create: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId);
+        allow update: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId);
         allow delete: if isOrganizer() || isSkipper(boatId);
       }
 
       match /paymentRequests/{requestId} {
-        allow read: if isOrganizer() || isSkipper(boatId);
+        allow read: if isOrganizer() || isSkipper(boatId) || (resource.data.recipientId is string && isInviteHolder(boatId, resource.data.recipientId));
         allow create, update: if isOrganizer() || isSkipper(boatId);
         allow delete: if isOrganizer();
       }

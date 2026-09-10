@@ -18,9 +18,11 @@ const authMessage = document.querySelector('#authMessage');
 let activeBoat = null;
 let activeMembers = [];
 let activePayments = [];
+let activeInvites = [];
 let stopBoatSubscription = null;
 let stopMemberSubscription = null;
 let stopPaymentSubscription = null;
+let stopInviteSubscription = null;
 let creatingBoat = false;
 let editingBoatId = null;
 let editingMemberId = null;
@@ -38,21 +40,71 @@ function resetPrivateView() {
   activeBoat = null;
   activeMembers = [];
   activePayments = [];
+  activeInvites = [];
   creatingBoat = false;
   editingBoatId = null;
   editingMemberId = null;
   stopBoatSubscription?.();
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
+  stopInviteSubscription?.();
   stopBoatSubscription = null;
   stopMemberSubscription = null;
   stopPaymentSubscription = null;
+  stopInviteSubscription = null;
   dashboard.hidden = true;
   registerSection.hidden = true;
 }
 
 function memberName(member) {
   return `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.displayName || 'Persona della crew';
+}
+
+function recipientName(recipientId) {
+  const member = activeMembers.find((candidate) => candidate.id === recipientId);
+  if (member) return memberName(member);
+  return activeInvites.find((candidate) => candidate.id === recipientId)?.displayName || 'Persona della crew';
+}
+
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(amount || 0);
+}
+
+function formatDate(value) {
+  return new Intl.DateTimeFormat('it-IT').format(new Date(`${value}T00:00:00`));
+}
+
+function participantUrl(inviteId) {
+  const url = new URL('participant.html', window.location.href);
+  url.searchParams.set('invite', inviteId);
+  url.searchParams.set('boat', activeBoat.id);
+  return url.toString();
+}
+
+function whatsappUrl(invite) {
+  const number = String(invite.whatsappNumber || '').replace(/\D/g, '');
+  const message = `Ciao ${invite.displayName}, ecco il tuo spazio personale per completare i dati della Crew List e vedere le richieste dedicate: ${participantUrl(invite.id)}`;
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+}
+
+function createInviteId() {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function renderPaymentRecipientOptions() {
+  const select = document.querySelector('#paymentMember');
+  const members = activeMembers.map((member) => `<option value="${escapeHtml(member.id)}">${escapeHtml(memberName(member))} · Crew</option>`).join('');
+  const pendingInvites = activeInvites.filter((invite) => !activeMembers.some((member) => member.id === invite.id));
+  const invites = pendingInvites.map((invite) => `<option value="${escapeHtml(invite.id)}">${escapeHtml(invite.displayName)} · Invito da completare</option>`).join('');
+  if (!members && !invites) {
+    select.innerHTML = '<option value="">Prima invita o aggiungi una persona</option>';
+    return;
+  }
+  select.innerHTML = '<option value="">Seleziona una persona</option>'
+    + (invites ? `<optgroup label="Inviti personali">${invites}</optgroup>` : '')
+    + (members ? `<optgroup label="Crew List">${members}</optgroup>` : '');
 }
 
 function normalizeMember(id, member) {
@@ -118,10 +170,9 @@ function updateCharterReadiness() {
 
 function renderMembers() {
   const list = document.querySelector('#memberList');
-  const select = document.querySelector('#paymentMember');
   if (!activeMembers.length) {
     list.innerHTML = '<p class="empty-state">Nessuna persona ancora inserita.</p>';
-    select.innerHTML = '<option value="">Prima aggiungi una persona</option>';
+    renderPaymentRecipientOptions();
     updateCharterReadiness();
     return;
   }
@@ -130,8 +181,23 @@ function renderMembers() {
     const status = missing.length ? `Mancano ${missing.length} dati` : 'Pronta per il charter';
     return `<article class="member-row"><div><strong>${escapeHtml(memberName(member))}</strong><span>${escapeHtml(member.role || 'Crew')} · ${escapeHtml(status)}</span></div><button class="text-button" type="button" data-edit-member="${escapeHtml(member.id)}">Modifica</button></article>`;
   }).join('');
-  select.innerHTML = '<option value="">Seleziona una persona</option>' + activeMembers.map((member) => `<option value="${escapeHtml(member.id)}">${escapeHtml(memberName(member))}</option>`).join('');
+  renderPaymentRecipientOptions();
   updateCharterReadiness();
+}
+
+function renderInvites() {
+  const list = document.querySelector('#inviteList');
+  if (!activeInvites.length) {
+    list.innerHTML = '<p class="empty-state">Nessun link personale creato.</p>';
+    renderPaymentRecipientOptions();
+    return;
+  }
+  list.innerHTML = activeInvites.map((invite) => {
+    const profileCompleted = activeMembers.some((member) => member.id === invite.id);
+    const status = profileCompleted ? 'Anagrafica completata' : invite.participantUid ? 'Link aperto: dati da completare' : 'Pronto da inviare';
+    return `<article class="invite-row"><div><strong>${escapeHtml(invite.displayName)}</strong><span>${escapeHtml(status)} · ${escapeHtml(invite.whatsappNumber)}</span></div><div class="payment-action"><button class="text-button" type="button" data-copy-invite="${escapeHtml(invite.id)}">Copia link</button><button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(invite.id)}">Apri WhatsApp</button></div></article>`;
+  }).join('');
+  renderPaymentRecipientOptions();
 }
 
 function renderPayments(snapshot) {
@@ -143,15 +209,16 @@ function renderPayments(snapshot) {
   }
   activePayments = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
   list.innerHTML = activePayments.map((payment) => {
-    const member = activeMembers.find((candidate) => candidate.id === payment.memberId);
-    const name = member ? memberName(member) : 'Persona della crew';
-    const amount = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(payment.amount || 0);
-    const reason = payment.reason || 'Contributo weekend';
-    const dueDate = payment.dueDate ? ` · Entro ${new Intl.DateTimeFormat('it-IT').format(new Date(`${payment.dueDate}T00:00:00`))}` : '';
+    const recipientId = payment.recipientId || payment.memberId;
+    const name = recipientName(recipientId);
+    const amount = formatCurrency(payment.amount);
+    const reason = `${payment.reason || 'Contributo weekend'}${payment.isOptional ? ' · Facoltativo' : ''}`;
+    const dueDate = payment.dueDate ? ` · Entro ${formatDate(payment.dueDate)}` : '';
     const isVerified = payment.status === 'verified';
     const status = isVerified ? 'Accredito verificato' : 'In attesa di verifica';
     const action = isVerified ? '' : `<button class="text-button" type="button" data-verify-payment="${escapeHtml(payment.id)}">Conferma accredito</button>`;
-    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span><span>${escapeHtml(payment.instructions)}</span></div><div class="payment-action"><span class="payment-status">${status}</span><button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${action}</div></article>`;
+    const inviteAction = activeInvites.some((invite) => invite.id === recipientId) ? `<button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(recipientId)}">Invia su WhatsApp</button>` : '';
+    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span><span>${escapeHtml(payment.instructions)}</span></div><div class="payment-action"><span class="payment-status">${status}</span><button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${inviteAction}${action}</div></article>`;
   }).join('');
 }
 
@@ -163,11 +230,17 @@ function subscribeToBoat(boat) {
   document.querySelector('#boatMeta').textContent = `${boat.model} · ${boat.capacity} posti · ${boat.homePort}`;
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
+  stopInviteSubscription?.();
   stopMemberSubscription = onSnapshot(collection(db, 'boats', boat.id, 'members'), (snapshot) => {
     activeMembers = snapshot.docs.map((item) => normalizeMember(item.id, item.data())).sort((first, second) => memberName(first).localeCompare(memberName(second), 'it'));
     renderMembers();
   }, () => setMessage(document.querySelector('#memberFormMessage'), 'Impossibile leggere la Crew List.', true));
   stopPaymentSubscription = onSnapshot(query(collection(db, 'boats', boat.id, 'paymentRequests'), orderBy('createdAt', 'desc')), renderPayments, () => setMessage(document.querySelector('#paymentFormMessage'), 'Impossibile leggere le richieste.', true));
+  stopInviteSubscription = onSnapshot(collection(db, 'boats', boat.id, 'invites'), (snapshot) => {
+    activeInvites = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort((first, second) => String(first.displayName || '').localeCompare(String(second.displayName || ''), 'it'));
+    renderInvites();
+    renderPayments({ empty: activePayments.length === 0, docs: activePayments.map((payment) => ({ id: payment.id, data: () => payment })) });
+  }, () => setMessage(document.querySelector('#inviteFormMessage'), 'Impossibile leggere gli inviti personali.', true));
 }
 
 function loadSkipperArea(user) {
@@ -252,6 +325,36 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
   }
 });
 
+document.querySelector('#inviteForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!activeBoat || !auth.currentUser) return;
+  const form = event.currentTarget;
+  const fields = new FormData(form);
+  const displayName = fields.get('displayName').trim();
+  const whatsappNumber = fields.get('whatsappNumber').trim();
+  const normalizedNumber = whatsappNumber.replace(/\D/g, '');
+  if (normalizedNumber.length < 8) {
+    setMessage(document.querySelector('#inviteFormMessage'), 'Inserisci un numero WhatsApp completo, con prefisso internazionale.', true);
+    return;
+  }
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  const inviteId = createInviteId();
+  const invite = { id: inviteId, boatId: activeBoat.id, displayName, whatsappNumber, participantUid: null, status: 'sent' };
+  try {
+    await setDoc(doc(db, 'boats', activeBoat.id, 'invites', inviteId), {
+      ...invite, createdAt: serverTimestamp(), createdBy: auth.currentUser.uid,
+    });
+    form.reset();
+    setMessage(document.querySelector('#inviteFormMessage'), 'Link personale creato: apro WhatsApp con il messaggio già pronto.');
+    window.open(whatsappUrl(invite), '_blank', 'noopener');
+  } catch (error) {
+    setMessage(document.querySelector('#inviteFormMessage'), 'Non riesco a creare il link personale.', true);
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
 document.querySelector('#memberForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!activeBoat) return;
@@ -321,7 +424,7 @@ document.querySelector('#paymentForm').addEventListener('submit', async (event) 
   submitButton.disabled = true;
   try {
     await addDoc(collection(db, 'boats', activeBoat.id, 'paymentRequests'), {
-      memberId: fields.get('memberId'), amount: Number(fields.get('amount')), reason: fields.get('reason').trim(), dueDate: fields.get('dueDate'), instructions: fields.get('instructions').trim(),
+      recipientId: fields.get('recipientId'), memberId: fields.get('recipientId'), amount: Number(fields.get('amount')), reason: fields.get('reason').trim(), isOptional: fields.get('isOptional') === 'on', dueDate: fields.get('dueDate'), instructions: fields.get('instructions').trim(),
       status: 'requested', createdAt: serverTimestamp(), createdBy: auth.currentUser.uid,
     });
     form.reset();
@@ -334,14 +437,31 @@ document.querySelector('#paymentForm').addEventListener('submit', async (event) 
 });
 
 document.querySelector('#paymentList').addEventListener('click', async (event) => {
+  const whatsappButton = event.target.closest('[data-whatsapp-invite]');
+  if (whatsappButton) {
+    const invite = activeInvites.find((candidate) => candidate.id === whatsappButton.dataset.whatsappInvite);
+    if (invite) window.open(whatsappUrl(invite), '_blank', 'noopener');
+    return;
+  }
+  const inviteCopyButton = event.target.closest('[data-copy-invite]');
+  if (inviteCopyButton) {
+    const invite = activeInvites.find((candidate) => candidate.id === inviteCopyButton.dataset.copyInvite);
+    if (!invite) return;
+    try {
+      await navigator.clipboard.writeText(participantUrl(invite.id));
+      setMessage(document.querySelector('#inviteFormMessage'), 'Link personale copiato.');
+    } catch (error) {
+      setMessage(document.querySelector('#inviteFormMessage'), 'Non riesco a copiare il link. Verifica i permessi del browser.', true);
+    }
+    return;
+  }
   const copyButton = event.target.closest('[data-copy-payment]');
   if (copyButton) {
     const payment = activePayments.find((candidate) => candidate.id === copyButton.dataset.copyPayment);
-    const member = activeMembers.find((candidate) => candidate.id === payment?.memberId);
-    if (!payment || !member) return;
-    const amount = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(payment.amount || 0);
-    const dueDate = payment.dueDate ? ` Entro il ${new Intl.DateTimeFormat('it-IT').format(new Date(`${payment.dueDate}T00:00:00`))}.` : '';
-    const message = `Ciao ${memberName(member)}, per ${payment.reason || 'il contributo del weekend'} la quota è ${amount}.${dueDate}\n\nIstruzioni: ${payment.instructions}\n\nDopo l'accredito avvisa lo skipper, così potrà verificarlo manualmente. Grazie!`;
+    if (!payment) return;
+    const amount = formatCurrency(payment.amount);
+    const dueDate = payment.dueDate ? ` Entro il ${formatDate(payment.dueDate)}.` : '';
+    const message = `Ciao ${recipientName(payment.recipientId || payment.memberId)}, per ${payment.reason || 'il contributo del weekend'} la quota è ${amount}.${dueDate}\n\nIstruzioni: ${payment.instructions}\n\nDopo l'accredito avvisa lo skipper, così potrà verificarlo manualmente. Grazie!`;
     try {
       await navigator.clipboard.writeText(message);
       setMessage(document.querySelector('#paymentFormMessage'), 'Messaggio copiato: puoi inviarlo tu su WhatsApp o dove preferisci.');
@@ -361,6 +481,25 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
   } catch (error) {
     button.disabled = false;
     setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco a confermare l’accredito.', true);
+  }
+});
+
+document.querySelector('#inviteList').addEventListener('click', async (event) => {
+  const whatsappButton = event.target.closest('[data-whatsapp-invite]');
+  if (whatsappButton) {
+    const invite = activeInvites.find((candidate) => candidate.id === whatsappButton.dataset.whatsappInvite);
+    if (invite) window.open(whatsappUrl(invite), '_blank', 'noopener');
+    return;
+  }
+  const copyButton = event.target.closest('[data-copy-invite]');
+  if (!copyButton) return;
+  const invite = activeInvites.find((candidate) => candidate.id === copyButton.dataset.copyInvite);
+  if (!invite) return;
+  try {
+    await navigator.clipboard.writeText(participantUrl(invite.id));
+    setMessage(document.querySelector('#inviteFormMessage'), 'Link personale copiato.');
+  } catch (error) {
+    setMessage(document.querySelector('#inviteFormMessage'), 'Non riesco a copiare il link. Verifica i permessi del browser.', true);
   }
 });
 

@@ -5,7 +5,8 @@ Sito pubblico statico e futura area privata per skipper ed equipaggi. Il progett
 ## Stato attuale
 
 - `index.html`: sito pubblico, passage plan flessibile e presentazione della flotta.
-- `area.html`: area skipper con Google Sign-In via redirect, registrazione barca, Crew List e richieste di contributo solo descrittive.
+- `area.html`: area skipper con Google Sign-In via redirect, registrazione barca, Crew List, inviti WhatsApp e richieste di contributo solo descrittive.
+- `participant.html`: spazio personale aperto dal link WhatsApp, protetto anche dall'accesso Google, per completare l'anagrafica e vedere le richieste dedicate.
 - `privacy.html`: principi da completare con informativa definitiva prima della raccolta dati.
 - `firestore.rules`: regole di accesso pubblicate per il progetto Firebase; skipper e organizzatore vedono solo le barche autorizzate.
 
@@ -31,8 +32,10 @@ boats/{boatId}
     firstName, lastName, birthDate, birthPlace, nationality
     documentType, documentNumber, documentExpiry, charterConsent
     role, email, phone, createdAt
+  invites/{inviteId}
+    boatId, displayName, whatsappNumber, participantUid, status, createdAt
   paymentRequests/{requestId}
-    memberId, amount, instructions, status, createdAt
+    recipientId, amount, reason, isOptional, dueDate, instructions, status, createdAt
 ```
 
 Non inserire in Firestore credenziali PayPal, Satispay, Revolut, carte o coordinate bancarie. Le richieste di contributo mostrano solo istruzioni dello skipper nella pagina privata e restano `in_attesa_di_verifica` fino alla conferma manuale.
@@ -45,14 +48,14 @@ Ogni skipper gestisce una sola barca e la relativa Crew List; per le nuove regis
 
 ## Limiti e privacy
 
-- Questa struttura non e' un sistema di pagamento: non chiama API dei provider e non riceve webhook. Lo skipper può definire importo, causale, eventuale scadenza e istruzioni, quindi copiare un messaggio da inviare manualmente.
+- Questa struttura non e' un sistema di pagamento: non chiama API dei provider e non riceve webhook. Lo skipper può definire importo, causale, eventuale scadenza e istruzioni, quindi copiare un messaggio da inviare manualmente. Per ogni persona può creare più richieste, comprese voci facoltative come assicurazione, cena, porto o cambusa.
 - Solo lo skipper può segnare una richiesta come verificata, dopo aver controllato l'accredito reale fuori dal sito. Un click non attiva né dimostra un pagamento.
 - Per documenti, dati sanitari, titolare del trattamento e tempi di cancellazione serve una decisione esplicita e un'informativa completa prima dell'uso reale.
 - Non usare `localStorage` per dati di crew o documenti.
 
 ## Da fare prima dell'uso con partecipanti
 
-La prima versione riserva tutta la Crew List allo skipper: e' la scelta piu' semplice e sicura per iniziare. Il passo successivo sara' l'invito personale con codice ad alta entropia e una scheda limitata al singolo partecipante; non va attivato finche' non sono definite le informazioni da chiedere e i tempi di conservazione.
+Ogni invito personale ha un codice casuale a 192 bit nel link e viene legato al primo account Google che lo apre. Il partecipante può leggere e aggiornare soltanto la propria anagrafica e le proprie richieste; skipper e organizzatore mantengono l'accesso operativo alla barca.
 
 ## Pubblicazione
 

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Scheda personale equipaggio per Egadi Sailing Experience." />
+  <title>La mia scheda · Egadi Sailing Experience</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="area-page">
+  <header class="site-header"><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><nav class="site-nav always-visible"><a href="index.html">Il viaggio</a></nav></header>
+  <main class="area-main participant-main">
+    <section class="area-hero participant-hero"><p class="eyebrow">Scheda personale</p><h1>La tua crew.<br /><em>I tuoi dettagli.</em></h1><p>Completa solo i dati necessari al charter. Qui trovi anche le richieste personali preparate dallo skipper.</p></section>
+
+    <section id="invalidLink" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Link non valido</p><h2>Serve il tuo invito personale.</h2><p>Apri il collegamento ricevuto dallo skipper su WhatsApp.</p></article></section>
+
+    <section id="signInSection" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Accesso protetto</p><h2>Entra con Google</h2><p>Il link è personale. L’accesso Google protegge la tua anagrafica e le richieste che ti riguardano.</p><button id="participantSignInButton" class="button button-primary" type="button">Continua con Google</button><p id="participantAuthMessage" class="form-message" role="status" aria-live="polite"></p></article></section>
+
+    <section id="participantDashboard" class="section dashboard" hidden>
+      <div class="dashboard-heading"><div><p class="eyebrow">Il tuo spazio</p><h2 id="participantTitle">La mia scheda</h2><p id="participantStatus"></p></div><button id="participantSignOutButton" class="text-button" type="button">Esci</button></div>
+      <div class="dashboard-grid">
+        <article class="dashboard-panel"><p class="eyebrow">Per la Crew List</p><h3>Anagrafica personale</h3><p class="panel-lead">Questi dati saranno visibili allo skipper e all’organizzazione soltanto per preparare la Crew List.</p><form id="participantForm" class="compact-form">
+          <div class="form-grid"><label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" /></label><label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" /></label></div>
+          <div class="form-grid"><label>Data di nascita *<input name="birthDate" type="date" required /></label><label>Luogo di nascita *<input name="birthPlace" required maxlength="100" /></label></div>
+          <div class="form-grid"><label>Nazionalità *<input name="nationality" required maxlength="80" placeholder="Es. Italiana" /></label><label>Sesso *<select name="gender" required><option value="">Seleziona</option><option>F</option><option>M</option><option>Altro</option></select></label></div>
+          <div class="form-grid"><label>Tipo documento *<select name="documentType" required><option value="">Seleziona</option><option>Carta d'identità</option><option>Passaporto</option><option>Patente nautica</option><option>Altro</option></select></label><label>Numero documento *<input name="documentNumber" required maxlength="60" /></label></div>
+          <div class="form-grid"><label>Scadenza documento *<input name="documentExpiry" type="date" min="2026-10-11" required /></label><label>Ruolo / cabina<input name="role" maxlength="100" placeholder="Es. Cabina poppa" /></label></div>
+          <div class="form-grid"><label>Email di contatto<input name="email" type="email" maxlength="160" autocomplete="email" /></label><label>Telefono<input name="phone" type="tel" maxlength="40" autocomplete="tel" /></label></div>
+          <label class="consent-field"><input name="charterConsent" type="checkbox" required /> Confermo che i dati possono essere inseriti nella Crew List da inviare al charter. *</label>
+          <button class="button button-primary" type="submit">Salva la mia anagrafica</button><p id="participantFormMessage" class="form-message" role="status" aria-live="polite"></p>
+        </form></article>
+        <article class="dashboard-panel"><p class="eyebrow">Contributi esterni</p><h3>Le mie richieste</h3><p class="panel-lead">Il sito non riceve denaro. Segui le istruzioni indicate e avvisa lo skipper dopo l’accredito.</p><div id="participantPaymentList" class="payment-list" aria-live="polite"></div></article>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="privacy.html">Privacy e dati</a></div></footer>
+  <script type="module" src="participant.js"></script>
+</body>
+</html>

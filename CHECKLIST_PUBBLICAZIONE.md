@@ -14,12 +14,14 @@ Ultimo aggiornamento: 10 settembre 2026.
 - [x] Storyboard video presente in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
 - [x] Nessun pagamento online, API di pagamento o dato bancario nel sito.
 - [x] Richieste personali con importo, causale, scadenza facoltativa e messaggio copiabile per l'invio manuale.
+- [x] Invito personale WhatsApp: link con codice casuale, accesso Google e anagrafica compilata direttamente dal partecipante.
+- [x] Più voci per persona, incluse spese facoltative aggiungibili in un secondo momento.
 
 ## Da verificare prima di raccogliere dati reali
 
-- [ ] Test Google Sign-In sul dominio pubblico con un account skipper reale.
+- [ ] Test Google Sign-In sul dominio pubblico con un account skipper reale e un account partecipante differente.
 - [ ] Test delle regole: skipper della propria barca, organizzatore e account estraneo senza accesso.
-- [ ] Inserimento di una Crew List completa con dati autorizzati e prova di stampa `Salva come PDF`.
+- [ ] Invio WhatsApp di prova, apertura del link personale, compilazione di una Crew List autorizzata e prova di stampa `Salva come PDF`.
 - [ ] Confronto del PDF con il modello effettivamente richiesto dal charter / Capitaneria.
 - [ ] Definizione della procedura pratica per i contributi: istruzioni, causale e verifica manuale dello skipper.
 - [ ] Informativa privacy definitiva: titolare, contatto, basi giuridiche, tempi di cancellazione e procedura di consegna del PDF.
@@ -34,6 +36,6 @@ Ultimo aggiornamento: 10 settembre 2026.
 
 ## Pubblicazione tecnica
 
-- [ ] Ripetere il deploy GitHub Pages della revisione corrente `11c8cc8`: un vecchio deploy GitHub Pages è rimasto in coda e deve liberarsi prima che la versione aggiornata possa essere letta online.
-- [ ] Leggere il sito pubblico dopo il deploy e verificare che non compaia più l'opzione di aggiungere una seconda barca.
+- [x] GitHub Pages ripristinato con un build standard il 10 settembre 2026.
+- [ ] Leggere il sito pubblico dopo il deploy e verificare inviti WhatsApp, area personale e richieste facoltative.
 - [ ] Come ultimo passaggio, configurare `egadi.thatsablast.it`: record DNS, dominio personalizzato GitHub Pages, HTTPS e dominio autorizzato in Firebase Authentication.
