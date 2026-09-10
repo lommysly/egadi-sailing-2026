@@ -7,7 +7,7 @@ Sito pubblico statico e futura area privata per skipper ed equipaggi. Il progett
 - `index.html`: sito pubblico, passage plan flessibile e presentazione della flotta.
 - `area.html`: area skipper con Google Sign-In via redirect, registrazione barca, Crew List e richieste di contributo solo descrittive.
 - `privacy.html`: principi da completare con informativa definitiva prima della raccolta dati.
-- `firestore.rules`: base delle regole di accesso. Non pubblicare il database prima di aver creato il documento evento e testato le regole.
+- `firestore.rules`: regole di accesso pubblicate per il progetto Firebase; skipper e organizzatore vedono solo le barche autorizzate.
 
 ## Firebase creato
 
@@ -16,7 +16,7 @@ Il progetto Firebase separato `egadi-sailing-2026` e l'app web sono stati creati
 1. Attivare Firebase Authentication con Google e/o email-password. Non usare login via link email: il piano Spark ha un limite molto basso di email di accesso.
 2. Accedere una prima volta con l'account organizzatore e annotarne l'UID dalla console Firebase Authentication.
 3. Creare dalla console il documento `events/egadi-2026` con il campo `organizerIds`, un array che contiene esclusivamente quell'UID. La configurazione iniziale e' gia' stata eseguita per l'organizzatore corrente.
-4. Pubblicare `firestore.rules` e testare nel simulatore: organizzazione, skipper della propria barca e utente estraneo. Le regole presenti non danno accesso diretto ai partecipanti.
+4. Testare le Security Rules nel simulatore: organizzazione, skipper della propria barca e utente estraneo. Le regole presenti non danno accesso diretto ai partecipanti.
 5. Per il test locale aggiungere `127.0.0.1` in Firebase Authentication > Impostazioni > Domini autorizzati. Prima della pubblicazione aggiungere anche il dominio reale del sito; non usare un elenco aperto di domini.
 
 ## Modello dati iniziale
