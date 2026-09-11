@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="La flotta pubblica di Egadi Sailing Experience: barche, skipper e posti resi disponibili dagli equipaggi." />
+  <title>La flotta · Egadi Sailing Experience</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=20260911-menu2" />
+</head>
+<body class="area-page">
+  <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Egadi Sailing Experience, home"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-menu" aria-label="Apri menu"><span class="menu-toggle-label">Menu</span><span class="menu-toggle-icon" aria-hidden="true"></span></button>
+    <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale"><a href="index.html">Il viaggio</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a></nav>
+  </header>
+  <button class="menu-backdrop" type="button" aria-label="Chiudi menu" hidden></button>
+
+  <main id="main-content" class="area-main">
+    <section class="area-hero">
+      <p class="eyebrow">La flotta</p>
+      <h1>Una flotta.<br /><em>Molti equipaggi.</em></h1>
+      <p>Ogni barca naviga con il proprio skipper. Qui trovi barca, modello, tipologia e skipper; lo skipper può scegliere se mostrare anche i posti disponibili.</p>
+    </section>
+
+    <section class="dashboard" aria-labelledby="fleet-list-title">
+      <div class="dashboard-heading">
+        <div>
+          <p class="eyebrow">Barche partecipanti</p>
+          <h2 id="fleet-list-title">La flotta<br />in partenza.</h2>
+          <p>Il totale dei posti liberi considera solo le disponibilità pubblicate. Non sono presenti contatti, inviti o dati della Crew List.</p>
+        </div>
+      </div>
+
+      <p id="fleetStatus" class="form-message" role="status" aria-live="polite">Aggiorno la flotta…</p>
+      <div id="fleetSummary" class="passage-status" aria-label="Riepilogo della flotta" hidden></div>
+      <div id="fleetList" class="dashboard-grid" aria-live="polite"></div>
+      <noscript><p class="empty-state">Per visualizzare la flotta è necessario attivare JavaScript.</p></noscript>
+    </section>
+
+    <section class="section registration-preview">
+      <div class="access-cards access-cards-single">
+        <article>
+          <p class="eyebrow">Fai parte della flotta?</p>
+          <h2>La tua barca,<br />il tuo equipaggio.</h2>
+          <p>Lo skipper registra e gestisce la propria barca dall’area riservata. La disponibilità dei posti resta sempre una sua scelta.</p>
+          <a class="button button-primary" href="accesso.html">Apri area riservata</a>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><p>8—11 ottobre 2026 · Marsala</p></div>
+    <div><a href="index.html">Il viaggio</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div>
+  </footer>
+  <script src="app.js?v=20260911-menu2"></script>
+  <script type="module" src="flotta.js?v=20260911-fleet2"></script>
+</body>
+</html>

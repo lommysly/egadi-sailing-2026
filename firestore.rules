@@ -28,6 +28,13 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/events/egadi-2026).data.privateAreaEnabled == true;
     }
 
+    // Interruttore indipendente: la vetrina pubblica può essere spenta senza
+    // toccare gli accessi privati di skipper ed equipaggi.
+    function isPublicFleetEnabled() {
+      return exists(/databases/$(database)/documents/events/egadi-2026)
+        && get(/databases/$(database)/documents/events/egadi-2026).data.publicFleetEnabled == true;
+    }
+
     function isSkipper(boatId) {
       return isGoogleSkipperAccount()
         && exists(/databases/$(database)/documents/boats/$(boatId))
@@ -306,10 +313,89 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt', 'cancelledBy']);
     }
 
+    // La vetrina pubblica non riusa mai /boats: quel documento contiene
+    // identificativi tecnici e metadati privati. Una mappa privata e
+    // immutabile lega l'ID casuale al solo skipper che l'ha creato.
+    function isPublicFleetOwner(publicId) {
+      return isGoogleSkipperAccount()
+        && publicId.matches('^[a-f0-9]{48}$')
+        && existsAfter(/databases/$(database)/documents/events/egadi-2026/publicFleetOwners/$(publicId))
+        && getAfter(/databases/$(database)/documents/events/egadi-2026/publicFleetOwners/$(publicId)).data.skipperId == request.auth.uid;
+    }
+
+    function matchesPrivateFleetBoat(publicId) {
+      return existsAfter(/databases/$(database)/documents/boats/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/boats/$(request.auth.uid)).data.skipperId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/boats/$(request.auth.uid)).data.publicFleetId == publicId
+        && request.resource.data.name == getAfter(/databases/$(database)/documents/boats/$(request.auth.uid)).data.name
+        && request.resource.data.model == getAfter(/databases/$(database)/documents/boats/$(request.auth.uid)).data.model
+        && request.resource.data.boatType == getAfter(/databases/$(database)/documents/boats/$(request.auth.uid)).data.boatType
+        && request.resource.data.skipperName == getAfter(/databases/$(database)/documents/boats/$(request.auth.uid)).data.skipperName
+        && request.resource.data.capacity == getAfter(/databases/$(database)/documents/boats/$(request.auth.uid)).data.capacity;
+    }
+
+    function hasValidPublicFleetProfile() {
+      return request.resource.data.keys().hasAll(['name', 'model', 'boatType', 'skipperName', 'capacity', 'showAvailability', 'availableSeats', 'berthPreference', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['name', 'model', 'boatType', 'skipperName', 'capacity', 'showAvailability', 'availableSeats', 'berthPreference', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 70
+        && request.resource.data.model is string
+        && request.resource.data.model.size() > 0
+        && request.resource.data.model.size() <= 100
+        && request.resource.data.boatType in ['Catamarano', 'Monoscafo', 'Gommone', 'Altro']
+        && request.resource.data.skipperName is string
+        && request.resource.data.skipperName.size() > 0
+        && request.resource.data.skipperName.size() <= 100
+        && request.resource.data.capacity is int
+        && request.resource.data.capacity >= 1
+        && request.resource.data.capacity <= 30
+        && request.resource.data.showAvailability is bool
+        && request.resource.data.berthPreference in ['not_specified', 'cabin_female', 'cabin_male', 'dinette', 'crew_cabin', 'other']
+        && request.resource.data.updatedAt == request.time
+        && ((request.resource.data.showAvailability == true
+          && request.resource.data.availableSeats is int
+          && request.resource.data.availableSeats >= 0
+          && request.resource.data.availableSeats <= request.resource.data.capacity)
+          || (request.resource.data.showAvailability == false
+            && request.resource.data.availableSeats == null
+            && request.resource.data.berthPreference == 'not_specified'));
+    }
+
     match /events/egadi-2026 {
       // Anche il documento evento resta non leggibile dall'area privata chiusa.
       allow read: if isPrivateAreaOpen() && isOrganizer();
       allow write: if isOrganizer();
+    }
+
+    match /events/egadi-2026/publicFleet/{publicId} {
+      // Dati dichiarati dallo skipper per la sola vetrina: nessun contatto,
+      // UID, ID barca, invito, Crew List o pagamento è presente qui.
+      allow get, list: if isPublicFleetEnabled();
+      allow create, update: if isPrivateAreaOpen()
+        && isPublicFleetOwner(publicId)
+        && matchesPrivateFleetBoat(publicId)
+        && hasValidPublicFleetProfile();
+      allow delete: if isPrivateAreaOpen() && (isOrganizer() || isPublicFleetOwner(publicId));
+    }
+
+    match /events/egadi-2026/publicFleetOwners/{publicId} {
+      // È un legame tecnico non leggibile dal web: non contiene alcun dato
+      // Crew List e, dopo la creazione, può solo essere riscritto identico.
+      allow create: if isPrivateAreaOpen()
+        && isGoogleSkipperAccount()
+        && publicId.matches('^[a-f0-9]{48}$')
+        && request.resource.data.keys().hasAll(['skipperId'])
+        && request.resource.data.keys().hasOnly(['skipperId'])
+        && request.resource.data.skipperId == request.auth.uid
+        && existsAfter(/databases/$(database)/documents/boats/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/boats/$(request.auth.uid)).data.skipperId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/boats/$(request.auth.uid)).data.publicFleetId == publicId;
+      allow update: if isPrivateAreaOpen()
+        && isGoogleSkipperAccount()
+        && resource.data.skipperId == request.auth.uid
+        && request.resource.data == resource.data;
+      allow read, delete: if false;
     }
 
     // Indice pseudonimo: non contiene nome, telefono o Crew List. È creato
@@ -336,7 +422,11 @@ service cloud.firestore {
       allow create: if isPrivateAreaOpen() && isGoogleSkipperAccount() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid;
       allow update: if isPrivateAreaOpen() && (isOrganizer() || (isSkipper(boatId)
         && request.resource.data.skipperId == resource.data.skipperId
-        && request.resource.data.eventId == resource.data.eventId));
+        && request.resource.data.eventId == resource.data.eventId
+        // L'ID della vetrina può essere aggiunto alla barca legacy una sola
+        // volta, poi resta immutabile per non sostituire una card esistente.
+        && (!resource.data.keys().hasAll(['publicFleetId'])
+          || request.resource.data.publicFleetId == resource.data.publicFleetId)));
       allow delete: if isPrivateAreaOpen() && isOrganizer();
 
       match /invites/{inviteId} {
