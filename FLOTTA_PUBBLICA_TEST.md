@@ -44,3 +44,10 @@ L'interruttore può essere riportato a `false` per nascondere subito la flotta p
 - Rules candidate pubblicate su Firestore il giorno 11 settembre 2026.
 - Lettura riservata successiva: area skipper attiva, flotta pubblica attiva, zero card presenti e zero anomalie di schema.
 - Smoke anonimo su `https://egadi.thatsablast.it/flotta.html`: visualizzato correttamente lo stato iniziale “La flotta si sta formando”, senza errore di autorizzazione e senza dati riservati.
+
+## Visibilità predefinita
+
+- Quando uno skipper registra una barca, la card pubblica e i posti disponibili partono visibili per impostazione iniziale.
+- Lo skipper può in seguito nascondere soltanto i posti e la configurazione: nome barca, modello, tipo, skipper e capienza restano nella flotta pubblica.
+- Le barche già registrate ricevono la card con un batch atomico alla prima apertura dell'area skipper; il vecchio valore predefinito non viene scambiato per una scelta esplicita di privacy.
+- Smoke reale dell'11 settembre 2026: la prima card è stata caricata anonimamente senza campi di contatto, Crew List, inviti o pagamenti.
