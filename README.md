@@ -80,9 +80,6 @@ Lo skipper pubblica per la propria barca le regole di bordo, ritrovo, imbarco, p
 ## Da fare prima dell'uso con partecipanti
 
 Ogni invito personale ha un codice casuale a 192 bit nel link e viene legato alla sessione tecnica aperta da chi lo utilizza. Il link associa già quella persona alla barca e allo skipper corretti; il partecipante non deve scegliere un account. Può leggere e aggiornare soltanto la propria anagrafica, bacheca e richieste; skipper e organizzatore mantengono l'accesso operativo alla barca. Il link è una chiave personale: se viene aperto da un altro browser, quell'accesso diventa quello corrente e il precedente perde l'accesso ai contenuti, ma chi possiede ancora il link può reclamarlo di nuovo. Non inoltrarlo: può esporre anche l'anagrafica già compilata. Prima dell'apertura reale servono una scadenza e una procedura di revoca/nuovo invito.
-
-La sequenza di apertura è obbligatoria: pubblicare le Rules con `privateAreaEnabled` assente o `false`, completare l'informativa privacy e i test con dati fittizi, poi attivare l'interfaccia e infine impostare `privateAreaEnabled: true` nel documento evento. Finché il flag non è vero, un client Firebase diretto non può creare, leggere o aggiornare barche, inviti, Crew List, bacheca o richieste.
-
 La sequenza di apertura è obbligatoria: pubblicare le Rules con `privateAreaEnabled` assente o `false`, completare l'informativa privacy e i test con dati fittizi, poi attivare l'interfaccia e infine impostare `privateAreaEnabled: true` nel documento evento. Finché il flag non è vero, un client Firebase diretto non può creare, leggere o aggiornare barche, inviti, Crew List, bacheca o richieste.
 
 ## Pubblicazione
