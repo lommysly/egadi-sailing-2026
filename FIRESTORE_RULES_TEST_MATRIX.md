@@ -63,4 +63,4 @@ L'interfaccia conta inviti e membri unici rispetto a `capacity`, definito come n
 
 ## Chiusura del test
 
-Annotare data, ambiente, regola pubblicata e risultato di ogni caso. Nel progetto live `privateAreaEnabled` resta assente o `false` finché non sono chiusi Privacy, provider Email/Password, test delle Rules, test browser e procedura di riemissione. HTTPS valido è necessario, ma non sostituisce questi controlli.
+Annotare data, ambiente, regola pubblicata e risultato di ogni caso. Nel progetto live `privateAreaEnabled` è stato attivato l'11 settembre 2026 con autorizzazione esplicita del titolare; per una chiusura immediata riportarlo a `false` e pubblicare anche `PRIVATE_AREA_ENABLED=false`. HTTPS resta necessario, ma non sostituisce i controlli privacy e operativi ancora aperti.

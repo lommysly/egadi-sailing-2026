@@ -1,6 +1,6 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verificato, non autorizzano l'apertura dell'area privata.
+Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
 
 ## Sito pubblico e contenuti
 
@@ -12,7 +12,7 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] Nome e dati della barca modificabili dallo skipper; una sola barca per skipper.
 - [x] Bacheca per barca con regole versionate, orari, comunicazioni e conferma di lettura dell'equipaggio.
 - [x] HTTPS pubblico verificato su `egadi.thatsablast.it`; HTTP reindirizza a HTTPS e la pagina anonima non mostra Crew List, inviti, pagamenti o dati personali.
-- [x] Con area chiusa, anche il modulo crew pubblicato resta disattivato e non invia dati a Firebase.
+- [x] Area privata attiva su HTTPS: accesso skipper con Google e equipaggio solo tramite invito personale.
 
 ## Nuovo accesso equipaggio
 
@@ -22,9 +22,9 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] Sorgente locale: un numero WhatsApp può avere una sola barca attiva nell'evento; il secondo invito viene bloccato dopo l'attivazione.
 - [x] Sorgente locale: nessun PIN viene scritto in Firestore, Crew List o browser.
 - [x] Sorgente locale: Face ID / impronta non sono mostrati come disponibili; una vera passkey resta fuori da questa versione.
-- [ ] Pubblicare il nuovo sorgente su GitHub Pages, mantenendo `PRIVATE_AREA_ENABLED=false`.
-- [ ] Pubblicare e rileggere le nuove `firestore.rules`, mantenendo `events/egadi-2026.privateAreaEnabled=false`.
-- [ ] Abilitare Firebase Authentication **Email/Password** per il codice tecnico; Google resta per skipper/organizzatore. Non attivare email-link o OTP SMS.
+- [x] Nuovo sorgente pubblicato su GitHub Pages con `PRIVATE_AREA_ENABLED=true`.
+- [x] Nuove `firestore.rules` pubblicate e rilette; `events/egadi-2026.privateAreaEnabled=true` è stato confermato dal readback.
+- [x] Firebase Authentication **Email/Password** attivo per il codice tecnico; Google resta per skipper/organizzatore. Email-link e OTP SMS non sono attivati.
 - [ ] Dopo la pubblicazione e i test, disabilitare Firebase Authentication **Anonimo** se non serve più ad altri flussi del progetto.
 
 ## Security Rules e test fittizi obbligatori
@@ -55,10 +55,10 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [ ] Esportare tre clip verticali 1080×1920 da 12–18 secondi.
 - [ ] Verificare diritti musica e audio prima della pubblicazione.
 
-## Apertura finale, solo dopo tutti i punti sopra
+## Apertura effettuata
 
-- [ ] Rileggere il commit pubblicato, il build GitHub Pages e il dominio HTTPS effettivo.
-- [ ] Con conferma esplicita del titolare, impostare insieme `PRIVATE_AREA_ENABLED=true` nel sorgente e `privateAreaEnabled: true` nel documento evento.
+- [x] Commit pubblicato, build GitHub Pages e dominio HTTPS riletti.
+- [x] Con conferma esplicita del titolare, impostati insieme `PRIVATE_AREA_ENABLED=true` nel sorgente e `privateAreaEnabled: true` nel documento evento.
 - [ ] Eseguire il test live conclusivo con skipper e una crew autorizzata, poi controllare che non esistano dati test indesiderati.
 
-HTTPS è ora valido: non è un motivo sufficiente per spuntare l'apertura finale. Il flag rimane chiuso finché questi controlli non sono completati.
+L'area è attiva: l'invito personale resta obbligatorio. I punti privacy ancora non spuntati vanno completati prima di estendere l'uso a tutta la flotta.

@@ -5,9 +5,9 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 ## Stato reale
 
 - Il sito pubblico è raggiungibile su `https://egadi.thatsablast.it/`.
-- Il certificato HTTPS è valido, ma l'area privata resta volutamente chiusa sia nell'interfaccia sia nelle Security Rules finché non sono completati test, configurazione Auth e informativa privacy.
-- `PRIVATE_AREA_ENABLED` nel sorgente e `events/egadi-2026.privateAreaEnabled` in Firestore devono rimanere `false` fino alla checklist finale. HTTPS è necessario, ma da solo non autorizza la raccolta dei dati della Crew List.
-- Questa cartella è la sorgente versionata del nuovo accesso con numero WhatsApp e codice personale. Prima dell'uso occorre pubblicare sorgente e Rules, poi eseguire il collaudo con soli dati fittizi.
+- L'area privata è attiva su HTTPS per autorizzazione esplicita del titolare: skipper con Google, equipaggio solo tramite invito WhatsApp personale e codice di sei cifre.
+- `PRIVATE_AREA_ENABLED` nel sorgente e `events/egadi-2026.privateAreaEnabled` in Firestore sono entrambi `true`. Per una chiusura di emergenza basta riportare uno dei due a `false`; per coerenza operativa vanno riportati entrambi a `false`.
+- Google ed Email/Password sono attivi; email-link e SMS non sono usati. Il dominio `egadi.thatsablast.it` è autorizzato in Firebase Authentication.
 
 ## Pagine e materiali
 
@@ -19,7 +19,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - `crew.html`: ingresso quotidiano dell'equipaggio con numero WhatsApp e codice personale.
 - `my-area.html`: area personale con scheda, bacheca, regole e richieste dedicate.
 - `crew-pdf.js`: foglio A4 orizzontale da salvare in PDF per charter / eventuali controlli; non esporta CSV.
-- `FIRESTORE_RULES_TEST_MATRIX.md`, `CHECKLIST_PUBBLICAZIONE.md` e `PRIVACY_DA_COMPLETARE.md`: controlli da chiudere prima dell'uso reale.
+- `FIRESTORE_RULES_TEST_MATRIX.md`, `CHECKLIST_PUBBLICAZIONE.md` e `PRIVACY_DA_COMPLETARE.md`: tracciabilità dei controlli, delle verifiche da completare e delle decisioni privacy da formalizzare.
 
 ## Accesso dell'equipaggio: flusso concordato
 
@@ -42,17 +42,17 @@ La pagina di attivazione imposta inoltre `Referrer-Policy: no-referrer`, così i
 - Firebase applica protezioni generiche contro l'abuso; il progetto non implementa un blocco configurabile tipo “5 tentativi per invito”, perché richiederebbe logica server-side a pagamento. Gli errori restano generici.
 - Per rendere possibile l'ingresso con il solo numero, Firestore conserva un'impronta SHA-256 del numero e un indice tecnico pubblico consultabile solo per chi conosce il numero esatto. Non contiene nome, numero, documento o Crew List; contiene l'alias tecnico e gli identificativi tecnici della barca/invito, e può rivelare che quel numero ha un accesso Egadi attivo. Va indicato nell'informativa e cancellato dopo l'evento.
 
-## Configurazione Firebase necessaria prima del test
+## Configurazione Firebase attiva
 
 Nel progetto `egadi-sailing-2026`:
 
 1. Conservare **Google** per skipper e organizzazione.
-2. Abilitare **Email/Password** in Firebase Authentication esclusivamente per la verifica tecnica del codice di 6 cifre. Non abilitare l'email-link: nessuna email viene inviata o usata dall'equipaggio.
+2. **Email/Password** è abilitato esclusivamente per la verifica tecnica del codice di 6 cifre. Email-link non è attivo: nessuna email viene inviata o usata dall'equipaggio.
 3. Configurare la policy password con minimo 6 caratteri. L'interfaccia accetta solo sei cifre; Firebase non può imporre da solo “solo cifre” con questa soluzione.
 4. Attivare la protezione contro l'enumerazione delle email se disponibile nel progetto: il codice gestisce gli errori generici di accesso.
 5. Il provider **Anonimo** non è usato dal nuovo sorgente. Disabilitarlo soltanto dopo che la nuova versione e le nuove Rules sono pubblicate e provate, così non si interrompe una sessione della versione precedente durante il passaggio.
 6. Lasciare autorizzati soltanto i domini necessari in Authentication, compreso `egadi.thatsablast.it` e, per i test locali, `127.0.0.1`.
-7. Il documento `events/egadi-2026` deve contenere `organizerIds` con il solo UID autorizzato e mantenere `privateAreaEnabled: false` fino al collaudo finale.
+7. Il documento `events/egadi-2026` contiene `organizerIds` con il solo UID autorizzato e `privateAreaEnabled: true`. Per chiudere l'operatività, riportare il flag a `false` e pubblicare anche `PRIVATE_AREA_ENABLED=false`.
 
 Non inserire in Firestore credenziali PayPal, Satispay o Revolut, carte, coordinate o IBAN, alias o link dei provider, PIN, OTP o chiavi di pagamento. Il sito conserva soltanto il nome di chi raccoglie il contributo e i tag PayPal, Satispay, Revolut o bonifico.
 
@@ -61,7 +61,7 @@ Non inserire in Firestore credenziali PayPal, Satispay o Revolut, carte, coordin
 ```text
 events/egadi-2026
   organizerIds: [uid]
-  privateAreaEnabled: false
+  privateAreaEnabled: true
 
 boats/{skipperUid}
   name, model, capacity, homePort, flag, skipperId, eventId
@@ -110,14 +110,12 @@ Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvis
 
 Il sito non incassa denaro, non genera o valida link dei provider e non dichiara pagamenti come eseguiti. Lo skipper configura il proprio nome e i tag PayPal, Satispay, Revolut e/o bonifico, quindi crea una richiesta con importo, causale, scadenza e una o più alternative. Eventuali link, alias o coordinate vengono scritti solo nel messaggio WhatsApp al momento dell'invio e non sono salvati. Il pagamento avviene fuori dal sito e può essere segnato come verificato solo dopo controllo manuale dell'accredito reale.
 
-## Sequenza obbligatoria di apertura
+## Attivazione operativa
 
-1. Versionare e pubblicare questo sorgente e le Security Rules, mantenendo l'area chiusa.
-2. Abilitare il provider Email/Password e verificare i domini autorizzati.
-3. Provare nel Playground/emulatore tutti i casi di `FIRESTORE_RULES_TEST_MATRIX.md` con UID, nomi e numeri fittizi.
-4. Eseguire un test browser con skipper e crew fittizi: primo invito, numero + codice, compilazione, ingresso successivo, PDF, bacheca, revoca e nuovo invito.
-5. Chiudere e pubblicare l'informativa privacy definitiva, inclusi indice tecnico, Firebase Authentication e tempi di cancellazione.
-6. Rileggere il sito realmente pubblicato su HTTPS.
-7. Solo allora, con conferma del titolare, impostare `privateAreaEnabled: true` e `PRIVATE_AREA_ENABLED=true`, quindi eseguire il test live finale.
+1. Il sorgente, le Security Rules e il dominio HTTPS sono pubblicati.
+2. Google, Email/Password e il dominio autorizzato sono stati riletti; email-link resta disattivato.
+3. Con autorizzazione del titolare dell'11 settembre 2026 sono stati attivati insieme `PRIVATE_AREA_ENABLED=true` e `privateAreaEnabled: true`.
+4. Il primo utilizzo deve partire dallo skipper: Google, verifica della barca `Karibu`, poi un invito personale a una persona alla volta.
+5. Restano da completare e formalizzare i punti in `PRIVACY_DA_COMPLETARE.md`, in particolare contatto, tempi di conservazione e procedura di cancellazione.
 
-Un deploy del sito pubblico o un certificato HTTPS valido non sostituiscono gli altri passaggi.
+L'invito resta obbligatorio: l'apertura dell'area non crea una registrazione pubblica libera.
