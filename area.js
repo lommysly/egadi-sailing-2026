@@ -25,6 +25,7 @@ const PAYMENT_METHODS = [
   { id: 'revolut', label: 'Revolut', profileField: 'revolutEnabled' },
   { id: 'bankTransfer', label: 'Bonifico', profileField: 'bankTransferEnabled' },
 ];
+const FLEET_BOAT_TYPES = new Set(['Catamarano', 'Monoscafo', 'Gommone', 'Altro']);
 const FLEET_BERTH_PREFERENCES = new Set(['not_specified', 'cabin_female', 'cabin_male', 'dinette', 'crew_cabin', 'other']);
 let activeBoat = null;
 let activeMembers = [];
@@ -44,6 +45,7 @@ let stopAcceptanceSubscription = null;
 let creatingBoat = false;
 let editingBoatId = null;
 let editingMemberId = null;
+const fleetPublicationInProgress = new Set();
 
 function setMessage(element, message, isError = false) {
   element.textContent = message;
@@ -77,18 +79,35 @@ function declaredFleetAvailability(boat) {
   return Number.isInteger(capacity) && capacity > 0 ? capacity : 0;
 }
 
+function hasValidFleetAvailability(boat) {
+  const capacity = Number(boat?.capacity);
+  return Number.isInteger(boat?.fleetAvailableSeats)
+    && boat.fleetAvailableSeats >= 0
+    && boat.fleetAvailableSeats <= capacity;
+}
+
+function declaredFleetBoatType(boat) {
+  return FLEET_BOAT_TYPES.has(boat?.boatType) ? boat.boatType : 'Altro';
+}
+
 function declaredFleetBerthPreference(boat) {
   return FLEET_BERTH_PREFERENCES.has(boat?.fleetBerthPreference)
     ? boat.fleetBerthPreference
     : 'not_specified';
 }
 
+function isFleetAvailabilityPublic(boat) {
+  // Prima di questa pubblicazione non esisteva una scelta persistita: anche
+  // l'eventuale `false` legacy era il vecchio default, non un opt-out dello skipper.
+  return boat?.fleetPublicProfileReady !== true || boat?.fleetShowAvailability !== false;
+}
+
 function publicFleetProfile(boat) {
-  const showAvailability = boat.fleetShowAvailability === true;
+  const showAvailability = isFleetAvailabilityPublic(boat);
   return {
     name: String(boat.name || '').trim(),
     model: String(boat.model || '').trim(),
-    boatType: String(boat.boatType || 'Altro').trim(),
+    boatType: declaredFleetBoatType(boat),
     skipperName: String(boat.skipperName || '').trim(),
     capacity: Number(boat.capacity),
     showAvailability,
@@ -100,7 +119,8 @@ function publicFleetProfile(boat) {
 
 async function saveBoatAndPublicFleet(boatId, currentBoat, changes, isNew = false) {
   if (!boatId || !auth.currentUser) throw new Error('Barca non disponibile.');
-  const nextBoat = { ...currentBoat, ...changes, id: boatId };
+  const privateChanges = { ...changes, fleetPublicProfileReady: true };
+  const nextBoat = { ...currentBoat, ...privateChanges, id: boatId };
   if (!nextBoat.publicFleetId) throw new Error('Profilo flotta mancante.');
 
   // La barca e la sua card pubblica viaggiano nello stesso batch: non può
@@ -108,9 +128,9 @@ async function saveBoatAndPublicFleet(boatId, currentBoat, changes, isNew = fals
   const batch = writeBatch(db);
   const boatRef = doc(db, 'boats', boatId);
   if (isNew) {
-    batch.set(boatRef, { ...changes, createdAt: serverTimestamp() });
+    batch.set(boatRef, { ...privateChanges, createdAt: serverTimestamp() });
   } else {
-    batch.update(boatRef, changes);
+    batch.update(boatRef, privateChanges);
   }
   // L'associazione privata e immutabile impedisce che un altro skipper possa
   // riutilizzare l'identificativo casuale di una barca già pubblicata.
@@ -127,7 +147,47 @@ function renderFleetProfileForm() {
   if (!form || !activeBoat) return;
   form.elements.availableSeats.value = String(declaredFleetAvailability(activeBoat));
   form.elements.berthPreference.value = declaredFleetBerthPreference(activeBoat);
-  form.elements.showAvailability.checked = activeBoat.fleetShowAvailability === true;
+  form.elements.showAvailability.checked = isFleetAvailabilityPublic(activeBoat);
+}
+
+function fleetInitializationChanges(boat) {
+  const changes = {};
+  const isLegacyFleetProfile = boat.fleetPublicProfileReady !== true;
+  const boatType = declaredFleetBoatType(boat);
+  const berthPreference = declaredFleetBerthPreference(boat);
+  if (!boat.publicFleetId) changes.publicFleetId = createPublicFleetId();
+  if (boat.boatType !== boatType) changes.boatType = boatType;
+  if (isLegacyFleetProfile || !hasValidFleetAvailability(boat)) {
+    changes.fleetAvailableSeats = declaredFleetAvailability({ capacity: boat.capacity });
+  }
+  if (isLegacyFleetProfile || typeof boat.fleetShowAvailability !== 'boolean') changes.fleetShowAvailability = true;
+  if (boat.fleetBerthPreference !== berthPreference) changes.fleetBerthPreference = berthPreference;
+  if (boat.fleetPublicProfileReady !== true) changes.fleetPublicProfileReady = true;
+  return changes;
+}
+
+async function publishExistingBoatToFleet(boat) {
+  if (!canUsePrivateArea() || !boat?.id || !auth.currentUser || boat.skipperId !== auth.currentUser.uid) return;
+  const changes = fleetInitializationChanges(boat);
+  if (!Object.keys(changes).length || fleetPublicationInProgress.has(boat.id)) return;
+
+  fleetPublicationInProgress.add(boat.id);
+  const message = document.querySelector('#fleetProfileMessage');
+  setMessage(message, 'Aggiungo la tua barca alla flotta pubblica…');
+  try {
+    const publishedBoat = await saveBoatAndPublicFleet(boat.id, boat, changes);
+    if (activeBoat?.id === boat.id) {
+      activeBoat = publishedBoat;
+      renderFleetProfileForm();
+      setMessage(message, publishedBoat.fleetShowAvailability
+        ? 'Partecipazione pubblicata: anche i posti disponibili sono visibili.'
+        : 'Partecipazione pubblicata: i posti disponibili restano privati.');
+    }
+  } catch (error) {
+    setMessage(message, 'Non riesco ad aggiungere automaticamente la barca alla flotta. Verifica le regole Firestore.', true);
+  } finally {
+    fleetPublicationInProgress.delete(boat.id);
+  }
 }
 
 function resetPrivateView() {
@@ -141,6 +201,7 @@ function resetPrivateView() {
   creatingBoat = false;
   editingBoatId = null;
   editingMemberId = null;
+  fleetPublicationInProgress.clear();
   stopBoatSubscription?.();
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
@@ -605,6 +666,7 @@ function subscribeToBoat(boat) {
   document.querySelector('#boatTitle').textContent = boat.name;
   document.querySelector('#boatMeta').textContent = boat.model + ' · ' + boat.capacity + ' posti equipaggio · ' + boat.homePort;
   renderFleetProfileForm();
+  void publishExistingBoatToFleet(boat);
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
   stopPaymentProfileSubscription?.();
@@ -704,7 +766,7 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
       skipperName: fields.get('skipperName').trim(), note: fields.get('note').trim(), skipperId: user.uid,
       publicFleetId: activeBoat?.publicFleetId || createPublicFleetId(),
       fleetAvailableSeats: Math.min(previousAvailability, capacity),
-      fleetShowAvailability: activeBoat?.fleetShowAvailability === true,
+      fleetShowAvailability: isFleetAvailabilityPublic(activeBoat),
       fleetBerthPreference: declaredFleetBerthPreference(activeBoat),
       eventId, updatedAt: serverTimestamp(),
     };
