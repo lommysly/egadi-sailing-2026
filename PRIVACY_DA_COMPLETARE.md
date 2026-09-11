@@ -6,7 +6,7 @@ Questa è una scheda operativa, non sostituisce una consulenza legale. `privacy.
 
 | Tema | Decisione da registrare prima dell'uso reale |
 | --- | --- |
-| Titolare | Nome o ragione sociale, indirizzo di contatto per esercitare i diritti e canale di risposta. |
+| Titolare | **Lomastro Silvio**. Manca ancora il canale di contatto dedicato per esercitare i diritti e ricevere risposta. |
 | Finalità | Gestione inviti, Crew List, sicurezza e organizzazione della barca; distinguere le eventuali comunicazioni facoltative. |
 | Dati | Anagrafica, documento, ruolo/cabina, contatti opzionali, numero WhatsApp dell'invitato e richieste di contributo descrittive. Verificare se ogni campo è davvero necessario. |
 | Base giuridica | Definire la base corretta per ogni finalità con il titolare o un consulente, senza usare un consenso generico come scorciatoia. |

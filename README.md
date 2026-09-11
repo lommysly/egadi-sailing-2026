@@ -6,13 +6,14 @@ Sito pubblico statico e futura area privata per skipper ed equipaggi. Il progett
 
 - `index.html`: sito pubblico, presentazione della flotta e collegamento al briefing comune.
 - `passage-plan.html`: unica pagina pubblica per meteo e Passage Plan, alimentata da `passage-plan-data.js`.
+- `film.html`: storyboard pubblico del film, senza incorporare video prima delle verifiche di licenza.
 - `PASSAGE_PLAN_PROMPT.md`: modello per aggiornare il briefing a T−30, T−10, T−5, T−72/48 e durante il viaggio.
 - `area.html`: area skipper con Google Sign-In via finestra popup, registrazione barca, Crew List, bacheca di bordo, inviti WhatsApp e richieste di contributo solo descrittive.
 - `participant.html`: compilazione della Crew List dal link WhatsApp personale; dopo il salvataggio compare una conferma e la persona viene portata nella propria area.
 - `my-area.html`: area personale con riepilogo dei dati inviati, bacheca della barca, regole e richieste dedicate.
 - `crew.html`: istruzioni per recuperare il proprio invito chiedendo allo skipper di reinviarlo.
 - `privacy.html`: principi da completare con informativa definitiva prima della raccolta dati.
-- `firestore.rules`: regole di accesso pubblicate per il progetto Firebase; skipper e organizzatore vedono solo le barche autorizzate.
+- `firestore.rules`: sorgente delle regole di accesso, con gate server-side da pubblicare; l'area privata sarà negata finché il flag amministrativo dell'evento non viene aperto dal titolare.
 - `FIRESTORE_RULES_TEST_MATRIX.md`: casi fittizi da provare nel Playground o nell'emulatore prima del test live.
 - `CONTRIBUTI_OPERATIVI.md`, `PRIVACY_DA_COMPLETARE.md` e `MEDIA_REGISTER_TEMPLATE.md`: procedure e materiali da completare prima dell'uso reale.
 
@@ -22,7 +23,7 @@ Il progetto Firebase separato `egadi-sailing-2026` e l'app web sono stati creati
 
 1. Attivare Firebase Authentication con Google per skipper e organizzazione e `Anonimo` per l'equipaggio. L'invito WhatsApp è l'unica chiave personale del partecipante: non richiede Google, password né OTP SMS.
 2. Accedere una prima volta con l'account organizzatore e annotarne l'UID dalla console Firebase Authentication.
-3. Creare dalla console il documento `events/egadi-2026` con il campo `organizerIds`, un array che contiene esclusivamente quell'UID. La configurazione iniziale e' gia' stata eseguita per l'organizzatore corrente.
+3. Creare dalla console il documento `events/egadi-2026` con il campo `organizerIds`, un array che contiene esclusivamente quell'UID. La configurazione iniziale e' gia' stata eseguita per l'organizzatore corrente. Lasciare assente o impostare a `false` il campo booleano `privateAreaEnabled`: in entrambi i casi le Rules negano le operazioni sulle barche.
 4. Testare le Security Rules nel simulatore: organizzazione, skipper della propria barca e utente estraneo. Le regole presenti non danno accesso diretto ai partecipanti.
 5. Per il test locale aggiungere `127.0.0.1` in Firebase Authentication > Impostazioni > Domini autorizzati. Prima della pubblicazione aggiungere anche il dominio reale del sito; non usare un elenco aperto di domini.
 
@@ -78,7 +79,9 @@ Lo skipper pubblica per la propria barca le regole di bordo, ritrovo, imbarco, p
 
 ## Da fare prima dell'uso con partecipanti
 
-Ogni invito personale ha un codice casuale a 192 bit nel link e viene legato alla sessione tecnica aperta da chi lo utilizza. Il link associa già quella persona alla barca e allo skipper corretti; il partecipante non deve scegliere un account. Può leggere e aggiornare soltanto la propria anagrafica, bacheca e richieste; skipper e organizzatore mantengono l'accesso operativo alla barca. Se perde il messaggio WhatsApp, lo skipper può reinviare lo stesso link dall'area della barca. Il link è una chiave personale: se viene aperto da un altro browser, quell'accesso diventa quello corrente e il precedente perde l'accesso ai contenuti. Non inoltrarlo.
+Ogni invito personale ha un codice casuale a 192 bit nel link e viene legato alla sessione tecnica aperta da chi lo utilizza. Il link associa già quella persona alla barca e allo skipper corretti; il partecipante non deve scegliere un account. Può leggere e aggiornare soltanto la propria anagrafica, bacheca e richieste; skipper e organizzatore mantengono l'accesso operativo alla barca. Il link è una chiave personale: se viene aperto da un altro browser, quell'accesso diventa quello corrente e il precedente perde l'accesso ai contenuti, ma chi possiede ancora il link può reclamarlo di nuovo. Non inoltrarlo: può esporre anche l'anagrafica già compilata. Prima dell'apertura reale servono una scadenza e una procedura di revoca/nuovo invito.
+
+La sequenza di apertura è obbligatoria: pubblicare le Rules con `privateAreaEnabled` assente o `false`, completare l'informativa privacy e i test con dati fittizi, poi attivare l'interfaccia e infine impostare `privateAreaEnabled: true` nel documento evento. Finché il flag non è vero, un client Firebase diretto non può creare, leggere o aggiornare barche, inviti, Crew List, bacheca o richieste.
 
 ## Pubblicazione
 

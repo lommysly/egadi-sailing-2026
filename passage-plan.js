@@ -19,7 +19,16 @@
   $("#planPhase").textContent = data.phase || "—";
   $("#planConfidence").textContent = data.confidence || "—";
   $("#planSummary").textContent = data.summary || "—";
-  $("#planSources").textContent = data.sourceNote || "—";
+  const sourceElement = $("#planSources");
+  sourceElement.replaceChildren(document.createTextNode(data.sourceNote || "—"));
+  if (data.sourceUrl) {
+    const sourceLink = document.createElement('a');
+    sourceLink.href = data.sourceUrl;
+    sourceLink.target = '_blank';
+    sourceLink.rel = 'noopener noreferrer';
+    sourceLink.textContent = data.sourceLabel || 'Apri la fonte';
+    sourceElement.append(' ', sourceLink);
+  }
   $("#planUpdatedAt").textContent = data.updatedAt
     ? `Aggiornato il ${data.updatedAt}`
     : "Nessun bollettino meteo operativo ancora pubblicato.";

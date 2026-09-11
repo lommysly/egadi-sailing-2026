@@ -8,7 +8,9 @@ window.PASSAGE_PLAN_DATA = {
   confidence: "Astronomia alta · meteo non previsionale",
   status: "Pianificazione iniziale pubblicata",
   summary: "Questo è il primo quadro per organizzare la flotta: conferma l'itinerario flessibile e la luce disponibile in ogni giornata. Non contiene una previsione di vento, onda o correnti; quella verrà pubblicata solo nella finestra utile, con fonti e ora di emissione.",
-  sourceNote: "Consultazione astronomica: 11 settembre 2026, 01:56 CEST. Fonte: U.S. Naval Observatory Data API (https://aa.usno.navy.mil/data/api), fuso Europe/Rome. Punti di pianificazione: Marsala 37.80 N, 12.44 E; Levanzo 38.02 N, 12.34 E; Marettimo 37.97 N, 12.06 E; Favignana 37.93 N, 12.33 E. Meteo marino, correnti, ordinanze e disponibilità di ormeggio non sono ancora dati previsionali: saranno confrontati nel briefing operativo con fonti ufficiali e verifica reale dello skipper.",
+  sourceNote: "Consultazione astronomica: 11 settembre 2026, 01:56 CEST. Fonte: U.S. Naval Observatory Data API, fuso Europe/Rome. Punti di pianificazione: Marsala 37.80 N, 12.44 E; Levanzo 38.02 N, 12.34 E; Marettimo 37.97 N, 12.06 E; Favignana 37.93 N, 12.33 E. Meteo marino, correnti, ordinanze e disponibilità di ormeggio non sono ancora dati previsionali: saranno confrontati nel briefing operativo con fonti ufficiali e verifica reale dello skipper.",
+  sourceUrl: "https://aa.usno.navy.mil/data/api",
+  sourceLabel: "Apri la fonte astronomica",
   days: [
     {
       date: "Giovedì 8 ottobre",

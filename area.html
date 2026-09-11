@@ -12,19 +12,20 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="area-page">
+  <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
   <header class="site-header">
     <a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
     <nav class="site-nav always-visible" aria-label="Navigazione principale"><a href="index.html">Torna al sito</a><a href="#accesso">Accesso</a></nav>
   </header>
-  <main class="area-main">
+  <main id="main-content" class="area-main">
     <section class="area-hero">
-      <p class="eyebrow">Area privata · un solo equipaggio alla volta</p>
+      <p class="eyebrow">Area privata · una barca per skipper</p>
       <h1>La tua barca.<br /><em>La tua crew.</em></h1>
       <p>Accesso personale, dati separati per barca e nessun pagamento gestito dal sito. La Crew List resta visibile soltanto allo skipper della barca.</p>
     </section>
     <section id="accesso" class="access-cards access-cards-single">
       <article id="signInCard">
-        <p class="eyebrow">Accesso protetto</p><h2>Entra con Google</h2><p>Lo skipper accede con il proprio account, poi registra e gestisce soltanto le proprie barche.</p>
+        <p class="eyebrow">Accesso protetto</p><h2>Entra con Google</h2><p>Lo skipper accede con il proprio account, poi registra e gestisce soltanto la propria barca.</p>
         <button id="signInButton" class="button button-primary" type="button">Continua con Google</button>
         <p id="authMessage" class="form-message" role="status" aria-live="polite"></p>
       </article>
@@ -50,7 +51,7 @@
         <div class="form-actions"><button id="boatSubmitButton" class="button button-primary" type="submit">Registra la barca</button><button id="cancelBoatEdit" class="text-button" type="button" hidden>Annulla modifica</button><p id="boatFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
       </form>
       <div class="steps-grid">
-        <div><span>1</span><h3>Registra</h3><p>Nome, modello, posti, porto, skipper e contatto operativo.</p></div>
+        <div><span>1</span><h3>Registra</h3><p>Nome, modello, posti, porto, skipper e contatto operativo della barca.</p></div>
         <div><span>2</span><h3>Organizza</h3><p>La Crew List resta privata allo skipper finché non sarà attivata la scheda personale per ogni partecipante.</p></div>
         <div><span>3</span><h3>Conferma</h3><p>Controlli dati, cabine e contributi senza fogli condivisi.</p></div>
       </div>

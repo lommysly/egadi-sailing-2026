@@ -8,18 +8,4 @@
       menuButton.textContent = isOpen ? 'Chiudi' : 'Menu';
     });
   }
-
-  const dialog = document.querySelector('#setupDialog');
-  const dialogTitle = document.querySelector('#dialogTitle');
-  document.querySelectorAll('.setup-action').forEach((button) => {
-    button.addEventListener('click', () => {
-      if (dialogTitle) {
-        dialogTitle.textContent = button.dataset.action === 'skipper'
-          ? 'Accesso skipper'
-          : 'Accesso Crew List';
-      }
-      dialog?.showModal();
-    });
-  });
-  document.querySelector('.dialog-close')?.addEventListener('click', () => dialog?.close());
 })();

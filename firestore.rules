@@ -10,6 +10,13 @@ service cloud.firestore {
       return signedIn() && request.auth.uid in get(/databases/$(database)/documents/events/egadi-2026).data.organizerIds;
     }
 
+    // L'area privata resta negata di default. Il titolare la apre soltanto
+    // dopo informativa definitiva e test, impostando il flag amministrativo.
+    function isPrivateAreaOpen() {
+      return exists(/databases/$(database)/documents/events/egadi-2026)
+        && get(/databases/$(database)/documents/events/egadi-2026).data.privateAreaEnabled == true;
+    }
+
     function isSkipper(boatId) {
       return signedIn() && get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid;
     }
@@ -46,73 +53,75 @@ service cloud.firestore {
     }
 
     match /events/egadi-2026 {
-      allow read: if signedIn();
+      // Anche il documento evento resta non leggibile dall'area privata chiusa.
+      // Le funzioni Rules possono comunque consultarlo per autorizzare il titolare.
+      allow read: if isPrivateAreaOpen() && signedIn();
       allow write: if isOrganizer();
     }
 
     match /boats/{boatId} {
-      allow read: if isOrganizer() || resource.data.skipperId == request.auth.uid;
-      allow create: if signedIn() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid;
-      allow update: if isOrganizer() || (isSkipper(boatId)
+      allow read: if isPrivateAreaOpen() && (isOrganizer() || resource.data.skipperId == request.auth.uid);
+      allow create: if isPrivateAreaOpen() && signedIn() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid;
+      allow update: if isPrivateAreaOpen() && (isOrganizer() || (isSkipper(boatId)
         && request.resource.data.skipperId == resource.data.skipperId
-        && request.resource.data.eventId == resource.data.eventId);
-      allow delete: if isOrganizer();
+        && request.resource.data.eventId == resource.data.eventId));
+      allow delete: if isPrivateAreaOpen() && isOrganizer();
 
       match /invites/{inviteId} {
         // Il codice a 192 bit nel link WhatsApp è la chiave personale dell'invito.
         // Gli inviti non sono elencabili: si può leggere solo conoscendo il codice esatto.
-        allow get: if signedIn();
-        allow list: if isOrganizer() || isSkipper(boatId);
-        allow create: if (isOrganizer() || isSkipper(boatId)) && request.resource.data.boatId == boatId;
-        allow delete: if isOrganizer() || isSkipper(boatId);
-        allow update: if isOrganizer() || isSkipper(boatId) || canClaimInvite();
+        allow get: if isPrivateAreaOpen() && signedIn();
+        allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+        allow create: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId)) && request.resource.data.boatId == boatId;
+        allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+        allow update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || canClaimInvite());
       }
 
       match /members/{memberId} {
-        allow read: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId);
-        allow create: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId);
-        allow update: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId);
-        allow delete: if isOrganizer() || isSkipper(boatId);
+        allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId));
+        allow create: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId));
+        allow update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId));
+        allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
       }
 
       match /paymentRequests/{requestId} {
-        allow read: if isOrganizer() || isSkipper(boatId) || (resource.data.recipientId is string && isInviteHolder(boatId, resource.data.recipientId));
-        allow create, update: if isOrganizer() || isSkipper(boatId);
-        allow delete: if isOrganizer();
+        allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || (resource.data.recipientId is string && isInviteHolder(boatId, resource.data.recipientId)));
+        allow create, update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+        allow delete: if isPrivateAreaOpen() && isOrganizer();
       }
 
       match /participantAccess/{userId} {
-        allow get: if isOrganizer() || isSkipper(boatId) || (signedIn() && userId == request.auth.uid);
-        allow list: if isOrganizer() || isSkipper(boatId) || (signedIn() && resource.data.userId == request.auth.uid);
-        allow create, update: if signedIn() && userId == request.auth.uid
+        allow get: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || (signedIn() && userId == request.auth.uid));
+        allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || (signedIn() && resource.data.userId == request.auth.uid));
+        allow create, update: if isPrivateAreaOpen() && signedIn() && userId == request.auth.uid
           && request.resource.data.inviteId is string
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.boatId == boatId
           && isInviteHolder(boatId, request.resource.data.inviteId);
-        allow delete: if isOrganizer() || isSkipper(boatId);
+        allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
       }
 
       match /briefing/{briefingId} {
-        allow read: if isOrganizer() || isSkipper(boatId) || isBoatParticipant(boatId);
-        allow create, update, delete: if isOrganizer() || isSkipper(boatId);
+        allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isBoatParticipant(boatId));
+        allow create, update, delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
       }
 
       match /announcements/{announcementId} {
-        allow read: if isOrganizer() || isSkipper(boatId) || isBoatParticipant(boatId);
-        allow create, update, delete: if isOrganizer() || isSkipper(boatId);
+        allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isBoatParticipant(boatId));
+        allow create, update, delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
       }
 
       match /ruleAcceptances/{inviteId} {
-        allow get: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, inviteId);
-        allow list: if isOrganizer() || isSkipper(boatId);
-        allow create, update: if isOrganizer() || isSkipper(boatId) || isValidRuleAcceptance(boatId, inviteId);
-        allow delete: if isOrganizer() || isSkipper(boatId);
+        allow get: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, inviteId));
+        allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+        allow create, update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isValidRuleAcceptance(boatId, inviteId));
+        allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
 
         match /history/{versionId} {
-          allow get: if isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, inviteId);
-          allow list: if isOrganizer() || isSkipper(boatId);
-          allow create, update: if isOrganizer() || isSkipper(boatId) || isValidRuleAcceptance(boatId, inviteId);
-          allow delete: if isOrganizer() || isSkipper(boatId);
+          allow get: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, inviteId));
+          allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+          allow create, update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isValidRuleAcceptance(boatId, inviteId));
+          allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
         }
       }
     }

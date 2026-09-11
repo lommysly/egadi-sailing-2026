@@ -23,7 +23,7 @@ Ultimo aggiornamento: 11 settembre 2026.
 - [x] Unica pagina pubblica Meteo & Passage Plan, con file dati separato e prompt operativo per aggiornamenti progressivi.
 - [x] Crediti delle foto Commons corretti con autore, fonte e licenza; nessuna foto o video di terzi è stata scaricata nel repository.
 - [x] Matrice di test delle regole e registri pronti per media e privacy: `FIRESTORE_RULES_TEST_MATRIX.md`, `MEDIA_REGISTER_TEMPLATE.md`, `PRIVACY_DA_COMPLETARE.md`.
-- [x] Blocco tecnico pre-pubblicazione dell’area privata: senza HTTPS valido oppure finché l’informativa privacy è una bozza non si avviano accessi né raccolta di anagrafiche.
+- [ ] Pubblicare e testare il blocco server-side dell’area privata: il flag Firestore `privateAreaEnabled` deve restare assente o `false` finché l’informativa privacy è una bozza; in quel caso le Rules devono negare anche i client Firebase diretti.
 
 ## Da verificare prima di raccogliere dati reali
 
@@ -32,9 +32,10 @@ Ultimo aggiornamento: 11 settembre 2026.
 - [ ] Test delle regole live: skipper della propria barca, organizzatore e account estraneo senza accesso.
 - [ ] Invio WhatsApp di prova, apertura del link personale, compilazione di una Crew List autorizzata e prova di stampa `Salva come PDF`.
 - [ ] Test della bacheca: pubblicazione skipper, lettura partecipante, conferma regole e nuova conferma dopo una modifica.
+- [ ] Implementare e testare scadenza, revoca e nuovo invito WhatsApp prima dell'apertura reale: il link è una chiave bearer e oggi chi lo possiede può reclamarlo di nuovo e leggere l'anagrafica già compilata.
 - [ ] Confronto del PDF con il modello effettivamente richiesto dal charter / Capitaneria.
 - [x] Definizione della procedura pratica per i contributi: istruzioni, causale e verifica manuale dello skipper.
-- [ ] Informativa privacy definitiva: titolare, contatto, basi giuridiche, tempi di cancellazione e procedura di consegna del PDF.
+- [ ] Informativa privacy definitiva: titolare identificato come Lomastro Silvio, contatto, basi giuridiche, tempi di cancellazione e procedura di consegna del PDF.
 - [x] Pubblicato il primo briefing T−27 con tracciabilità della fonte astronomica, coordinate, ora di consultazione e distinzione esplicita fra pianificazione e previsioni operative.
 
 ## Materiali editoriali
