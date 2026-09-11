@@ -26,6 +26,7 @@ EVENTO
 - Rientro: domenica 11 ottobre, Marsala entro le 18:00; lascia Favignana intorno alle 15:30 salvo decisione dello skipper.
 - Itinerario desiderato ma non garantito: Marsala → Levanzo → Marettimo → Favignana → Marsala.
 - Soste possibili: Levanzo (Cala Dogana, Cala Fredda, Cala Minnola, Cala Calcara, Cala Tramontana); Marettimo (porto, Punta Troia, Scalo Maestro, Cala Bianca, Punta Bassana, Cretazzo); Favignana (Cala Azzurra, Cala Rossa, Bue Marino, Cala Rotonda, Punta Lunga, Preveto, Grotta Perciata).
+- Pernottamenti desiderati: prima notte in rada a Levanzo solo se ammessa e confortevole; seconda notte in porto a Marettimo; terza notte in porto a Favignana; domenica rientro a Marsala.
 - Vincolo: vento, onda, fondali, traffico, ordinanze, disponibilità di ormeggio e decisione dello skipper possono cambiare la rotta.
 
 FINESTRA DI AGGIORNAMENTO
@@ -42,12 +43,15 @@ REGOLE DI AFFIDABILITÀ
 7. Indica temperatura aria, temperatura acqua, nuvolosità, precipitazioni, visibilità e fenomeni che cambiano comfort/sicurezza.
 8. Per ogni data calcola per la località/area della tappa: alba e tramonto del sole, fase della luna, levata e tramonto della luna. Usa fuso Europe/Rome e scrivi la fonte astronomica.
 9. Non dare istruzioni nautiche definitive e non sostituire bollettini ufficiali, avvisi ai naviganti, ordinanze o la decisione dello skipper.
+10. Distingui sempre una caletta bella da una rada idonea: una cala può essere indicata come scenario di tramonto, alba o sosta diurna, ma non come pernottamento garantito. Per ogni notte indica separatamente porto, boa autorizzata o rada da confermare dopo controllo di meteo, onda, fondale, zonazione AMP, ordinanze e disponibilità.
 
 FORMATO OBBLIGATORIO
 Restituisci prima una sintesi per l'equipaggio, chiara e non allarmistica; poi quattro schede giornaliere, una per data. Per ogni scheda usa esattamente queste etichette:
 - Data e tratta
 - Piano indicativo
+- Notte prevista
 - Alternativa / ridosso
+- Scenari di luce e soste possibili
 - Vento
 - Mare / onda
 - Aria
@@ -62,7 +66,7 @@ Chiudi con:
 - limiti del dato e variazioni fra modelli;
 - una nota di sicurezza: “La rotta e gli ancoraggi sono confermati dallo skipper in base alle condizioni reali, agli avvisi e alle ordinanze vigenti.”
 
-Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi: updatedAt, phase, confidence, status, summary, sourceNote e, per ogni giorno, date, route, plan, alternative, wind, sea, air, water, currents, decision, sun, moon.
+Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi: updatedAt, phase, confidence, status, summary, sourceNote, stopsNote e, per ogni giorno, date, route, plan, overnight, alternative, stops, wind, sea, air, water, currents, decision, sun, moon. `stops` è un array di oggetti con moment, title, description e check.
 ```
 
 ## Fonti da confrontare nel briefing reale
