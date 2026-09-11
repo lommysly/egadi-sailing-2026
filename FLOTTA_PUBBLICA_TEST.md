@@ -22,6 +22,12 @@ L'ID casuale è collegato in una raccolta non leggibile dal web allo skipper che
 
 Esito: 11 controlli superati nell'emulatore Firestore con le Rules candidate.
 
+Candidate verificato: commit `43b6143`.
+
+SHA-256 del file Rules candidato: `d082b025f1e7a266e715f61a9ec0c90a54485b695b983cebab33691aa672c6fe`.
+
+Il controllo è stato eseguito con `firebase emulators:exec --only firestore --project egadi-fleet-rules-test …` sull'esatto file versionato.
+
 ## Apertura controllata
 
 Prima di impostare `publicFleetEnabled: true` nel documento `events/egadi-2026`:
