@@ -50,7 +50,7 @@ service cloud.firestore {
 
     function hasValidMemberPayload() {
       return request.resource.data.keys().hasAll(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt'])
-        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'roleConfirmed', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy', 'createdAt', 'createdBy'])
         && request.resource.data.firstName is string
         && request.resource.data.firstName.size() > 0
         && request.resource.data.lastName is string
@@ -63,6 +63,7 @@ service cloud.firestore {
         && request.resource.data.documentNumber is string
         && request.resource.data.documentExpiry is string
         && request.resource.data.role is string
+        && (!request.resource.data.keys().hasAll(['roleConfirmed']) || request.resource.data.roleConfirmed is bool)
         && request.resource.data.email is string
         && request.resource.data.phone is string
         && request.resource.data.charterConsent is bool
@@ -79,21 +80,38 @@ service cloud.firestore {
 
     function isValidOwnerMemberUpdate() {
       return hasValidMemberPayload()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'roleConfirmed', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt']);
     }
 
     function isValidCrewMemberCreate(boatId, memberId) {
       return isInviteHolder(boatId, memberId)
         && hasValidMemberPayload()
-        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasAll(['roleConfirmed'])
+        && request.resource.data.roleConfirmed == false
+        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'roleConfirmed', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy'])
         && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    function hasSafeCrewRoleConfirmation() {
+      return (request.resource.data.role == resource.data.role
+          && ((!resource.data.keys().hasAll(['roleConfirmed']) && !request.resource.data.keys().hasAll(['roleConfirmed']))
+            || (resource.data.keys().hasAll(['roleConfirmed'])
+              && request.resource.data.keys().hasAll(['roleConfirmed'])
+              && request.resource.data.roleConfirmed == resource.data.roleConfirmed)
+            || (!resource.data.keys().hasAll(['roleConfirmed'])
+              && request.resource.data.keys().hasAll(['roleConfirmed'])
+              && request.resource.data.roleConfirmed == false)))
+        || (request.resource.data.role != resource.data.role
+          && request.resource.data.keys().hasAll(['roleConfirmed'])
+          && request.resource.data.roleConfirmed == false);
     }
 
     function isValidCrewMemberUpdate(boatId, memberId) {
       return isInviteHolder(boatId, memberId)
         && hasValidMemberPayload()
         && request.resource.data.updatedBy == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'roleConfirmed', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy'])
+        && hasSafeCrewRoleConfirmation();
     }
 
     function isValidNewInvite(boatId, inviteId) {

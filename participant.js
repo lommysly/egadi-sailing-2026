@@ -11,8 +11,10 @@ import {
   startInviteActivation,
 } from './crew-session.js?v=20260911-live';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260911-live';
+import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260911-role1';
 
 let activeInvite = null;
+let activeMember = null;
 let activatedPhone = '';
 const isEditMode = new URLSearchParams(window.location.search).get('edit') === '1';
 
@@ -46,6 +48,7 @@ function showInvalid() {
 
 function showProfile({ invite, member, phone = '' }) {
   activeInvite = invite;
+  activeMember = member;
   activatedPhone = phone;
   document.querySelector('#signInSection').hidden = true;
   document.querySelector('#activationSection').hidden = true;
@@ -66,6 +69,7 @@ function fillProfile(member) {
     if (input.type === 'checkbox') input.checked = Boolean(value);
     else input.value = value || '';
   }
+  fillRoleFields(form, 'role', member?.role);
 }
 
 async function openProfile({ invite, phone = '', redirectWhenCompleted = true }) {
@@ -116,10 +120,13 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
   try {
     const firstName = fields.get('firstName').trim();
     const lastName = fields.get('lastName').trim();
+    const role = roleFromFields(fields, 'role');
+    const roleChanged = role !== String(activeMember?.role || '').trim();
     await setDoc(doc(db, 'boats', activeInvite.boatId, 'members', activeInvite.id), {
       firstName, lastName, birthDate: fields.get('birthDate'), birthPlace: fields.get('birthPlace').trim(),
       nationality: fields.get('nationality').trim(), gender: fields.get('gender'), documentType: fields.get('documentType'),
-      documentNumber: fields.get('documentNumber').trim(), documentExpiry: fields.get('documentExpiry'), role: fields.get('role').trim(),
+      documentNumber: fields.get('documentNumber').trim(), documentExpiry: fields.get('documentExpiry'), role,
+      roleConfirmed: roleChanged ? false : activeMember?.roleConfirmed === true,
       email: fields.get('email').trim().toLowerCase(), phone: fields.get('phone').trim() || activatedPhone, charterConsent: fields.get('charterConsent') === 'on',
       displayName: `${firstName} ${lastName}`, updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid,
     }, { merge: true });

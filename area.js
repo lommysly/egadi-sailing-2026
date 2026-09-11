@@ -5,6 +5,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260911-live';
+import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260911-role1';
 
 const eventId = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
@@ -562,7 +563,11 @@ function renderMembers() {
   list.innerHTML = activeMembers.map((member) => {
     const missing = getMissingCharterFields(member);
     const status = missing.length ? `Mancano ${missing.length} dati` : 'Pronta per il charter';
-    return `<article class="member-row"><div><strong>${escapeHtml(memberName(member))}</strong><span>${escapeHtml(member.role || 'Crew')} · ${escapeHtml(status)}</span></div><button class="text-button" type="button" data-edit-member="${escapeHtml(member.id)}">Modifica</button></article>`;
+    const roleStatus = roleConfirmationText(member);
+    const confirmAction = member.roleConfirmed === true
+      ? ''
+      : `<button class="text-button" type="button" data-confirm-member-role="${escapeHtml(member.id)}">Conferma ruolo</button>`;
+    return `<article class="member-row"><div><strong>${escapeHtml(memberName(member))}</strong><span>${escapeHtml(roleStatus)} · ${escapeHtml(status)}</span></div><div class="member-actions">${confirmAction}<button class="text-button" type="button" data-edit-member="${escapeHtml(member.id)}">Modifica</button></div></article>`;
   }).join('');
   renderPaymentRecipientOptions();
   renderCapacityStatus();
@@ -900,13 +905,13 @@ document.querySelector('#memberForm').addEventListener('submit', async (event) =
       firstName: fields.get('firstName').trim(), lastName: fields.get('lastName').trim(), birthDate: fields.get('birthDate'),
       birthPlace: fields.get('birthPlace').trim(), nationality: fields.get('nationality').trim(), gender: fields.get('gender'),
       documentType: fields.get('documentType'), documentNumber: fields.get('documentNumber').trim(), documentExpiry: fields.get('documentExpiry'),
-      role: fields.get('role').trim(), email: fields.get('email').trim().toLowerCase(), phone: fields.get('phone').trim(),
+      role: roleFromFields(fields, 'role'), roleConfirmed: true, email: fields.get('email').trim().toLowerCase(), phone: fields.get('phone').trim(),
       charterConsent: fields.get('charterConsent') === 'on', updatedAt: serverTimestamp(),
     };
     memberData.displayName = `${memberData.firstName} ${memberData.lastName}`;
     if (editingMemberId) {
       await updateDoc(doc(db, 'boats', activeBoat.id, 'members', editingMemberId), memberData);
-      setMessage(document.querySelector('#memberFormMessage'), 'Dati della persona aggiornati.');
+      setMessage(document.querySelector('#memberFormMessage'), 'Dati della persona aggiornati e ruolo confermato.');
     } else {
       await addDoc(collection(db, 'boats', activeBoat.id, 'members'), { ...memberData, createdAt: serverTimestamp(), createdBy: auth.currentUser.uid });
       setMessage(document.querySelector('#memberFormMessage'), 'Persona aggiunta alla Crew List.');
@@ -919,7 +924,25 @@ document.querySelector('#memberForm').addEventListener('submit', async (event) =
   }
 });
 
-document.querySelector('#memberList').addEventListener('click', (event) => {
+document.querySelector('#memberList').addEventListener('click', async (event) => {
+  const confirmButton = event.target.closest('[data-confirm-member-role]');
+  if (confirmButton) {
+    const member = activeMembers.find((candidate) => candidate.id === confirmButton.dataset.confirmMemberRole);
+    if (!member || !activeBoat) return;
+    confirmButton.disabled = true;
+    try {
+      await updateDoc(doc(db, 'boats', activeBoat.id, 'members', member.id), {
+        role: String(member.role || '').trim() || DEFAULT_CREW_ROLE,
+        roleConfirmed: true,
+        updatedAt: serverTimestamp(),
+      });
+      setMessage(document.querySelector('#memberFormMessage'), `Ruolo di ${memberName(member)} confermato.`);
+    } catch (error) {
+      setMessage(document.querySelector('#memberFormMessage'), 'Non riesco a confermare il ruolo.', true);
+      confirmButton.disabled = false;
+    }
+    return;
+  }
   const button = event.target.closest('[data-edit-member]');
   if (!button) return;
   const member = activeMembers.find((candidate) => candidate.id === button.dataset.editMember);
@@ -931,6 +954,7 @@ document.querySelector('#memberList').addEventListener('click', (event) => {
     if (input.type === 'checkbox') input.checked = Boolean(value);
     else input.value = value || '';
   }
+  fillRoleFields(form, 'role', member.role);
   editingMemberId = member.id;
   document.querySelector('#memberSubmitButton').textContent = 'Salva modifiche';
   document.querySelector('#cancelMemberEdit').hidden = false;
