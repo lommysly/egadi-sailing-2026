@@ -359,7 +359,7 @@ function whatsappUrl(invite) {
   const number = normalizeWhatsAppNumber(invite.whatsappNumber);
   const personalUrl = participantUrl(invite);
   if (!number || !personalUrl) return '';
-  const message = `Ciao ${invite.displayName}, ecco il tuo invito personale per la Crew List Egadi. Apri il link, conferma il numero WhatsApp e scegli un codice personale di 6 cifre: ${personalUrl}`;
+  const message = `Ciao ${invite.displayName}, ecco il tuo invito personale di prova per l’area Egadi. Apri il link, conferma il numero WhatsApp e scegli un codice personale di 6 cifre: ${personalUrl}\n\nPrima di attivarlo puoi leggere Privacy e dati: ${new URL('privacy.html', window.location.href).toString()}\n\nL’area è in test: fino alla pubblicazione dell’informativa finale inserisci esclusivamente dati fittizi.`;
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
 
