@@ -6,7 +6,7 @@ Questa è una scheda operativa, non sostituisce una consulenza legale. `privacy.
 
 | Tema | Decisione da registrare prima dell'uso reale |
 | --- | --- |
-| Titolare | **Lomastro Silvio**. Manca il canale di contatto dedicato per esercitare i diritti e ricevere risposta. |
+| Titolare | **Lomastro Silvio**. Canale di contatto per richieste e diritti: `hello@thatsablast.it` (oggetto consigliato: `Egadi Sailing Experience - Privacy`). |
 | Finalità | Gestione inviti, Crew List, sicurezza e organizzazione della barca; distinguere eventuali comunicazioni facoltative. |
 | Dati Crew List e contributi | Anagrafica, documento, ruolo/cabina, contatti, consenso di consegna al charter; per le richieste: importo, causale, scadenza, facoltatività, nome di chi raccoglie e tag del metodo. Escludere coordinate/IBAN, carte, credenziali, alias e link dei provider. Verificare se ogni campo è davvero necessario. |
 | Dati tecnici di accesso | Numero WhatsApp normalizzato nell'invito; impronta SHA-256 del numero; alias tecnico Firebase `@crew.egadi.thatsablast.it`; UID Firebase; stato, scadenza e revoca dell'invito. L'alias non è l'email reale della persona e non riceve messaggi. |
