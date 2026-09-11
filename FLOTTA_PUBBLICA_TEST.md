@@ -38,3 +38,9 @@ Prima di impostare `publicFleetEnabled: true` nel documento `events/egadi-2026`:
 4. Solo dopo il controllo riservato, impostare `publicFleetEnabled: true` e fare lo smoke anonimo su `flotta.html`.
 
 L'interruttore può essere riportato a `false` per nascondere subito la flotta pubblica senza chiudere le aree private.
+
+## Esito pubblicazione controllata
+
+- Rules candidate pubblicate su Firestore il giorno 11 settembre 2026.
+- Lettura riservata successiva: area skipper attiva, flotta pubblica attiva, zero card presenti e zero anomalie di schema.
+- Smoke anonimo su `https://egadi.thatsablast.it/flotta.html`: visualizzato correttamente lo stato iniziale “La flotta si sta formando”, senza errore di autorizzazione e senza dati riservati.
