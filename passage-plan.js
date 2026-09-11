@@ -8,6 +8,64 @@
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
+  // Sono immagini di scenario, non indicazioni nautiche né conferme di sosta.
+  // Le fonti e le licenze sono riportate accanto a ogni fotografia.
+  const DAY_VISUALS = [
+    {
+      label: 'Levanzo · acqua e rocce',
+      imageUrl: 'media/levanzo-sea.jpg',
+      alt: 'Acqua cristallina e rocce di Levanzo',
+      sourceUrl: 'https://commons.wikimedia.org/wiki/File:Levanzo_Italy_12.jpg',
+      author: 'Norbert Nagel',
+      license: 'CC BY-SA 3.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/deed.it',
+      className: 'is-levanzo-port',
+    },
+    {
+      label: 'Levanzo · luce del mattino',
+      imageUrl: 'media/levanzo-sea.jpg',
+      alt: 'Acqua e fondale di Levanzo',
+      sourceUrl: 'https://commons.wikimedia.org/wiki/File:Levanzo_Italy_12.jpg',
+      author: 'Norbert Nagel',
+      license: 'CC BY-SA 3.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/deed.it',
+      className: 'is-levanzo-light',
+    },
+    {
+      label: 'Marettimo · costa dal largo',
+      imageUrl: 'media/marettimo-sea.jpg',
+      alt: 'Costa e acqua trasparente di Marettimo',
+      sourceUrl: 'https://commons.wikimedia.org/wiki/File:Marettimo_coast.jpg',
+      author: 'The Cosmonaut',
+      license: 'CC BY-SA 2.5 CA',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/2.5/ca/deed.it',
+      className: 'is-marettimo-coast',
+    },
+    {
+      label: 'Favignana · acqua e luce',
+      imageUrl: 'media/favignana-crystal-water.jpg',
+      alt: 'Acqua cristallina di Favignana',
+      sourceUrl: 'https://commons.wikimedia.org/wiki/File:Crystal_clear_water_at_Favignana_-_panoramio.jpg',
+      author: 'René Bongard',
+      license: 'CC BY-SA 3.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/deed.it',
+      className: 'is-favignana-water',
+    },
+  ];
+
+  const renderDayVisual = (visual) => {
+    if (!visual) return '';
+    return `
+      <figure class="passage-day-visual ${escapeHtml(visual.className)}">
+        <img src="${visual.imageUrl}" alt="${escapeHtml(visual.alt)}" loading="lazy" decoding="async" />
+        <figcaption>
+          <span>${escapeHtml(visual.label)} · immagine di scenario</span>
+          <small>Foto: <a href="${visual.sourceUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(visual.author)}</a> · <a href="${visual.licenseUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(visual.license)}</a></small>
+        </figcaption>
+      </figure>
+    `;
+  };
+
   if (!data) {
     $("#planStatus").textContent = "Aggiornamento non disponibile";
     $("#planSummary").textContent = "Il Passage Plan non è stato caricato. Riprova più tardi oppure chiedi allo skipper il briefing più recente.";
@@ -60,8 +118,9 @@
   const planningMode = data.dataMode === 'planning';
   const operationalData = (day) => planningMode ? `
     <section class="passage-weather-pending" aria-label="Meteo operativo non ancora pubblicato">
-      <strong>Meteo operativo non ancora pubblicato.</strong>
-      <p>Vento, mare, aria, acqua e correnti verranno aggiunti nella finestra utile con fonti, ora di emissione e validità. Fino ad allora questa scheda resta un quadro di pianificazione.</p>
+      <span>Meteo operativo</span>
+      <strong>In attesa della finestra utile.</strong>
+      <p>Vento, mare, temperature e correnti arriveranno con fonte, ora di emissione e validità.</p>
     </section>
     <dl class="passage-data-grid passage-astronomy-grid">
       <div><dt>Sole</dt><dd>${escapeHtml(day.sun)}</dd></div>
@@ -80,31 +139,43 @@
     </dl>
   `;
 
-  $("#dailyPlan").innerHTML = (data.days || []).map((day) => `
-    <article class="passage-day-card">
-      <div class="passage-day-heading">
-        <p class="eyebrow">${escapeHtml(day.date)}</p>
-        <h2>${escapeHtml(day.route)}</h2>
-      </div>
-      <p>${escapeHtml(day.plan)}</p>
-      <p class="passage-overnight"><span class="passage-overnight-meta">${escapeHtml(day.overnightType || 'Da definire')} · ${escapeHtml(day.overnightStatus || 'Da verificare')}</span><strong>Piano notte indicativo:</strong> ${escapeHtml(day.overnight)}</p>
-      <p class="passage-alternative"><strong>Alternativa:</strong> ${escapeHtml(day.alternative)}</p>
-      ${Array.isArray(day.stops) && day.stops.length ? `
-        <section class="passage-stop-section" aria-label="Scenari di luce e soste">
-          <p class="passage-stop-heading">Scenari di luce e soste</p>
-          <div class="passage-stop-grid">
-            ${day.stops.map((stop) => `
-              <article class="passage-stop-card">
-                <p class="passage-stop-moment">${escapeHtml(stop.moment)}</p>
-                <h3>${escapeHtml(stop.title)}</h3>
-                <p>${escapeHtml(stop.description)}</p>
-                <p class="passage-stop-check">${escapeHtml(stop.check)}</p>
-              </article>
-            `).join("")}
+  $("#dailyPlan").innerHTML = (data.days || []).map((day, index) => {
+    const stops = Array.isArray(day.stops) && day.stops.length ? `
+      <section class="passage-stop-section" aria-label="Scenari di luce e soste">
+        <p class="passage-stop-heading">Scenari da valutare con lo skipper</p>
+        <div class="passage-stop-grid">
+          ${day.stops.map((stop) => `
+            <article class="passage-stop-card">
+              <p class="passage-stop-moment">${escapeHtml(stop.moment)}</p>
+              <h3>${escapeHtml(stop.title)}</h3>
+              <p>${escapeHtml(stop.description)}</p>
+              <details class="passage-stop-check">
+                <summary>Verifiche prima della sosta</summary>
+                <p>${escapeHtml(stop.check)}</p>
+              </details>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    ` : '';
+
+    return `
+      <article class="passage-day-card">
+        <div class="passage-day-layout">
+          <div class="passage-day-story">
+            <div class="passage-day-heading">
+              <p class="eyebrow">${escapeHtml(day.date)}</p>
+              <h2>${escapeHtml(day.route)}</h2>
+            </div>
+            <p class="passage-day-plan">${escapeHtml(day.plan)}</p>
+            <p class="passage-overnight"><span class="passage-overnight-meta">${escapeHtml(day.overnightType || 'Da definire')} · ${escapeHtml(day.overnightStatus || 'Da verificare')}</span><strong>Piano notte indicativo:</strong> ${escapeHtml(day.overnight)}</p>
+            <p class="passage-alternative"><strong>Alternativa:</strong> ${escapeHtml(day.alternative)}</p>
           </div>
-        </section>
-      ` : ""}
-      ${operationalData(day)}
-    </article>
-  `).join("");
+          ${renderDayVisual(DAY_VISUALS[index])}
+        </div>
+        ${stops}
+        ${operationalData(day)}
+      </article>
+    `;
+  }).join("");
 })();

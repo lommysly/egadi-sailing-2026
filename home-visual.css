@@ -1,0 +1,579 @@
+/* Restyling della sola home: le pagine operative mantengono il loro linguaggio sobrio. */
+.home-page {
+  background: #f6fffe;
+}
+
+.home-page .site-nav {
+  gap: clamp(12px, 2vw, 34px);
+}
+
+.home-page .home-hero {
+  position: relative;
+  min-height: min(860px, calc(100vh - 86px));
+  grid-template-columns: minmax(0, .94fr) minmax(430px, 1.06fr);
+  gap: clamp(34px, 6vw, 88px);
+  background:
+    radial-gradient(circle at 73% 11%, rgba(140, 246, 237, .35) 0 11%, transparent 30%),
+    linear-gradient(115deg, #f8fffe 0%, #f8fffe 52%, #dcfaf7 100%);
+}
+
+.home-page .hero-copy {
+  position: relative;
+  z-index: 2;
+}
+
+.home-page .hero-text {
+  max-width: 510px;
+  font-size: clamp(1.02rem, 1.35vw, 1.18rem);
+}
+
+.home-hero-mosaic {
+  position: relative;
+  min-height: 570px;
+}
+
+.home-photo {
+  position: absolute;
+  overflow: hidden;
+  margin: 0;
+  background: #07586c;
+  box-shadow: 0 26px 70px rgba(3, 50, 62, .21);
+}
+
+.home-photo::after {
+  position: absolute;
+  content: "";
+  inset: 0;
+  background: linear-gradient(155deg, rgba(2, 55, 67, .02), rgba(2, 55, 67, .25));
+  pointer-events: none;
+}
+
+.home-photo img,
+.home-photo video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  filter: saturate(1.14) contrast(1.03);
+}
+
+.home-photo video {
+  background: #07586c;
+}
+
+.home-photo-primary {
+  inset: 0 5% 5% 10%;
+  border-radius: 48% 52% 40% 60% / 44% 40% 60% 56%;
+}
+
+.home-photo-primary img {
+  object-position: 53% center;
+}
+
+.home-photo-primary video {
+  object-position: 52% center;
+}
+
+.home-photo-secondary {
+  right: 0;
+  bottom: 0;
+  width: 42%;
+  height: 38%;
+  border: 8px solid #f6fffe;
+  border-radius: 32px 32px 70px 32px;
+  transform: rotate(4deg);
+}
+
+.home-route-stamp {
+  position: absolute;
+  z-index: 2;
+  top: 8%;
+  left: 0;
+  display: grid;
+  gap: 5px;
+  padding: 16px 19px;
+  border: 1px solid rgba(255, 255, 255, .65);
+  border-radius: 16px;
+  background: rgba(1, 55, 68, .86);
+  color: white;
+  box-shadow: 0 14px 36px rgba(2, 47, 58, .16);
+}
+
+.home-route-stamp span,
+.home-visual-note {
+  font: 500 .63rem/1.3 "DM Mono", monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.home-route-stamp strong {
+  font: 600 1.3rem/.98 "Fraunces", serif;
+  letter-spacing: -.04em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-route-stamp {
+    animation: home-route-float 7s ease-in-out infinite;
+  }
+
+  .home-photo-secondary {
+    animation: home-photo-drift 10s ease-in-out infinite;
+  }
+}
+
+@keyframes home-route-float {
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes home-photo-drift {
+  50% { transform: rotate(2deg) translate(-4px, -7px); }
+}
+
+.home-visual-note {
+  position: absolute;
+  z-index: 2;
+  right: 7%;
+  bottom: 8%;
+  width: 205px;
+  margin: 0;
+  padding: 10px 0 0 12px;
+  border-left: 2px solid #b6fff8;
+  color: white;
+  text-shadow: 0 1px 14px rgba(2, 43, 58, .75);
+}
+
+.home-page .departure-strip {
+  position: relative;
+  z-index: 3;
+}
+
+.home-page .section-heading h2 {
+  max-width: 620px;
+}
+
+.home-page .home-logistics-section {
+  align-items: start;
+  background: #f6fffe;
+}
+
+.home-page .transfer-home-copy > p,
+.home-page .fleet-copy > p {
+  max-width: 550px;
+  margin-bottom: 25px;
+  font: 500 clamp(1.25rem, 2vw, 1.7rem)/1.28 "Fraunces", serif;
+  letter-spacing: -.035em;
+}
+
+.home-logistics-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 28px;
+}
+
+.home-logistics-tiles article {
+  min-height: 174px;
+  padding: 17px;
+  border: 1px solid rgba(7, 59, 76, .14);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #e8fbf9, #c9f5f0);
+}
+
+.home-logistics-tiles article:nth-child(2) {
+  background: linear-gradient(145deg, #0a6273, #0c3f50);
+  color: white;
+}
+
+.home-logistics-tiles article:nth-child(3) {
+  background: linear-gradient(145deg, #eafff8, #a9ebe7);
+}
+
+.home-logistics-tiles span {
+  display: block;
+  margin-bottom: 32px;
+  color: #087b8a;
+  font: 500 .67rem "DM Mono", monospace;
+  letter-spacing: .08em;
+}
+
+.home-logistics-tiles article:nth-child(2) span {
+  color: #9ff5ed;
+}
+
+.home-logistics-tiles strong {
+  display: block;
+  font: 600 1.2rem/1.05 "Fraunces", serif;
+  letter-spacing: -.035em;
+}
+
+.home-logistics-tiles p {
+  margin: 8px 0 0;
+  font-size: .76rem;
+  line-height: 1.42;
+}
+
+.home-page .home-route-section {
+  grid-template-columns: minmax(260px, .66fr) minmax(0, 1.34fr);
+  align-items: start;
+  background: #d8f4f1;
+}
+
+.home-page .passage-intro {
+  padding-top: 14px;
+}
+
+.home-page .passage-intro > p {
+  margin-top: 0;
+  font: 500 clamp(1.25rem, 2vw, 1.7rem)/1.28 "Fraunces", serif;
+  letter-spacing: -.035em;
+}
+
+.home-page .safety-note {
+  max-width: 480px;
+  margin: 26px 0 8px;
+}
+
+.home-route-link {
+  margin-top: 26px;
+}
+
+.home-route-cards {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.home-route-card {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 300px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #063b4c;
+  color: white;
+}
+
+.home-route-card::after {
+  position: absolute;
+  content: "";
+  z-index: 1;
+  inset: 28% 0 0;
+  background: linear-gradient(transparent, rgba(1, 31, 43, .92));
+}
+
+.home-route-card > img,
+.route-card-return-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(1.12) contrast(1.04);
+}
+
+.home-route-card > div:last-child {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  padding: 23px;
+}
+
+.home-route-card p {
+  margin: 0 0 8px;
+  color: #aefff7;
+  font: 500 .63rem "DM Mono", monospace;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.home-route-card h3 {
+  margin: 0;
+  font: 600 clamp(1.75rem, 3vw, 2.5rem)/.9 "Fraunces", serif;
+  letter-spacing: -.055em;
+}
+
+.home-route-card span {
+  display: block;
+  max-width: 280px;
+  margin-top: 12px;
+  font-size: .82rem;
+  line-height: 1.42;
+}
+
+.route-card-return-art {
+  overflow: hidden;
+  background: linear-gradient(148deg, #0d9bab 0%, #42c9c9 43%, #0a5269 100%);
+}
+
+.route-card-return-art::before {
+  position: absolute;
+  content: "";
+  inset: -10% -15% 32%;
+  border-radius: 47% 53% 30% 70%;
+  border: 1px solid rgba(255, 255, 255, .45);
+  transform: rotate(-17deg);
+}
+
+.route-card-return-art span {
+  position: absolute;
+  display: block;
+  height: 1px;
+  margin: 0;
+  background: rgba(255, 255, 255, .42);
+  transform: rotate(-15deg);
+}
+
+.route-card-return-art span:nth-child(1) { top: 27%; right: -6%; left: 20%; }
+.route-card-return-art span:nth-child(2) { top: 42%; right: 8%; left: -7%; }
+.route-card-return-art span:nth-child(3) { top: 57%; right: -12%; left: 15%; }
+
+.home-page .island-grid {
+  gap: 20px;
+}
+
+.home-page .island-card {
+  min-height: 550px;
+  border-radius: 26px;
+}
+
+.home-page .island-card-content {
+  padding: 30px;
+}
+
+.home-page .home-fleet-section {
+  align-items: center;
+  background: linear-gradient(145deg, #92e9e4 0%, #ccf8f3 100%);
+}
+
+.home-page .fleet-copy {
+  padding-top: 0;
+}
+
+.home-boat-preview {
+  display: grid;
+  grid-template-columns: minmax(160px, .8fr) minmax(0, 1.2fr);
+  gap: 22px;
+  margin: 30px 0;
+  padding: 22px;
+  border-radius: 20px;
+  background: rgba(246, 255, 254, .7);
+  box-shadow: 0 18px 40px rgba(7, 59, 76, .1);
+}
+
+.home-boat-illustration {
+  position: relative;
+  min-height: 198px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: linear-gradient(158deg, #a7f3eb 0%, #4acdc9 50%, #078098 100%);
+}
+
+.home-boat-illustration::before {
+  position: absolute;
+  content: "";
+  top: 23%;
+  right: 15%;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(246, 255, 254, .9);
+  box-shadow: 0 0 0 9px rgba(246, 255, 254, .22);
+}
+
+.boat-mast,
+.boat-sail,
+.boat-hull,
+.boat-water {
+  position: absolute;
+  display: block;
+}
+
+.boat-mast {
+  z-index: 2;
+  bottom: 40px;
+  left: 48%;
+  width: 3px;
+  height: 110px;
+  background: #f6fffe;
+}
+
+.boat-sail {
+  z-index: 1;
+  bottom: 50px;
+  width: 0;
+  height: 0;
+}
+
+.boat-sail-left {
+  left: 24%;
+  border-right: 65px solid #e9fffc;
+  border-top: 92px solid transparent;
+}
+
+.boat-sail-right {
+  left: 50%;
+  border-left: 56px solid rgba(217, 255, 250, .77);
+  border-bottom: 79px solid transparent;
+}
+
+.boat-hull {
+  z-index: 3;
+  bottom: 32px;
+  left: 20%;
+  width: 62%;
+  height: 25px;
+  border-radius: 4px 4px 56% 56%;
+  background: #f6fffe;
+  transform: skewX(-17deg);
+}
+
+.boat-water {
+  right: -8%;
+  bottom: 11px;
+  left: -8%;
+  height: 28px;
+  border-top: 2px solid rgba(246, 255, 254, .82);
+  background: repeating-linear-gradient(165deg, rgba(246, 255, 254, .25) 0 2px, transparent 2px 10px);
+}
+
+.home-boat-copy .eyebrow {
+  margin-bottom: 9px;
+}
+
+.home-boat-copy h3 {
+  margin: 0;
+  font: 600 clamp(2rem, 3.4vw, 3rem)/.9 "Fraunces", serif;
+  letter-spacing: -.055em;
+}
+
+.home-boat-copy > p:not(.eyebrow) {
+  margin: 8px 0 17px;
+  font: 500 .8rem "DM Mono", monospace;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.home-boat-copy ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-boat-copy li {
+  padding: 6px 8px;
+  border: 1px solid rgba(7, 59, 76, .18);
+  border-radius: 999px;
+  font-size: .73rem;
+  font-weight: 700;
+}
+
+.home-page .film-section {
+  background: #e5fbf9;
+}
+
+@media (max-width: 980px) {
+  .home-page .home-hero,
+  .home-page .home-route-section {
+    grid-template-columns: 1fr;
+  }
+
+  .home-hero-mosaic {
+    min-height: 480px;
+    max-width: 700px;
+    width: 100%;
+  }
+
+  .home-page .home-route-section .section-heading {
+    margin-bottom: -12px;
+  }
+
+  .home-route-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .home-page .home-hero {
+    min-height: 0;
+    padding-bottom: 48px;
+  }
+
+  .home-hero-mosaic {
+    min-height: 390px;
+  }
+
+  .home-photo-primary {
+    inset: 0 3% 6% 5%;
+  }
+
+  .home-photo-secondary {
+    width: 45%;
+    height: 36%;
+    border-width: 6px;
+  }
+
+  .home-route-stamp {
+    top: 4%;
+  }
+
+  .home-logistics-tiles {
+    grid-template-columns: 1fr;
+  }
+
+  .home-logistics-tiles article {
+    min-height: 0;
+  }
+
+  .home-logistics-tiles span {
+    margin-bottom: 17px;
+  }
+
+  .home-route-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .home-route-card {
+    min-height: 270px;
+  }
+
+  .home-page .island-card {
+    min-height: 430px;
+  }
+
+  .home-boat-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .home-boat-illustration {
+    min-height: 220px;
+  }
+}
+
+@media (max-width: 430px) {
+  .home-hero-mosaic {
+    min-height: 335px;
+  }
+
+  .home-route-stamp {
+    left: 2%;
+    padding: 12px 14px;
+  }
+
+  .home-visual-note {
+    right: 6%;
+    bottom: 10%;
+    width: 172px;
+    font-size: .56rem;
+  }
+
+  .home-route-card > div:last-child,
+  .home-page .island-card-content {
+    padding: 21px;
+  }
+}
