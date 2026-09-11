@@ -36,14 +36,15 @@ FINESTRA DI AGGIORNAMENTO
 REGOLE DI AFFIDABILITÀ
 1. Non inventare dati, orari, allerta, correnti o disponibilità di boe/porti. Se un dato non è disponibile, scrivi “non disponibile” e indica come verificarlo.
 2. A T−30 produci solo scenario climatico e pianificazione: non usare numeri come se fossero una previsione.
-3. Indica sempre la data/ora di emissione, la validità, le fonti consultate e una confidenza: bassa, media o alta. Se le fonti divergono, dichiaralo.
+3. Indica sempre la data/ora di emissione, la validità, il prossimo aggiornamento, le fonti consultate e una confidenza: bassa, media o alta. Se le fonti divergono, dichiaralo.
 4. Per il vento specifica sempre “da” (direzione di provenienza), gradi veri se disponibili, intensità media e raffiche in nodi.
 5. Per il mare separa mare del vento e swell quando la fonte lo permette: direzione di provenienza, altezza significativa e periodo. Non ridurre tutto a “mare mosso”.
 6. Per le correnti indica direzione e velocità solo con una fonte affidabile; altrimenti annota che la verifica è a bordo.
 7. Indica temperatura aria, temperatura acqua, nuvolosità, precipitazioni, visibilità e fenomeni che cambiano comfort/sicurezza.
 8. Per ogni data calcola per la località/area della tappa: alba e tramonto del sole, fase della luna, levata e tramonto della luna. Usa fuso Europe/Rome e scrivi la fonte astronomica.
 9. Non dare istruzioni nautiche definitive e non sostituire bollettini ufficiali, avvisi ai naviganti, ordinanze o la decisione dello skipper.
-10. Distingui sempre una caletta bella da una rada idonea: una cala può essere indicata come scenario di tramonto, alba o sosta diurna, ma non come pernottamento garantito. Per ogni notte indica separatamente porto, boa autorizzata o rada da confermare dopo controllo di meteo, onda, fondale, zonazione AMP, ordinanze e disponibilità.
+10. Distingui sempre una caletta bella da una rada idonea: una cala può essere indicata come scenario di tramonto, alba o sosta diurna, ma non come pernottamento garantito. Per ogni notte indica separatamente porto, campo boe autorizzato o rada da confermare dopo controllo di meteo, onda, fondale, zonazione AMP, ordinanze, autorizzazioni e disponibilità.
+11. Per ogni porto, campo boe o rada usa uno stato esplicito: `idea`, `da verificare` o `confermato dallo skipper`. Non usare mai “confermato” senza indicare ora della verifica di autorizzazione e disponibilità.
 
 FORMATO OBBLIGATORIO
 Restituisci prima una sintesi per l'equipaggio, chiara e non allarmistica; poi quattro schede giornaliere, una per data. Per ogni scheda usa esattamente queste etichette:
@@ -66,7 +67,7 @@ Chiudi con:
 - limiti del dato e variazioni fra modelli;
 - una nota di sicurezza: “La rotta e gli ancoraggi sono confermati dallo skipper in base alle condizioni reali, agli avvisi e alle ordinanze vigenti.”
 
-Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi: updatedAt, phase, confidence, status, summary, sourceNote, stopsNote e, per ogni giorno, date, route, plan, overnight, alternative, stops, wind, sea, air, water, currents, decision, sun, moon. `stops` è un array di oggetti con moment, title, description e check.
+Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi: updatedAt, publishedAt, validFrom, validUntil, nextUpdateAt, dataMode (`planning`, `trend` o `operational`), phase, confidence, status, summary, sourceNote, stopsNote, mooringGuide e sources. `sources` è un array di oggetti con label, url, scope e checkedAt. Per ogni giorno mantieni: date, route, plan, overnight, overnightType, overnightStatus, alternative, stops, wind, sea, air, water, currents, decision, sun, moon. `stops` è un array di oggetti con moment, title, description e check.
 ```
 
 ## Fonti da confrontare nel briefing reale

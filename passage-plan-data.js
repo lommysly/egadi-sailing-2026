@@ -7,20 +7,36 @@ window.PASSAGE_PLAN_DATA = {
   phase: "27 giorni alla partenza · quadro di pianificazione",
   confidence: "Astronomia alta · meteo non previsionale",
   status: "Pianificazione iniziale pubblicata",
+  publishedAt: "11 settembre 2026 · 01:56 CEST",
+  validFrom: "Valido come quadro di pianificazione fino al prossimo aggiornamento",
+  validUntil: "Non è un bollettino operativo e non conferma ancoraggi o disponibilità",
+  nextUpdateAt: "28 settembre 2026 · tendenza a dieci giorni",
+  dataMode: "planning",
   summary: "Questo è il primo quadro per organizzare la flotta: conferma l'itinerario flessibile, la luce disponibile e gli scenari di cala da vivere. Non contiene una previsione di vento, onda o correnti; quella verrà pubblicata solo nella finestra utile, con fonti e ora di emissione.",
-  sourceNote: "Consultazione astronomica: 11 settembre 2026, 01:56 CEST, fuso Europe/Rome. Le calette sono scenari possibili, non posti assegnati: ogni sera lo skipper sceglie porto, boa autorizzata o rada ammessa solo dopo controllo di meteo, onda, fondale, zonazione AMP, ordinanze e disponibilità.",
+  sourceNote: "Consultazione astronomica: 11 settembre 2026, 01:56 CEST, fuso Europe/Rome. Le calette sono scenari possibili, non posti assegnati: ogni sera lo skipper sceglie porto, campo boe autorizzato o rada ammessa solo dopo controllo di meteo, onda, fondale, zonazione AMP, ordinanze e disponibilità.",
   sources: [
-    { label: "Fonte astronomica", url: "https://aa.usno.navy.mil/data/api" },
-    { label: "AMP Egadi · zonazione", url: "https://www.ampisoleegadi.it/index.php/zonazione/" },
-    { label: "AMP Egadi · campi boe", url: "https://www.ampisoleegadi.it/index.php/campi-boe/" }
+    { label: "Fonte astronomica", url: "https://aa.usno.navy.mil/data/api", scope: "alba, tramonto e luna", checkedAt: "11 settembre 2026 · 01:56 CEST" },
+    { label: "AMP Egadi · zonazione", url: "https://www.ampisoleegadi.it/index.php/zonazione/", scope: "zone e disciplina da verificare", checkedAt: "11 settembre 2026" },
+    { label: "AMP Egadi · campi boe", url: "https://www.ampisoleegadi.it/index.php/campi-boe/", scope: "campi stagionali e autorizzazioni", checkedAt: "11 settembre 2026" }
   ],
-  stopsNote: "Per ottobre 2026, la disciplina AMP, le eventuali autorizzazioni e le ordinanze vigenti andranno controllate nel briefing operativo: una bella cala non equivale automaticamente a una rada idonea per la notte.",
+  stopsNote: "Per ottobre 2026, la disciplina AMP, le eventuali autorizzazioni, l'installazione stagionale dei campi boe e le ordinanze vigenti andranno controllate nel briefing operativo: una bella cala non equivale automaticamente a una rada idonea per la notte.",
+  mooringGuide: {
+    title: "Rada, porto o campo boe?",
+    introduction: "Le carte qui sotto aiutano a immaginare i luoghi; non sono istruzioni di ancoraggio. La stessa cala può essere splendida per un bagno e inadatta per una notte. Ogni barca riceve la decisione quotidiana del proprio skipper.",
+    checks: [
+      { title: "1 · Prima le regole", text: "Lo skipper verifica zonazione AMP, ordinanze, autorizzazioni e l'eventuale stato stagionale del campo boe. Una boa vista online non equivale a una boa disponibile." },
+      { title: "2 · Poi il mare reale", text: "Direzione e intensità del vento, onda, periodo, fondale, spazio di manovra e comfort dell'equipaggio decidono se fermarsi, cambiare lato o proseguire." },
+      { title: "3 · Il piano B è parte del piano", text: "Se rada o campo boe non sono adatti, si passa al porto o a un ridosso alternativo. La sicurezza e il rientro puntuale valgono più della cala desiderata." }
+    ]
+  },
   days: [
     {
       date: "Giovedì 8 ottobre",
       route: "Marsala → Levanzo",
       plan: "Partenza alle 15:00 con cambusa già pronta. Cerchiamo la luce del tramonto e, se le condizioni lo consentono, una notte calma a Levanzo.",
       overnight: "Rada a Levanzo solo se ammessa, ridossata e confortevole; altrimenti porto o ridosso alternativo scelto dallo skipper.",
+      overnightType: "Rada da verificare",
+      overnightStatus: "Non confermata",
       alternative: "Ridosso alternativo o variazione di rotta decisi dagli skipper.",
       stops: [
         {
@@ -50,6 +66,8 @@ window.PASSAGE_PLAN_DATA = {
       route: "Levanzo → Marettimo",
       plan: "Seconda caletta a Levanzo, pranzo a bordo e navigazione verso Marettimo. Notte in porto e serata nel borgo.",
       overnight: "Porto di Marettimo: è il piano base della serata, con cena libera a terra o a bordo e ritrovo nel borgo.",
+      overnightType: "Porto",
+      overnightStatus: "Piano base da confermare con l'ormeggio",
       alternative: "La traversata e le soste dipendono da onda, vento e comfort della flotta.",
       stops: [
         {
@@ -79,6 +97,8 @@ window.PASSAGE_PLAN_DATA = {
       route: "Marettimo → Favignana",
       plan: "Esplorazione di Marettimo, poi rotta verso Favignana. Arrivo in porto, cena collettiva, DJ set e festa.",
       overnight: "Porto di Favignana: cena collettiva, DJ set e festa, con rientro a bordo a fine serata.",
+      overnightType: "Porto",
+      overnightStatus: "Piano base da confermare con l'ormeggio",
       alternative: "Boe, porto e percorso costiero saranno confermati nel briefing del giorno.",
       stops: [
         {
@@ -108,6 +128,8 @@ window.PASSAGE_PLAN_DATA = {
       route: "Favignana → Marsala",
       plan: "Calette di Favignana fino alle 15:30 circa, quindi rientro per essere a Marsala entro le 18:00.",
       overnight: "Nessun pernottamento: rientro a Marsala in porto entro le 18:00.",
+      overnightType: "Rientro in porto",
+      overnightStatus: "Orario vincolante",
       alternative: "La sosta finale viene ridotta o anticipata se necessario per un rientro puntuale e sicuro.",
       stops: [
         {

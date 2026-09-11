@@ -13,6 +13,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 
 - `index.html`: presentazione pubblica della flotta e del viaggio.
 - `passage-plan.html`: unica pagina pubblica per meteo e Passage Plan, alimentata da `passage-plan-data.js`.
+- `arrivi-partenze.html`: sezione pubblica che spiega le quattro tratte, la finestra di match ±2 ore e la visibilità controllata dei contatti; non raccoglie dati in pagina.
 - `film.html` e `VIDEO_STORYBOARD.md`: storyboard del film; nessun filmato di terzi viene incorporato senza licenza.
 - `area.html`: area skipper con Google Sign-In, una barca per skipper, Crew List, PDF, bacheca, inviti WhatsApp e richieste di contributo con tag dei metodi e messaggio WhatsApp diretto.
 - `participant.html`: primo accesso dal link WhatsApp; la persona conferma il suo numero e sceglie il proprio codice di 6 cifre, poi completa i dati necessari alla Crew List.
@@ -20,6 +21,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - `my-area.html`: area personale con scheda, bacheca, regole e richieste dedicate.
 - `crew-pdf.js`: foglio A4 orizzontale da salvare in PDF per charter / eventuali controlli; non esporta CSV.
 - `FIRESTORE_RULES_TEST_MATRIX.md`, `CHECKLIST_PUBBLICAZIONE.md` e `PRIVACY_DA_COMPLETARE.md`: tracciabilità dei controlli, delle verifiche da completare e delle decisioni privacy da formalizzare.
+- `ARRIVI_PARTENZE_SPEC.md`: modello operativo per la futura scheda privata dell'equipaggio e per l'area riservata della società transfer.
 
 ## Accesso dell'equipaggio: flusso concordato
 
@@ -109,6 +111,12 @@ Ogni skipper gestisce una sola barca: per le nuove registrazioni l'ID della barc
 Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Ogni persona vede soltanto la bacheca della propria barca. Quando cambia il testo delle regole, aumenta la versione e la persona deve confermare di nuovo la lettura.
 
 Il sito non incassa denaro, non genera o valida link dei provider e non dichiara pagamenti come eseguiti. Lo skipper configura il proprio nome e i tag PayPal, Satispay, Revolut e/o bonifico, quindi crea una richiesta con importo, causale, scadenza e una o più alternative. Eventuali link, alias o coordinate vengono scritti solo nel messaggio WhatsApp al momento dell'invio e non sono salvati. Il pagamento avviene fuori dal sito e può essere segnato come verificato solo dopo controllo manuale dell'accredito reale.
+
+## Arrivi e partenze
+
+La sezione pubblica è online e descrive il flusso per aeroporto, Marsala e passaggi fra amici. La futura scheda privata richiederà città di partenza/arrivo, aeroporto reale, data e orari, compagnia e numero di volo facoltativi, bagagli e una finestra di compatibilità fissa di ±120 minuti.
+
+La società transfer avrà un'area riservata separata per le sole tratte aeroporto ↔ Marsala: potrà raggruppare persone, assegnare il mezzo e contattarle. I passaggi casa ↔ aeroporto restano fuori dalla sua area. I contatti fra partecipanti non saranno pubblici: saranno visibili solo dopo la scelta per tratta e l'accettazione del collegamento da entrambe le persone. La raccolta effettiva e le Rules dedicate verranno implementate soltanto dopo la definizione dell'accesso nominativo della società e dell'informativa definitiva.
 
 ## Attivazione operativa
 

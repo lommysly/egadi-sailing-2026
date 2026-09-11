@@ -14,6 +14,15 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] HTTPS pubblico verificato su `egadi.thatsablast.it`; HTTP reindirizza a HTTPS e la pagina anonima non mostra Crew List, inviti, pagamenti o dati personali.
 - [x] Area privata attiva su HTTPS: accesso skipper con Google e equipaggio solo tramite invito personale.
 
+## Arrivi e partenze
+
+- [x] Sezione pubblica online con le quattro tratte, città/aeroporti reali, orari, volo facoltativo, bagagli e finestra di match ±2 ore.
+- [x] Passage Plan separa scenari di luce da porto, campo boe o rada e dichiara stato, validità e prossimo aggiornamento.
+- [ ] Aggiungere la scheda privata per raccogliere le tratte nell'area equipaggio: nessun modulo pubblico con contatti.
+- [ ] Creare l'area riservata della società transfer con identità nominative, gruppi, veicoli, orari e contatti limitati alle tratte aeroporto ↔ Marsala.
+- [ ] Pubblicare Rules, indici e test: le tratte restano separate da Crew List e inviti; i passaggi fra partecipanti usano consenso per tratta e doppia conferma prima di mostrare WhatsApp.
+- [ ] Aggiornare l'informativa definitiva con società transfer, destinatari, finalità, revoca e tempi di conservazione.
+
 ## Nuovo accesso equipaggio
 
 - [x] Sorgente locale: primo accesso dal link WhatsApp, conferma del numero e scelta di un codice personale di sei cifre.

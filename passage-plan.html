@@ -15,7 +15,7 @@
   <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
   <header class="site-header">
     <a class="brand" href="index.html" aria-label="Egadi Sailing Experience, home"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
-    <nav class="site-nav always-visible" aria-label="Navigazione principale"><a href="index.html">Torna al sito</a><a href="area.html">Area skipper</a></nav>
+    <nav class="site-nav always-visible" aria-label="Navigazione principale"><a href="index.html">Torna al sito</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="area.html">Area skipper</a></nav>
   </header>
 
   <main id="main-content" class="area-main passage-plan-main">
@@ -29,13 +29,24 @@
       <div><span>Stato</span><strong id="planStatus">Caricamento</strong></div>
       <div><span>Finestra</span><strong id="planPhase">—</strong></div>
       <div><span>Affidabilità</span><strong id="planConfidence">—</strong></div>
+      <div><span>Prossimo aggiornamento</span><strong id="planNextUpdate">—</strong></div>
     </section>
 
     <section class="passage-introduction">
       <p id="planSummary">Caricamento del Passage Plan.</p>
       <p id="planUpdatedAt" class="passage-updated"></p>
+      <p id="planValidity" class="passage-validity"></p>
       <p id="planSources" class="passage-source"></p>
       <p id="planStopsNote" class="passage-stop-note"></p>
+    </section>
+
+    <section id="planMooringGuide" class="passage-mooring-guide" aria-labelledby="planMooringTitle" hidden>
+      <div>
+        <p class="eyebrow">Scelte di ormeggio</p>
+        <h2 id="planMooringTitle">Rada, porto<br /><em>o campo boe?</em></h2>
+        <p id="planMooringIntroduction"></p>
+      </div>
+      <ol id="planMooringChecks" class="passage-mooring-checks"></ol>
     </section>
 
     <section id="dailyPlan" class="passage-day-list" aria-live="polite"></section>
@@ -50,7 +61,7 @@
 
   <footer class="site-footer">
     <div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><p>8—11 ottobre 2026 · Marsala</p></div>
-    <div><a href="index.html#rotta">Itinerario</a><a href="area.html">Area skipper</a><a href="privacy.html">Privacy e dati</a></div>
+    <div><a href="index.html#rotta">Itinerario</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="area.html">Area skipper</a><a href="privacy.html">Privacy e dati</a></div>
   </footer>
   <script src="passage-plan-data.js"></script>
   <script src="passage-plan.js"></script>
