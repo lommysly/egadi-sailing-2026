@@ -49,6 +49,7 @@ Ultimo aggiornamento: 11 settembre 2026.
 
 - [x] GitHub Pages ripristinato con un build standard il 10 settembre 2026.
 - [x] Versione pubblicata su `main` e riletta in HTTP senza autenticazione; il JavaScript pubblico espone una versione datata dell’area skipper.
-- [ ] Verificare inviti WhatsApp, area personale e richieste facoltative su dominio HTTPS con account autorizzati e dati di prova approvati.
-- [x] Configurati file `CNAME`, dominio personalizzato GitHub Pages e dominio autorizzato in Firebase Authentication per `egadi.thatsablast.it`; il sito risponde in HTTP.
-- [ ] Risolvere lo stato GitHub Pages “DNS check in progress” e verificare il certificato HTTPS valido per `egadi.thatsablast.it`; fino ad allora non raccogliere dati reali né eseguire test autenticati sul dominio personalizzato.
+- [ ] Verificare inviti WhatsApp, area personale e richieste facoltative su dominio HTTPS con account autorizzati e dati di prova approvati, dopo l’attivazione dell’area privata a informativa privacy definitiva.
+- [x] Configurati file `CNAME`, dominio personalizzato GitHub Pages e dominio autorizzato in Firebase Authentication per `egadi.thatsablast.it`; il sito è online su HTTPS e HTTP reindirizza a HTTPS.
+- [x] Certificato TLS valido per `egadi.thatsablast.it` verificato e opzione GitHub Pages “Enforce HTTPS” attivata l’11 settembre 2026.
+- [ ] Rileggere il pannello GitHub Pages quando aggiornerà il badge “DNS Check in Progress”: DNS pubblico, certificato e redirect sono già corretti, quindi non modificare record DNS alla cieca.
