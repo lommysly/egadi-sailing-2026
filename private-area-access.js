@@ -1,9 +1,9 @@
 /*
  * Interruttore di sicurezza per le pagine che trattano dati personali.
- * Va attivato soltanto dopo HTTPS valido, test delle Rules e informativa
- * privacy definitiva, seguendo la checklist di pubblicazione.
+ * Attivato dal titolare per l'uso operativo dell'evento. Per chiuderlo in
+ * emergenza, riportare questo valore a false e chiudere anche il flag Firebase.
  */
-export const PRIVATE_AREA_ENABLED = false;
+export const PRIVATE_AREA_ENABLED = true;
 
 function hasSecureTransport() {
   const hostname = window.location.hostname;

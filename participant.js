@@ -9,8 +9,8 @@ import {
   personalAreaUrl,
   startCrewAreaSession,
   startInviteActivation,
-} from './crew-session.js';
-import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js';
+} from './crew-session.js?v=20260911-live';
+import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260911-live';
 
 let activeInvite = null;
 let activatedPhone = '';

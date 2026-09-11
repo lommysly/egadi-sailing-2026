@@ -1,4 +1,4 @@
-import { crewAccessErrorMessage, personalAreaUrl, signInCrew, startCrewAreaSession } from './crew-session.js';
+import { crewAccessErrorMessage, personalAreaUrl, signInCrew, startCrewAreaSession } from './crew-session.js?v=20260911-live';
 
 const form = document.querySelector('#crewLoginForm');
 const message = document.querySelector('#crewLoginMessage');

@@ -4,7 +4,7 @@ import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, que
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
-import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js';
+import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260911-live';
 
 const eventId = 'egadi-2026';
 const app = initializeApp(firebaseConfig);

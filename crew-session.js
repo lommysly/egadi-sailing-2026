@@ -10,7 +10,7 @@ import {
 import { doc, getDoc, getFirestore, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { createCrewInviteIdentity, isCrewPin, isInviteCode, phoneFingerprintFor } from './crew-identity.js';
-import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js';
+import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260911-live';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
