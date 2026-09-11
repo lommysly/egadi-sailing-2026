@@ -8,9 +8,18 @@ function setMessage(text, isError = false) {
   message.classList.toggle('is-error', isError);
 }
 
+function setFormAvailability(enabled) {
+  form.querySelectorAll('input, button').forEach((control) => {
+    control.disabled = !enabled;
+  });
+}
+
 startCrewAreaSession({
-  onOpening: (text, isError) => setMessage(text, isError),
-  onInvalid: () => {},
+  onOpening: (text, isError) => {
+    setMessage(text, isError);
+    setFormAvailability(!isError);
+  },
+  onInvalid: () => setFormAvailability(true),
   onReady: () => window.location.replace(personalAreaUrl()),
 });
 

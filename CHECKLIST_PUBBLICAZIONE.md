@@ -12,6 +12,7 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] Nome e dati della barca modificabili dallo skipper; una sola barca per skipper.
 - [x] Bacheca per barca con regole versionate, orari, comunicazioni e conferma di lettura dell'equipaggio.
 - [x] HTTPS pubblico verificato su `egadi.thatsablast.it`; HTTP reindirizza a HTTPS e la pagina anonima non mostra Crew List, inviti, pagamenti o dati personali.
+- [x] Con area chiusa, anche il modulo crew pubblicato resta disattivato e non invia dati a Firebase.
 
 ## Nuovo accesso equipaggio
 
