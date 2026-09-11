@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { auth, boatId, db, inviteId, personalAreaUrl, profileUrl, startCrewSession } from './crew-session.js';
+import { auth, crewAccessErrorMessage, crewAccessUrl, db, profileUrl, signOutCrew, startCrewAreaSession } from './crew-session.js';
 
 let activeInvite = null;
 let activeBriefing = null;
@@ -36,10 +36,14 @@ function showOpening(message = '', isError = false) {
   setMessage(document.querySelector('#participantAuthMessage'), message, isError);
 }
 
-function showInvalid() {
+function showInvalid(error) {
   document.querySelector('#signInSection').hidden = true;
   document.querySelector('#participantDashboard').hidden = true;
   document.querySelector('#invalidLink').hidden = false;
+  const message = document.querySelector('#invalidAccessMessage');
+  if (message) setMessage(message, crewAccessErrorMessage(error));
+  const loginLink = document.querySelector('#crewLoginLink');
+  if (loginLink) loginLink.href = crewAccessUrl();
 }
 
 function clearPersonalDashboard() {
@@ -56,7 +60,7 @@ function clearPersonalDashboard() {
 function handlePrivateReadError(error, messageElement, fallbackMessage) {
   if (error?.code === 'permission-denied') {
     clearPersonalDashboard();
-    showOpening('Questo accesso non è più attivo in questo browser. Apri nuovamente il tuo link WhatsApp personale o chiedi allo skipper di reinviartelo.', true);
+    showOpening('Questo accesso non è più attivo. Accedi di nuovo con numero e codice personale oppure chiedi allo skipper un nuovo invito.', true);
     return;
   }
   setMessage(messageElement, fallbackMessage, true);
@@ -116,13 +120,11 @@ function renderAnnouncements(snapshot) {
   }).join('');
 }
 
-document.querySelector('#participantSignOutButton').addEventListener('click', () => window.location.assign('index.html'));
-document.querySelector('#copyAccessButton').addEventListener('click', async () => {
+document.querySelector('#participantSignOutButton').addEventListener('click', async () => {
   try {
-    await navigator.clipboard.writeText(personalAreaUrl());
-    setMessage(document.querySelector('#accessLinkMessage'), 'Link copiato. Conservalo nei messaggi preferiti e non inoltrarlo.');
-  } catch (error) {
-    setMessage(document.querySelector('#accessLinkMessage'), 'Non riesco a copiare il link. Puoi chiedere allo skipper di reinviarlo.', true);
+    await signOutCrew();
+  } finally {
+    window.location.assign('index.html');
   }
 });
 document.querySelector('#acceptRulesButton').addEventListener('click', async () => {
@@ -131,10 +133,11 @@ document.querySelector('#acceptRulesButton').addEventListener('click', async () 
   button.disabled = true;
   try {
     const rulesVersion = activeBriefing.rulesVersion || 1;
-    const acceptance = { inviteId, acceptedBy: auth.currentUser.uid, rulesVersion, acceptedAt: serverTimestamp() };
+    const acceptance = { inviteId: activeInvite.id, acceptedBy: auth.currentUser.uid, rulesVersion, acceptedAt: serverTimestamp() };
     const batch = writeBatch(db);
-    batch.set(doc(db, 'boats', boatId, 'ruleAcceptances', inviteId), acceptance, { merge: true });
-    batch.set(doc(db, 'boats', boatId, 'ruleAcceptances', inviteId, 'history', String(rulesVersion)), acceptance, { merge: true });
+    batch.set(doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id), acceptance, { merge: true });
+    const historyId = `${rulesVersion}-${auth.currentUser.uid}`;
+    batch.create(doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id, 'history', historyId), acceptance);
     await batch.commit();
     setMessage(document.querySelector('#participantRulesMessage'), 'Regole confermate.');
   } catch (error) {
@@ -143,14 +146,14 @@ document.querySelector('#acceptRulesButton').addEventListener('click', async () 
   }
 });
 
-startCrewSession({
+startCrewAreaSession({
   onOpening: showOpening,
   onInvalid: showInvalid,
   onReady: async ({ invite }) => {
     activeInvite = invite;
-    const member = await getDoc(doc(db, 'boats', boatId, 'members', inviteId));
+    const member = await getDoc(doc(db, 'boats', invite.boatId, 'members', invite.id));
     if (!member.exists()) {
-      window.location.replace(profileUrl());
+      window.location.replace(profileUrl({ edit: true }));
       return;
     }
     document.querySelector('#signInSection').hidden = true;
@@ -158,9 +161,9 @@ startCrewSession({
     document.querySelector('#participantTitle').textContent = member.data().displayName || invite.displayName || 'La mia area';
     document.querySelector('#editProfileButton').href = profileUrl({ edit: true });
     renderProfile(member.data());
-    onSnapshot(query(collection(db, 'boats', boatId, 'paymentRequests'), where('recipientId', '==', inviteId)), renderPayments, (error) => handlePrivateReadError(error, document.querySelector('#accessLinkMessage'), 'Non riesco a leggere le richieste personali.'));
-    onSnapshot(doc(db, 'boats', boatId, 'briefing', 'board'), (snapshot) => { activeBriefing = snapshot.exists() ? snapshot.data() : null; renderBriefing(); }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la bacheca di bordo.'));
-    onSnapshot(query(collection(db, 'boats', boatId, 'announcements'), orderBy('createdAt', 'desc')), renderAnnouncements, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere le comunicazioni.'));
-    onSnapshot(doc(db, 'boats', boatId, 'ruleAcceptances', inviteId), (snapshot) => { activeRuleAcceptance = snapshot.exists() ? snapshot.data() : null; renderBriefing(); }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la conferma delle regole.'));
+    onSnapshot(query(collection(db, 'boats', invite.boatId, 'paymentRequests'), where('recipientId', '==', invite.id)), renderPayments, (error) => handlePrivateReadError(error, document.querySelector('#accessLinkMessage'), 'Non riesco a leggere le richieste personali.'));
+    onSnapshot(doc(db, 'boats', invite.boatId, 'briefing', 'board'), (snapshot) => { activeBriefing = snapshot.exists() ? snapshot.data() : null; renderBriefing(); }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la bacheca di bordo.'));
+    onSnapshot(query(collection(db, 'boats', invite.boatId, 'announcements'), orderBy('createdAt', 'desc')), renderAnnouncements, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere le comunicazioni.'));
+    onSnapshot(doc(db, 'boats', invite.boatId, 'ruleAcceptances', invite.id), (snapshot) => { activeRuleAcceptance = snapshot.exists() ? snapshot.data() : null; renderBriefing(); }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la conferma delle regole.'));
   },
 });

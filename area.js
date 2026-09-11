@@ -1,8 +1,9 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js';
+import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js';
 
 const eventId = 'egadi-2026';
@@ -43,6 +44,10 @@ function getAuthErrorMessage(error) {
   if (error.code === 'auth/unauthorized-domain') return 'Questo indirizzo del sito non è ancora autorizzato in Firebase.';
   if (error.code === 'auth/operation-not-allowed') return 'L’accesso con Google non è abilitato nel progetto Firebase.';
   return 'Accesso non completato. Riprova tra poco.';
+}
+
+function isGoogleSkipperAccount(user) {
+  return user?.providerData?.some((profile) => profile.providerId === 'google.com');
 }
 
 function escapeHtml(value = '') {
@@ -125,22 +130,27 @@ function toDateTimeLocal(value) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
-function participantUrl(inviteId) {
+const INVITE_VALIDITY_DAYS = 14;
+
+function participantUrl(invite) {
+  if (!invite?.accessKey) return '';
   const url = new URL('participant.html', window.location.href);
-  url.searchParams.set('invite', inviteId);
+  url.searchParams.set('invite', invite.id);
   url.searchParams.set('boat', activeBoat.id);
+  url.searchParams.set('key', invite.accessKey);
   return url.toString();
 }
 
 function normalizeWhatsAppNumber(value) {
-  const normalized = String(value || '').trim().replace(/[ .()-]/g, '');
-  return /^\+[1-9]\d{7,14}$/.test(normalized) ? normalized.slice(1) : '';
+  const normalized = normalizeCrewPhone(value);
+  return normalized ? normalized.slice(1) : '';
 }
 
 function whatsappUrl(invite) {
   const number = normalizeWhatsAppNumber(invite.whatsappNumber);
-  if (!number) return '';
-  const message = `Ciao ${invite.displayName}, ecco il tuo spazio personale per completare i dati della Crew List e vedere le richieste dedicate: ${participantUrl(invite.id)}`;
+  const personalUrl = participantUrl(invite);
+  if (!number || !personalUrl) return '';
+  const message = `Ciao ${invite.displayName}, ecco il tuo invito personale per la Crew List Egadi. Apri il link, conferma il numero WhatsApp e scegli un codice personale di 6 cifre: ${personalUrl}`;
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
 
@@ -148,6 +158,51 @@ function createInviteId() {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function inviteExpiresAt() {
+  return Timestamp.fromDate(new Date(Date.now() + INVITE_VALIDITY_DAYS * 24 * 60 * 60 * 1000));
+}
+
+async function createInviteRecord({ displayName, whatsappNumber, existingInvite = null }) {
+  const accessKey = createInviteId();
+  const identity = await createCrewInviteIdentity({ phone: whatsappNumber, accessKey });
+  if (!existingInvite) {
+    const assignedIndex = await getDoc(doc(db, 'crewLoginIndex', identity.phoneFingerprint));
+    if (assignedIndex.exists()) {
+      const error = new Error('Numero già associato a una barca.');
+      error.code = 'phone-already-assigned';
+      throw error;
+    }
+  }
+  return {
+    id: existingInvite?.id || createInviteId(),
+    boatId: activeBoat.id,
+    displayName,
+    whatsappNumber: identity.normalizedPhone,
+    phoneFingerprint: identity.phoneFingerprint,
+    loginEmail: identity.loginEmail,
+    accessKey,
+    participantUid: null,
+    status: 'pending',
+    accessVersion: Number(existingInvite?.accessVersion || 0) + 1,
+    expiresAt: inviteExpiresAt(),
+  };
+}
+
+async function reissueInvite(invite) {
+  const renewedInvite = await createInviteRecord({
+    displayName: invite.displayName,
+    whatsappNumber: invite.whatsappNumber,
+    existingInvite: invite,
+  });
+  await updateDoc(doc(db, 'boats', activeBoat.id, 'invites', invite.id), {
+    ...renewedInvite,
+    activatedAt: null,
+    reissuedAt: serverTimestamp(),
+    reissuedBy: auth.currentUser.uid,
+  });
+  return renewedInvite;
 }
 
 function renderPaymentRecipientOptions() {
@@ -176,7 +231,7 @@ function crewSeatLimit() {
 }
 
 function allocatedCrewSeatCount() {
-  const seatIds = new Set(activeInvites.map((invite) => invite.id));
+  const seatIds = new Set(activeInvites.filter((invite) => invite.status !== 'revoked').map((invite) => invite.id));
   activeMembers.forEach((member) => seatIds.add(member.id));
   return seatIds.size;
 }
@@ -286,8 +341,14 @@ function renderInvites() {
   }
   list.innerHTML = activeInvites.map((invite) => {
     const profileCompleted = activeMembers.some((member) => member.id === invite.id);
-    const status = profileCompleted ? 'Anagrafica completata' : invite.participantUid ? 'Link aperto: dati da completare' : 'Pronto da inviare';
-    return `<article class="invite-row"><div><strong>${escapeHtml(invite.displayName)}</strong><span>${escapeHtml(status)} · ${escapeHtml(invite.whatsappNumber)}</span></div><div class="payment-action"><button class="text-button" type="button" data-copy-invite="${escapeHtml(invite.id)}">Copia link</button><button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(invite.id)}">Apri WhatsApp</button></div></article>`;
+    const expired = invite.expiresAt?.toDate && invite.expiresAt.toDate() < new Date();
+    const status = invite.status === 'active'
+      ? (profileCompleted ? 'Accesso attivo · anagrafica completata' : 'Accesso attivo · dati da completare')
+      : (expired ? 'Invito scaduto' : 'Pronto da inviare · valido 14 giorni');
+    const sendActions = invite.status === 'pending' && !expired && invite.accessKey
+      ? `<button class="text-button" type="button" data-copy-invite="${escapeHtml(invite.id)}">Copia link</button><button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(invite.id)}">Apri WhatsApp</button>`
+      : '';
+    return `<article class="invite-row"><div><strong>${escapeHtml(invite.displayName)}</strong><span>${escapeHtml(status)} · ${escapeHtml(invite.whatsappNumber)}</span></div><div class="payment-action">${sendActions}<button class="text-button" type="button" data-reissue-invite="${escapeHtml(invite.id)}">Revoca e genera nuovo link</button></div></article>`;
   }).join('');
   renderPaymentRecipientOptions();
   renderCapacityStatus();
@@ -310,7 +371,9 @@ function renderPayments(snapshot) {
     const isVerified = payment.status === 'verified';
     const status = isVerified ? 'Accredito verificato' : 'In attesa di verifica';
     const action = isVerified ? '' : `<button class="text-button" type="button" data-verify-payment="${escapeHtml(payment.id)}">Conferma accredito</button>`;
-    const inviteAction = activeInvites.some((invite) => invite.id === recipientId) ? `<button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(recipientId)}">Invia su WhatsApp</button>` : '';
+    const inviteAction = activeInvites.some((invite) => invite.id === recipientId && invite.status === 'pending' && invite.accessKey)
+      ? `<button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(recipientId)}">Invia invito</button>`
+      : '';
     return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span><span>${escapeHtml(payment.instructions)}</span></div><div class="payment-action"><span class="payment-status">${status}</span><button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${inviteAction}${action}</div></article>`;
   }).join('');
 }
@@ -490,10 +553,9 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
   submitButton.disabled = true;
   const whatsappWindow = window.open('', '_blank');
   if (whatsappWindow) whatsappWindow.opener = null;
-  const inviteId = createInviteId();
-  const invite = { id: inviteId, boatId: activeBoat.id, displayName, whatsappNumber, participantUid: null, status: 'sent' };
   try {
-    await setDoc(doc(db, 'boats', activeBoat.id, 'invites', inviteId), {
+    const invite = await createInviteRecord({ displayName, whatsappNumber });
+    await setDoc(doc(db, 'boats', activeBoat.id, 'invites', invite.id), {
       ...invite, createdAt: serverTimestamp(), createdBy: auth.currentUser.uid,
     });
     form.reset();
@@ -511,7 +573,9 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
     }
   } catch (error) {
     whatsappWindow?.close();
-    setMessage(document.querySelector('#inviteFormMessage'), 'Non riesco a creare il link personale.', true);
+    setMessage(document.querySelector('#inviteFormMessage'), error.code === 'phone-already-assigned'
+      ? 'Questo numero è già associato a una barca dell’evento. Non creare un secondo invito: verifica prima con l’organizzatore.'
+      : 'Non riesco a creare il link personale.', true);
   } finally {
     submitButton.disabled = false;
   }
@@ -671,7 +735,7 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
     const invite = activeInvites.find((candidate) => candidate.id === inviteCopyButton.dataset.copyInvite);
     if (!invite) return;
     try {
-      await navigator.clipboard.writeText(participantUrl(invite.id));
+      await navigator.clipboard.writeText(participantUrl(invite));
       setMessage(document.querySelector('#inviteFormMessage'), 'Link personale copiato.');
     } catch (error) {
       setMessage(document.querySelector('#inviteFormMessage'), 'Non riesco a copiare il link. Verifica i permessi del browser.', true);
@@ -709,6 +773,30 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
 
 document.querySelector('#inviteList').addEventListener('click', async (event) => {
   if (blockPrivateAction(document.querySelector('#inviteFormMessage'))) return;
+  const reissueButton = event.target.closest('[data-reissue-invite]');
+  if (reissueButton) {
+    const invite = activeInvites.find((candidate) => candidate.id === reissueButton.dataset.reissueInvite);
+    if (!invite || !activeBoat || !auth.currentUser) return;
+    const confirmed = window.confirm(`Revocare l’accesso attuale di ${invite.displayName} e inviare un nuovo link? Il vecchio codice personale smetterà di funzionare.`);
+    if (!confirmed) return;
+    reissueButton.disabled = true;
+    const whatsappWindow = window.open('', '_blank');
+    if (whatsappWindow) whatsappWindow.opener = null;
+    try {
+      const renewedInvite = await reissueInvite(invite);
+      const url = whatsappUrl(renewedInvite);
+      if (whatsappWindow && url) whatsappWindow.location.replace(url);
+      else whatsappWindow?.close();
+      setMessage(document.querySelector('#inviteFormMessage'), whatsappWindow && url
+        ? 'Il vecchio accesso è stato revocato: WhatsApp è aperto con il nuovo link.'
+        : 'Il vecchio accesso è stato revocato. Copia il nuovo link dalla scheda dell’invito.', !url);
+    } catch (error) {
+      whatsappWindow?.close();
+      reissueButton.disabled = false;
+      setMessage(document.querySelector('#inviteFormMessage'), 'Non riesco a revocare e generare il nuovo link. Se era aperta un’altra scheda, aggiorna l’elenco e usa il link più recente.', true);
+    }
+    return;
+  }
   const whatsappButton = event.target.closest('[data-whatsapp-invite]');
   if (whatsappButton) {
     const invite = activeInvites.find((candidate) => candidate.id === whatsappButton.dataset.whatsappInvite);
@@ -722,7 +810,7 @@ document.querySelector('#inviteList').addEventListener('click', async (event) =>
   const invite = activeInvites.find((candidate) => candidate.id === copyButton.dataset.copyInvite);
   if (!invite) return;
   try {
-    await navigator.clipboard.writeText(participantUrl(invite.id));
+    await navigator.clipboard.writeText(participantUrl(invite));
     setMessage(document.querySelector('#inviteFormMessage'), 'Link personale copiato.');
   } catch (error) {
     setMessage(document.querySelector('#inviteFormMessage'), 'Non riesco a copiare il link. Verifica i permessi del browser.', true);
@@ -735,9 +823,12 @@ onAuthStateChanged(auth, async (user) => {
     showPrivateAreaBlocked();
     return;
   }
-  if (!user) {
+  if (!user || !isGoogleSkipperAccount(user)) {
     signInCard.hidden = false;
     accountCard.hidden = true;
+    if (user) {
+      setMessage(authMessage, 'Questa è l’area skipper. Per l’equipaggio usa l’accesso con numero e codice personale.', true);
+    }
     return;
   }
   signInCard.hidden = true;

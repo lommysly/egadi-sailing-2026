@@ -6,99 +6,270 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isPasswordCrew() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'password'
+        && request.auth.token.email is string;
+    }
+
+    function isGoogleSkipperAccount() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
     function isOrganizer() {
       return signedIn() && request.auth.uid in get(/databases/$(database)/documents/events/egadi-2026).data.organizerIds;
     }
 
     // L'area privata resta negata di default. Il titolare la apre soltanto
-    // dopo informativa definitiva e test, impostando il flag amministrativo.
+    // dopo informativa definitiva, test Rules e test browser separati.
     function isPrivateAreaOpen() {
       return exists(/databases/$(database)/documents/events/egadi-2026)
         && get(/databases/$(database)/documents/events/egadi-2026).data.privateAreaEnabled == true;
     }
 
     function isSkipper(boatId) {
-      return signedIn() && get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid;
+      return isGoogleSkipperAccount()
+        && exists(/databases/$(database)/documents/boats/$(boatId))
+        && get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid;
     }
 
     function isInviteHolder(boatId, inviteId) {
       return signedIn()
         && exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId))
+        && get(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId)).data.status == 'active'
         && get(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId)).data.participantUid == request.auth.uid;
+    }
+
+    function hasValidMemberPayload() {
+      return request.resource.data.keys().hasAll(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy', 'createdAt', 'createdBy'])
+        && request.resource.data.firstName is string
+        && request.resource.data.firstName.size() > 0
+        && request.resource.data.lastName is string
+        && request.resource.data.lastName.size() > 0
+        && request.resource.data.birthDate is string
+        && request.resource.data.birthPlace is string
+        && request.resource.data.nationality is string
+        && request.resource.data.gender is string
+        && request.resource.data.documentType is string
+        && request.resource.data.documentNumber is string
+        && request.resource.data.documentExpiry is string
+        && request.resource.data.role is string
+        && request.resource.data.email is string
+        && request.resource.data.phone is string
+        && request.resource.data.charterConsent is bool
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName == request.resource.data.firstName + ' ' + request.resource.data.lastName
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function isValidOwnerMemberCreate() {
+      return hasValidMemberPayload()
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+    }
+
+    function isValidOwnerMemberUpdate() {
+      return hasValidMemberPayload()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt']);
+    }
+
+    function isValidCrewMemberCreate(boatId, memberId) {
+      return isInviteHolder(boatId, memberId)
+        && hasValidMemberPayload()
+        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy'])
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    function isValidCrewMemberUpdate(boatId, memberId) {
+      return isInviteHolder(boatId, memberId)
+        && hasValidMemberPayload()
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy']);
+    }
+
+    function isValidNewInvite(boatId, inviteId) {
+      return request.resource.data.keys().hasAll(['id', 'boatId', 'displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasOnly(['id', 'boatId', 'displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'createdAt', 'createdBy'])
+        && request.resource.data.id == inviteId
+        && request.resource.data.boatId == boatId
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.whatsappNumber is string
+        && request.resource.data.phoneFingerprint is string
+        && request.resource.data.loginEmail is string
+        && request.resource.data.accessKey is string
+        && request.resource.data.accessKey.size() == 48
+        && request.resource.data.participantUid == null
+        && request.resource.data.status == 'pending'
+        && request.resource.data.accessVersion == 1
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+    }
+
+    function canClaimInvite(boatId, inviteId) {
+      return isPasswordCrew()
+        && resource.data.id == inviteId
+        && resource.data.boatId == boatId
+        && resource.data.status == 'pending'
+        && resource.data.participantUid == null
+        && resource.data.expiresAt > request.time
+        && resource.data.loginEmail == request.auth.token.email
+        && request.resource.data.participantUid == request.auth.uid
+        && request.resource.data.status == 'active'
+        && request.resource.data.activatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantUid', 'status', 'activatedAt']);
+    }
+
+    function canReissueInvite(boatId, inviteId) {
+      return resource.data.id == inviteId
+        && resource.data.boatId == boatId
+        && request.resource.data.id == inviteId
+        && request.resource.data.boatId == boatId
+        && request.resource.data.displayName is string
+        && request.resource.data.whatsappNumber is string
+        && request.resource.data.phoneFingerprint is string
+        && request.resource.data.loginEmail is string
+        && request.resource.data.accessKey is string
+        && request.resource.data.accessKey.size() == 48
+        && request.resource.data.status == 'pending'
+        && request.resource.data.participantUid == null
+        && request.resource.data.accessVersion is int
+        && ((resource.data.keys().hasAll(['accessVersion'])
+          && resource.data.accessVersion is int
+          && request.resource.data.accessVersion == resource.data.accessVersion + 1)
+          || (!resource.data.keys().hasAll(['accessVersion'])
+            && request.resource.data.accessVersion == 1))
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.reissuedAt == request.time
+        && request.resource.data.reissuedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'activatedAt', 'reissuedAt', 'reissuedBy']);
+    }
+
+    function isCurrentCrewAccess(userId) {
+      return signedIn()
+        && userId == request.auth.uid
+        && resource.data.userId == request.auth.uid
+        && resource.data.loginEmail == request.auth.token.email
+        && resource.data.boatId is string
+        && resource.data.inviteId is string
+        && isInviteHolder(resource.data.boatId, resource.data.inviteId);
+    }
+
+    function isValidCrewAccess(userId) {
+      return isPasswordCrew()
+        && userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['boatId', 'inviteId', 'userId', 'loginEmail', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['boatId', 'inviteId', 'userId', 'loginEmail', 'updatedAt'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.loginEmail == request.auth.token.email
+        && request.resource.data.boatId is string
+        && request.resource.data.inviteId is string
+        && request.resource.data.updatedAt == request.time
+        && isInviteHolder(request.resource.data.boatId, request.resource.data.inviteId);
     }
 
     function isBoatParticipant(boatId) {
       return signedIn()
-        && exists(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid))
-        && get(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid)).data.userId == request.auth.uid
-        && get(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid)).data.boatId == boatId
-        && get(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid)).data.inviteId is string
-        && isInviteHolder(boatId, get(/databases/$(database)/documents/boats/$(boatId)/participantAccess/$(request.auth.uid)).data.inviteId);
+        && exists(/databases/$(database)/documents/crewAccess/$(request.auth.uid))
+        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.boatId == boatId
+        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.userId == request.auth.uid
+        && isInviteHolder(boatId, get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.inviteId);
+    }
+
+    function canWriteCrewLoginIndex(phoneFingerprint) {
+      let access = get(/databases/$(database)/documents/crewAccess/$(request.auth.uid));
+      let invite = get(/databases/$(database)/documents/boats/$(access.data.boatId)/invites/$(access.data.inviteId));
+      return isPasswordCrew()
+        && access.data.userId == request.auth.uid
+        && access.data.loginEmail == request.auth.token.email
+        && invite.data.status == 'active'
+        && invite.data.participantUid == request.auth.uid
+        && invite.data.phoneFingerprint == phoneFingerprint
+        && request.resource.data.keys().hasAll(['loginEmail', 'boatId', 'inviteId', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['loginEmail', 'boatId', 'inviteId', 'updatedAt'])
+        && request.resource.data.loginEmail == request.auth.token.email
+        && request.resource.data.boatId == access.data.boatId
+        && request.resource.data.inviteId == access.data.inviteId
+        && request.resource.data.updatedAt == request.time;
     }
 
     function isValidRuleAcceptance(boatId, inviteId) {
       return isInviteHolder(boatId, inviteId)
+        && request.resource.data.keys().hasOnly(['inviteId', 'acceptedBy', 'rulesVersion', 'acceptedAt'])
         && request.resource.data.inviteId == inviteId
         && request.resource.data.acceptedBy == request.auth.uid
         && request.resource.data.rulesVersion is int
+        && request.resource.data.acceptedAt == request.time
         && exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
         && request.resource.data.rulesVersion == get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion;
     }
 
-    function canClaimInvite() {
-      return signedIn()
-        && request.resource.data.participantUid == request.auth.uid
-        && request.resource.data.status == 'opened'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantUid', 'status', 'acceptedAt']);
-    }
-
     match /events/egadi-2026 {
       // Anche il documento evento resta non leggibile dall'area privata chiusa.
-      // Le funzioni Rules possono comunque consultarlo per autorizzare il titolare.
-      allow read: if isPrivateAreaOpen() && signedIn();
+      allow read: if isPrivateAreaOpen() && isOrganizer();
       allow write: if isOrganizer();
     }
 
+    // Indice pseudonimo: non contiene nome, telefono o Crew List. È creato
+    // solo dopo l'attivazione e serve a risalire all'account dal numero inserito.
+    match /crewLoginIndex/{phoneFingerprint} {
+      allow get: if isPrivateAreaOpen();
+      allow list: if false;
+      allow create: if isPrivateAreaOpen() && canWriteCrewLoginIndex(phoneFingerprint);
+      allow update: if isPrivateAreaOpen() && canWriteCrewLoginIndex(phoneFingerprint)
+        && resource.data.boatId == request.resource.data.boatId
+        && resource.data.inviteId == request.resource.data.inviteId;
+      allow delete: if false;
+    }
+
+    match /crewAccess/{userId} {
+      allow get: if isPrivateAreaOpen() && isCurrentCrewAccess(userId);
+      allow list: if false;
+      allow create, update: if isPrivateAreaOpen() && isValidCrewAccess(userId);
+      allow delete: if false;
+    }
+
     match /boats/{boatId} {
-      allow read: if isPrivateAreaOpen() && (isOrganizer() || resource.data.skipperId == request.auth.uid);
-      allow create: if isPrivateAreaOpen() && signedIn() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid;
+      allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+      allow create: if isPrivateAreaOpen() && isGoogleSkipperAccount() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid;
       allow update: if isPrivateAreaOpen() && (isOrganizer() || (isSkipper(boatId)
         && request.resource.data.skipperId == resource.data.skipperId
         && request.resource.data.eventId == resource.data.eventId));
       allow delete: if isPrivateAreaOpen() && isOrganizer();
 
       match /invites/{inviteId} {
-        // Il codice a 192 bit nel link WhatsApp è la chiave personale dell'invito.
-        // Gli inviti non sono elencabili: si può leggere solo conoscendo il codice esatto.
-        allow get: if isPrivateAreaOpen() && signedIn();
+        // Il link è un codice di attivazione, non l'accesso quotidiano.
+        allow get: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, inviteId));
         allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
-        allow create: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId)) && request.resource.data.boatId == boatId;
+        allow create: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId)) && isValidNewInvite(boatId, inviteId);
         allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
-        allow update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || canClaimInvite());
+        allow update: if isPrivateAreaOpen() && (canClaimInvite(boatId, inviteId)
+          || ((isOrganizer() || isSkipper(boatId)) && canReissueInvite(boatId, inviteId)));
       }
 
       match /members/{memberId} {
         allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId));
-        allow create: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId));
-        allow update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, memberId));
+        allow create: if isPrivateAreaOpen() && (((isOrganizer() || isSkipper(boatId)) && isValidOwnerMemberCreate())
+          || isValidCrewMemberCreate(boatId, memberId));
+        allow update: if isPrivateAreaOpen() && (((isOrganizer() || isSkipper(boatId)) && isValidOwnerMemberUpdate())
+          || isValidCrewMemberUpdate(boatId, memberId));
         allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+      }
+
+      // Percorso legacy: il nuovo accesso usa soltanto /crewAccess/{uid}.
+      match /participantAccess/{userId} {
+        allow read, write: if false;
       }
 
       match /paymentRequests/{requestId} {
         allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || (resource.data.recipientId is string && isInviteHolder(boatId, resource.data.recipientId)));
         allow create, update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
         allow delete: if isPrivateAreaOpen() && isOrganizer();
-      }
-
-      match /participantAccess/{userId} {
-        allow get: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || (signedIn() && userId == request.auth.uid));
-        allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || (signedIn() && resource.data.userId == request.auth.uid));
-        allow create, update: if isPrivateAreaOpen() && signedIn() && userId == request.auth.uid
-          && request.resource.data.inviteId is string
-          && request.resource.data.userId == request.auth.uid
-          && request.resource.data.boatId == boatId
-          && isInviteHolder(boatId, request.resource.data.inviteId);
-        allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
       }
 
       match /briefing/{briefingId} {
@@ -120,7 +291,8 @@ service cloud.firestore {
         match /history/{versionId} {
           allow get: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, inviteId));
           allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
-          allow create, update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isValidRuleAcceptance(boatId, inviteId));
+          allow create: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isValidRuleAcceptance(boatId, inviteId));
+          allow update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
           allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
         }
       }

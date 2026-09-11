@@ -1,6 +1,7 @@
 /*
  * Interruttore di sicurezza per le pagine che trattano dati personali.
- * Va attivato soltanto dopo HTTPS valido e informativa privacy definitiva.
+ * Va attivato soltanto dopo HTTPS valido, test delle Rules e informativa
+ * privacy definitiva, seguendo la checklist di pubblicazione.
  */
 export const PRIVATE_AREA_ENABLED = false;
 

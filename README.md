@@ -1,87 +1,118 @@
 # Egadi Sailing Experience · 8–11 ottobre 2026
 
-Sito pubblico statico e futura area privata per skipper ed equipaggi. Il progetto e' pensato per restare sul piano Firebase Spark: nessun checkout, nessuna Cloud Function, nessun SMS e nessun servizio a consumo.
+Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il progetto resta sul piano Firebase Spark: nessun checkout, nessuna Cloud Function, nessun SMS e nessun servizio a consumo.
 
-## Stato attuale
+## Stato reale
 
-- `index.html`: sito pubblico, presentazione della flotta e collegamento al briefing comune.
+- Il sito pubblico è raggiungibile su `https://egadi.thatsablast.it/`.
+- Il certificato HTTPS è valido, ma l'area privata resta volutamente chiusa sia nell'interfaccia sia nelle Security Rules finché non sono completati test, configurazione Auth e informativa privacy.
+- `PRIVATE_AREA_ENABLED` nel sorgente e `events/egadi-2026.privateAreaEnabled` in Firestore devono rimanere `false` fino alla checklist finale. HTTPS è necessario, ma da solo non autorizza la raccolta dei dati della Crew List.
+- Questa cartella è la sorgente versionata del nuovo accesso con numero WhatsApp e codice personale. Prima dell'uso occorre pubblicare sorgente e Rules, poi eseguire il collaudo con soli dati fittizi.
+
+## Pagine e materiali
+
+- `index.html`: presentazione pubblica della flotta e del viaggio.
 - `passage-plan.html`: unica pagina pubblica per meteo e Passage Plan, alimentata da `passage-plan-data.js`.
-- `film.html`: storyboard pubblico del film, senza incorporare video prima delle verifiche di licenza.
-- `PASSAGE_PLAN_PROMPT.md`: modello per aggiornare il briefing a T−30, T−10, T−5, T−72/48 e durante il viaggio.
-- `area.html`: area skipper con Google Sign-In via finestra popup, registrazione barca, Crew List, bacheca di bordo, inviti WhatsApp e richieste di contributo solo descrittive.
-- `participant.html`: compilazione della Crew List dal link WhatsApp personale; dopo il salvataggio compare una conferma e la persona viene portata nella propria area.
-- `my-area.html`: area personale con riepilogo dei dati inviati, bacheca della barca, regole e richieste dedicate.
-- `crew.html`: istruzioni per recuperare il proprio invito chiedendo allo skipper di reinviarlo.
-- `privacy.html`: principi da completare con informativa definitiva prima della raccolta dati.
-- `firestore.rules`: sorgente delle regole di accesso, con gate server-side da pubblicare; l'area privata sarà negata finché il flag amministrativo dell'evento non viene aperto dal titolare.
-- `FIRESTORE_RULES_TEST_MATRIX.md`: casi fittizi da provare nel Playground o nell'emulatore prima del test live.
-- `CONTRIBUTI_OPERATIVI.md`, `PRIVACY_DA_COMPLETARE.md` e `MEDIA_REGISTER_TEMPLATE.md`: procedure e materiali da completare prima dell'uso reale.
+- `film.html` e `VIDEO_STORYBOARD.md`: storyboard del film; nessun filmato di terzi viene incorporato senza licenza.
+- `area.html`: area skipper con Google Sign-In, una barca per skipper, Crew List, PDF, bacheca, inviti WhatsApp e richieste di contributo solo descrittive.
+- `participant.html`: primo accesso dal link WhatsApp; la persona conferma il suo numero e sceglie il proprio codice di 6 cifre, poi completa i dati necessari alla Crew List.
+- `crew.html`: ingresso quotidiano dell'equipaggio con numero WhatsApp e codice personale.
+- `my-area.html`: area personale con scheda, bacheca, regole e richieste dedicate.
+- `crew-pdf.js`: foglio A4 orizzontale da salvare in PDF per charter / eventuali controlli; non esporta CSV.
+- `FIRESTORE_RULES_TEST_MATRIX.md`, `CHECKLIST_PUBBLICAZIONE.md` e `PRIVACY_DA_COMPLETARE.md`: controlli da chiudere prima dell'uso reale.
 
-## Firebase creato
+## Accesso dell'equipaggio: flusso concordato
 
-Il progetto Firebase separato `egadi-sailing-2026` e l'app web sono stati creati senza account di fatturazione. Firestore e' nella regione Milano (`europe-west8`) con protezione dall'eliminazione attiva.
+1. Lo skipper crea un invito con nome e numero WhatsApp internazionale.
+2. Il sito genera un link personale casuale, valido 14 giorni. Lo skipper lo invia direttamente su WhatsApp.
+3. Al primo accesso la persona apre quel link, conferma il numero WhatsApp e sceglie il proprio codice personale di **esattamente 6 cifre**. Non è il PIN di sblocco del telefono.
+4. Il codice viene verificato da Firebase Authentication e non viene salvato nella Crew List, in Firestore o nel browser.
+5. Dopo aver completato la scheda, la persona torna quando vuole da `crew.html`: inserisce numero + codice e viene portata soltanto nella barca e nell'area dello skipper associati. Per il weekend un numero WhatsApp può avere una sola barca attiva.
+6. Se dimentica il codice o perde il link, lo skipper usa **Revoca e genera nuovo link**. L'invito conserva lo stesso identificativo, quindi anagrafica, richieste e associazione al PDF restano nella stessa posizione; il precedente accesso smette di funzionare.
 
-1. Attivare Firebase Authentication con Google per skipper e organizzazione e `Anonimo` per l'equipaggio. L'invito WhatsApp è l'unica chiave personale del partecipante: non richiede Google, password né OTP SMS.
-2. Accedere una prima volta con l'account organizzatore e annotarne l'UID dalla console Firebase Authentication.
-3. Creare dalla console il documento `events/egadi-2026` con il campo `organizerIds`, un array che contiene esclusivamente quell'UID. La configurazione iniziale e' gia' stata eseguita per l'organizzatore corrente. Lasciare assente o impostare a `false` il campo booleano `privateAreaEnabled`: in entrambi i casi le Rules negano le operazioni sulle barche.
-4. Testare le Security Rules nel simulatore: organizzazione, skipper della propria barca e utente estraneo. Le regole presenti non danno accesso diretto ai partecipanti.
-5. Per il test locale aggiungere `127.0.0.1` in Firebase Authentication > Impostazioni > Domini autorizzati. Prima della pubblicazione aggiungere anche il dominio reale del sito; non usare un elenco aperto di domini.
+Il link WhatsApp è un codice di attivazione, non un accesso permanente. Se viene inoltrato e usato **prima** della persona destinataria, chi lo possiede può attivarlo: un link diretto non può dimostrare l'identità del destinatario senza OTP o verifica esterna. Per questo scade, non va inoltrato e lo skipper può revocarlo.
 
-## Modello dati iniziale
+La pagina di attivazione imposta inoltre `Referrer-Policy: no-referrer`, così il codice presente nel link non viene passato come referrer a font, script o altre risorse esterne caricate dalla pagina.
+
+### Limiti dichiarati del compromesso
+
+- Non viene inviato nessun messaggio email e non è richiesto Google all'equipaggio.
+- Non esiste ancora Face ID / impronta: una vera passkey richiede un server che generi e verifichi le challenge WebAuthn. Non viene simulata con un pulsante fittizio.
+- Non c'è OTP SMS: comporterebbe costi e un piano di fatturazione.
+- Firebase applica protezioni generiche contro l'abuso; il progetto non implementa un blocco configurabile tipo “5 tentativi per invito”, perché richiederebbe logica server-side a pagamento. Gli errori restano generici.
+- Per rendere possibile l'ingresso con il solo numero, Firestore conserva un'impronta SHA-256 del numero e un indice tecnico pubblico consultabile solo per chi conosce il numero esatto. Non contiene nome, numero, documento o Crew List; contiene l'alias tecnico e gli identificativi tecnici della barca/invito, e può rivelare che quel numero ha un accesso Egadi attivo. Va indicato nell'informativa e cancellato dopo l'evento.
+
+## Configurazione Firebase necessaria prima del test
+
+Nel progetto `egadi-sailing-2026`:
+
+1. Conservare **Google** per skipper e organizzazione.
+2. Abilitare **Email/Password** in Firebase Authentication esclusivamente per la verifica tecnica del codice di 6 cifre. Non abilitare l'email-link: nessuna email viene inviata o usata dall'equipaggio.
+3. Configurare la policy password con minimo 6 caratteri. L'interfaccia accetta solo sei cifre; Firebase non può imporre da solo “solo cifre” con questa soluzione.
+4. Attivare la protezione contro l'enumerazione delle email se disponibile nel progetto: il codice gestisce gli errori generici di accesso.
+5. Il provider **Anonimo** non è usato dal nuovo sorgente. Disabilitarlo soltanto dopo che la nuova versione e le nuove Rules sono pubblicate e provate, così non si interrompe una sessione della versione precedente durante il passaggio.
+6. Lasciare autorizzati soltanto i domini necessari in Authentication, compreso `egadi.thatsablast.it` e, per i test locali, `127.0.0.1`.
+7. Il documento `events/egadi-2026` deve contenere `organizerIds` con il solo UID autorizzato e mantenere `privateAreaEnabled: false` fino al collaudo finale.
+
+Non inserire in Firestore credenziali PayPal, Satispay, Revolut, carte, coordinate bancarie, PIN o chiavi di pagamento.
+
+## Modello dati
 
 ```text
 events/egadi-2026
   organizerIds: [uid]
+  privateAreaEnabled: false
 
-boats/{boatId}
-  name, model, capacity, homePort, note, skipperId, eventId
-  members/{memberId}
-    firstName, lastName, birthDate, birthPlace, nationality
+boats/{skipperUid}
+  name, model, capacity, homePort, flag, skipperId, eventId
+  members/{inviteId}
+    firstName, lastName, birthDate, birthPlace, nationality, gender
     documentType, documentNumber, documentExpiry, charterConsent
-    role, email, phone, createdAt
+    role, email, phone, displayName, updatedAt
   invites/{inviteId}
-    boatId, displayName, whatsappNumber, participantUid, status, createdAt
-  participantAccess/{userId}
-    inviteId, boatId, userId, updatedAt
+    displayName, whatsappNumber, phoneFingerprint, loginEmail, accessKey
+    participantUid, status, accessVersion, expiresAt, createdAt
   paymentRequests/{requestId}
-    recipientId, amount, reason, isOptional, dueDate, instructions, status, createdAt
+    recipientId, amount, reason, isOptional, dueDate, instructions, status
   briefing/board
-    rulesTitle, rulesText, rulesVersion, meetingPoint
-    boardingAt, departureAt, returnAt, scheduleNote, updatedAt
   announcements/{announcementId}
-    title, message, isImportant, createdAt, createdBy
   ruleAcceptances/{inviteId}
-    inviteId, acceptedBy, rulesVersion, acceptedAt
-    history/{rulesVersion}
+    history/{rulesVersion}-{participantUid}
       inviteId, acceptedBy, rulesVersion, acceptedAt
+
+crewAccess/{participantUid}
+  boatId, inviteId, userId, loginEmail, updatedAt
+
+crewLoginIndex/{phoneFingerprint}
+  loginEmail, boatId, inviteId, updatedAt
 ```
 
-Non inserire in Firestore credenziali PayPal, Satispay, Revolut, carte o coordinate bancarie. Le richieste di contributo mostrano solo istruzioni dello skipper nella pagina privata e restano `requested` fino alla conferma manuale.
+`loginEmail` è un alias tecnico pseudonimo: non è l'email reale della persona e non riceve messaggi. Dopo l'attivazione le autorizzazioni della Crew List sono legate al `participantUid` Firebase, non a quell'alias. Il percorso legacy `participantAccess` è negato dalle nuove Rules.
 
-Il pulsante `Genera Crew List PDF` apre un foglio A4 orizzontale prestampato per charter / eventuali controlli dell'autorita marittima. Lo skipper sceglie `Salva come PDF` dalla finestra di stampa: il file non viene inviato dal sito e si attiva solo quando sono completi i dati della barca, di ogni persona e la relativa conferma di condivisione. Il comandante è nell'intestazione e nella firma, mentre il conteggio indica le persone nella Crew List: prima della consegna, verificare con il charter se il comandante deve comparire anche come riga o se richiede un proprio modello o ulteriori campi.
+Il vincolo operativo è **un numero WhatsApp, una barca attiva** nello stesso evento. Il sito blocca un secondo invito dopo che il numero è stato attivato; se una persona deve cambiare barca, l'organizzatore deve prima verificare e chiudere l'associazione errata.
 
-I dati della barca, incluso il nome, sono modificabili dallo skipper con `Modifica questa barca`; la stessa Crew List e le richieste personali restano associate alla barca esistente. Il PDF non richiede il porto di iscrizione della barca.
+## Crew List PDF e capienza
 
-`capacity` indica i posti destinati all'equipaggio, escluso lo skipper. L'interfaccia conta inviti e membri unici e non consente di aggiungere oltre quel numero; il controllo è operativo e non sostituisce la valutazione nautica dello skipper né un vincolo atomico lato server.
+Il pulsante **Genera Crew List PDF** apre un foglio A4 orizzontale prestampato. Lo skipper sceglie “Salva come PDF” dalla finestra di stampa. Il PDF si attiva solo con dati della barca, dati richiesti per ogni persona e conferma di condivisione completati. Il porto di iscrizione non è un campo necessario.
 
-Ogni skipper gestisce una sola barca e la relativa Crew List; per le nuove registrazioni l'identificativo della barca coincide con l'UID dello skipper, così le regole Firestore impediscono una seconda barca. Lo skipper può aggiornare i dati operativi, ma non può trasferire la barca a un altro account né cambiarne l'evento associato.
+`capacity` indica i posti per l'equipaggio, escluso lo skipper. L'interfaccia conta inviti e membri unici e non aggiunge oltre il limite; non è un vincolo atomico server-side e non sostituisce la valutazione nautica dello skipper.
 
-## Bacheca di bordo
+Ogni skipper gestisce una sola barca: per le nuove registrazioni l'ID della barca coincide con l'UID dello skipper e le Rules impediscono una seconda creazione. Il nome della barca, ad esempio `Karibu`, è modificabile dallo skipper.
 
-Lo skipper pubblica per la propria barca le regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Ogni partecipante vede solo la bacheca della barca associata al proprio invito. Quando le regole cambiano, la versione aumenta e il partecipante deve confermare di nuovo la lettura. Se lo stesso link viene riaperto da un altro browser, l'accesso corrente passa al nuovo browser e quello precedente non può più leggere bacheca, anagrafica o richieste; la nuova sessione deve confermare le regole a suo nome.
+## Bacheca e contributi
 
-## Limiti e privacy
+Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Ogni persona vede soltanto la bacheca della propria barca. Quando cambia il testo delle regole, aumenta la versione e la persona deve confermare di nuovo la lettura.
 
-- Questa struttura non e' un sistema di pagamento: non chiama API dei provider e non riceve webhook. Lo skipper può definire importo, causale, eventuale scadenza e istruzioni, quindi copiare un messaggio da inviare manualmente. Per ogni persona può creare più richieste, comprese voci facoltative come assicurazione, cena, porto o cambusa.
-- Solo lo skipper può segnare una richiesta come verificata, dopo aver controllato l'accredito reale fuori dal sito. Un click non attiva né dimostra un pagamento.
-- Per documenti, dati sanitari, titolare del trattamento e tempi di cancellazione serve una decisione esplicita e un'informativa completa prima dell'uso reale. La matrice da chiudere è in `PRIVACY_DA_COMPLETARE.md`.
-- Non usare `localStorage` per dati di crew o documenti.
+Il sito non incassa denaro e non dichiara pagamenti come eseguiti. Lo skipper può creare richieste personali con importo, causale, scadenza e istruzioni, incluse voci facoltative come assicurazione, cena, porto o cambusa. Il pagamento avviene fuori dal sito (PayPal, Satispay, Revolut o bonifico) e può essere segnato come verificato solo dopo controllo manuale dell'accredito reale.
 
-## Da fare prima dell'uso con partecipanti
+## Sequenza obbligatoria di apertura
 
-Ogni invito personale ha un codice casuale a 192 bit nel link e viene legato alla sessione tecnica aperta da chi lo utilizza. Il link associa già quella persona alla barca e allo skipper corretti; il partecipante non deve scegliere un account. Può leggere e aggiornare soltanto la propria anagrafica, bacheca e richieste; skipper e organizzatore mantengono l'accesso operativo alla barca. Il link è una chiave personale: se viene aperto da un altro browser, quell'accesso diventa quello corrente e il precedente perde l'accesso ai contenuti, ma chi possiede ancora il link può reclamarlo di nuovo. Non inoltrarlo: può esporre anche l'anagrafica già compilata. Prima dell'apertura reale servono una scadenza e una procedura di revoca/nuovo invito.
-La sequenza di apertura è obbligatoria: pubblicare le Rules con `privateAreaEnabled` assente o `false`, completare l'informativa privacy e i test con dati fittizi, poi attivare l'interfaccia e infine impostare `privateAreaEnabled: true` nel documento evento. Finché il flag non è vero, un client Firebase diretto non può creare, leggere o aggiornare barche, inviti, Crew List, bacheca o richieste.
+1. Versionare e pubblicare questo sorgente e le Security Rules, mantenendo l'area chiusa.
+2. Abilitare il provider Email/Password e verificare i domini autorizzati.
+3. Provare nel Playground/emulatore tutti i casi di `FIRESTORE_RULES_TEST_MATRIX.md` con UID, nomi e numeri fittizi.
+4. Eseguire un test browser con skipper e crew fittizi: primo invito, numero + codice, compilazione, ingresso successivo, PDF, bacheca, revoca e nuovo invito.
+5. Chiudere e pubblicare l'informativa privacy definitiva, inclusi indice tecnico, Firebase Authentication e tempi di cancellazione.
+6. Rileggere il sito realmente pubblicato su HTTPS.
+7. Solo allora, con conferma del titolare, impostare `privateAreaEnabled: true` e `PRIVATE_AREA_ENABLED=true`, quindi eseguire il test live finale.
 
-## Pubblicazione
-
-Il sito pubblico puo' essere pubblicato su GitHub Pages. Prima di usare l'area privata con dati reali: versione nel repository, test delle Security Rules, certificato HTTPS valido, verifica da un account skipper e da un account crew separati, quindi lettura finale del sito realmente pubblicato.
+Un deploy del sito pubblico o un certificato HTTPS valido non sostituiscono gli altri passaggi.

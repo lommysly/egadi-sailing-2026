@@ -1,56 +1,63 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 11 settembre 2026.
+Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verificato, non autorizzano l'apertura dell'area privata.
 
-## Pronto nel progetto
+## Sito pubblico e contenuti
 
-- [x] Sito pubblico con programma flessibile Marsala, Levanzo, Marettimo e Favignana.
-- [x] Area privata skipper con accesso Google, modifica della barca, Crew List e richieste di contributo manuali.
-- [x] Un solo skipper, una sola barca: le nuove registrazioni usano l'UID dello skipper anche come ID della barca e le regole Firestore bloccano una seconda creazione.
-- [x] Il proprietario e l'evento di una barca non sono modificabili dallo skipper; solo l'organizzatore può correggerli.
-- [x] Crew List in formato stampabile A4 orizzontale, da salvare come PDF dallo skipper.
-- [x] Il PDF resta disattivato se un documento scade prima della fine dell'evento, l'11 ottobre 2026.
-- [x] Regole Firestore iniziali compilate e pubblicate nel progetto `egadi-sailing-2026` il 10 settembre 2026.
-- [x] Correzione delle regole Firestore pubblicata l'11 settembre 2026: se un invito WhatsApp viene aperto da un nuovo browser, la vecchia sessione non può più leggere dati della barca; la nuova sessione deve confermare le regole a proprio nome.
-- [x] Capienza esplicita dei posti equipaggio: l'interfaccia conta inviti e membri unici, non aggiunge oltre il limite e ricorda che lo skipper non è conteggiato.
-- [x] Storyboard video presente in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
-- [x] Nessun pagamento online, API di pagamento o dato bancario nel sito.
-- [x] Richieste personali con importo, causale, scadenza facoltativa e messaggio copiabile per l'invio manuale.
-- [x] Procedura operativa per i contributi documentata in `CONTRIBUTI_OPERATIVI.md`: richiesta, invio manuale, accredito esterno e verifica skipper.
-- [x] Invito personale WhatsApp: link con codice casuale, accesso diretto, conferma di salvataggio e area personale separata per il partecipante.
-- [x] Più voci per persona, incluse spese facoltative aggiungibili in un secondo momento.
-- [x] Bacheca privata per barca: regole versionate, orari operativi, comunicazioni dello skipper e conferma di lettura dell'equipaggio.
+- [x] Programma pubblico flessibile Marsala, Levanzo, Marettimo e Favignana.
 - [x] Unica pagina pubblica Meteo & Passage Plan, con file dati separato e prompt operativo per aggiornamenti progressivi.
-- [x] Crediti delle foto Commons corretti con autore, fonte e licenza; nessuna foto o video di terzi è stata scaricata nel repository.
-- [x] Matrice di test delle regole e registri pronti per media e privacy: `FIRESTORE_RULES_TEST_MATRIX.md`, `MEDIA_REGISTER_TEMPLATE.md`, `PRIVACY_DA_COMPLETARE.md`.
-- [ ] Pubblicare e testare il blocco server-side dell’area privata: il flag Firestore `privateAreaEnabled` deve restare assente o `false` finché l’informativa privacy è una bozza; in quel caso le Rules devono negare anche i client Firebase diretti.
+- [x] Storyboard video in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
+- [x] Richieste di contributo solo descrittive: nessun checkout, API di pagamento, dato bancario o conferma automatica nel sito.
+- [x] Crew List A4 orizzontale, da salvare come PDF dallo skipper; il PDF resta disattivato con dati obbligatori mancanti o documento in scadenza prima dell'11 ottobre 2026.
+- [x] Nome e dati della barca modificabili dallo skipper; una sola barca per skipper.
+- [x] Bacheca per barca con regole versionate, orari, comunicazioni e conferma di lettura dell'equipaggio.
+- [x] HTTPS pubblico verificato su `egadi.thatsablast.it`; HTTP reindirizza a HTTPS e la pagina anonima non mostra Crew List, inviti, pagamenti o dati personali.
 
-## Da verificare prima di raccogliere dati reali
+## Nuovo accesso equipaggio
 
-- [ ] Test Google Sign-In skipper e invito WhatsApp diretto per un partecipante sul dominio pubblico.
-- [ ] Provare nel Playground/emulatore i casi senza dati personali della matrice delle regole pubblicate.
-- [ ] Test delle regole live: skipper della propria barca, organizzatore e account estraneo senza accesso.
-- [ ] Invio WhatsApp di prova, apertura del link personale, compilazione di una Crew List autorizzata e prova di stampa `Salva come PDF`.
-- [ ] Test della bacheca: pubblicazione skipper, lettura partecipante, conferma regole e nuova conferma dopo una modifica.
-- [ ] Implementare e testare scadenza, revoca e nuovo invito WhatsApp prima dell'apertura reale: il link è una chiave bearer e oggi chi lo possiede può reclamarlo di nuovo e leggere l'anagrafica già compilata.
-- [ ] Confronto del PDF con il modello effettivamente richiesto dal charter / Capitaneria.
-- [x] Definizione della procedura pratica per i contributi: istruzioni, causale e verifica manuale dello skipper.
-- [ ] Informativa privacy definitiva: titolare identificato come Lomastro Silvio, contatto, basi giuridiche, tempi di cancellazione e procedura di consegna del PDF.
-- [x] Pubblicato il primo briefing T−27 con tracciabilità della fonte astronomica, coordinate, ora di consultazione e distinzione esplicita fra pianificazione e previsioni operative.
+- [x] Sorgente locale: primo accesso dal link WhatsApp, conferma del numero e scelta di un codice personale di sei cifre.
+- [x] Sorgente locale: ingresso successivo da `crew.html` con numero WhatsApp + codice, senza Google, email o SMS.
+- [x] Sorgente locale: scadenza del link a 14 giorni e riemissione sullo stesso invito, con revoca del precedente UID e conservazione di scheda/richieste/PDF.
+- [x] Sorgente locale: un numero WhatsApp può avere una sola barca attiva nell'evento; il secondo invito viene bloccato dopo l'attivazione.
+- [x] Sorgente locale: nessun PIN viene scritto in Firestore, Crew List o browser.
+- [x] Sorgente locale: Face ID / impronta non sono mostrati come disponibili; una vera passkey resta fuori da questa versione.
+- [ ] Pubblicare il nuovo sorgente su GitHub Pages, mantenendo `PRIVATE_AREA_ENABLED=false`.
+- [ ] Pubblicare e rileggere le nuove `firestore.rules`, mantenendo `events/egadi-2026.privateAreaEnabled=false`.
+- [ ] Abilitare Firebase Authentication **Email/Password** per il codice tecnico; Google resta per skipper/organizzatore. Non attivare email-link o OTP SMS.
+- [ ] Dopo la pubblicazione e i test, disabilitare Firebase Authentication **Anonimo** se non serve più ad altri flussi del progetto.
 
-## Materiali editoriali
+## Security Rules e test fittizi obbligatori
+
+- [ ] Eseguire ogni caso di `FIRESTORE_RULES_TEST_MATRIX.md` nel Playground/emulatore con soli UID, telefoni e dati fittizi.
+- [ ] Verificare che il flag chiuso neghi anche il client Firebase diretto, non solo l'interfaccia.
+- [ ] Test skipper: Google Sign-In, propria barca, altra barca negata, PDF, bacheca e richiesta contributo.
+- [ ] Test crew: claim dal nuovo link, creazione scheda, ingresso successivo con numero + codice e accesso soltanto alla propria barca.
+- [ ] Test negativo: numero assente, codice errato, link scaduto, token Google/anonimo e account estraneo non leggono dati.
+- [ ] Test riemissione: il vecchio codice/UID perde accesso; il nuovo link conserva lo stesso `inviteId`, scheda, richieste e PDF.
+- [ ] Test bacheca: pubblicazione skipper, lettura crew, conferma regole e nuova conferma dopo modifica.
+- [ ] Test contributi: destinatario vede solo le proprie richieste; lo skipper registra “verificato” solo dopo accredito esterno reale.
+- [ ] Test browser separato su HTTPS con account fittizi approvati e senza documenti reali.
+
+## Dati reali e privacy
+
+- [ ] Chiudere `privacy.html` e `PRIVACY_DA_COMPLETARE.md`: titolare, contatto, finalità, base giuridica, destinatari, retention, PDF e procedura di cancellazione.
+- [ ] Inserire esplicitamente nell'informativa: Firebase Authentication tecnico, impronta del numero, indice di ingresso e assenza di OTP/verifica del possesso del numero.
+- [ ] Definire data e responsabile per cancellare Crew List, inviti, `crewAccess`, `crewLoginIndex`, account Firebase tecnici, PDF locali e messaggi WhatsApp dopo l'evento.
+- [ ] Prima di qualunque pulizia, inventariare i documenti di test e confermare il bersaglio esatto: non eliminare per errore barca, skipper, inviti o dati che devono restare.
+- [ ] Confrontare il PDF con il modello effettivamente richiesto da charter / Capitaneria.
+
+## Media editoriali
 
 - [ ] Realizzare o raccogliere soltanto riprese originali dell'organizzazione o con licenza esplicita.
-- [ ] Ottenere le autorizzazioni di immagine necessarie prima di usare primi piani riconoscibili.
-- [ ] Montare il film home (45-60 secondi, MP4 H.264 1920x1080, meno di 10 MB, poster separato).
-- [ ] Esportare le tre clip verticali (1080x1920, 12-18 secondi) per WhatsApp, Instagram e pagina viaggio.
-- [ ] Verificare i diritti per musica e audio prima della pubblicazione.
+- [ ] Ottenere autorizzazioni di immagine prima di usare primi piani riconoscibili.
+- [ ] Montare film home 45–60 secondi, MP4 H.264 1920×1080, meno di 10 MB e poster separato.
+- [ ] Esportare tre clip verticali 1080×1920 da 12–18 secondi.
+- [ ] Verificare diritti musica e audio prima della pubblicazione.
 
-## Pubblicazione tecnica
+## Apertura finale, solo dopo tutti i punti sopra
 
-- [x] GitHub Pages ripristinato con un build standard il 10 settembre 2026.
-- [x] Versione pubblicata su `main` e riletta in HTTP senza autenticazione; il JavaScript pubblico espone una versione datata dell’area skipper.
-- [ ] Verificare inviti WhatsApp, area personale e richieste facoltative su dominio HTTPS con account autorizzati e dati di prova approvati, dopo l’attivazione dell’area privata a informativa privacy definitiva.
-- [x] Configurati file `CNAME`, dominio personalizzato GitHub Pages e dominio autorizzato in Firebase Authentication per `egadi.thatsablast.it`; il sito è online su HTTPS e HTTP reindirizza a HTTPS.
-- [x] Certificato TLS valido per `egadi.thatsablast.it` verificato e opzione GitHub Pages “Enforce HTTPS” attivata l’11 settembre 2026.
-- [ ] Rileggere il pannello GitHub Pages quando aggiornerà il badge “DNS Check in Progress”: DNS pubblico, certificato e redirect sono già corretti, quindi non modificare record DNS alla cieca.
+- [ ] Rileggere il commit pubblicato, il build GitHub Pages e il dominio HTTPS effettivo.
+- [ ] Con conferma esplicita del titolare, impostare insieme `PRIVATE_AREA_ENABLED=true` nel sorgente e `privateAreaEnabled: true` nel documento evento.
+- [ ] Eseguire il test live conclusivo con skipper e una crew autorizzata, poi controllare che non esistano dati test indesiderati.
+
+HTTPS è ora valido: non è un motivo sufficiente per spuntare l'apertura finale. Il flag rimane chiuso finché questi controlli non sono completati.
