@@ -209,6 +209,103 @@ service cloud.firestore {
         && request.resource.data.rulesVersion == get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion;
     }
 
+    function isPaymentManager(boatId) {
+      return isOrganizer() || isSkipper(boatId);
+    }
+
+    function hasValidPaymentMethodSelection(methods) {
+      return methods is map
+        && methods.keys().hasOnly(['paypal', 'satispay', 'revolut', 'bankTransfer'])
+        && methods.keys().hasAny(['paypal', 'satispay', 'revolut', 'bankTransfer'])
+        && (!methods.keys().hasAll(['paypal']) || methods.paypal == true)
+        && (!methods.keys().hasAll(['satispay']) || methods.satispay == true)
+        && (!methods.keys().hasAll(['revolut']) || methods.revolut == true)
+        && (!methods.keys().hasAll(['bankTransfer']) || methods.bankTransfer == true);
+    }
+
+    function hasValidCollectionProfile() {
+      return request.resource.data.keys().hasAll(['collectorId', 'collectorName', 'paypalEnabled', 'satispayEnabled', 'revolutEnabled', 'bankTransferEnabled', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['collectorId', 'collectorName', 'paypalEnabled', 'satispayEnabled', 'revolutEnabled', 'bankTransferEnabled', 'updatedAt', 'updatedBy'])
+        && request.resource.data.collectorId == request.auth.uid
+        && request.resource.data.collectorName is string
+        && request.resource.data.collectorName.size() > 0
+        && request.resource.data.collectorName.size() <= 100
+        && request.resource.data.paypalEnabled is bool
+        && request.resource.data.satispayEnabled is bool
+        && request.resource.data.revolutEnabled is bool
+        && request.resource.data.bankTransferEnabled is bool
+        && (request.resource.data.paypalEnabled == true
+          || request.resource.data.satispayEnabled == true
+          || request.resource.data.revolutEnabled == true
+          || request.resource.data.bankTransferEnabled == true)
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    function collectionProfileExists(boatId) {
+      return exists(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default);
+    }
+
+    function inviteExists(boatId, inviteId) {
+      return exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId));
+    }
+
+    function paymentMethodsAllowedByProfile(boatId, methods) {
+      let profile = get(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data;
+      return (!methods.keys().hasAll(['paypal']) || profile.paypalEnabled == true)
+        && (!methods.keys().hasAll(['satispay']) || profile.satispayEnabled == true)
+        && (!methods.keys().hasAll(['revolut']) || profile.revolutEnabled == true)
+        && (!methods.keys().hasAll(['bankTransfer']) || profile.bankTransferEnabled == true);
+    }
+
+    function isValidPaymentRequestCreate(boatId) {
+      let profile = get(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data;
+      return request.resource.data.keys().hasAll(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
+        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
+        && request.resource.data.recipientId is string
+        && request.resource.data.recipientId.size() > 0
+        && request.resource.data.memberId == request.resource.data.recipientId
+        && request.resource.data.payerInviteId == request.resource.data.recipientId
+        && inviteExists(boatId, request.resource.data.recipientId)
+        && request.resource.data.amountCents is int
+        && request.resource.data.amountCents >= 1
+        && request.resource.data.amountCents <= 1000000
+        && request.resource.data.currency == 'EUR'
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() > 0
+        && request.resource.data.reason.size() <= 160
+        && request.resource.data.isOptional is bool
+        && request.resource.data.dueDate is string
+        && request.resource.data.dueDate.size() <= 10
+        && request.resource.data.collectorId == request.auth.uid
+        && request.resource.data.collectorName == profile.collectorName
+        && hasValidPaymentMethodSelection(request.resource.data.paymentMethods)
+        && paymentMethodsAllowedByProfile(boatId, request.resource.data.paymentMethods)
+        && request.resource.data.status == 'prepared'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.verifiedAt == null
+        && request.resource.data.verifiedBy == null
+        && request.resource.data.cancelledAt == null
+        && request.resource.data.cancelledBy == null;
+    }
+
+    function canVerifyPayment() {
+      return (resource.data.status == 'prepared' || resource.data.status == 'requested')
+        && request.resource.data.status == 'verified'
+        && request.resource.data.verifiedAt == request.time
+        && request.resource.data.verifiedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'verifiedAt', 'verifiedBy']);
+    }
+
+    function canCancelPayment() {
+      return (resource.data.status == 'prepared' || resource.data.status == 'requested')
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.cancelledAt == request.time
+        && request.resource.data.cancelledBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt', 'cancelledBy']);
+    }
+
     match /events/egadi-2026 {
       // Anche il documento evento resta non leggibile dall'area privata chiusa.
       allow read: if isPrivateAreaOpen() && isOrganizer();
@@ -266,10 +363,20 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // Il profilo conserva soltanto il nome mostrato e i tag dei metodi.
+      // Link, alias, coordinate e credenziali restano fuori da Firestore.
+      match /collectionProfile/{profileId} {
+        allow get: if isPrivateAreaOpen() && profileId == 'default' && (isOrganizer() || isSkipper(boatId));
+        allow list: if false;
+        allow create, update: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId) && hasValidCollectionProfile();
+        allow delete: if false;
+      }
+
       match /paymentRequests/{requestId} {
         allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || (resource.data.recipientId is string && isInviteHolder(boatId, resource.data.recipientId)));
-        allow create, update: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
-        allow delete: if isPrivateAreaOpen() && isOrganizer();
+        allow create: if isPrivateAreaOpen() && isSkipper(boatId) && collectionProfileExists(boatId) && isValidPaymentRequestCreate(boatId);
+        allow update: if isPrivateAreaOpen() && isPaymentManager(boatId) && (canVerifyPayment() || canCancelPayment());
+        allow delete: if false;
       }
 
       match /briefing/{briefingId} {

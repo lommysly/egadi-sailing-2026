@@ -4,6 +4,12 @@ import { auth, crewAccessErrorMessage, crewAccessUrl, db, profileUrl, signOutCre
 let activeInvite = null;
 let activeBriefing = null;
 let activeRuleAcceptance = null;
+const PAYMENT_METHODS = [
+  { id: 'paypal', label: 'PayPal' },
+  { id: 'satispay', label: 'Satispay' },
+  { id: 'revolut', label: 'Revolut' },
+  { id: 'bankTransfer', label: 'Bonifico' },
+];
 
 function setMessage(element, message, isError = false) {
   element.textContent = message;
@@ -27,6 +33,24 @@ function formatDateTime(value) {
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(amount || 0);
+}
+
+function paymentAmount(payment) {
+  if (Number.isInteger(payment.amountCents)) return payment.amountCents / 100;
+  return Number(payment.amount) || 0;
+}
+
+function paymentMethodTags(payment) {
+  const selectedMethods = payment.paymentMethods || payment.methods || {};
+  const methods = PAYMENT_METHODS.filter((method) => selectedMethods[method.id] === true);
+  if (!methods.length) return '';
+  return `<div class="payment-method-tags">${methods.map((method) => `<span class="payment-method-tag">${method.label}</span>`).join('')}</div>`;
+}
+
+function paymentStatusLabel(payment) {
+  if (payment.status === 'verified') return 'Accredito verificato dallo skipper';
+  if (payment.status === 'cancelled') return 'Richiesta annullata';
+  return 'In attesa di verifica';
 }
 
 function showOpening(message = '', isError = false) {
@@ -81,8 +105,10 @@ function renderPayments(snapshot) {
     const payment = item.data();
     const dueDate = payment.dueDate ? ` · Entro ${formatDate(payment.dueDate)}` : '';
     const reason = `${payment.reason || 'Contributo weekend'}${payment.isOptional ? ' · Facoltativo' : ''}`;
-    const status = payment.status === 'verified' ? 'Accredito verificato dallo skipper' : 'In attesa di verifica';
-    return `<article class="payment-row"><div><strong>${formatCurrency(payment.amount)} · ${escapeHtml(reason)}</strong><span>${escapeHtml(payment.instructions || '')}</span><span>${escapeHtml(dueDate)}</span></div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span></div></article>`;
+    const status = paymentStatusLabel(payment);
+    const methods = paymentMethodTags(payment) || '<span>Metodo da concordare con lo skipper.</span>';
+    const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
+    return `<article class="payment-row"><div><strong>${formatCurrency(paymentAmount(payment))} · ${escapeHtml(reason)}</strong><span>${escapeHtml(dueDate)}</span>${methods}${legacyInstructions}<span class="payment-detail-note">I dettagli del pagamento sono nel messaggio WhatsApp dello skipper.</span></div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span></div></article>`;
   }).join('');
 }
 

@@ -7,7 +7,7 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] Programma pubblico flessibile Marsala, Levanzo, Marettimo e Favignana.
 - [x] Unica pagina pubblica Meteo & Passage Plan, con file dati separato e prompt operativo per aggiornamenti progressivi.
 - [x] Storyboard video in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
-- [x] Richieste di contributo solo descrittive: nessun checkout, API di pagamento, dato bancario o conferma automatica nel sito.
+- [x] Richieste di contributo con tag dei metodi e messaggio WhatsApp diretto: nessun checkout, API, creazione o persistenza di link, dato bancario, credenziale o conferma automatica nel sito.
 - [x] Crew List A4 orizzontale, da salvare come PDF dallo skipper; il PDF resta disattivato con dati obbligatori mancanti o documento in scadenza prima dell'11 ottobre 2026.
 - [x] Nome e dati della barca modificabili dallo skipper; una sola barca per skipper.
 - [x] Bacheca per barca con regole versionate, orari, comunicazioni e conferma di lettura dell'equipaggio.
@@ -36,7 +36,7 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [ ] Test negativo: numero assente, codice errato, link scaduto, token Google/anonimo e account estraneo non leggono dati.
 - [ ] Test riemissione: il vecchio codice/UID perde accesso; il nuovo link conserva lo stesso `inviteId`, scheda, richieste e PDF.
 - [ ] Test bacheca: pubblicazione skipper, lettura crew, conferma regole e nuova conferma dopo modifica.
-- [ ] Test contributi: destinatario vede solo le proprie richieste; lo skipper registra “verificato” solo dopo accredito esterno reale.
+- [ ] Test contributi: profilo incasso, uno o più tag, WhatsApp con dettaglio non persistito, destinatario vede solo le proprie richieste e lo skipper registra “verificato” o “annullata” solo dopo controllo esterno reale. Un click non prova il pagamento.
 - [ ] Test browser separato su HTTPS con account fittizi approvati e senza documenti reali.
 
 ## Dati reali e privacy

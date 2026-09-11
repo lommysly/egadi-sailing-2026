@@ -18,15 +18,24 @@ const registerSection = document.querySelector('#registra-barca');
 const dashboard = document.querySelector('#dashboard');
 const signInButton = document.querySelector('#signInButton');
 const authMessage = document.querySelector('#authMessage');
+const PAYMENT_PROFILE_ID = 'default';
+const PAYMENT_METHODS = [
+  { id: 'paypal', label: 'PayPal', profileField: 'paypalEnabled' },
+  { id: 'satispay', label: 'Satispay', profileField: 'satispayEnabled' },
+  { id: 'revolut', label: 'Revolut', profileField: 'revolutEnabled' },
+  { id: 'bankTransfer', label: 'Bonifico', profileField: 'bankTransferEnabled' },
+];
 let activeBoat = null;
 let activeMembers = [];
 let activePayments = [];
 let activeInvites = [];
+let activePaymentProfile = null;
 let activeBriefing = null;
 let activeAcceptances = [];
 let stopBoatSubscription = null;
 let stopMemberSubscription = null;
 let stopPaymentSubscription = null;
+let stopPaymentProfileSubscription = null;
 let stopInviteSubscription = null;
 let stopBriefingSubscription = null;
 let stopAnnouncementSubscription = null;
@@ -59,6 +68,7 @@ function resetPrivateView() {
   activeMembers = [];
   activePayments = [];
   activeInvites = [];
+  activePaymentProfile = null;
   activeBriefing = null;
   activeAcceptances = [];
   creatingBoat = false;
@@ -67,6 +77,7 @@ function resetPrivateView() {
   stopBoatSubscription?.();
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
+  stopPaymentProfileSubscription?.();
   stopInviteSubscription?.();
   stopBriefingSubscription?.();
   stopAnnouncementSubscription?.();
@@ -74,6 +85,7 @@ function resetPrivateView() {
   stopBoatSubscription = null;
   stopMemberSubscription = null;
   stopPaymentSubscription = null;
+  stopPaymentProfileSubscription = null;
   stopInviteSubscription = null;
   stopBriefingSubscription = null;
   stopAnnouncementSubscription = null;
@@ -109,6 +121,74 @@ function recipientName(recipientId) {
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(amount || 0);
+}
+
+function defaultPaymentProfile() {
+  return {
+    collectorName: auth.currentUser?.displayName || '',
+    paypalEnabled: false,
+    satispayEnabled: false,
+    revolutEnabled: false,
+    bankTransferEnabled: false,
+  };
+}
+
+function availablePaymentMethods() {
+  const profile = activePaymentProfile || defaultPaymentProfile();
+  return PAYMENT_METHODS.filter((method) => profile[method.profileField] === true);
+}
+
+function paymentMethodsFor(payment) {
+  const selectedMethods = payment.paymentMethods || payment.methods || {};
+  return PAYMENT_METHODS.filter((method) => selectedMethods[method.id] === true);
+}
+
+function paymentAmount(payment) {
+  if (Number.isInteger(payment.amountCents)) return payment.amountCents / 100;
+  return Number(payment.amount) || 0;
+}
+
+function paymentMethodTags(payment) {
+  const methods = paymentMethodsFor(payment);
+  if (!methods.length) return '';
+  return `<div class="payment-method-tags">${methods.map((method) => `<span class="payment-method-tag">${method.label}</span>`).join('')}</div>`;
+}
+
+function paymentStatusLabel(payment) {
+  if (payment.status === 'verified') return 'Accredito verificato';
+  if (payment.status === 'cancelled') return 'Richiesta annullata';
+  return 'In attesa di verifica';
+}
+
+function isPendingPayment(payment) {
+  return payment.status === 'prepared' || payment.status === 'requested' || !payment.status;
+}
+
+function renderPaymentMethodOptions() {
+  const options = document.querySelector('#paymentMethodOptions');
+  if (!options) return;
+  const selected = new Set([...options.querySelectorAll('input[name="paymentMethod"]:checked')].map((input) => input.value));
+  const methods = availablePaymentMethods();
+  if (!methods.length) {
+    options.innerHTML = '<p class="field-hint">Salva prima almeno un metodo di incasso.</p>';
+    return;
+  }
+  options.innerHTML = methods.map((method) => {
+    const checked = selected.size ? selected.has(method.id) : true;
+    return `<label class="payment-method-choice"><input name="paymentMethod" type="checkbox" value="${method.id}"${checked ? ' checked' : ''} /> <span>${method.label}</span></label>`;
+  }).join('');
+}
+
+function renderPaymentProfile(profile) {
+  activePaymentProfile = { ...defaultPaymentProfile(), ...(profile || {}) };
+  const form = document.querySelector('#paymentProfileForm');
+  const collectorName = form.elements.namedItem('collectorName');
+  if (collectorName) collectorName.value = activePaymentProfile.collectorName || '';
+  PAYMENT_METHODS.forEach((method) => {
+    const input = form.elements.namedItem(method.profileField);
+    if (input) input.checked = activePaymentProfile[method.profileField] === true;
+  });
+  renderPaymentMethodOptions();
 }
 
 function formatDate(value) {
@@ -152,6 +232,36 @@ function whatsappUrl(invite) {
   if (!number || !personalUrl) return '';
   const message = `Ciao ${invite.displayName}, ecco il tuo invito personale per la Crew List Egadi. Apri il link, conferma il numero WhatsApp e scegli un codice personale di 6 cifre: ${personalUrl}`;
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+}
+
+function paymentRecipientWhatsappNumber(recipientId) {
+  const invite = activeInvites.find((candidate) => candidate.id === recipientId);
+  if (invite?.whatsappNumber) return normalizeWhatsAppNumber(invite.whatsappNumber);
+  const member = activeMembers.find((candidate) => candidate.id === recipientId);
+  return normalizeWhatsAppNumber(member?.phone || '');
+}
+
+function paymentWhatsappMessage(payment, { messageDetails = '' } = {}) {
+  const recipientId = payment.recipientId || payment.memberId || payment.payerInviteId;
+  const amount = formatCurrency(paymentAmount(payment));
+  const reason = payment.reason || 'il contributo del weekend';
+  const dueDate = payment.dueDate ? `\nSe possibile entro il ${formatDate(payment.dueDate)}.` : '';
+  const methods = paymentMethodsFor(payment).map((method) => method.label);
+  const methodText = methods.length
+    ? `\n\nPuoi scegliere il metodo che preferisci: ${methods.join(', ')}.`
+    : '\n\nScrivimi qui e scegliamo insieme il metodo più comodo.';
+  const details = String(messageDetails || '').trim();
+  const detailsText = details
+    ? `\n\nDettagli per il pagamento:\n${details}`
+    : '\n\nPer i dettagli del metodo scelto, rispondimi qui su WhatsApp.';
+  return `Ciao ${recipientName(recipientId)} 🌊\n\nPer ${reason}, il contributo è di ${amount}.${dueDate}${methodText}${detailsText}\n\nIl sito non riceve denaro: dopo il contributo avvisami qui, così controllo l’accredito reale. Grazie! ⛵`;
+}
+
+function paymentWhatsappUrl(payment, options = {}) {
+  const recipientId = payment.recipientId || payment.memberId || payment.payerInviteId;
+  const number = paymentRecipientWhatsappNumber(recipientId);
+  if (!number) return '';
+  return `https://wa.me/${number}?text=${encodeURIComponent(paymentWhatsappMessage(payment, options))}`;
 }
 
 function createInviteId() {
@@ -363,18 +473,25 @@ function renderPayments(snapshot) {
   }
   activePayments = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
   list.innerHTML = activePayments.map((payment) => {
-    const recipientId = payment.recipientId || payment.memberId;
+    const recipientId = payment.recipientId || payment.memberId || payment.payerInviteId;
     const name = recipientName(recipientId);
-    const amount = formatCurrency(payment.amount);
+    const amount = formatCurrency(paymentAmount(payment));
     const reason = `${payment.reason || 'Contributo weekend'}${payment.isOptional ? ' · Facoltativo' : ''}`;
     const dueDate = payment.dueDate ? ` · Entro ${formatDate(payment.dueDate)}` : '';
-    const isVerified = payment.status === 'verified';
-    const status = isVerified ? 'Accredito verificato' : 'In attesa di verifica';
-    const action = isVerified ? '' : `<button class="text-button" type="button" data-verify-payment="${escapeHtml(payment.id)}">Conferma accredito</button>`;
+    const status = paymentStatusLabel(payment);
+    const canUpdateStatus = isPendingPayment(payment);
+    const statusActions = canUpdateStatus
+      ? `<button class="text-button" type="button" data-verify-payment="${escapeHtml(payment.id)}">Conferma accredito</button><button class="text-button" type="button" data-cancel-payment="${escapeHtml(payment.id)}">Annulla richiesta</button>`
+      : '';
     const inviteAction = activeInvites.some((invite) => invite.id === recipientId && invite.status === 'pending' && invite.accessKey)
       ? `<button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(recipientId)}">Invia invito</button>`
       : '';
-    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span><span>${escapeHtml(payment.instructions)}</span></div><div class="payment-action"><span class="payment-status">${status}</span><button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${inviteAction}${action}</div></article>`;
+    const paymentMessageAction = paymentRecipientWhatsappNumber(recipientId)
+      ? `<button class="text-button" type="button" data-whatsapp-payment="${escapeHtml(payment.id)}">Apri WhatsApp</button>`
+      : '';
+    const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
+    const methods = paymentMethodTags(payment) || '<span>Metodo da concordare nello scambio WhatsApp.</span>';
+    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}<button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${inviteAction}${statusActions}</div></article>`;
   }).join('');
 }
 
@@ -422,6 +539,7 @@ function subscribeToBoat(boat) {
   document.querySelector('#boatMeta').textContent = boat.model + ' · ' + boat.capacity + ' posti equipaggio · ' + boat.homePort;
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
+  stopPaymentProfileSubscription?.();
   stopInviteSubscription?.();
   stopBriefingSubscription?.();
   stopAnnouncementSubscription?.();
@@ -430,6 +548,12 @@ function subscribeToBoat(boat) {
     activeMembers = snapshot.docs.map((item) => normalizeMember(item.id, item.data())).sort((first, second) => memberName(first).localeCompare(memberName(second), 'it'));
     renderMembers();
   }, () => setMessage(document.querySelector('#memberFormMessage'), 'Impossibile leggere la Crew List.', true));
+  stopPaymentProfileSubscription = onSnapshot(doc(db, 'boats', boat.id, 'collectionProfile', PAYMENT_PROFILE_ID), (snapshot) => {
+    renderPaymentProfile(snapshot.exists() ? snapshot.data() : null);
+  }, () => {
+    renderPaymentProfile(null);
+    setMessage(document.querySelector('#paymentProfileMessage'), 'Impossibile leggere i metodi di incasso.', true);
+  });
   stopPaymentSubscription = onSnapshot(query(collection(db, 'boats', boat.id, 'paymentRequests'), orderBy('createdAt', 'desc')), renderPayments, () => setMessage(document.querySelector('#paymentFormMessage'), 'Impossibile leggere le richieste.', true));
   stopInviteSubscription = onSnapshot(collection(db, 'boats', boat.id, 'invites'), (snapshot) => {
     activeInvites = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort((first, second) => String(first.displayName || '').localeCompare(String(second.displayName || ''), 'it'));
@@ -698,22 +822,115 @@ document.querySelector('#generatePdfButton').addEventListener('click', () => {
   }
 });
 
-document.querySelector('#paymentForm').addEventListener('submit', async (event) => {
+document.querySelector('#paymentProfileForm').addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (blockPrivateAction(document.querySelector('#paymentFormMessage'))) return;
-  if (!activeBoat) return;
+  if (blockPrivateAction(document.querySelector('#paymentProfileMessage'))) return;
+  if (!activeBoat || !auth.currentUser) return;
   const form = event.currentTarget;
   const fields = new FormData(form);
+  const collectorName = String(fields.get('collectorName') || '').trim();
+  const enabledMethods = PAYMENT_METHODS.filter((method) => fields.get(method.profileField) === 'on');
+  if (!collectorName) {
+    setMessage(document.querySelector('#paymentProfileMessage'), 'Indica il nome di chi incassa il contributo.', true);
+    return;
+  }
+  if (!enabledMethods.length) {
+    setMessage(document.querySelector('#paymentProfileMessage'), 'Seleziona almeno un metodo di incasso.', true);
+    return;
+  }
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
   try {
-    await addDoc(collection(db, 'boats', activeBoat.id, 'paymentRequests'), {
-      recipientId: fields.get('recipientId'), memberId: fields.get('recipientId'), amount: Number(fields.get('amount')), reason: fields.get('reason').trim(), isOptional: fields.get('isOptional') === 'on', dueDate: fields.get('dueDate'), instructions: fields.get('instructions').trim(),
-      status: 'requested', createdAt: serverTimestamp(), createdBy: auth.currentUser.uid,
+    await setDoc(doc(db, 'boats', activeBoat.id, 'collectionProfile', PAYMENT_PROFILE_ID), {
+      collectorId: auth.currentUser.uid,
+      collectorName,
+      paypalEnabled: fields.get('paypalEnabled') === 'on',
+      satispayEnabled: fields.get('satispayEnabled') === 'on',
+      revolutEnabled: fields.get('revolutEnabled') === 'on',
+      bankTransferEnabled: fields.get('bankTransferEnabled') === 'on',
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser.uid,
     });
-    form.reset();
-    setMessage(document.querySelector('#paymentFormMessage'), 'Richiesta preparata: da verificare fuori dal sito.');
+    setMessage(document.querySelector('#paymentProfileMessage'), 'Metodi di incasso salvati. Ora puoi usarli nelle richieste personali.');
   } catch (error) {
+    setMessage(document.querySelector('#paymentProfileMessage'), 'Non riesco a salvare i metodi di incasso.', true);
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+document.querySelector('#paymentForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (blockPrivateAction(document.querySelector('#paymentFormMessage'))) return;
+  if (!activeBoat || !auth.currentUser) return;
+  const form = event.currentTarget;
+  const fields = new FormData(form);
+  const recipientId = String(fields.get('recipientId') || '');
+  const collectorName = String(activePaymentProfile?.collectorName || '').trim();
+  const reason = String(fields.get('reason') || '').trim();
+  const amountCents = Math.round(Number(fields.get('amount')) * 100);
+  const allowedMethods = new Set(availablePaymentMethods().map((method) => method.id));
+  const selectedMethodIds = fields.getAll('paymentMethod').filter((methodId) => allowedMethods.has(methodId));
+  if (!collectorName || !allowedMethods.size) {
+    setMessage(document.querySelector('#paymentFormMessage'), 'Salva prima il nome e almeno un metodo di incasso.', true);
+    return;
+  }
+  if (!recipientId) {
+    setMessage(document.querySelector('#paymentFormMessage'), 'Seleziona la persona a cui inviare la richiesta.', true);
+    return;
+  }
+  if (!reason) {
+    setMessage(document.querySelector('#paymentFormMessage'), 'Indica una causale per la richiesta.', true);
+    return;
+  }
+  if (!Number.isInteger(amountCents) || amountCents < 1 || amountCents > 1_000_000) {
+    setMessage(document.querySelector('#paymentFormMessage'), 'Inserisci un importo valido fino a 10.000 euro.', true);
+    return;
+  }
+  if (!selectedMethodIds.length) {
+    setMessage(document.querySelector('#paymentFormMessage'), 'Scegli almeno un metodo da proporre.', true);
+    return;
+  }
+  const paymentMethods = Object.fromEntries(selectedMethodIds.map((methodId) => [methodId, true]));
+  const payment = {
+    recipientId,
+    memberId: recipientId,
+    payerInviteId: recipientId,
+    amountCents,
+    currency: 'EUR',
+    reason,
+    isOptional: fields.get('isOptional') === 'on',
+    dueDate: String(fields.get('dueDate') || ''),
+    collectorId: auth.currentUser.uid,
+    collectorName,
+    paymentMethods,
+    status: 'prepared',
+    createdAt: serverTimestamp(),
+    createdBy: auth.currentUser.uid,
+    verifiedAt: null,
+    verifiedBy: null,
+    cancelledAt: null,
+    cancelledBy: null,
+  };
+  const whatsappUrl = paymentWhatsappUrl(payment, { messageDetails: fields.get('messageDetails') });
+  if (!whatsappUrl) {
+    setMessage(document.querySelector('#paymentFormMessage'), 'Per aprire WhatsApp serve un numero valido nell’invito della persona. Crea o correggi prima l’invito personale.', true);
+    return;
+  }
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  const whatsappWindow = window.open('', '_blank');
+  if (whatsappWindow) whatsappWindow.opener = null;
+  try {
+    await addDoc(collection(db, 'boats', activeBoat.id, 'paymentRequests'), payment);
+    form.reset();
+    renderPaymentMethodOptions();
+    if (whatsappWindow) whatsappWindow.location.replace(whatsappUrl);
+    setMessage(document.querySelector('#paymentFormMessage'), whatsappWindow
+      ? 'Richiesta preparata: WhatsApp è aperto con il messaggio da inviare personalmente.'
+      : 'Richiesta preparata. Il browser ha bloccato la nuova finestra: usa “Apri WhatsApp” dalla richiesta.');
+  } catch (error) {
+    whatsappWindow?.close();
     setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco a preparare la richiesta.', true);
   } finally {
     submitButton.disabled = false;
@@ -728,6 +945,14 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
     const url = invite && whatsappUrl(invite);
     if (url) window.open(url, '_blank', 'noopener');
     else setMessage(document.querySelector('#paymentFormMessage'), 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
+    return;
+  }
+  const paymentWhatsappButton = event.target.closest('[data-whatsapp-payment]');
+  if (paymentWhatsappButton) {
+    const payment = activePayments.find((candidate) => candidate.id === paymentWhatsappButton.dataset.whatsappPayment);
+    const url = payment && paymentWhatsappUrl(payment);
+    if (url) window.open(url, '_blank', 'noopener');
+    else setMessage(document.querySelector('#paymentFormMessage'), 'Non trovo un numero WhatsApp valido per questa richiesta.', true);
     return;
   }
   const inviteCopyButton = event.target.closest('[data-copy-invite]');
@@ -746,19 +971,36 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
   if (copyButton) {
     const payment = activePayments.find((candidate) => candidate.id === copyButton.dataset.copyPayment);
     if (!payment) return;
-    const amount = formatCurrency(payment.amount);
-    const dueDate = payment.dueDate ? ` Entro il ${formatDate(payment.dueDate)}.` : '';
-    const message = `Ciao ${recipientName(payment.recipientId || payment.memberId)}, per ${payment.reason || 'il contributo del weekend'} la quota è ${amount}.${dueDate}\n\nIstruzioni: ${payment.instructions}\n\nDopo l'accredito avvisa lo skipper, così potrà verificarlo manualmente. Grazie!`;
+    const message = paymentWhatsappMessage(payment);
     try {
       await navigator.clipboard.writeText(message);
-      setMessage(document.querySelector('#paymentFormMessage'), 'Messaggio copiato: puoi inviarlo tu su WhatsApp o dove preferisci.');
+      setMessage(document.querySelector('#paymentFormMessage'), 'Messaggio copiato. I dettagli di pagamento vanno aggiunti solo nella chat WhatsApp.');
     } catch (error) {
       setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco a copiare il messaggio. Verifica i permessi del browser.', true);
     }
     return;
   }
+  const cancelButton = event.target.closest('[data-cancel-payment]');
+  if (cancelButton && activeBoat) {
+    const payment = activePayments.find((candidate) => candidate.id === cancelButton.dataset.cancelPayment);
+    if (!payment || !isPendingPayment(payment)) return;
+    if (!window.confirm('Annullare questa richiesta? L’operazione resta registrata e non cancella alcun contributo esterno.')) return;
+    cancelButton.disabled = true;
+    try {
+      await updateDoc(doc(db, 'boats', activeBoat.id, 'paymentRequests', payment.id), {
+        status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: auth.currentUser.uid,
+      });
+      setMessage(document.querySelector('#paymentFormMessage'), 'Richiesta annullata.');
+    } catch (error) {
+      cancelButton.disabled = false;
+      setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco ad annullare la richiesta.', true);
+    }
+    return;
+  }
   const button = event.target.closest('[data-verify-payment]');
   if (!button || !activeBoat) return;
+  const payment = activePayments.find((candidate) => candidate.id === button.dataset.verifyPayment);
+  if (!payment || !isPendingPayment(payment)) return;
   button.disabled = true;
   try {
     await updateDoc(doc(db, 'boats', activeBoat.id, 'paymentRequests', button.dataset.verifyPayment), {

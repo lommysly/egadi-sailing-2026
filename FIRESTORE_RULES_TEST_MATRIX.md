@@ -11,6 +11,8 @@ Usare esclusivamente UID, nomi, numeri, documenti e contributi fittizi nel Rules
 - `events/egadi-2026.privateAreaEnabled`: inizialmente `false`; passarlo a `true` soltanto nella fixture dopo aver provato il blocco chiuso.
 - `INVITE_A`: documento con ID di 48 caratteri esadecimali, `boatId: SKIPPER_A`, `status: pending`, `participantUid: null`, `accessVersion: 1`, `expiresAt` futura, `loginEmail: crew-a@crew.egadi.thatsablast.it`, `phoneFingerprint` fittizio e `accessKey` di 48 caratteri esadecimali.
 - `MEMBER_A`: eventuale scheda in `boats/SKIPPER_A/members/{INVITE_A}`. Non usare dati reali.
+- `COLLECTION_PROFILE_A`: documento `boats/SKIPPER_A/collectionProfile/default` con `collectorId: SKIPPER_A`, nome fittizio, soli quattro booleani dei metodi, `updatedAt` server e `updatedBy: SKIPPER_A`.
+- `PAYMENT_A`: richiesta fittizia per `INVITE_A`, `amountCents` positivo, `currency: EUR`, uno o più tag dei metodi e stato `prepared`. Non includere link, alias, coordinate o credenziali.
 
 Nel Playground simulare nel token crew `firebase.sign_in_provider: "password"` e `email` coerente con `loginEmail`. Un token Google o anonimo non può sostituirlo.
 
@@ -32,7 +34,10 @@ Nel Playground simulare nel token crew `firebase.sign_in_provider: "password"` e
 | Un numero, una barca | Dopo l'attivazione di `INVITE_A`, `CREW_B` prova a sostituire nello stesso indice un'altra barca o invito. Dall'interfaccia skipper prova a creare un secondo invito con lo stesso numero già attivo. | Nega la sostituzione lato Rules e blocca la creazione lato interfaccia. |
 | Scheda personale | Dopo claim, `CREW_A` crea o aggiorna solo `members/INVITE_A` con i campi consentiti, `updatedBy: CREW_A` e timestamp server. Prova altro `memberId`, dati extra, `createdBy` o scheda dopo revoca. | Consenti solo la propria scheda dell'invito attivo. |
 | Inserimento skipper | `SKIPPER_A` crea o aggiorna una scheda manuale con soli campi Crew List previsti, timestamp e autore alla creazione. Prova campi extra. | Consenti payload previsto; nega varianti. |
-| Bacheca e contributi | `CREW_A` legge briefing, annunci e sole richieste con `recipientId: INVITE_A`; prova altra richiesta o altra barca. Skipper/organizzatore pubblicano briefing e annunci. | Consenti solo contenuti della propria barca e proprie richieste; nega gli altri. |
+| Bacheca | `CREW_A` legge briefing e annunci della propria barca; prova altra barca. Skipper/organizzatore pubblicano briefing e annunci. | Consenti solo contenuti della propria barca; nega gli altri. |
+| Profilo incasso | `SKIPPER_A` crea o aggiorna solo `collectionProfile/default` con nome, quattro booleani, autore e timestamp server. Crew, outsider e `list` provano a leggerlo; lo skipper prova `iban`, URL, alias o un campo extra. | Solo skipper della propria barca e organizzatore possono leggere; soltanto skipper può scrivere lo schema esatto. Nega crew, outsider, lista e campi finanziari. |
+| Richiesta contributo | `SKIPPER_A` crea `PAYMENT_A` per `INVITE_A`: centesimi positivi, EUR, causale, uno o più tag abilitati nel profilo, stato `prepared` e timestamp server. Prova invito inesistente, importo decimale/zero, metodo non abilitato, `iban`, URL, dettagli liberi o stato `verified` alla creazione. | Consenti solo lo schema esatto per un invito della stessa barca; nega varianti, dettagli finanziari e conferma iniziale. |
+| Lettura e stati contributo | `CREW_A` legge soltanto `PAYMENT_A`; `CREW_B` e outsider provano la stessa lettura o la lista. Skipper/organizzatore provano `prepared → verified` o `prepared → cancelled` con timestamp/autore server e poi provano a cambiare importo, destinatario, causale o metodi. | Crew legge solo la propria richiesta e mai il profilo incasso; skipper/organizzatore possono soltanto le due transizioni. Nega modifiche del contenuto, richiesta già chiusa e ogni scrittura crew. |
 | Regole di bordo | `CREW_A` conferma la versione corrente della bacheca, poi lo skipper modifica le regole e aumenta la versione. La cronologia usa un documento nuovo `{rulesVersion}-{uid}` e il crew non può riscriverlo. | Consenti la conferma; l'interfaccia deve richiedere la nuova conferma e conservare lo storico precedente. |
 | Riemissione | `SKIPPER_A` aggiorna lo **stesso** `INVITE_A` a `pending`, azzera `participantUid`, cambia chiave/alias/scadenza, aumenta `accessVersion` di uno e registra `reissuedAt/reissuedBy`. Prova a cambiare ID, barca o a saltare versione. | Consenti solo lo schema di riemissione sullo stesso invito. |
 | Due schede skipper | Due richieste di riemissione partono dallo stesso `accessVersion`. | Solo la prima è consentita; la seconda è negata e deve ricaricare l'elenco, così non invia un link già superato. |
@@ -48,7 +53,7 @@ Le Rules non verificano il PIN: Firebase Authentication lo fa. Prima dell'apertu
 2. Ingresso quotidiano da `crew.html`: stesso numero + codice, senza link WhatsApp.
 3. Codice errato, numero non presente, invito scaduto e provider Email/Password disabilitato: messaggio generico, nessun dato visibile.
 4. Riemissione skipper: vecchio codice non entra più; nuovo link consente di impostare un nuovo codice e conserva la stessa scheda/PDF/richieste.
-5. Logout, bacheca, conferma regole, richiesta contributo e stampa PDF con dati fittizi autorizzati.
+5. Logout, bacheca, conferma regole, profilo incasso, richiesta con uno o più tag, WhatsApp e stampa PDF con dati fittizi autorizzati. Dopo il reload, verificare che i dettagli digitati per WhatsApp non compaiano nel sito o in Firestore.
 
 Firebase applica limiti antiabuso generici; questa soluzione non offre un blocco per-invito configurabile come “5 tentativi in 15 minuti”. Non introdurre dati reali finché i risultati di questa matrice non sono registrati.
 

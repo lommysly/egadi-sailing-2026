@@ -14,7 +14,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - `index.html`: presentazione pubblica della flotta e del viaggio.
 - `passage-plan.html`: unica pagina pubblica per meteo e Passage Plan, alimentata da `passage-plan-data.js`.
 - `film.html` e `VIDEO_STORYBOARD.md`: storyboard del film; nessun filmato di terzi viene incorporato senza licenza.
-- `area.html`: area skipper con Google Sign-In, una barca per skipper, Crew List, PDF, bacheca, inviti WhatsApp e richieste di contributo solo descrittive.
+- `area.html`: area skipper con Google Sign-In, una barca per skipper, Crew List, PDF, bacheca, inviti WhatsApp e richieste di contributo con tag dei metodi e messaggio WhatsApp diretto.
 - `participant.html`: primo accesso dal link WhatsApp; la persona conferma il suo numero e sceglie il proprio codice di 6 cifre, poi completa i dati necessari alla Crew List.
 - `crew.html`: ingresso quotidiano dell'equipaggio con numero WhatsApp e codice personale.
 - `my-area.html`: area personale con scheda, bacheca, regole e richieste dedicate.
@@ -54,7 +54,7 @@ Nel progetto `egadi-sailing-2026`:
 6. Lasciare autorizzati soltanto i domini necessari in Authentication, compreso `egadi.thatsablast.it` e, per i test locali, `127.0.0.1`.
 7. Il documento `events/egadi-2026` deve contenere `organizerIds` con il solo UID autorizzato e mantenere `privateAreaEnabled: false` fino al collaudo finale.
 
-Non inserire in Firestore credenziali PayPal, Satispay, Revolut, carte, coordinate bancarie, PIN o chiavi di pagamento.
+Non inserire in Firestore credenziali PayPal, Satispay o Revolut, carte, coordinate o IBAN, alias o link dei provider, PIN, OTP o chiavi di pagamento. Il sito conserva soltanto il nome di chi raccoglie il contributo e i tag PayPal, Satispay, Revolut o bonifico.
 
 ## Modello dati
 
@@ -72,8 +72,13 @@ boats/{skipperUid}
   invites/{inviteId}
     displayName, whatsappNumber, phoneFingerprint, loginEmail, accessKey
     participantUid, status, accessVersion, expiresAt, createdAt
+  collectionProfile/default
+    collectorId, collectorName, paypalEnabled, satispayEnabled
+    revolutEnabled, bankTransferEnabled, updatedAt, updatedBy
   paymentRequests/{requestId}
-    recipientId, amount, reason, isOptional, dueDate, instructions, status
+    recipientId, memberId, payerInviteId, amountCents, currency, reason, isOptional, dueDate
+    collectorId, collectorName, paymentMethods, status, createdAt, createdBy
+    verifiedAt, verifiedBy, cancelledAt, cancelledBy
   briefing/board
   announcements/{announcementId}
   ruleAcceptances/{inviteId}
@@ -103,7 +108,7 @@ Ogni skipper gestisce una sola barca: per le nuove registrazioni l'ID della barc
 
 Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Ogni persona vede soltanto la bacheca della propria barca. Quando cambia il testo delle regole, aumenta la versione e la persona deve confermare di nuovo la lettura.
 
-Il sito non incassa denaro e non dichiara pagamenti come eseguiti. Lo skipper può creare richieste personali con importo, causale, scadenza e istruzioni, incluse voci facoltative come assicurazione, cena, porto o cambusa. Il pagamento avviene fuori dal sito (PayPal, Satispay, Revolut o bonifico) e può essere segnato come verificato solo dopo controllo manuale dell'accredito reale.
+Il sito non incassa denaro, non genera o valida link dei provider e non dichiara pagamenti come eseguiti. Lo skipper configura il proprio nome e i tag PayPal, Satispay, Revolut e/o bonifico, quindi crea una richiesta con importo, causale, scadenza e una o più alternative. Eventuali link, alias o coordinate vengono scritti solo nel messaggio WhatsApp al momento dell'invio e non sono salvati. Il pagamento avviene fuori dal sito e può essere segnato come verificato solo dopo controllo manuale dell'accredito reale.
 
 ## Sequenza obbligatoria di apertura
 
