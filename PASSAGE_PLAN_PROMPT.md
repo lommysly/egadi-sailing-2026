@@ -62,7 +62,7 @@ Chiudi con:
 - limiti del dato e variazioni fra modelli;
 - una nota di sicurezza: “La rotta e gli ancoraggi sono confermati dallo skipper in base alle condizioni reali, agli avvisi e alle ordinanze vigenti.”
 
-Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi: updatedAt, phase, confidence, status, summary, sourceNote e, per ogni giorno, date, route, plan, alternative, wind, sea, air, water, currents, sun, moon.
+Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi: updatedAt, phase, confidence, status, summary, sourceNote e, per ogni giorno, date, route, plan, alternative, wind, sea, air, water, currents, decision, sun, moon.
 ```
 
 ## Fonti da confrontare nel briefing reale

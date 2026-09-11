@@ -2,6 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/fireba
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { doc, getFirestore, getDoc, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
+import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -26,6 +27,10 @@ export function personalAreaUrl() { return linkFor('my-area.html'); }
 
 export function startCrewSession({ onOpening, onReady, onInvalid }) {
   let isStarting = false;
+  if (!canUsePrivateArea()) {
+    onOpening(privateAreaBlockMessage(), true);
+    return () => {};
+  }
   if (!hasValidInviteParameters) {
     onInvalid();
     return () => {};

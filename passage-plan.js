@@ -8,7 +8,12 @@
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-  if (!data) return;
+  if (!data) {
+    $("#planStatus").textContent = "Aggiornamento non disponibile";
+    $("#planSummary").textContent = "Il Passage Plan non è stato caricato. Riprova più tardi oppure chiedi allo skipper il briefing più recente.";
+    $("#planSources").textContent = "Nessun dato meteo o di navigazione deve essere dedotto da questa pagina finché il briefing non è disponibile.";
+    return;
+  }
 
   $("#planStatus").textContent = data.status || "Aggiornamento in corso";
   $("#planPhase").textContent = data.phase || "—";
@@ -33,6 +38,7 @@
         <div><dt>Aria</dt><dd>${escapeHtml(day.air)}</dd></div>
         <div><dt>Acqua</dt><dd>${escapeHtml(day.water)}</dd></div>
         <div><dt>Correnti</dt><dd>${escapeHtml(day.currents)}</dd></div>
+        <div><dt>Decisione skipper</dt><dd>${escapeHtml(day.decision)}</dd></div>
         <div><dt>Sole</dt><dd>${escapeHtml(day.sun)}</dd></div>
         <div><dt>Luna</dt><dd>${escapeHtml(day.moon)}</dd></div>
       </dl>

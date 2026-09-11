@@ -42,6 +42,26 @@ function showInvalid() {
   document.querySelector('#invalidLink').hidden = false;
 }
 
+function clearPersonalDashboard() {
+  activeInvite = null;
+  activeBriefing = null;
+  activeRuleAcceptance = null;
+  ['#participantProfileSummary', '#participantPaymentList', '#participantSchedule', '#participantRulesText', '#participantAnnouncementList'].forEach((selector) => {
+    document.querySelector(selector).replaceChildren();
+  });
+  document.querySelector('#participantBriefing').hidden = true;
+  document.querySelector('#acceptRulesButton').hidden = true;
+}
+
+function handlePrivateReadError(error, messageElement, fallbackMessage) {
+  if (error?.code === 'permission-denied') {
+    clearPersonalDashboard();
+    showOpening('Questo accesso non è più attivo in questo browser. Apri nuovamente il tuo link WhatsApp personale o chiedi allo skipper di reinviartelo.', true);
+    return;
+  }
+  setMessage(messageElement, fallbackMessage, true);
+}
+
 function renderProfile(member) {
   const documentTail = member.documentNumber ? `•••• ${escapeHtml(member.documentNumber.slice(-4))}` : 'Non indicato';
   document.querySelector('#participantProfileSummary').innerHTML = `<dl><div><dt>Nome</dt><dd>${escapeHtml(member.displayName || `${member.firstName || ''} ${member.lastName || ''}`)}</dd></div><div><dt>Nascita</dt><dd>${escapeHtml([formatDate(member.birthDate), member.birthPlace].filter(Boolean).join(' · '))}</dd></div><div><dt>Documento</dt><dd>${escapeHtml(member.documentType || 'Documento')} · ${documentTail}</dd></div><div><dt>Cabina / ruolo</dt><dd>${escapeHtml(member.role || 'Da definire con lo skipper')}</dd></div></dl>`;
@@ -138,9 +158,9 @@ startCrewSession({
     document.querySelector('#participantTitle').textContent = member.data().displayName || invite.displayName || 'La mia area';
     document.querySelector('#editProfileButton').href = profileUrl({ edit: true });
     renderProfile(member.data());
-    onSnapshot(query(collection(db, 'boats', boatId, 'paymentRequests'), where('recipientId', '==', inviteId)), renderPayments, () => setMessage(document.querySelector('#accessLinkMessage'), 'Non riesco a leggere le richieste personali.', true));
-    onSnapshot(doc(db, 'boats', boatId, 'briefing', 'board'), (snapshot) => { activeBriefing = snapshot.exists() ? snapshot.data() : null; renderBriefing(); }, () => setMessage(document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la bacheca di bordo.', true));
-    onSnapshot(query(collection(db, 'boats', boatId, 'announcements'), orderBy('createdAt', 'desc')), renderAnnouncements, () => setMessage(document.querySelector('#participantRulesMessage'), 'Non riesco a leggere le comunicazioni.', true));
-    onSnapshot(doc(db, 'boats', boatId, 'ruleAcceptances', inviteId), (snapshot) => { activeRuleAcceptance = snapshot.exists() ? snapshot.data() : null; renderBriefing(); }, () => setMessage(document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la conferma delle regole.', true));
+    onSnapshot(query(collection(db, 'boats', boatId, 'paymentRequests'), where('recipientId', '==', inviteId)), renderPayments, (error) => handlePrivateReadError(error, document.querySelector('#accessLinkMessage'), 'Non riesco a leggere le richieste personali.'));
+    onSnapshot(doc(db, 'boats', boatId, 'briefing', 'board'), (snapshot) => { activeBriefing = snapshot.exists() ? snapshot.data() : null; renderBriefing(); }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la bacheca di bordo.'));
+    onSnapshot(query(collection(db, 'boats', boatId, 'announcements'), orderBy('createdAt', 'desc')), renderAnnouncements, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere le comunicazioni.'));
+    onSnapshot(doc(db, 'boats', boatId, 'ruleAcceptances', inviteId), (snapshot) => { activeRuleAcceptance = snapshot.exists() ? snapshot.data() : null; renderBriefing(); }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la conferma delle regole.'));
   },
 });

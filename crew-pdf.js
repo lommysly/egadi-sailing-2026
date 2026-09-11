@@ -72,7 +72,7 @@ export function buildCapitaneriaPrintHtml({ boat, members }) {
     <div><p class="label">Comandante / Skipper</p><p class="value">${escapeHtml(boat.skipperName)}</p></div>
   </section>
   <section class="meta meta-route">
-    <div><p class="label">Porto di partenza</p><p class="value">Marsala</p></div>
+    <div><p class="label">Porto di partenza</p><p class="value">${escapeHtml(boat.homePort || 'Marsala')}</p></div>
     <div><p class="label">Partenza</p><p class="value">8 ottobre 2026 - ore 15:00</p></div>
     <div><p class="label">Porto di rientro</p><p class="value">Marsala</p></div>
     <div><p class="label">Rientro previsto</p><p class="value">11 ottobre 2026 - entro le 18:00</p></div>

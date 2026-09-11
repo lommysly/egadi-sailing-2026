@@ -1,5 +1,6 @@
 import { doc, getDoc, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { auth, boatId, db, inviteId, personalAreaUrl, startCrewSession } from './crew-session.js';
+import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js';
 
 let activeInvite = null;
 const isEditMode = new URLSearchParams(window.location.search).get('edit') === '1';
@@ -34,6 +35,10 @@ function fillProfile(member) {
 
 document.querySelector('#participantForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (!canUsePrivateArea()) {
+    showOpening(privateAreaBlockMessage(), true);
+    return;
+  }
   if (!activeInvite || !auth.currentUser) return;
   const form = event.currentTarget;
   const fields = new FormData(form);

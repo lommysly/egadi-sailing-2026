@@ -3,6 +3,7 @@ import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signO
 import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js';
+import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js';
 
 const eventId = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
@@ -76,6 +77,21 @@ function resetPrivateView() {
   registerSection.hidden = true;
 }
 
+function showPrivateAreaBlocked() {
+  resetPrivateView();
+  signInCard.hidden = false;
+  accountCard.hidden = true;
+  signInButton.disabled = true;
+  setMessage(authMessage, privateAreaBlockMessage(), true);
+}
+
+function blockPrivateAction(messageElement) {
+  if (canUsePrivateArea()) return false;
+  showPrivateAreaBlocked();
+  if (messageElement) setMessage(messageElement, privateAreaBlockMessage(), true);
+  return true;
+}
+
 function memberName(member) {
   return `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.displayName || 'Persona della crew';
 }
@@ -116,8 +132,14 @@ function participantUrl(inviteId) {
   return url.toString();
 }
 
+function normalizeWhatsAppNumber(value) {
+  const normalized = String(value || '').trim().replace(/[ .()-]/g, '');
+  return /^\+[1-9]\d{7,14}$/.test(normalized) ? normalized.slice(1) : '';
+}
+
 function whatsappUrl(invite) {
-  const number = String(invite.whatsappNumber || '').replace(/\D/g, '');
+  const number = normalizeWhatsAppNumber(invite.whatsappNumber);
+  if (!number) return '';
   const message = `Ciao ${invite.displayName}, ecco il tuo spazio personale per completare i dati della Crew List e vedere le richieste dedicate: ${participantUrl(invite.id)}`;
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
@@ -385,6 +407,7 @@ function loadSkipperArea(user) {
 }
 
 signInButton.addEventListener('click', async () => {
+  if (blockPrivateAction(authMessage)) return;
   signInButton.disabled = true;
   setMessage(authMessage, 'Apro l’accesso Google…');
   try {
@@ -409,6 +432,7 @@ document.querySelector('#cancelBoatEdit').addEventListener('click', () => {
 
 document.querySelector('#boatForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (blockPrivateAction(document.querySelector('#boatFormMessage'))) return;
   const user = auth.currentUser;
   if (!user) return;
   const form = event.currentTarget;
@@ -447,6 +471,7 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
 
 document.querySelector('#inviteForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (blockPrivateAction(document.querySelector('#inviteFormMessage'))) return;
   if (!activeBoat || !auth.currentUser) return;
   if (isCrewCapacityReached()) {
     setMessage(document.querySelector('#inviteFormMessage'), 'Hai già riservato tutti i posti equipaggio indicati per questa barca.', true);
@@ -455,12 +480,12 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
   const form = event.currentTarget;
   const fields = new FormData(form);
   const displayName = fields.get('displayName').trim();
-  const whatsappNumber = fields.get('whatsappNumber').trim();
-  const normalizedNumber = whatsappNumber.replace(/\D/g, '');
-  if (normalizedNumber.length < 8) {
-    setMessage(document.querySelector('#inviteFormMessage'), 'Inserisci un numero WhatsApp completo, con prefisso internazionale.', true);
+  const normalizedNumber = normalizeWhatsAppNumber(fields.get('whatsappNumber'));
+  if (!normalizedNumber) {
+    setMessage(document.querySelector('#inviteFormMessage'), 'Inserisci il numero WhatsApp in formato internazionale, ad esempio +39 333 1234567.', true);
     return;
   }
+  const whatsappNumber = `+${normalizedNumber}`;
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
   const whatsappWindow = window.open('', '_blank');
@@ -473,8 +498,14 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
     });
     form.reset();
     if (whatsappWindow) {
-      whatsappWindow.location.replace(whatsappUrl(invite));
-      setMessage(document.querySelector('#inviteFormMessage'), 'Link personale creato: WhatsApp è aperto con il messaggio già pronto.');
+      const url = whatsappUrl(invite);
+      if (url) {
+        whatsappWindow.location.replace(url);
+        setMessage(document.querySelector('#inviteFormMessage'), 'Link personale creato: WhatsApp è aperto con il messaggio già pronto.');
+      } else {
+        whatsappWindow.close();
+        setMessage(document.querySelector('#inviteFormMessage'), 'Link creato, ma il numero WhatsApp non è valido. Correggilo prima di inviarlo.', true);
+      }
     } else {
       setMessage(document.querySelector('#inviteFormMessage'), 'Link personale creato: apri WhatsApp dalla scheda dell’invito.');
     }
@@ -488,6 +519,7 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
 
 document.querySelector('#memberForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (blockPrivateAction(document.querySelector('#memberFormMessage'))) return;
   if (!activeBoat) return;
   if (!editingMemberId && isCrewCapacityReached()) {
     setMessage(document.querySelector('#memberFormMessage'), 'Hai già riservato tutti i posti equipaggio indicati per questa barca.', true);
@@ -545,6 +577,7 @@ document.querySelector('#briefingForm').addEventListener('input', () => {
 });
 document.querySelector('#briefingForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (blockPrivateAction(document.querySelector('#briefingFormMessage'))) return;
   if (!activeBoat || !auth.currentUser) return;
   const form = event.currentTarget;
   const fields = new FormData(form);
@@ -571,6 +604,7 @@ document.querySelector('#briefingForm').addEventListener('submit', async (event)
 });
 document.querySelector('#announcementForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (blockPrivateAction(document.querySelector('#announcementFormMessage'))) return;
   if (!activeBoat || !auth.currentUser) return;
   const form = event.currentTarget;
   const fields = new FormData(form);
@@ -590,6 +624,7 @@ document.querySelector('#announcementForm').addEventListener('submit', async (ev
   }
 });
 document.querySelector('#generatePdfButton').addEventListener('click', () => {
+  if (blockPrivateAction(document.querySelector('#memberFormMessage'))) return;
   if (!activeBoat || !isBoatReadyForPdf(activeBoat) || activeMembers.length > crewSeatLimit() || activeMembers.some((member) => !isCharterReady(member))) return;
   try {
     openCapitaneriaPdf({ boat: activeBoat, members: activeMembers });
@@ -601,6 +636,7 @@ document.querySelector('#generatePdfButton').addEventListener('click', () => {
 
 document.querySelector('#paymentForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (blockPrivateAction(document.querySelector('#paymentFormMessage'))) return;
   if (!activeBoat) return;
   const form = event.currentTarget;
   const fields = new FormData(form);
@@ -621,10 +657,13 @@ document.querySelector('#paymentForm').addEventListener('submit', async (event) 
 });
 
 document.querySelector('#paymentList').addEventListener('click', async (event) => {
+  if (blockPrivateAction(document.querySelector('#paymentFormMessage'))) return;
   const whatsappButton = event.target.closest('[data-whatsapp-invite]');
   if (whatsappButton) {
     const invite = activeInvites.find((candidate) => candidate.id === whatsappButton.dataset.whatsappInvite);
-    if (invite) window.open(whatsappUrl(invite), '_blank', 'noopener');
+    const url = invite && whatsappUrl(invite);
+    if (url) window.open(url, '_blank', 'noopener');
+    else setMessage(document.querySelector('#paymentFormMessage'), 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
     return;
   }
   const inviteCopyButton = event.target.closest('[data-copy-invite]');
@@ -669,10 +708,13 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
 });
 
 document.querySelector('#inviteList').addEventListener('click', async (event) => {
+  if (blockPrivateAction(document.querySelector('#inviteFormMessage'))) return;
   const whatsappButton = event.target.closest('[data-whatsapp-invite]');
   if (whatsappButton) {
     const invite = activeInvites.find((candidate) => candidate.id === whatsappButton.dataset.whatsappInvite);
-    if (invite) window.open(whatsappUrl(invite), '_blank', 'noopener');
+    const url = invite && whatsappUrl(invite);
+    if (url) window.open(url, '_blank', 'noopener');
+    else setMessage(document.querySelector('#inviteFormMessage'), 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
     return;
   }
   const copyButton = event.target.closest('[data-copy-invite]');
@@ -689,6 +731,10 @@ document.querySelector('#inviteList').addEventListener('click', async (event) =>
 
 onAuthStateChanged(auth, async (user) => {
   resetPrivateView();
+  if (!canUsePrivateArea()) {
+    showPrivateAreaBlocked();
+    return;
+  }
   if (!user) {
     signInCard.hidden = false;
     accountCard.hidden = true;

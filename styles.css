@@ -111,6 +111,7 @@ a { color:inherit; }
 .passage-introduction,.passage-safety { margin:18px 0; padding:30px; border-radius:18px; background:var(--paper); }
 .passage-introduction > p:first-child { max-width:760px; margin:0; font:500 1.35rem/1.45 "Fraunces",serif; }
 .passage-updated,.passage-source { margin:18px 0 0; font-size:.87rem; line-height:1.5; color:rgba(17,45,56,.72); }
+.passage-source { overflow-wrap:anywhere; }
 .passage-day-list { display:grid; gap:18px; }
 .passage-day-card { padding:30px; border-radius:18px; background:var(--paper); }
 .passage-day-heading { display:flex; justify-content:space-between; gap:22px; align-items:start; border-bottom:1px solid var(--line); }
@@ -127,3 +128,4 @@ a { color:inherit; }
 @media (max-width:800px) { .passage-status,.passage-data-grid { grid-template-columns:1fr; }.passage-day-heading { display:grid; gap:0; }.passage-day-card,.passage-introduction,.passage-safety { padding:24px; } }
 @media (max-width:800px) { .form-grid,.dashboard-grid,.schedule-list { grid-template-columns:1fr; }.dashboard-heading { display:grid; align-items:start; }.dashboard-actions { justify-content:start; }.form-actions { display:grid; align-items:start; }.form-actions .form-message { margin:0; } }
 @media (max-width:800px) { .charter-export { display:grid; align-items:start; } }
+@media (max-width:420px) { .site-header { align-items:flex-start; flex-wrap:wrap; gap:12px; }.site-nav.always-visible { flex:1 1 100%; justify-content:flex-start; flex-wrap:wrap; gap:8px 14px; } }

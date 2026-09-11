@@ -23,6 +23,7 @@ Ultimo aggiornamento: 11 settembre 2026.
 - [x] Unica pagina pubblica Meteo & Passage Plan, con file dati separato e prompt operativo per aggiornamenti progressivi.
 - [x] Crediti delle foto Commons corretti con autore, fonte e licenza; nessuna foto o video di terzi è stata scaricata nel repository.
 - [x] Matrice di test delle regole e registri pronti per media e privacy: `FIRESTORE_RULES_TEST_MATRIX.md`, `MEDIA_REGISTER_TEMPLATE.md`, `PRIVACY_DA_COMPLETARE.md`.
+- [x] Blocco tecnico pre-pubblicazione dell’area privata: senza HTTPS valido oppure finché l’informativa privacy è una bozza non si avviano accessi né raccolta di anagrafiche.
 
 ## Da verificare prima di raccogliere dati reali
 
@@ -34,7 +35,7 @@ Ultimo aggiornamento: 11 settembre 2026.
 - [ ] Confronto del PDF con il modello effettivamente richiesto dal charter / Capitaneria.
 - [x] Definizione della procedura pratica per i contributi: istruzioni, causale e verifica manuale dello skipper.
 - [ ] Informativa privacy definitiva: titolare, contatto, basi giuridiche, tempi di cancellazione e procedura di consegna del PDF.
-- [x] Pubblicato il primo briefing T−27 con fonti, dati astronomici verificati e distinzione esplicita fra pianificazione e previsioni operative.
+- [x] Pubblicato il primo briefing T−27 con tracciabilità della fonte astronomica, coordinate, ora di consultazione e distinzione esplicita fra pianificazione e previsioni operative.
 
 ## Materiali editoriali
 
@@ -47,7 +48,7 @@ Ultimo aggiornamento: 11 settembre 2026.
 ## Pubblicazione tecnica
 
 - [x] GitHub Pages ripristinato con un build standard il 10 settembre 2026.
-- [x] Versione pubblicata su `main` e riletta in HTTP senza autenticazione; il JavaScript pubblico espone `area.js?v=20260911-safety`.
+- [x] Versione pubblicata su `main` e riletta in HTTP senza autenticazione; il JavaScript pubblico espone una versione datata dell’area skipper.
 - [ ] Verificare inviti WhatsApp, area personale e richieste facoltative su dominio HTTPS con account autorizzati e dati di prova approvati.
 - [x] Configurati file `CNAME`, dominio personalizzato GitHub Pages e dominio autorizzato in Firebase Authentication per `egadi.thatsablast.it`; il sito risponde in HTTP.
 - [ ] Risolvere lo stato GitHub Pages “DNS check in progress” e verificare il certificato HTTPS valido per `egadi.thatsablast.it`; fino ad allora non raccogliere dati reali né eseguire test autenticati sul dominio personalizzato.
