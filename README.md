@@ -83,6 +83,8 @@ Ogni invito personale ha un codice casuale a 192 bit nel link e viene legato all
 
 La sequenza di apertura è obbligatoria: pubblicare le Rules con `privateAreaEnabled` assente o `false`, completare l'informativa privacy e i test con dati fittizi, poi attivare l'interfaccia e infine impostare `privateAreaEnabled: true` nel documento evento. Finché il flag non è vero, un client Firebase diretto non può creare, leggere o aggiornare barche, inviti, Crew List, bacheca o richieste.
 
+La sequenza di apertura è obbligatoria: pubblicare le Rules con `privateAreaEnabled` assente o `false`, completare l'informativa privacy e i test con dati fittizi, poi attivare l'interfaccia e infine impostare `privateAreaEnabled: true` nel documento evento. Finché il flag non è vero, un client Firebase diretto non può creare, leggere o aggiornare barche, inviti, Crew List, bacheca o richieste.
+
 ## Pubblicazione
 
 Il sito pubblico puo' essere pubblicato su GitHub Pages. Prima di usare l'area privata con dati reali: versione nel repository, test delle Security Rules, certificato HTTPS valido, verifica da un account skipper e da un account crew separati, quindi lettura finale del sito realmente pubblicato.

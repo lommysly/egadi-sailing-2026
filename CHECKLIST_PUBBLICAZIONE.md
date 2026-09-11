@@ -32,7 +32,7 @@ Ultimo aggiornamento: 11 settembre 2026.
 - [ ] Test delle regole live: skipper della propria barca, organizzatore e account estraneo senza accesso.
 - [ ] Invio WhatsApp di prova, apertura del link personale, compilazione di una Crew List autorizzata e prova di stampa `Salva come PDF`.
 - [ ] Test della bacheca: pubblicazione skipper, lettura partecipante, conferma regole e nuova conferma dopo una modifica.
-- [ ] Implementare e testare scadenza, revoca e nuovo invito WhatsApp prima dell'apertura reale: il link è una chiave bearer e oggi chi lo possiede può reclamarlo di nuovo e leggere l'anagrafica già compilata.
+- [ ] Decidere e testare la procedura di revoca o riemissione di un link WhatsApp personale prima dell'apertura reale: il link è una chiave bearer e oggi può essere reclamato di nuovo da chi lo possiede.
 - [ ] Confronto del PDF con il modello effettivamente richiesto dal charter / Capitaneria.
 - [x] Definizione della procedura pratica per i contributi: istruzioni, causale e verifica manuale dello skipper.
 - [ ] Informativa privacy definitiva: titolare identificato come Lomastro Silvio, contatto, basi giuridiche, tempi di cancellazione e procedura di consegna del PDF.
