@@ -252,3 +252,9 @@ body.menu-open { overflow:hidden; }
 
 @media (max-width:800px) { .storyboard-hero { padding:72px 22px 64px; }.storyboard-principles,.storyboard-delivery { grid-template-columns:1fr; gap:35px; padding:72px 22px; }.storyboard-chapters { grid-template-columns:1fr; padding:72px 22px; }.storyboard-card { min-height:0; }.storyboard-note { padding:52px 22px; } }
 @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; }.button,.skip-link { transition:none; }.button:hover { transform:none; } }
+
+.boat-accommodation-fieldset { display:grid; gap:12px; margin:0; padding:16px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.38); }
+.boat-accommodation-fieldset legend { padding:0 6px; color:rgba(17,45,56,.72); font:700 .74rem "DM Sans",sans-serif; }
+.boat-accommodation-fieldset .field-hint { margin:0; }
+#berthLayoutSummary.is-error { color:#a53d2c; font-weight:700; }
+.boat-accommodation { max-width:680px; margin:8px 0 0; color:#087b8a; font-size:.9rem; line-height:1.5; }

@@ -28,6 +28,7 @@ const PAYMENT_METHODS = [
 ];
 const FLEET_BOAT_TYPES = new Set(['Catamarano', 'Monoscafo', 'Gommone', 'Altro']);
 const FLEET_BERTH_PREFERENCES = new Set(['not_specified', 'cabin_female', 'cabin_male', 'dinette', 'crew_cabin', 'other']);
+const CREW_CABIN_USES = new Set(['not_specified', 'skipper', 'crew']);
 let activeBoat = null;
 let activeMembers = [];
 let activePayments = [];
@@ -108,6 +109,107 @@ function declaredFleetBerthPreference(boat) {
   return FLEET_BERTH_PREFERENCES.has(boat?.fleetBerthPreference)
     ? boat.fleetBerthPreference
     : 'not_specified';
+}
+
+function asNonNegativeInteger(value, maximum = 12) {
+  const numericValue = Number(value);
+  return Number.isInteger(numericValue) && numericValue >= 0 && numericValue <= maximum ? numericValue : 0;
+}
+
+function normalizeBerthLayout(layout = {}) {
+  return {
+    doubleCabins: asNonNegativeInteger(layout?.doubleCabins),
+    singleCabins: asNonNegativeInteger(layout?.singleCabins),
+    dinetteBerths: asNonNegativeInteger(layout?.dinetteBerths),
+    crewCabinUse: CREW_CABIN_USES.has(layout?.crewCabinUse) ? layout.crewCabinUse : 'not_specified',
+    otherCrewBerths: asNonNegativeInteger(layout?.otherCrewBerths),
+  };
+}
+
+function berthLayoutTotals(layout) {
+  const normalized = normalizeBerthLayout(layout);
+  const crewCabinBerths = normalized.crewCabinUse === 'not_specified' ? 0 : 1;
+  const crewAssignableBerths = (normalized.doubleCabins * 2)
+    + normalized.singleCabins
+    + normalized.dinetteBerths
+    + normalized.otherCrewBerths
+    + (normalized.crewCabinUse === 'crew' ? 1 : 0);
+  return {
+    ...normalized,
+    totalSleepingBerths: crewAssignableBerths + (normalized.crewCabinUse === 'skipper' ? 1 : 0),
+    crewAssignableBerths,
+    crewCabinBerths,
+  };
+}
+
+function hasBerthLayout(layout) {
+  const totals = berthLayoutTotals(layout);
+  return totals.doubleCabins > 0
+    || totals.singleCabins > 0
+    || totals.dinetteBerths > 0
+    || totals.otherCrewBerths > 0
+    || totals.crewCabinUse !== 'not_specified';
+}
+
+function describeBerthLayout(layout) {
+  const totals = berthLayoutTotals(layout);
+  if (!hasBerthLayout(totals)) return '';
+  const parts = [];
+  if (totals.doubleCabins) parts.push(`${totals.doubleCabins} ${totals.doubleCabins === 1 ? 'cabina doppia' : 'cabine doppie'}`);
+  if (totals.singleCabins) parts.push(`${totals.singleCabins} ${totals.singleCabins === 1 ? 'cabina singola' : 'cabine singole'}`);
+  if (totals.dinetteBerths) parts.push(`${totals.dinetteBerths} ${totals.dinetteBerths === 1 ? 'posto in dinette' : 'posti in dinette'}`);
+  if (totals.crewCabinUse === 'skipper') parts.push('cabina marinaio riservata a skipper/staff');
+  if (totals.crewCabinUse === 'crew') parts.push('1 posto in cabina marinaio');
+  if (totals.otherCrewBerths) parts.push(`${totals.otherCrewBerths} ${totals.otherCrewBerths === 1 ? 'posto extra Crew List' : 'posti extra Crew List'}`);
+  return parts.join(' · ');
+}
+
+function readBerthLayout(form) {
+  return normalizeBerthLayout({
+    doubleCabins: form.elements.doubleCabins?.value,
+    singleCabins: form.elements.singleCabins?.value,
+    dinetteBerths: form.elements.dinetteBerths?.value,
+    crewCabinUse: form.elements.crewCabinUse?.value,
+    otherCrewBerths: form.elements.otherCrewBerths?.value,
+  });
+}
+
+function fillBerthLayoutForm(form, layout) {
+  const normalized = normalizeBerthLayout(layout);
+  form.elements.doubleCabins.value = String(normalized.doubleCabins);
+  form.elements.singleCabins.value = String(normalized.singleCabins);
+  form.elements.dinetteBerths.value = String(normalized.dinetteBerths);
+  form.elements.crewCabinUse.value = normalized.crewCabinUse;
+  form.elements.otherCrewBerths.value = String(normalized.otherCrewBerths);
+}
+
+function renderBerthLayoutSummary() {
+  const form = document.querySelector('#boatForm');
+  const summary = document.querySelector('#berthLayoutSummary');
+  if (!form || !summary) return;
+  const layout = readBerthLayout(form);
+  const totals = berthLayoutTotals(layout);
+  summary.classList.remove('is-error');
+  if (!hasBerthLayout(layout)) {
+    summary.textContent = 'Facoltativo: se preferisci puoi indicare solo il totale della Crew List.';
+    return;
+  }
+
+  const description = describeBerthLayout(layout);
+  const sleepingLabel = totals.totalSleepingBerths === 1 ? 'cuccetta descritta' : 'cuccette descritte';
+  const crewLabel = totals.crewAssignableBerths === 1 ? 'posto assegnabile' : 'posti assegnabili';
+  const capacity = Number(form.elements.capacity?.value);
+  if (Number.isInteger(capacity) && capacity > totals.crewAssignableBerths) {
+    const difference = capacity - totals.crewAssignableBerths;
+    summary.classList.add('is-error');
+    summary.textContent = `${description}. ${totals.totalSleepingBerths} ${sleepingLabel}, ${totals.crewAssignableBerths} ${crewLabel} alla Crew List. Il limite sopra è ${capacity}: aggiungi ${difference} ${difference === 1 ? 'posto extra' : 'posti extra'} o riduci il limite.`;
+    return;
+  }
+
+  const limitText = Number.isInteger(capacity) && capacity > 0
+    ? ` Limite Crew List impostato: ${capacity}.`
+    : ' Inserisci sopra il limite della Crew List.';
+  summary.textContent = `${description}. ${totals.totalSleepingBerths} ${sleepingLabel}, ${totals.crewAssignableBerths} ${crewLabel} alla Crew List.${limitText}`;
 }
 
 function isFleetAvailabilityPublic(boat) {
@@ -517,6 +619,7 @@ function resetMemberForm() {
 function setBoatFormDefaults(user) {
   const skipperField = document.querySelector('#boatForm [name="skipperName"]');
   if (skipperField && !skipperField.value) skipperField.value = user?.displayName || '';
+  renderBerthLayoutSummary();
 }
 
 function resetBoatForm(user) {
@@ -526,15 +629,19 @@ function resetBoatForm(user) {
   document.querySelector('#boatSubmitButton').textContent = 'Registra la barca';
   document.querySelector('#cancelBoatEdit').hidden = true;
   setBoatFormDefaults(user);
+  renderBerthLayoutSummary();
 }
 
 function openBoatEdit() {
   if (!activeBoat) return;
   const form = document.querySelector('#boatForm');
+  form.reset();
   for (const [field, value] of Object.entries(activeBoat)) {
     const input = form.elements.namedItem(field);
     if (input) input.value = value ?? '';
   }
+  fillBerthLayoutForm(form, activeBoat.berthLayout);
+  renderBerthLayoutSummary();
   creatingBoat = true;
   editingBoatId = activeBoat.id;
   document.querySelector('#boatSubmitButton').textContent = 'Salva modifiche';
@@ -683,6 +790,10 @@ function subscribeToBoat(boat) {
   dashboard.hidden = false;
   document.querySelector('#boatTitle').textContent = boat.name;
   document.querySelector('#boatMeta').textContent = boat.model + ' · ' + boat.capacity + ' posti equipaggio · ' + boat.homePort;
+  const accommodation = document.querySelector('#boatAccommodation');
+  const accommodationDescription = describeBerthLayout(boat.berthLayout);
+  accommodation.hidden = !accommodationDescription;
+  accommodation.textContent = accommodationDescription ? `Sistemazioni private: ${accommodationDescription}.` : '';
   renderFleetProfileForm();
   void publishExistingBoatToFleet(boat);
   stopMemberSubscription?.();
@@ -770,7 +881,15 @@ document.querySelector('#cancelBoatEdit').addEventListener('click', () => {
   }
 });
 
-document.querySelector('#boatForm').addEventListener('submit', async (event) => {
+const boatForm = document.querySelector('#boatForm');
+boatForm.querySelectorAll('[data-berth-layout-input]').forEach((input) => {
+  input.addEventListener('input', renderBerthLayoutSummary);
+  input.addEventListener('change', renderBerthLayoutSummary);
+});
+boatForm.elements.capacity.addEventListener('input', renderBerthLayoutSummary);
+renderBerthLayoutSummary();
+
+boatForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (blockPrivateAction(document.querySelector('#boatFormMessage'))) return;
   const user = auth.currentUser;
@@ -782,11 +901,19 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
   setMessage(document.querySelector('#boatFormMessage'), 'Registro la barca…');
   try {
     const capacity = Number(fields.get('capacity'));
-    const previousAvailability = declaredFleetAvailability(activeBoat);
+    const berthLayout = readBerthLayout(form);
+    const layoutTotals = berthLayoutTotals(berthLayout);
+    if (hasBerthLayout(berthLayout) && capacity > layoutTotals.crewAssignableBerths) {
+      setMessage(document.querySelector('#boatFormMessage'), `La composizione indica ${layoutTotals.crewAssignableBerths} ${layoutTotals.crewAssignableBerths === 1 ? 'posto assegnabile' : 'posti assegnabili'} alla Crew List. Riduci il limite o aggiungi i posti mancanti.`, true);
+      return;
+    }
+    // Alla prima registrazione i posti liberi partono dal totale dichiarato;
+    // nelle modifiche successive resta invece la scelta già fatta dallo skipper.
+    const previousAvailability = activeBoat ? declaredFleetAvailability(activeBoat) : capacity;
     const boatData = {
       name: fields.get('name').trim(), model: fields.get('model').trim(), boatType: fields.get('boatType'), capacity,
       homePort: fields.get('homePort').trim(), flag: fields.get('flag').trim(),
-      skipperName: fields.get('skipperName').trim(), note: fields.get('note').trim(), skipperId: user.uid,
+      skipperName: fields.get('skipperName').trim(), note: fields.get('note').trim(), berthLayout, skipperId: user.uid,
       publicFleetId: activeBoat?.publicFleetId || createPublicFleetId(),
       fleetAvailableSeats: Math.min(previousAvailability, capacity),
       fleetShowAvailability: isFleetAvailabilityPublic(activeBoat),
