@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
@@ -57,6 +57,19 @@ function getAuthErrorMessage(error) {
   if (error.code === 'auth/unauthorized-domain') return 'Questo indirizzo del sito non è ancora autorizzato in Firebase.';
   if (error.code === 'auth/operation-not-allowed') return 'L’accesso con Google non è abilitato nel progetto Firebase.';
   return 'Accesso non completato. Riprova tra poco.';
+}
+
+function getFirestoreErrorMessage(error, fallbackMessage) {
+  // Il codice è sufficiente per capire il ramo da verificare senza esporre
+  // dettagli dei dati personali o delle Rules nella pagina pubblica.
+  console.error('Egadi Firestore:', error);
+  if (error?.code === 'permission-denied') {
+    return 'Operazione non autorizzata. Esci e rientra scegliendo l’account Google che deve essere skipper, poi riprova.';
+  }
+  if (error?.code === 'unavailable') {
+    return 'Connessione a Firestore non disponibile. Controlla la rete e riprova.';
+  }
+  return fallbackMessage;
 }
 
 function isGoogleSkipperAccount(user) {
@@ -185,7 +198,7 @@ async function publishExistingBoatToFleet(boat) {
         : 'Partecipazione pubblicata: i posti disponibili restano privati.');
     }
   } catch (error) {
-    setMessage(message, 'Non riesco ad aggiungere automaticamente la barca alla flotta. Verifica le regole Firestore.', true);
+    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco ad aggiungere automaticamente la barca alla flotta. Riprova tra poco.'), true);
   } finally {
     fleetPublicationInProgress.delete(boat.id);
   }
@@ -708,23 +721,28 @@ function subscribeToBoat(boat) {
 }
 
 function loadSkipperArea(user) {
-  const boatQuery = query(collection(db, 'boats'), where('skipperId', '==', user.uid));
-  stopBoatSubscription = onSnapshot(boatQuery, (snapshot) => {
-    const boats = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort((first, second) => String(first.name || '').localeCompare(String(second.name || ''), 'it'));
+  // Ogni skipper ha una sola barca, salvata con il proprio UID come ID del
+  // documento. La lettura puntuale evita una query-list che Firestore non può
+  // autorizzare in base a una Rule proprietaria per singolo documento.
+  const boatRef = doc(db, 'boats', user.uid);
+  stopBoatSubscription = onSnapshot(boatRef, (snapshot) => {
     if (creatingBoat) {
       return;
     }
-    if (activeBoat && boats.some((boat) => boat.id === activeBoat.id)) {
-      subscribeToBoat(boats.find((boat) => boat.id === activeBoat.id));
-    } else if (boats.length) {
-      subscribeToBoat(boats[0]);
+    if (snapshot.exists()) {
+      subscribeToBoat({ id: snapshot.id, ...snapshot.data() });
     } else {
+      activeBoat = null;
       dashboard.hidden = true;
       registerSection.hidden = false;
     }
-  }, () => {
+  }, (error) => {
     registerSection.hidden = false;
-    setMessage(document.querySelector('#boatFormMessage'), 'Non riesco a leggere la tua barca. Riprova tra poco.', true);
+    // Per un nuovo skipper l'assenza del documento è prevista: mostra subito
+    // la registrazione. Gli altri errori restano espliciti ma non tecnici.
+    if (error?.code !== 'permission-denied') {
+      setMessage(document.querySelector('#boatFormMessage'), getFirestoreErrorMessage(error, 'Non riesco a leggere la tua barca. Riprova tra poco.'), true);
+    }
   });
 }
 
@@ -789,7 +807,7 @@ document.querySelector('#boatForm').addEventListener('submit', async (event) => 
       setMessage(document.querySelector('#boatFormMessage'), 'Barca registrata e partecipazione alla flotta pubblicata.');
     }
   } catch (error) {
-    setMessage(document.querySelector('#boatFormMessage'), 'Non riesco a registrare la barca. Verifica le regole Firestore.', true);
+    setMessage(document.querySelector('#boatFormMessage'), getFirestoreErrorMessage(error, 'Non riesco a registrare la barca. Riprova tra poco.'), true);
   } finally {
     submitButton.disabled = false;
   }
