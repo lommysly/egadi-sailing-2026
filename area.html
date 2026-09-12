@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260912-menu3" />
+  <link rel="stylesheet" href="styles.css?v=20260912-berths1" />
 </head>
 <body class="area-page">
   <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
@@ -45,23 +45,35 @@
           <label>Nome della barca<input name="name" autocomplete="off" required maxlength="70" placeholder="Es. Isla 40 - nome da confermare" /></label>
           <label>Modello<input name="model" autocomplete="off" required maxlength="100" placeholder="Es. Fountaine Pajot Isla 40" /></label>
           <label>Tipo di imbarcazione<select name="boatType" required><option value="">Seleziona</option><option value="Catamarano">Catamarano</option><option value="Monoscafo">Monoscafo</option><option value="Gommone">Gommone</option><option value="Altro">Altro</option></select></label>
-          <label>Posti equipaggio<input name="capacity" type="number" required min="1" max="30" inputmode="numeric" placeholder="Decide lo skipper" /><small class="field-hint">Numero massimo di persone della Crew List; lo skipper non viene conteggiato.</small></label>
+          <label>Posti assegnabili alla Crew List<input name="capacity" type="number" required min="1" max="30" inputmode="numeric" placeholder="Es. 10" /><small class="field-hint">Numero massimo di persone della Crew List; lo skipper non viene conteggiato.</small></label>
           <label>Porto di partenza<input name="homePort" autocomplete="off" required maxlength="80" value="Marsala" /></label>
           <label>Bandiera<input name="flag" autocomplete="off" required maxlength="60" value="Italiana" /></label>
           <label>Comandante / skipper<input name="skipperName" autocomplete="name" required maxlength="100" /></label>
         </div>
+        <fieldset class="boat-accommodation-fieldset">
+          <legend>Sistemazioni a bordo · private</legend>
+          <p class="field-hint">Descrivi le cuccette della barca: questo riepilogo aiuta a impostare il limite della Crew List, ma non compare nella flotta pubblica.</p>
+          <div class="form-grid">
+            <label>Cabine doppie<input name="doubleCabins" type="number" min="0" max="12" value="0" inputmode="numeric" data-berth-layout-input /></label>
+            <label>Cabine singole<input name="singleCabins" type="number" min="0" max="12" value="0" inputmode="numeric" data-berth-layout-input /></label>
+            <label>Posti in dinette<input name="dinetteBerths" type="number" min="0" max="12" value="0" inputmode="numeric" data-berth-layout-input /></label>
+            <label>Cabina marinaio<select name="crewCabinUse" data-berth-layout-input><option value="not_specified">Non presente / non indicata</option><option value="skipper">Riservata allo skipper o staff</option><option value="crew">Disponibile alla Crew List</option></select></label>
+            <label>Altri posti Crew List<input name="otherCrewBerths" type="number" min="0" max="12" value="0" inputmode="numeric" data-berth-layout-input /><small class="field-hint">Es. cuccetta aggiuntiva o sistemazione non inclusa sopra.</small></label>
+          </div>
+          <p id="berthLayoutSummary" class="field-hint" aria-live="polite"></p>
+        </fieldset>
         <label>Nota operativa facoltativa<textarea name="note" maxlength="400" placeholder="Es. configurazione cabine, preferenze cambusa o dettaglio per la crew"></textarea></label>
         <div class="form-actions"><button id="boatSubmitButton" class="button button-primary" type="submit">Registra la barca</button><button id="cancelBoatEdit" class="text-button" type="button" hidden>Annulla modifica</button><p id="boatFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
       </form>
       <div class="steps-grid">
-        <div><span>1</span><h3>Registra</h3><p>Nome, modello, posti, porto, skipper e contatto operativo della barca.</p></div>
+        <div><span>1</span><h3>Registra</h3><p>Nome, modello, sistemazioni, posti Crew List, porto e skipper della barca.</p></div>
         <div><span>2</span><h3>Organizza</h3><p>La Crew List resta privata allo skipper finché non sarà attivata la scheda personale per ogni partecipante.</p></div>
         <div><span>3</span><h3>Conferma</h3><p>Controlli dati, cabine e contributi senza fogli condivisi.</p></div>
       </div>
     </section>
 
     <section id="dashboard" class="section dashboard" hidden>
-      <div class="dashboard-heading"><div><p class="eyebrow">Spazio skipper</p><h2 id="boatTitle">La mia barca</h2><p id="boatMeta"></p></div><div class="dashboard-actions"><button id="editBoatButton" class="button button-ghost" type="button">Modifica questa barca</button></div></div>
+      <div class="dashboard-heading"><div><p class="eyebrow">Spazio skipper</p><h2 id="boatTitle">La mia barca</h2><p id="boatMeta"></p><p id="boatAccommodation" class="boat-accommodation" hidden></p></div><div class="dashboard-actions"><button id="editBoatButton" class="button button-ghost" type="button">Modifica questa barca</button></div></div>
       <p id="capacityStatus" class="capacity-status" aria-live="polite"></p>
       <div class="dashboard-grid">
         <article class="dashboard-panel"><p class="eyebrow">Crew List</p><h3>Persone a bordo</h3><p class="panel-lead">Il percorso normale è inviare un link personale: la persona sceglie un codice di 6 cifre, completa i dati del charter e poi rientra con numero WhatsApp e codice.</p><p class="field-hint">Area in test: prima della pubblicazione dell’informativa finale usa solo dati fittizi. Consulta <a href="privacy.html">Privacy e dati</a>.</p><details class="manual-entry"><summary>Inserimento manuale · solo eccezione</summary><p class="panel-lead">Usalo soltanto se una persona non può aprire il proprio invito WhatsApp.</p><form id="memberForm" class="compact-form">
@@ -108,6 +120,6 @@
   </main>
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
   <script src="app.js?v=20260911-menu2"></script>
-  <script type="module" src="area.js?v=20260912-owner1"></script>
+  <script type="module" src="area.js?v=20260912-berths1"></script>
 </body>
 </html>
