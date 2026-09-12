@@ -27,7 +27,7 @@ const PAYMENT_METHODS = [
   { id: 'bankTransfer', label: 'Bonifico', profileField: 'bankTransferEnabled' },
 ];
 const FLEET_BOAT_TYPES = new Set(['Catamarano', 'Monoscafo', 'Gommone', 'Altro']);
-const FLEET_BERTH_PREFERENCES = new Set(['not_specified', 'cabin_female', 'cabin_male', 'dinette', 'crew_cabin', 'other']);
+const FLEET_BERTH_PREFERENCES = new Set(['not_specified', 'cabin_female', 'cabin_male', 'cabin_mixed', 'dinette', 'crew_cabin', 'other']);
 const CREW_CABIN_USES = new Set(['not_specified', 'skipper', 'crew']);
 let activeBoat = null;
 let activeMembers = [];

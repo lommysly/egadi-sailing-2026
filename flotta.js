@@ -8,6 +8,7 @@ const BERTH_PREFERENCE_LABELS = {
   not_specified: 'Nessuna indicazione',
   cabin_female: 'Posto in cabina femminile',
   cabin_male: 'Posto in cabina maschile',
+  cabin_mixed: 'Posto in cabina mista',
   dinette: 'Posto in dinette',
   crew_cabin: 'Posto in cabina marinaio',
   other: 'Altra sistemazione',
