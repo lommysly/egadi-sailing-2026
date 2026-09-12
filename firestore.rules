@@ -436,7 +436,14 @@ service cloud.firestore {
     }
 
     match /boats/{boatId} {
-      allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+      // La pagina skipper legge esclusivamente /boats/{proprio UID}. Se il
+      // documento non esiste, la lettura puntuale serve solo a mostrare la
+      // registrazione; se esiste, resta leggibile al solo vero proprietario.
+      allow get: if isPrivateAreaOpen() && (isOrganizer()
+        || (isGoogleSkipperAccount() && boatId == request.auth.uid
+          && (!exists(/databases/$(database)/documents/boats/$(boatId))
+            || get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid)));
+      allow list: if false;
       allow create: if isPrivateAreaOpen() && isGoogleSkipperAccount() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid;
       allow update: if isPrivateAreaOpen() && (isOrganizer() || (isSkipper(boatId)
         && request.resource.data.skipperId == resource.data.skipperId
