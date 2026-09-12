@@ -5,6 +5,8 @@ import { roleConfirmationText } from './crew-roles.js?v=20260911-role1';
 let activeInvite = null;
 let activeBriefing = null;
 let activeRuleAcceptance = null;
+let stopPaymentSubscription = null;
+let stopAnnouncementSubscription = null;
 const PAYMENT_METHODS = [
   { id: 'paypal', label: 'PayPal' },
   { id: 'satispay', label: 'Satispay' },
@@ -56,6 +58,7 @@ function paymentStatusLabel(payment) {
 
 function showOpening(message = '', isError = false) {
   document.querySelector('#invalidLink').hidden = true;
+  document.querySelector('#boardingRulesGate').hidden = true;
   document.querySelector('#participantDashboard').hidden = true;
   document.querySelector('#signInSection').hidden = false;
   setMessage(document.querySelector('#participantAuthMessage'), message, isError);
@@ -63,6 +66,7 @@ function showOpening(message = '', isError = false) {
 
 function showInvalid(error) {
   document.querySelector('#signInSection').hidden = true;
+  document.querySelector('#boardingRulesGate').hidden = true;
   document.querySelector('#participantDashboard').hidden = true;
   document.querySelector('#invalidLink').hidden = false;
   const message = document.querySelector('#invalidAccessMessage');
@@ -72,14 +76,22 @@ function showInvalid(error) {
 }
 
 function clearPersonalDashboard() {
+  stopPaymentSubscription?.();
+  stopAnnouncementSubscription?.();
+  stopPaymentSubscription = null;
+  stopAnnouncementSubscription = null;
   activeInvite = null;
   activeBriefing = null;
   activeRuleAcceptance = null;
-  ['#participantProfileSummary', '#participantPaymentList', '#participantSchedule', '#participantRulesText', '#participantAnnouncementList'].forEach((selector) => {
+  ['#participantProfileSummary', '#participantPaymentList', '#boardingSchedule', '#participantSchedule', '#boardingRulesText', '#participantRulesText', '#participantAnnouncementList'].forEach((selector) => {
     document.querySelector(selector).replaceChildren();
   });
+  document.querySelector('#boardingRulesGate').hidden = true;
+  document.querySelector('#boardingBriefing').hidden = true;
+  document.querySelector('#boardingGateWaiting').hidden = true;
   document.querySelector('#participantBriefing').hidden = true;
-  document.querySelector('#acceptRulesButton').hidden = true;
+  document.querySelector('#rulesAcknowledgement').checked = false;
+  document.querySelector('#acceptRulesButton').disabled = true;
 }
 
 function handlePrivateReadError(error, messageElement, fallbackMessage) {
@@ -113,25 +125,119 @@ function renderPayments(snapshot) {
   }).join('');
 }
 
-function renderBriefing() {
+function hasPublishedBriefing() {
+  return typeof activeBriefing?.rulesText === 'string' && activeBriefing.rulesText.trim().length > 0;
+}
+
+function currentBriefingVersion() {
+  return Number.isInteger(activeBriefing?.rulesVersion) ? activeBriefing.rulesVersion : 1;
+}
+
+function hasAcceptedCurrentBriefing() {
+  return activeRuleAcceptance?.rulesVersion === currentBriefingVersion()
+    && activeRuleAcceptance?.acceptedBy === auth.currentUser?.uid;
+}
+
+function briefingSchedule() {
+  return [
+    ['Ritrovo', activeBriefing?.meetingPoint],
+    ['Imbarco', formatDateTime(activeBriefing?.boardingAt)],
+    ['Partenza', formatDateTime(activeBriefing?.departureAt)],
+    ['Rientro', formatDateTime(activeBriefing?.returnAt)],
+    ['Nota operativa', activeBriefing?.scheduleNote],
+  ].filter(([, value]) => value);
+}
+
+function renderSchedule(selector) {
+  const target = document.querySelector(selector);
+  target.innerHTML = briefingSchedule().map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+}
+
+function stopDashboardSubscriptions() {
+  stopPaymentSubscription?.();
+  stopAnnouncementSubscription?.();
+  stopPaymentSubscription = null;
+  stopAnnouncementSubscription = null;
+}
+
+function startDashboardSubscriptions() {
+  if (!activeInvite || stopPaymentSubscription || stopAnnouncementSubscription) return;
+  stopPaymentSubscription = onSnapshot(
+    query(collection(db, 'boats', activeInvite.boatId, 'paymentRequests'), where('recipientId', '==', activeInvite.id)),
+    renderPayments,
+    (error) => handlePrivateReadError(error, document.querySelector('#accessLinkMessage'), 'Non riesco a leggere le richieste personali.'),
+  );
+  stopAnnouncementSubscription = onSnapshot(
+    query(collection(db, 'boats', activeInvite.boatId, 'announcements'), orderBy('createdAt', 'desc')),
+    renderAnnouncements,
+    (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere le comunicazioni.'),
+  );
+}
+
+function renderDashboardBriefing() {
   const empty = document.querySelector('#participantBriefingEmpty');
   const briefing = document.querySelector('#participantBriefing');
-  if (!activeBriefing?.rulesText) {
+  if (!hasPublishedBriefing()) {
     empty.hidden = false;
     briefing.hidden = true;
     return;
   }
   empty.hidden = true;
   briefing.hidden = false;
-  const schedule = [['Ritrovo', activeBriefing.meetingPoint], ['Imbarco', formatDateTime(activeBriefing.boardingAt)], ['Partenza', formatDateTime(activeBriefing.departureAt)], ['Rientro', formatDateTime(activeBriefing.returnAt)], ['Nota operativa', activeBriefing.scheduleNote]].filter(([, value]) => value);
-  document.querySelector('#participantSchedule').innerHTML = schedule.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
-  document.querySelector('#participantRulesTitle').textContent = activeBriefing.rulesTitle || 'Regole di bordo';
+  renderSchedule('#participantSchedule');
+  document.querySelector('#participantRulesTitle').textContent = activeBriefing.rulesTitle || 'Briefing di sicurezza';
   document.querySelector('#participantRulesText').textContent = activeBriefing.rulesText;
-  const version = activeBriefing.rulesVersion || 1;
-  const accepted = activeRuleAcceptance?.rulesVersion === version
-    && activeRuleAcceptance?.acceptedBy === auth.currentUser?.uid;
-  document.querySelector('#participantRulesStatus').textContent = accepted ? `Hai confermato la lettura delle regole, versione ${version}.` : `Leggi le regole e conferma la versione ${version} prima della partenza.`;
-  document.querySelector('#acceptRulesButton').hidden = accepted;
+  const acceptedAt = formatDateTime(activeRuleAcceptance?.acceptedAt);
+  document.querySelector('#participantRulesStatus').textContent = `Briefing di sicurezza versione ${currentBriefingVersion()} accettato${acceptedAt ? ` il ${acceptedAt}` : ''}.`;
+}
+
+function renderBoardingGate() {
+  if (!activeInvite || !auth.currentUser) return;
+  const gate = document.querySelector('#boardingRulesGate');
+  const dashboard = document.querySelector('#participantDashboard');
+  const briefing = document.querySelector('#boardingBriefing');
+  const waiting = document.querySelector('#boardingGateWaiting');
+  const status = document.querySelector('#boardingGateStatus');
+  const acknowledgement = document.querySelector('#rulesAcknowledgement');
+  const acceptButton = document.querySelector('#acceptRulesButton');
+
+  if (!hasPublishedBriefing()) {
+    stopDashboardSubscriptions();
+    dashboard.hidden = true;
+    gate.hidden = false;
+    briefing.hidden = true;
+    waiting.hidden = false;
+    acknowledgement.checked = false;
+    acceptButton.disabled = true;
+    gate.dataset.rulesVersion = '';
+    status.textContent = 'Il briefing di sicurezza è obbligatorio prima di accedere alla tua area di bordo.';
+    return;
+  }
+
+  renderSchedule('#boardingSchedule');
+  document.querySelector('#boardingRulesTitle').textContent = activeBriefing.rulesTitle || 'Briefing di sicurezza';
+  document.querySelector('#boardingRulesText').textContent = activeBriefing.rulesText;
+  const version = String(currentBriefingVersion());
+  if (gate.dataset.rulesVersion !== version) {
+    acknowledgement.checked = false;
+    gate.dataset.rulesVersion = version;
+  }
+
+  if (hasAcceptedCurrentBriefing()) {
+    gate.hidden = true;
+    dashboard.hidden = false;
+    renderDashboardBriefing();
+    startDashboardSubscriptions();
+    return;
+  }
+
+  stopDashboardSubscriptions();
+  dashboard.hidden = true;
+  gate.hidden = false;
+  waiting.hidden = true;
+  briefing.hidden = false;
+  status.textContent = `Leggi il briefing di sicurezza e accetta la versione ${version} per entrare nella tua area di bordo.`;
+  acceptButton.disabled = !acknowledgement.checked;
 }
 
 function renderAnnouncements(snapshot) {
@@ -154,19 +260,29 @@ document.querySelector('#participantSignOutButton').addEventListener('click', as
     window.location.assign('index.html');
   }
 });
+
+document.querySelector('#rulesAcknowledgement').addEventListener('change', (event) => {
+  const canAccept = hasPublishedBriefing() && !hasAcceptedCurrentBriefing() && event.currentTarget.checked;
+  document.querySelector('#acceptRulesButton').disabled = !canAccept;
+});
+
 document.querySelector('#acceptRulesButton').addEventListener('click', async () => {
-  if (!activeBriefing || !activeInvite || !auth.currentUser) return;
+  if (!hasPublishedBriefing() || !activeInvite || !auth.currentUser) return;
+  if (!document.querySelector('#rulesAcknowledgement').checked) {
+    setMessage(document.querySelector('#participantRulesMessage'), 'Conferma di aver letto briefing e regole prima di proseguire.', true);
+    return;
+  }
   const button = document.querySelector('#acceptRulesButton');
   button.disabled = true;
   try {
-    const rulesVersion = activeBriefing.rulesVersion || 1;
+    const rulesVersion = currentBriefingVersion();
     const acceptance = { inviteId: activeInvite.id, acceptedBy: auth.currentUser.uid, rulesVersion, acceptedAt: serverTimestamp() };
     const batch = writeBatch(db);
     batch.set(doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id), acceptance, { merge: true });
     const historyId = `${rulesVersion}-${auth.currentUser.uid}`;
     batch.create(doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id, 'history', historyId), acceptance);
     await batch.commit();
-    setMessage(document.querySelector('#participantRulesMessage'), 'Regole confermate.');
+    setMessage(document.querySelector('#participantRulesMessage'), 'Briefing confermato. Apro la tua area di bordo…');
   } catch (error) {
     setMessage(document.querySelector('#participantRulesMessage'), 'Non riesco a confermare le regole. Riprova tra poco.', true);
     button.disabled = false;
@@ -184,13 +300,17 @@ startCrewAreaSession({
       return;
     }
     document.querySelector('#signInSection').hidden = true;
-    document.querySelector('#participantDashboard').hidden = false;
+    document.querySelector('#participantDashboard').hidden = true;
     document.querySelector('#participantTitle').textContent = member.data().displayName || invite.displayName || 'La mia area';
     document.querySelector('#editProfileButton').href = profileUrl({ edit: true });
     renderProfile(member.data());
-    onSnapshot(query(collection(db, 'boats', invite.boatId, 'paymentRequests'), where('recipientId', '==', invite.id)), renderPayments, (error) => handlePrivateReadError(error, document.querySelector('#accessLinkMessage'), 'Non riesco a leggere le richieste personali.'));
-    onSnapshot(doc(db, 'boats', invite.boatId, 'briefing', 'board'), (snapshot) => { activeBriefing = snapshot.exists() ? snapshot.data() : null; renderBriefing(); }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la bacheca di bordo.'));
-    onSnapshot(query(collection(db, 'boats', invite.boatId, 'announcements'), orderBy('createdAt', 'desc')), renderAnnouncements, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere le comunicazioni.'));
-    onSnapshot(doc(db, 'boats', invite.boatId, 'ruleAcceptances', invite.id), (snapshot) => { activeRuleAcceptance = snapshot.exists() ? snapshot.data() : null; renderBriefing(); }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la conferma delle regole.'));
+    onSnapshot(doc(db, 'boats', invite.boatId, 'briefing', 'board'), (snapshot) => {
+      activeBriefing = snapshot.exists() ? snapshot.data() : null;
+      renderBoardingGate();
+    }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere il briefing di sicurezza.'));
+    onSnapshot(doc(db, 'boats', invite.boatId, 'ruleAcceptances', invite.id), (snapshot) => {
+      activeRuleAcceptance = snapshot.exists() ? snapshot.data() : null;
+      renderBoardingGate();
+    }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere la conferma del briefing.'));
   },
 });

@@ -762,12 +762,12 @@ function renderBriefingForm() {
 function renderBriefingStatus() {
   const status = document.querySelector('#briefingStatus');
   if (!activeBriefing?.rulesText) {
-    status.textContent = 'Pubblica le regole per renderle disponibili all’equipaggio.';
+    status.textContent = 'Pubblica il briefing obbligatorio per attivare l’ingresso dell’equipaggio nella propria area.';
     return;
   }
   const version = activeBriefing.rulesVersion || 1;
   const accepted = activeAcceptances.filter((item) => item.rulesVersion === version).length;
-  status.textContent = `Regole versione ${version} pubblicate. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} confermato la lettura.`;
+  status.textContent = `Briefing safety versione ${version} pubblicato. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} completato l’accettazione.`;
 }
 
 function renderAnnouncements(snapshot) {
@@ -1119,18 +1119,28 @@ document.querySelector('#briefingForm').addEventListener('submit', async (event)
   const submitButton = form.querySelector('button[type="submit"]');
   const rulesTitle = fields.get('rulesTitle').trim();
   const rulesText = fields.get('rulesText').trim();
-  const rulesChanged = !activeBriefing || rulesTitle !== (activeBriefing.rulesTitle || '') || rulesText !== (activeBriefing.rulesText || '');
-  const rulesVersion = activeBriefing ? (activeBriefing.rulesVersion || 1) + (rulesChanged ? 1 : 0) : 1;
+  const briefingData = {
+    rulesTitle,
+    rulesText,
+    meetingPoint: fields.get('meetingPoint').trim(),
+    boardingAt: fields.get('boardingAt'),
+    departureAt: fields.get('departureAt'),
+    returnAt: fields.get('returnAt'),
+    scheduleNote: fields.get('scheduleNote').trim(),
+  };
+  const briefingChanged = !activeBriefing || Object.entries(briefingData).some(([field, value]) => {
+    const previous = field.endsWith('At') ? toDateTimeLocal(activeBriefing[field]) : String(activeBriefing[field] || '');
+    return previous !== value;
+  });
+  const rulesVersion = activeBriefing ? (activeBriefing.rulesVersion || 1) + (briefingChanged ? 1 : 0) : 1;
   submitButton.disabled = true;
   setMessage(document.querySelector('#briefingFormMessage'), 'Pubblico la bacheca…');
   try {
     await setDoc(doc(db, 'boats', activeBoat.id, 'briefing', 'board'), {
-      rulesTitle, rulesText, rulesVersion, meetingPoint: fields.get('meetingPoint').trim(),
-      boardingAt: fields.get('boardingAt'), departureAt: fields.get('departureAt'), returnAt: fields.get('returnAt'),
-      scheduleNote: fields.get('scheduleNote').trim(), updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid,
+      ...briefingData, rulesVersion, updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid,
     }, { merge: true });
     form.dataset.editing = '';
-    setMessage(document.querySelector('#briefingFormMessage'), rulesChanged && activeBriefing ? `Regole aggiornate: l’equipaggio dovrà confermare la versione ${rulesVersion}.` : 'Bacheca pubblicata.');
+    setMessage(document.querySelector('#briefingFormMessage'), briefingChanged && activeBriefing ? `Briefing aggiornato: l’equipaggio dovrà accettare la versione ${rulesVersion}.` : 'Briefing obbligatorio pubblicato.');
   } catch (error) {
     setMessage(document.querySelector('#briefingFormMessage'), 'Non riesco a pubblicare la bacheca.', true);
   } finally {

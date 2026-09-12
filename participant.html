@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260912-berths1" />
+  <link rel="stylesheet" href="styles.css?v=20260912-safety2" />
 </head>
 <body class="area-page">
   <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
@@ -21,7 +21,24 @@
     <section id="invalidLink" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Link non valido</p><h2>Serve un nuovo invito personale.</h2><p>Apri il collegamento più recente ricevuto dallo skipper su WhatsApp. Se non lo trovi più o pensi che sia stato inoltrato, chiedi allo skipper di revocarlo e generarne uno nuovo.</p><a class="button button-ghost" href="accesso.html#aiuto">Aiuto per l’accesso</a></article></section>
     <section id="signInSection" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Invito personale</p><h2>Preparo la tua scheda</h2><p id="participantAuthMessage" class="form-message" role="status" aria-live="polite"></p></article></section>
     <section id="activationSection" class="access-cards access-cards-single" hidden><article><p class="eyebrow">Attiva il tuo accesso</p><h2>Scegli il tuo codice personale.</h2><p>Conferma il numero WhatsApp a cui hai ricevuto l’invito e scegli un codice di 6 cifre. Non usare il PIN che sblocca il telefono.</p><p class="field-hint">Stai attivando un invito personale. Consulta <a href="privacy.html">Privacy e dati</a> prima di proseguire. L’area è in test: non inserire documento, data di nascita o altri dati reali finché l’informativa finale non sarà pubblicata.</p><form id="activationForm" class="compact-form"><label>Numero WhatsApp *<input name="phone" type="tel" required inputmode="tel" autocomplete="tel" maxlength="30" pattern="\+[1-9][0-9 .()\-]{7,29}" placeholder="Es. +39 333 1234567" /></label><div class="form-grid"><label>Codice personale *<input name="pin" type="password" required inputmode="numeric" autocomplete="new-password" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="6 cifre" /></label><label>Ripeti il codice *<input name="pinConfirmation" type="password" required inputmode="numeric" autocomplete="new-password" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="6 cifre" /></label></div><button class="button button-primary" type="submit">Attiva accesso</button><p id="activationMessage" class="form-message" role="status" aria-live="polite"></p></form></article></section>
-    <section id="profileSection" class="section dashboard" hidden><div class="dashboard-heading"><div><p class="eyebrow">La tua scheda</p><h2 id="participantTitle">Dati per la Crew List</h2><p>Al termine vedrai una conferma e accederai alla tua area personale.</p></div></div><div class="dashboard-grid"><article class="dashboard-panel"><p class="eyebrow">Per la Crew List</p><h3>Anagrafica personale</h3><p class="panel-lead">Questi dati saranno visibili allo skipper e all’organizzazione soltanto per preparare la Crew List.</p><p class="field-hint">Consulta <a href="privacy.html">Privacy e dati</a>. In fase di test usa soltanto dati fittizi.</p><form id="participantForm" class="compact-form">
+    <section id="preRegistrationBriefing" class="section boarding-rules-gate" hidden>
+      <article class="boarding-rules-card">
+        <p class="eyebrow">Prima della Crew List</p>
+        <h2>Leggi il briefing,<br /><em>poi ti imbarchi.</em></h2>
+        <p id="preRegistrationBriefingStatus" class="panel-lead">Carico il briefing della tua barca…</p>
+        <p id="preRegistrationBriefingWaiting" class="panel-lead" hidden>Lo skipper deve ancora pubblicare il briefing di sicurezza e le regole di bordo. Quando saranno pubblicati, potrai leggerli e accettarli qui prima di inserire i tuoi dati nella Crew List.</p>
+        <div id="preRegistrationBriefingContent" hidden>
+          <div id="preRegistrationSchedule" class="schedule-list"></div>
+          <div class="board-divider"></div>
+          <h3 id="preRegistrationRulesTitle">Briefing di sicurezza</h3>
+          <p id="preRegistrationRulesText" class="rules-text"></p>
+          <aside class="briefing-practical-note"><strong>Importante</strong><span>Questa conferma attesta la lettura online. All’imbarco lo skipper svolgerà comunque il briefing pratico su dotazioni, procedure e caratteristiche reali della barca.</span></aside>
+          <label class="consent-field rules-acknowledgement"><input id="preRegistrationAcknowledgement" type="checkbox" /> Ho letto il briefing di sicurezza e le regole di bordo; mi impegno a rispettarle e a partecipare al briefing pratico a bordo.</label>
+          <div class="form-actions"><button id="preRegistrationAcceptButton" class="button button-primary" type="button" disabled>Accetto il briefing e proseguo</button><p id="preRegistrationMessage" class="form-message" role="status" aria-live="polite"></p></div>
+        </div>
+      </article>
+    </section>
+    <section id="profileSection" class="section dashboard" hidden><div class="dashboard-heading"><div><p class="eyebrow">La tua scheda</p><h2 id="participantTitle">Dati per la Crew List</h2><p>Hai accettato il briefing della tua barca. Ora puoi compilare la tua anagrafica e comparire nella Crew List.</p></div></div><div class="dashboard-grid"><article class="dashboard-panel"><p class="eyebrow">Per la Crew List</p><h3>Anagrafica personale</h3><p class="panel-lead">Questi dati saranno visibili allo skipper e all’organizzazione soltanto per preparare la Crew List.</p><p class="field-hint">Consulta <a href="privacy.html">Privacy e dati</a>. In fase di test usa soltanto dati fittizi.</p><form id="participantForm" class="compact-form">
       <div class="form-grid"><label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" /></label><label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" /></label></div>
       <div class="form-grid"><label>Data di nascita *<input name="birthDate" type="date" required /></label><label>Luogo di nascita *<input name="birthPlace" required maxlength="100" /></label></div>
       <div class="form-grid"><label>Nazionalità *<input name="nationality" required maxlength="80" placeholder="Es. Italiana" /></label><label>Sesso *<select name="gender" required><option value="">Seleziona</option><option>F</option><option>M</option><option>Altro</option></select></label></div>
@@ -35,6 +52,6 @@
   </main>
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
   <script src="app.js?v=20260911-menu2"></script>
-  <script type="module" src="participant.js?v=20260911-role1"></script>
+  <script type="module" src="participant.js?v=20260912-safety2"></script>
 </body>
 </html>

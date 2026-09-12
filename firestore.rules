@@ -85,6 +85,7 @@ service cloud.firestore {
 
     function isValidCrewMemberCreate(boatId, memberId) {
       return isInviteHolder(boatId, memberId)
+        && hasCurrentBriefingAcceptance(boatId, memberId)
         && hasValidMemberPayload()
         && request.resource.data.keys().hasAll(['roleConfirmed'])
         && request.resource.data.roleConfirmed == false
@@ -225,13 +226,30 @@ service cloud.firestore {
 
     function isValidRuleAcceptance(boatId, inviteId) {
       return isInviteHolder(boatId, inviteId)
+        && hasPublishedBriefing(boatId)
         && request.resource.data.keys().hasOnly(['inviteId', 'acceptedBy', 'rulesVersion', 'acceptedAt'])
         && request.resource.data.inviteId == inviteId
         && request.resource.data.acceptedBy == request.auth.uid
         && request.resource.data.rulesVersion is int
         && request.resource.data.acceptedAt == request.time
-        && exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
         && request.resource.data.rulesVersion == get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion;
+    }
+
+    // Un invito attivo non basta per comparire nella Crew List: prima va
+    // accettata l'ultima versione del briefing pubblicato dallo skipper.
+    function hasPublishedBriefing(boatId) {
+      return exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
+        && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesText is string
+        && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesText.size() > 0
+        && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion is int;
+    }
+
+    function hasCurrentBriefingAcceptance(boatId, inviteId) {
+      return hasPublishedBriefing(boatId)
+        && exists(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId))
+        && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.inviteId == inviteId
+        && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.acceptedBy == request.auth.uid
+        && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.rulesVersion == get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion;
     }
 
     function isPaymentManager(boatId) {

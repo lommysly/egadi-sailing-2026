@@ -127,6 +127,25 @@ body.menu-open { overflow:hidden; }
 .rules-text { margin:0; white-space:pre-line; line-height:1.6; }
 .rules-acceptance { margin-top:20px; padding:17px; border-radius:12px; background:#e8eee9; }
 .rules-acceptance .panel-lead { margin-bottom:12px; }
+.boarding-rules-gate { padding-top:0; padding-bottom:48px; }
+.boarding-rules-card { max-width:920px; margin:0 auto; padding:clamp(28px,5vw,54px); border-radius:20px; background:#063644; color:white; }
+.boarding-rules-card h2 { margin:0 0 24px; font:600 clamp(2.8rem,6vw,5rem)/.92 "Fraunces",serif; letter-spacing:-.06em; }
+.boarding-rules-card h2 em { color:#9ff5ed; font-style:italic; }
+.boarding-rules-card .eyebrow { color:#91eee7; }
+.boarding-rules-card .panel-lead { max-width:720px; color:rgba(255,255,255,.86); }
+.boarding-rules-card .schedule-list div { background:rgba(255,255,255,.12); }
+.boarding-rules-card .schedule-list span { color:#9ff5ed; }
+.boarding-rules-card .board-divider { background:rgba(255,255,255,.2); }
+.briefing-practical-note { display:grid; gap:8px; margin:22px 0; padding:16px; border-left:3px solid #9ff5ed; background:rgba(255,255,255,.09); line-height:1.5; }
+.briefing-practical-note strong { color:#9ff5ed; }
+.boarding-rules-card .rules-acknowledgement { display:grid; margin-top:24px; color:white; }
+.boarding-rules-card .rules-acknowledgement input { accent-color:#9ff5ed; }
+.boarding-rules-card .form-actions { margin-top:20px; }
+.boarding-rules-card .form-message { color:#c6f6f0; }
+.boarding-rules-card .form-message.is-error { color:#ffd0ca; }
+.briefing-recap { margin-top:18px; }
+.briefing-recap summary { cursor:pointer; font-weight:700; }
+.briefing-recap .schedule-list { margin:18px 0; }
 .crew-area-list { display:grid; gap:10px; margin-top:24px; }
 .passage-plan-main { padding-bottom:90px; }
 .passage-status { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
