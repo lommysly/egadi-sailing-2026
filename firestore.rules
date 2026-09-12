@@ -369,7 +369,7 @@ service cloud.firestore {
         && request.resource.data.capacity >= 1
         && request.resource.data.capacity <= 30
         && request.resource.data.showAvailability is bool
-        && request.resource.data.berthPreference in ['not_specified', 'cabin_female', 'cabin_male', 'dinette', 'crew_cabin', 'other']
+        && request.resource.data.berthPreference in ['not_specified', 'cabin_female', 'cabin_male', 'cabin_mixed', 'dinette', 'crew_cabin', 'other']
         && request.resource.data.updatedAt == request.time
         && ((request.resource.data.showAvailability == true
           && request.resource.data.availableSeats is int
