@@ -10,7 +10,6 @@ const BERTH_PREFERENCE_LABELS = {
   cabin_male: 'Posto in cabina maschile',
   cabin_mixed: 'Posto in cabina mista',
   dinette: 'Posto in dinette',
-  crew_cabin: 'Posto in cabina marinaio',
   other: 'Altra sistemazione',
 };
 
