@@ -79,7 +79,7 @@ function renderSummary(fleet) {
 
   fleetSummary.innerHTML = [
     `<div><span>Barche</span><strong>${escapeHtml(String(fleet.length))}</strong></div>`,
-    `<div><span>Posti equipaggio</span><strong>${declaredCapacity ? escapeHtml(String(declaredCapacity)) : '—'}</strong></div>`,
+    `<div><span>Posti partecipanti</span><strong>${declaredCapacity ? escapeHtml(String(declaredCapacity)) : '—'}</strong></div>`,
     `<div><span>Posti liberi dichiarati</span><strong>${boatsWithAvailability.length ? escapeHtml(String(declaredAvailability)) : '—'}</strong></div>`,
     `<div><span>Disponibilità pubblicate</span><strong>${escapeHtml(plural(boatsWithAvailability.length, 'barca', 'barche'))}</strong></div>`,
   ].join('');
@@ -107,7 +107,7 @@ function renderCard(boat) {
     ${boatDetails ? `<p class="panel-lead">${escapeHtml(boatDetails)}</p>` : ''}
     <dl class="profile-summary">
       ${detailsRow('Skipper', boat.skipperName || 'In aggiornamento')}
-      ${boat.capacity !== null ? detailsRow('Posti equipaggio', plural(boat.capacity, 'posto', 'posti')) : ''}
+      ${boat.capacity !== null ? detailsRow('Posti partecipanti', plural(boat.capacity, 'posto', 'posti')) : ''}
       ${availabilityDetails}
       ${preferenceDetails}
       ${updatedAt ? detailsRow('Aggiornata', updatedAt) : ''}

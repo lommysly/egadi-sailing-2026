@@ -275,6 +275,8 @@ body.menu-open { overflow:hidden; }
 .boat-accommodation-fieldset { display:grid; gap:12px; margin:0; padding:16px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.38); }
 .boat-accommodation-fieldset legend { padding:0 6px; color:rgba(17,45,56,.72); font:700 .74rem "DM Sans",sans-serif; }
 .boat-accommodation-fieldset .field-hint { margin:0; }
+.berth-rate-section { display:grid; gap:9px; padding:14px; border-radius:10px; background:rgba(126,228,223,.15); }
+.berth-rate-heading { margin:0; color:#087b8a; font:700 .76rem "DM Mono",monospace; letter-spacing:.04em; text-transform:uppercase; }
 #berthLayoutSummary.is-error { color:#a53d2c; font-weight:700; }
 .boat-accommodation { max-width:680px; margin:8px 0 0; color:#087b8a; font-size:.9rem; line-height:1.5; }
 
