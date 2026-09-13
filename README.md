@@ -67,7 +67,7 @@ events/egadi-2026
   privateAreaEnabled: true
 
 boats/{skipperUid}
-  name, model, capacity, berthLayout (privato), homePort, flag, skipperId, eventId
+  name, model, capacity (partecipanti), berthLayout e berthRates (privati), homePort, flag, skipperId, eventId
   members/{inviteId}
     firstName, lastName, birthDate, birthPlace, nationality, gender
     documentType, documentNumber, documentExpiry, charterConsent
@@ -106,9 +106,11 @@ Il vincolo operativo è **un numero WhatsApp, una barca attiva** nello stesso ev
 
 Il pulsante **Genera Crew List PDF** apre un foglio A4 orizzontale prestampato. Lo skipper sceglie “Salva come PDF” dalla finestra di stampa. Il PDF si attiva solo con dati della barca, dati richiesti per ogni persona e conferma di condivisione completati. Il porto di iscrizione non è un campo necessario.
 
-`capacity` indica i posti per l'equipaggio, escluso lo skipper. L'interfaccia conta inviti e membri unici e non aggiunge oltre il limite; non è un vincolo atomico server-side e non sostituisce la valutazione nautica dello skipper.
+`capacity` indica i posti per partecipanti / Crew List, escluso lo skipper. L'interfaccia conta inviti e membri unici e non aggiunge oltre il limite; non è un vincolo atomico server-side e non sostituisce la valutazione nautica dello skipper.
 
-`berthLayout` è facoltativo e privato: cabine doppie o singole, posti letto in dinette, cabina marinaio presente/non presente, altri posti letto e numero totale dei bagni. La cabina marinaio descrive solo se esiste: non indica se sia assegnabile alla Crew List e non altera la capienza. Il numero dei bagni non incide sulla capienza e per ora non distingue bagni privati o condivisi. Non alimenta la flotta pubblica né il PDF per il charter.
+`berthLayout` è facoltativo e privato: cabine doppie o singole, posti letto in dinette, cabina marinaio, altri posti letto e numero totale dei bagni. La cabina marinaio aggiunge un posto letto fisico riservato allo skipper; non è assegnabile alla Crew List. Il riepilogo distingue quindi i posti letto totali a bordo dai posti per partecipanti: se non esiste una cabina marinaio, lo skipper occupa una delle cuccette configurate. Il numero dei bagni non incide sulla capienza e per ora non distingue bagni privati o condivisi. Non alimenta la flotta pubblica né il PDF per il charter.
+
+`berthRates` è un listino privato e facoltativo in centesimi per singolo posto letto: cabina doppia, cabina singola, dinette o altra sistemazione. Non esiste una quota per la cabina marinaio. Il listino precompila importo e causale nella richiesta personale WhatsApp, ma lo skipper può sempre modificarli. Non riserva automaticamente una cuccetta a una persona e non rende il pagamento automatico o verificato.
 
 Ogni skipper gestisce una sola barca: per le nuove registrazioni l'ID della barca coincide con l'UID dello skipper e le Rules impediscono una seconda creazione. Il nome della barca, ad esempio `Karibu`, è modificabile dallo skipper.
 

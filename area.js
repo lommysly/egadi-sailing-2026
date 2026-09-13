@@ -2,7 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/fireba
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
-import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js';
+import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260913-berth-pricing1';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260911-live';
 import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260911-role1';
@@ -29,6 +29,12 @@ const PAYMENT_METHODS = [
 const FLEET_BOAT_TYPES = new Set(['Catamarano', 'Monoscafo', 'Gommone', 'Altro']);
 const FLEET_BERTH_PREFERENCES = new Set(['not_specified', 'cabin_female', 'cabin_male', 'cabin_mixed', 'dinette', 'other']);
 const LEGACY_CREW_CABIN_USES = new Set(['not_specified', 'skipper', 'crew']);
+const BERTH_RATE_TYPES = [
+  { id: 'double_cabin', label: 'Posto in cabina doppia', rateKey: 'doubleCabinCents', defaultReason: 'Quota posto in cabina doppia', count: (totals) => totals.doubleCabins * 2 },
+  { id: 'single_cabin', label: 'Posto in cabina singola', rateKey: 'singleCabinCents', defaultReason: 'Quota posto in cabina singola', count: (totals) => totals.singleCabins },
+  { id: 'dinette', label: 'Posto in dinette', rateKey: 'dinetteCents', defaultReason: 'Quota posto in dinette', count: (totals) => totals.dinetteBerths },
+  { id: 'other', label: 'Altra sistemazione', rateKey: 'otherBerthCents', defaultReason: 'Quota altra sistemazione', count: (totals) => totals.otherCrewBerths },
+];
 const DEFAULT_RULES_SUMMARY = [
   '1. Seguo sempre le decisioni dello skipper su sicurezza, manovre, meteo, rotta, rada e porto.',
   '2. Partecipo al briefing pratico e uso le dotazioni di sicurezza quando richiesto.',
@@ -191,6 +197,26 @@ function asNonNegativeInteger(value, maximum = 12) {
   return Number.isInteger(numericValue) && numericValue >= 0 && numericValue <= maximum ? numericValue : 0;
 }
 
+function toEuroCents(value) {
+  const rawValue = String(value ?? '').trim().replace(',', '.');
+  if (!rawValue) return 0;
+  const amount = Number(rawValue);
+  return Number.isFinite(amount) && amount >= 0 && amount <= 10_000 ? Math.round(amount * 100) : 0;
+}
+
+function euroInputValue(cents) {
+  return cents > 0 ? (cents / 100).toFixed(2) : '';
+}
+
+function normalizeBerthRates(rates = {}) {
+  return {
+    doubleCabinCents: asNonNegativeInteger(rates?.doubleCabinCents, 1_000_000),
+    singleCabinCents: asNonNegativeInteger(rates?.singleCabinCents, 1_000_000),
+    dinetteCents: asNonNegativeInteger(rates?.dinetteCents, 1_000_000),
+    otherBerthCents: asNonNegativeInteger(rates?.otherBerthCents, 1_000_000),
+  };
+}
+
 function normalizeBerthLayout(layout = {}) {
   return {
     doubleCabins: asNonNegativeInteger(layout?.doubleCabins),
@@ -207,17 +233,22 @@ function normalizeBerthLayout(layout = {}) {
 
 function berthLayoutTotals(layout) {
   const normalized = normalizeBerthLayout(layout);
-  const crewAssignableBerths = (normalized.doubleCabins * 2)
+  const standardBerths = (normalized.doubleCabins * 2)
     + normalized.singleCabins
     + normalized.dinetteBerths
     + normalized.otherCrewBerths;
+  const physicalBerths = standardBerths + (normalized.hasCrewCabin ? 1 : 0);
+  const skipperBerths = physicalBerths > 0 ? 1 : 0;
+  const participantBerths = Math.max(0, physicalBerths - skipperBerths);
   return {
     ...normalized,
-    crewAssignableBerths,
+    physicalBerths,
+    skipperBerths,
+    participantBerths,
   };
 }
 
-function hasCrewSleepingLayout(layout) {
+function hasParticipantSleepingLayout(layout) {
   const totals = berthLayoutTotals(layout);
   return totals.doubleCabins > 0
     || totals.singleCabins > 0
@@ -227,7 +258,7 @@ function hasCrewSleepingLayout(layout) {
 
 function hasAccommodationDetails(layout) {
   const totals = berthLayoutTotals(layout);
-  return hasCrewSleepingLayout(totals) || totals.hasCrewCabin;
+  return totals.physicalBerths > 0;
 }
 
 function describeBerthLayout(layout) {
@@ -237,7 +268,7 @@ function describeBerthLayout(layout) {
   if (totals.doubleCabins) parts.push(`${totals.doubleCabins} ${totals.doubleCabins === 1 ? 'cabina doppia' : 'cabine doppie'}`);
   if (totals.singleCabins) parts.push(`${totals.singleCabins} ${totals.singleCabins === 1 ? 'cabina singola' : 'cabine singole'}`);
   if (totals.dinetteBerths) parts.push(`${totals.dinetteBerths} ${totals.dinetteBerths === 1 ? 'posto in dinette' : 'posti in dinette'}`);
-  if (totals.hasCrewCabin) parts.push('cabina marinaio presente');
+  if (totals.hasCrewCabin) parts.push('cabina marinaio · posto skipper');
   if (totals.otherCrewBerths) parts.push(`${totals.otherCrewBerths} ${totals.otherCrewBerths === 1 ? 'posto letto extra' : 'posti letto extra'}`);
   if (totals.bathroomCount) parts.push(`${totals.bathroomCount} ${totals.bathroomCount === 1 ? 'bagno a bordo' : 'bagni a bordo'}`);
   return parts.join(' · ');
@@ -264,6 +295,47 @@ function fillBerthLayoutForm(form, layout) {
   form.elements.otherCrewBerths.value = String(normalized.otherCrewBerths);
 }
 
+function readBerthRates(form) {
+  return normalizeBerthRates({
+    doubleCabinCents: toEuroCents(form.elements.doubleCabinRate?.value),
+    singleCabinCents: toEuroCents(form.elements.singleCabinRate?.value),
+    dinetteCents: toEuroCents(form.elements.dinetteRate?.value),
+    otherBerthCents: toEuroCents(form.elements.otherBerthRate?.value),
+  });
+}
+
+function fillBerthRatesForm(form, rates) {
+  const normalized = normalizeBerthRates(rates);
+  form.elements.doubleCabinRate.value = euroInputValue(normalized.doubleCabinCents);
+  form.elements.singleCabinRate.value = euroInputValue(normalized.singleCabinCents);
+  form.elements.dinetteRate.value = euroInputValue(normalized.dinetteCents);
+  form.elements.otherBerthRate.value = euroInputValue(normalized.otherBerthCents);
+}
+
+function describeBerthCapacity(totals) {
+  if (!totals.physicalBerths) return '';
+  const totalLabel = totals.physicalBerths === 1 ? 'posto letto totale' : 'posti letto totali';
+  const participantLabel = totals.participantBerths === 1 ? 'posto per partecipante' : 'posti per partecipanti';
+  const skipperDetail = totals.hasCrewCabin
+    ? '1 riservato allo skipper nella cabina marinaio'
+    : '1 occupato dallo skipper';
+  return `${totals.physicalBerths} ${totalLabel}: ${skipperDetail} e ${totals.participantBerths} ${participantLabel}`;
+}
+
+function describeBerthRates(rates) {
+  const normalized = normalizeBerthRates(rates);
+  const labels = {
+    doubleCabinCents: 'cabina doppia',
+    singleCabinCents: 'cabina singola',
+    dinetteCents: 'dinette',
+    otherBerthCents: 'altra sistemazione',
+  };
+  return Object.entries(labels)
+    .filter(([key]) => normalized[key] > 0)
+    .map(([key, label]) => `${label} ${formatCurrency(normalized[key] / 100)} a persona`)
+    .join(' · ');
+}
+
 function renderBerthLayoutSummary() {
   const form = document.querySelector('#boatForm');
   const summary = document.querySelector('#berthLayoutSummary');
@@ -277,24 +349,30 @@ function renderBerthLayoutSummary() {
     return;
   }
 
-  if (!hasCrewSleepingLayout(layout)) {
-    summary.textContent = `${description}. Cabina marinaio e bagni descrivono la barca, ma non modificano i posti della Crew List.`;
+  if (!hasParticipantSleepingLayout(layout)) {
+    const capacity = Number(form.elements.capacity?.value);
+    if (totals.physicalBerths && Number.isInteger(capacity) && capacity > totals.participantBerths) {
+      summary.classList.add('is-error');
+      summary.textContent = `${description}. ${describeBerthCapacity(totals)}. Aggiungi posti per partecipanti oppure riduci il limite.`;
+      return;
+    }
+    summary.textContent = `${description}. Aggiungi anche i posti per partecipanti: la cabina marinaio resta riservata allo skipper.`;
     return;
   }
 
-  const crewLabel = totals.crewAssignableBerths === 1 ? 'posto assegnabile' : 'posti assegnabili';
+  const capacityDescription = describeBerthCapacity(totals);
   const capacity = Number(form.elements.capacity?.value);
-  if (Number.isInteger(capacity) && capacity > totals.crewAssignableBerths) {
-    const difference = capacity - totals.crewAssignableBerths;
+  if (Number.isInteger(capacity) && capacity > totals.participantBerths) {
+    const difference = capacity - totals.participantBerths;
     summary.classList.add('is-error');
-    summary.textContent = `${description}. ${totals.crewAssignableBerths} ${crewLabel} alla Crew List. Il limite sopra è ${capacity}: aggiungi ${difference} ${difference === 1 ? 'posto letto extra' : 'posti letto extra'} o riduci il limite.`;
+    summary.textContent = `${description}. ${capacityDescription}. Il limite partecipanti sopra è ${capacity}: aggiungi ${difference} ${difference === 1 ? 'posto letto' : 'posti letto'} o riduci il limite.`;
     return;
   }
 
   const limitText = Number.isInteger(capacity) && capacity > 0
-    ? ` Limite Crew List impostato: ${capacity}.`
-    : ' Inserisci sopra il limite della Crew List.';
-  summary.textContent = `${description}. ${totals.crewAssignableBerths} ${crewLabel} alla Crew List.${limitText}`;
+    ? ` Limite partecipanti impostato: ${capacity}.`
+    : ' Inserisci sopra il limite per partecipanti.';
+  summary.textContent = `${description}. ${capacityDescription}.${limitText}`;
 }
 
 function isFleetAvailabilityPublic(boat) {
@@ -658,6 +736,53 @@ function renderPaymentRecipientOptions() {
     + (members ? `<optgroup label="Crew List">${members}</optgroup>` : '');
 }
 
+function berthRateType(typeId) {
+  return BERTH_RATE_TYPES.find((type) => type.id === typeId) || null;
+}
+
+function renderPaymentBerthOptions() {
+  const select = document.querySelector('#paymentBerthType');
+  if (!select) return;
+  const selectedType = select.value || 'custom';
+  const totals = berthLayoutTotals(activeBoat?.berthLayout);
+  const rates = normalizeBerthRates(activeBoat?.berthRates);
+  const options = BERTH_RATE_TYPES
+    .map((type) => ({ ...type, count: type.count(totals), cents: rates[type.rateKey] }))
+    .filter((type) => type.count > 0)
+    .map((type) => {
+      const placeLabel = type.count === 1 ? '1 posto' : `${type.count} posti`;
+      const priceLabel = type.cents > 0 ? `${formatCurrency(type.cents / 100)} a persona` : 'quota da indicare';
+      return `<option value="${type.id}">${type.label} · ${placeLabel} · ${priceLabel}</option>`;
+    }).join('');
+  select.innerHTML = '<option value="custom">Importo libero / altra voce</option>' + options;
+  select.value = berthRateType(selectedType) && [...select.options].some((option) => option.value === selectedType)
+    ? selectedType
+    : 'custom';
+}
+
+function applyPaymentBerthPreset() {
+  const form = document.querySelector('#paymentForm');
+  const type = berthRateType(form?.elements.berthType?.value);
+  if (!form || !type || !activeBoat) return;
+  const totals = berthLayoutTotals(activeBoat.berthLayout);
+  if (type.count(totals) < 1) return;
+  const rates = normalizeBerthRates(activeBoat.berthRates);
+  const amount = form.elements.amount;
+  const reason = form.elements.reason;
+  const cents = rates[type.rateKey];
+  if (cents > 0 && (!amount.value || amount.dataset.autoBerthRate === 'true')) {
+    amount.value = euroInputValue(cents);
+    amount.dataset.autoBerthRate = 'true';
+  } else if (cents === 0 && amount.dataset.autoBerthRate === 'true') {
+    amount.value = '';
+    delete amount.dataset.autoBerthRate;
+  }
+  if (!reason.value.trim() || reason.dataset.autoBerthReason === 'true') {
+    reason.value = type.defaultReason;
+    reason.dataset.autoBerthReason = 'true';
+  }
+}
+
 function normalizeMember(id, member) {
   if (member.firstName || member.lastName) return { id, ...member };
   const [firstName = '', ...lastNameParts] = String(member.displayName || '').trim().split(/\s+/);
@@ -685,11 +810,11 @@ function renderCapacityStatus() {
   const limit = crewSeatLimit();
   const allocated = allocatedCrewSeatCount();
   if (!activeBoat || !limit) {
-    status.textContent = 'Definisci i posti equipaggio della barca prima di inviare gli inviti.';
+    status.textContent = 'Definisci i posti per partecipanti prima di inviare gli inviti.';
     return;
   }
   const available = Math.max(0, limit - allocated);
-  status.textContent = 'Posti equipaggio: ' + allocated + ' di ' + limit + ' occupati o riservati. '
+  status.textContent = 'Posti partecipanti: ' + allocated + ' di ' + limit + ' occupati o riservati. '
     + (available ? available + ' ancora disponibili.' : 'Nessun posto ancora disponibile.');
 }
 
@@ -726,6 +851,7 @@ function openBoatEdit() {
     if (input) input.value = value ?? '';
   }
   fillBerthLayoutForm(form, activeBoat.berthLayout);
+  fillBerthRatesForm(form, activeBoat.berthRates);
   renderBerthLayoutSummary();
   creatingBoat = true;
   editingBoatId = activeBoat.id;
@@ -748,7 +874,7 @@ function updateCharterReadiness() {
     : boatMissing
       ? 'Completa bandiera e comandante della barca per attivare il PDF.'
       : overCapacity
-        ? 'La Crew List supera i posti equipaggio indicati per la barca.'
+        ? 'La Crew List supera i posti per partecipanti indicati per la barca.'
       : activeMembers.length === 0
         ? 'Aggiungi almeno una persona per preparare il PDF.'
     : incomplete.length
@@ -878,12 +1004,19 @@ function subscribeToBoat(boat) {
   registerSection.hidden = true;
   dashboard.hidden = false;
   document.querySelector('#boatTitle').textContent = boat.name;
-  document.querySelector('#boatMeta').textContent = boat.model + ' · ' + boat.capacity + ' posti equipaggio · ' + boat.homePort;
+  const berthTotals = berthLayoutTotals(boat.berthLayout);
+  const totalBerths = berthTotals.physicalBerths ? ` · ${berthTotals.physicalBerths} posti letto totali` : '';
+  document.querySelector('#boatMeta').textContent = boat.model + ' · ' + boat.capacity + ' posti partecipanti' + totalBerths + ' · ' + boat.homePort;
   const accommodation = document.querySelector('#boatAccommodation');
   const accommodationDescription = describeBerthLayout(boat.berthLayout);
-  accommodation.hidden = !accommodationDescription;
-  accommodation.textContent = accommodationDescription ? `Sistemazioni e servizi privati: ${accommodationDescription}.` : '';
+  const accommodationCapacity = describeBerthCapacity(berthTotals);
+  const rateDescription = describeBerthRates(boat.berthRates);
+  accommodation.hidden = !accommodationDescription && !rateDescription;
+  accommodation.textContent = accommodationDescription
+    ? `Sistemazioni private: ${accommodationDescription}. ${accommodationCapacity}.${rateDescription ? ` Quote per persona: ${rateDescription}.` : ''}`
+    : rateDescription ? `Quote private per persona: ${rateDescription}.` : '';
   renderFleetProfileForm();
+  renderPaymentBerthOptions();
   void publishExistingBoatToFleet(boat);
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
@@ -992,8 +1125,8 @@ boatForm.addEventListener('submit', async (event) => {
     const capacity = Number(fields.get('capacity'));
     const berthLayout = readBerthLayout(form);
     const layoutTotals = berthLayoutTotals(berthLayout);
-    if (hasCrewSleepingLayout(berthLayout) && capacity > layoutTotals.crewAssignableBerths) {
-      setMessage(document.querySelector('#boatFormMessage'), `La composizione indica ${layoutTotals.crewAssignableBerths} ${layoutTotals.crewAssignableBerths === 1 ? 'posto assegnabile' : 'posti assegnabili'} alla Crew List. Riduci il limite o aggiungi i posti mancanti.`, true);
+    if (layoutTotals.physicalBerths > 0 && capacity > layoutTotals.participantBerths) {
+      setMessage(document.querySelector('#boatFormMessage'), `La composizione indica ${layoutTotals.participantBerths} ${layoutTotals.participantBerths === 1 ? 'posto per partecipante' : 'posti per partecipanti'} oltre allo skipper. Riduci il limite o aggiungi i posti mancanti.`, true);
       return;
     }
     // Alla prima registrazione i posti liberi partono dal totale dichiarato;
@@ -1002,7 +1135,7 @@ boatForm.addEventListener('submit', async (event) => {
     const boatData = {
       name: fields.get('name').trim(), model: fields.get('model').trim(), boatType: fields.get('boatType'), capacity,
       homePort: fields.get('homePort').trim(), flag: fields.get('flag').trim(),
-      skipperName: fields.get('skipperName').trim(), note: fields.get('note').trim(), berthLayout, skipperId: user.uid,
+      skipperName: fields.get('skipperName').trim(), note: fields.get('note').trim(), berthLayout, berthRates: readBerthRates(form), skipperId: user.uid,
       publicFleetId: activeBoat?.publicFleetId || createPublicFleetId(),
       fleetAvailableSeats: Math.min(previousAvailability, capacity),
       fleetShowAvailability: isFleetAvailabilityPublic(activeBoat),
@@ -1078,7 +1211,7 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
   if (blockPrivateAction(document.querySelector('#inviteFormMessage'))) return;
   if (!activeBoat || !auth.currentUser) return;
   if (isCrewCapacityReached()) {
-    setMessage(document.querySelector('#inviteFormMessage'), 'Hai già riservato tutti i posti equipaggio indicati per questa barca.', true);
+    setMessage(document.querySelector('#inviteFormMessage'), 'Hai già riservato tutti i posti per partecipanti indicati per questa barca.', true);
     return;
   }
   const form = event.currentTarget;
@@ -1127,7 +1260,7 @@ document.querySelector('#memberForm').addEventListener('submit', async (event) =
   if (blockPrivateAction(document.querySelector('#memberFormMessage'))) return;
   if (!activeBoat) return;
   if (!editingMemberId && isCrewCapacityReached()) {
-    setMessage(document.querySelector('#memberFormMessage'), 'Hai già riservato tutti i posti equipaggio indicati per questa barca.', true);
+    setMessage(document.querySelector('#memberFormMessage'), 'Hai già riservato tutti i posti per partecipanti indicati per questa barca.', true);
     return;
   }
   const form = event.currentTarget;
@@ -1310,7 +1443,16 @@ document.querySelector('#paymentProfileForm').addEventListener('submit', async (
   }
 });
 
-document.querySelector('#paymentForm').addEventListener('submit', async (event) => {
+const paymentForm = document.querySelector('#paymentForm');
+paymentForm.elements.berthType.addEventListener('change', applyPaymentBerthPreset);
+paymentForm.elements.amount.addEventListener('input', () => {
+  delete paymentForm.elements.amount.dataset.autoBerthRate;
+});
+paymentForm.elements.reason.addEventListener('input', () => {
+  delete paymentForm.elements.reason.dataset.autoBerthReason;
+});
+
+paymentForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (blockPrivateAction(document.querySelector('#paymentFormMessage'))) return;
   if (!activeBoat || !auth.currentUser) return;
@@ -1375,6 +1517,9 @@ document.querySelector('#paymentForm').addEventListener('submit', async (event) 
   try {
     await addDoc(collection(db, 'boats', activeBoat.id, 'paymentRequests'), payment);
     form.reset();
+    delete form.elements.amount.dataset.autoBerthRate;
+    delete form.elements.reason.dataset.autoBerthReason;
+    renderPaymentBerthOptions();
     renderPaymentMethodOptions();
     if (whatsappWindow) whatsappWindow.location.replace(whatsappUrl);
     setMessage(document.querySelector('#paymentFormMessage'), whatsappWindow
