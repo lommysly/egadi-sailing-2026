@@ -57,6 +57,7 @@ function paymentStatusLabel(payment) {
 }
 
 function showOpening(message = '', isError = false) {
+  clearPersonalDashboard();
   document.querySelector('#invalidLink').hidden = true;
   document.querySelector('#boardingRulesGate').hidden = true;
   document.querySelector('#participantDashboard').hidden = true;
@@ -65,6 +66,7 @@ function showOpening(message = '', isError = false) {
 }
 
 function showInvalid(error) {
+  clearPersonalDashboard();
   document.querySelector('#signInSection').hidden = true;
   document.querySelector('#boardingRulesGate').hidden = true;
   document.querySelector('#participantDashboard').hidden = true;
@@ -83,15 +85,14 @@ function clearPersonalDashboard() {
   activeInvite = null;
   activeBriefing = null;
   activeRuleAcceptance = null;
-  ['#participantProfileSummary', '#participantPaymentList', '#boardingSchedule', '#participantSchedule', '#boardingRulesText', '#participantRulesText', '#participantAnnouncementList'].forEach((selector) => {
+  ['#participantProfileSummary', '#participantPaymentList', '#boardingSchedule', '#participantSchedule', '#boardingRulesSummary', '#boardingRulesText', '#participantRulesSummary', '#participantRulesText', '#participantAnnouncementList'].forEach((selector) => {
     document.querySelector(selector).replaceChildren();
   });
   document.querySelector('#boardingRulesGate').hidden = true;
   document.querySelector('#boardingBriefing').hidden = true;
   document.querySelector('#boardingGateWaiting').hidden = true;
   document.querySelector('#participantBriefing').hidden = true;
-  document.querySelector('#rulesAcknowledgement').checked = false;
-  document.querySelector('#acceptRulesButton').disabled = true;
+  clearBoardingRulesGateState();
 }
 
 function handlePrivateReadError(error, messageElement, fallbackMessage) {
@@ -129,13 +130,82 @@ function hasPublishedBriefing() {
   return typeof activeBriefing?.rulesText === 'string' && activeBriefing.rulesText.trim().length > 0;
 }
 
+function briefingRequiresFullRulesRead() {
+  return activeBriefing?.fullRulesRequired === true;
+}
+
+function briefingSummary() {
+  const summary = activeBriefing?.rulesSummary;
+  return typeof summary === 'string' && summary.trim()
+    ? summary.trim()
+    : 'Leggi integralmente il regolamento completo: questa sintesi non sostituisce il testo.';
+}
+
 function currentBriefingVersion() {
   return Number.isInteger(activeBriefing?.rulesVersion) ? activeBriefing.rulesVersion : 1;
 }
 
 function hasAcceptedCurrentBriefing() {
   return activeRuleAcceptance?.rulesVersion === currentBriefingVersion()
-    && activeRuleAcceptance?.acceptedBy === auth.currentUser?.uid;
+    && activeRuleAcceptance?.acceptedBy === auth.currentUser?.uid
+    && (!briefingRequiresFullRulesRead() || activeRuleAcceptance?.fullRulesRead === true);
+}
+
+function hasReachedEnd(element) {
+  return element.clientHeight > 0 && element.scrollHeight - element.scrollTop - element.clientHeight <= 8;
+}
+
+function isEntireRulesTextVisible(element) {
+  return element.clientHeight > 0 && element.scrollHeight <= element.clientHeight + 8;
+}
+
+function clearBoardingRulesGateState() {
+  const gate = document.querySelector('#boardingRulesGate');
+  const scrollRegion = document.querySelector('#boardingRulesScroll');
+  gate.dataset.rulesContext = '';
+  gate.dataset.rulesVersion = '';
+  gate.dataset.fullRulesRead = '';
+  scrollRegion.scrollTop = 0;
+  scrollRegion.classList.remove('is-complete');
+  document.querySelector('#rulesAcknowledgement').checked = false;
+  document.querySelector('#rulesAcknowledgement').disabled = true;
+  document.querySelector('#acceptRulesButton').disabled = true;
+  document.querySelector('#boardingFullRulesHint').textContent = 'Scorri fino alla fine del regolamento per sbloccare la conferma.';
+}
+
+function updateBoardingAcceptState() {
+  const gate = document.querySelector('#boardingRulesGate');
+  const acknowledgement = document.querySelector('#rulesAcknowledgement');
+  const acceptButton = document.querySelector('#acceptRulesButton');
+  const fullRulesRead = gate.dataset.fullRulesRead === 'true';
+  acknowledgement.disabled = !fullRulesRead;
+  if (!fullRulesRead) acknowledgement.checked = false;
+  acceptButton.disabled = !(hasPublishedBriefing() && !hasAcceptedCurrentBriefing() && fullRulesRead && acknowledgement.checked);
+}
+
+function markBoardingRulesRead() {
+  const gate = document.querySelector('#boardingRulesGate');
+  const scrollRegion = document.querySelector('#boardingRulesScroll');
+  const acknowledgement = document.querySelector('#rulesAcknowledgement');
+  if (gate.dataset.fullRulesRead === 'true') return;
+  gate.dataset.fullRulesRead = 'true';
+  scrollRegion.classList.add('is-complete');
+  document.querySelector('#boardingFullRulesHint').textContent = 'Regolamento completo visualizzato. Ora puoi confermare la lettura.';
+  updateBoardingAcceptState();
+  if (document.activeElement === scrollRegion) acknowledgement.focus();
+}
+
+function resetBoardingRulesRead() {
+  const gate = document.querySelector('#boardingRulesGate');
+  const scrollRegion = document.querySelector('#boardingRulesScroll');
+  gate.dataset.fullRulesRead = '';
+  scrollRegion.scrollTop = 0;
+  scrollRegion.classList.remove('is-complete');
+  document.querySelector('#boardingFullRulesHint').textContent = 'Scorri fino alla fine del regolamento per sbloccare la conferma.';
+  updateBoardingAcceptState();
+  requestAnimationFrame(() => {
+    if (isEntireRulesTextVisible(scrollRegion)) markBoardingRulesRead();
+  });
 }
 
 function briefingSchedule() {
@@ -185,7 +255,8 @@ function renderDashboardBriefing() {
   empty.hidden = true;
   briefing.hidden = false;
   renderSchedule('#participantSchedule');
-  document.querySelector('#participantRulesTitle').textContent = activeBriefing.rulesTitle || 'Briefing di sicurezza';
+  document.querySelector('#participantRulesTitle').textContent = activeBriefing.rulesTitle || 'Regolamento completo';
+  document.querySelector('#participantRulesSummary').textContent = briefingSummary();
   document.querySelector('#participantRulesText').textContent = activeBriefing.rulesText;
   const acceptedAt = formatDateTime(activeRuleAcceptance?.acceptedAt);
   document.querySelector('#participantRulesStatus').textContent = `Briefing di sicurezza versione ${currentBriefingVersion()} accettato${acceptedAt ? ` il ${acceptedAt}` : ''}.`;
@@ -208,19 +279,25 @@ function renderBoardingGate() {
     briefing.hidden = true;
     waiting.hidden = false;
     acknowledgement.checked = false;
+    acknowledgement.disabled = true;
     acceptButton.disabled = true;
+    gate.dataset.rulesContext = '';
     gate.dataset.rulesVersion = '';
+    gate.dataset.fullRulesRead = '';
     status.textContent = 'Il briefing di sicurezza è obbligatorio prima di accedere alla tua area di bordo.';
     return;
   }
 
   renderSchedule('#boardingSchedule');
-  document.querySelector('#boardingRulesTitle').textContent = activeBriefing.rulesTitle || 'Briefing di sicurezza';
-  document.querySelector('#boardingRulesText').textContent = activeBriefing.rulesText;
   const version = String(currentBriefingVersion());
-  if (gate.dataset.rulesVersion !== version) {
-    acknowledgement.checked = false;
+  const rulesContext = `${activeInvite.boatId}:${activeInvite.id}:${version}`;
+  if (gate.dataset.rulesContext !== rulesContext) {
+    document.querySelector('#boardingRulesTitle').textContent = activeBriefing.rulesTitle || 'Regolamento completo';
+    document.querySelector('#boardingRulesSummary').textContent = briefingSummary();
+    document.querySelector('#boardingRulesText').textContent = activeBriefing.rulesText;
+    gate.dataset.rulesContext = rulesContext;
     gate.dataset.rulesVersion = version;
+    resetBoardingRulesRead();
   }
 
   if (hasAcceptedCurrentBriefing()) {
@@ -236,8 +313,8 @@ function renderBoardingGate() {
   gate.hidden = false;
   waiting.hidden = true;
   briefing.hidden = false;
-  status.textContent = `Leggi il briefing di sicurezza e accetta la versione ${version} per entrare nella tua area di bordo.`;
-  acceptButton.disabled = !acknowledgement.checked;
+  status.textContent = `Leggi la sintesi e l’intero regolamento, poi accetta la versione ${version} per entrare nella tua area di bordo.`;
+  updateBoardingAcceptState();
 }
 
 function renderAnnouncements(snapshot) {
@@ -262,21 +339,41 @@ document.querySelector('#participantSignOutButton').addEventListener('click', as
 });
 
 document.querySelector('#rulesAcknowledgement').addEventListener('change', (event) => {
-  const canAccept = hasPublishedBriefing() && !hasAcceptedCurrentBriefing() && event.currentTarget.checked;
-  document.querySelector('#acceptRulesButton').disabled = !canAccept;
+  if (!event.currentTarget.disabled) updateBoardingAcceptState();
 });
+
+document.querySelector('#boardingRulesScroll').addEventListener('scroll', (event) => {
+  if (hasPublishedBriefing() && hasReachedEnd(event.currentTarget)) markBoardingRulesRead();
+});
+
+if ('ResizeObserver' in window) {
+  new ResizeObserver(() => {
+    const scrollRegion = document.querySelector('#boardingRulesScroll');
+    if (hasPublishedBriefing() && scrollRegion && isEntireRulesTextVisible(scrollRegion)) markBoardingRulesRead();
+  }).observe(document.querySelector('#boardingRulesScroll'));
+}
+
+document.querySelector('#boardingGateStatus').setAttribute('role', 'status');
+document.querySelector('#boardingGateStatus').setAttribute('aria-live', 'polite');
 
 document.querySelector('#acceptRulesButton').addEventListener('click', async () => {
   if (!hasPublishedBriefing() || !activeInvite || !auth.currentUser) return;
   if (!document.querySelector('#rulesAcknowledgement').checked) {
-    setMessage(document.querySelector('#participantRulesMessage'), 'Conferma di aver letto briefing e regole prima di proseguire.', true);
+    setMessage(document.querySelector('#participantRulesMessage'), 'Scorri il regolamento completo e conferma di averlo letto prima di proseguire.', true);
     return;
   }
+  if (document.querySelector('#boardingRulesGate').dataset.fullRulesRead !== 'true') return;
   const button = document.querySelector('#acceptRulesButton');
   button.disabled = true;
   try {
     const rulesVersion = currentBriefingVersion();
-    const acceptance = { inviteId: activeInvite.id, acceptedBy: auth.currentUser.uid, rulesVersion, acceptedAt: serverTimestamp() };
+    const acceptance = {
+      inviteId: activeInvite.id,
+      acceptedBy: auth.currentUser.uid,
+      rulesVersion,
+      ...(briefingRequiresFullRulesRead() ? { fullRulesRead: true } : {}),
+      acceptedAt: serverTimestamp(),
+    };
     const batch = writeBatch(db);
     batch.set(doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id), acceptance, { merge: true });
     const historyId = `${rulesVersion}-${auth.currentUser.uid}`;

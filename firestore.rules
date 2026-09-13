@@ -109,6 +109,7 @@ service cloud.firestore {
 
     function isValidCrewMemberUpdate(boatId, memberId) {
       return isInviteHolder(boatId, memberId)
+        && hasCurrentBriefingAcceptance(boatId, memberId)
         && hasValidMemberPayload()
         && request.resource.data.updatedBy == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'roleConfirmed', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy'])
@@ -227,10 +228,13 @@ service cloud.firestore {
     function isValidRuleAcceptance(boatId, inviteId) {
       return isInviteHolder(boatId, inviteId)
         && hasPublishedBriefing(boatId)
-        && request.resource.data.keys().hasOnly(['inviteId', 'acceptedBy', 'rulesVersion', 'acceptedAt'])
+        && request.resource.data.keys().hasOnly(['inviteId', 'acceptedBy', 'rulesVersion', 'fullRulesRead', 'acceptedAt'])
         && request.resource.data.inviteId == inviteId
         && request.resource.data.acceptedBy == request.auth.uid
         && request.resource.data.rulesVersion is int
+        && (!request.resource.data.keys().hasAll(['fullRulesRead']) || request.resource.data.fullRulesRead == true)
+        && (!briefingRequiresFullRulesRead(boatId)
+          || (request.resource.data.keys().hasAll(['fullRulesRead']) && request.resource.data.fullRulesRead == true))
         && request.resource.data.acceptedAt == request.time
         && request.resource.data.rulesVersion == get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion;
     }
@@ -244,12 +248,76 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion is int;
     }
 
+    // Lo skipper resta proprietario del contenuto, ma non può modificare il
+    // briefing già accettato senza produrre una nuova versione. I documenti
+    // legacy sono ammessi soltanto in lettura: il primo salvataggio li porta
+    // nel formato completo e rende obbligatoria la rilettura.
+    function hasValidBoardBriefingPayload() {
+      return request.resource.data.keys().hasAll(['rulesTitle', 'rulesSummary', 'rulesText', 'fullRulesRequired', 'rulesVersion', 'meetingPoint', 'boardingAt', 'departureAt', 'returnAt', 'scheduleNote', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['rulesTitle', 'rulesSummary', 'rulesText', 'fullRulesRequired', 'rulesVersion', 'meetingPoint', 'boardingAt', 'departureAt', 'returnAt', 'scheduleNote', 'updatedAt', 'updatedBy'])
+        && request.resource.data.rulesTitle is string
+        && request.resource.data.rulesTitle.size() > 0
+        && request.resource.data.rulesTitle.size() <= 120
+        && request.resource.data.rulesSummary is string
+        && request.resource.data.rulesSummary.size() > 0
+        && request.resource.data.rulesSummary.size() <= 1800
+        && request.resource.data.rulesText is string
+        && request.resource.data.rulesText.size() > 0
+        && request.resource.data.rulesText.size() <= 9000
+        && request.resource.data.fullRulesRequired == true
+        && request.resource.data.rulesVersion is int
+        && request.resource.data.rulesVersion > 0
+        && request.resource.data.meetingPoint is string
+        && request.resource.data.meetingPoint.size() <= 160
+        && request.resource.data.boardingAt is string
+        && request.resource.data.boardingAt.size() <= 40
+        && request.resource.data.departureAt is string
+        && request.resource.data.departureAt.size() <= 40
+        && request.resource.data.returnAt is string
+        && request.resource.data.returnAt.size() <= 40
+        && request.resource.data.scheduleNote is string
+        && request.resource.data.scheduleNote.size() <= 400
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    function boardContentHasChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['rulesTitle', 'rulesSummary', 'rulesText', 'fullRulesRequired', 'meetingPoint', 'boardingAt', 'departureAt', 'returnAt', 'scheduleNote']);
+    }
+
+    function hasValidBoardVersionUpdate() {
+      return (resource.data.keys().hasAll(['rulesVersion'])
+          && resource.data.rulesVersion is int
+          && ((boardContentHasChanged() && request.resource.data.rulesVersion == resource.data.rulesVersion + 1)
+            || (!boardContentHasChanged() && request.resource.data.rulesVersion == resource.data.rulesVersion)))
+        || (!resource.data.keys().hasAll(['rulesVersion']) && request.resource.data.rulesVersion == 1);
+    }
+
+    function isValidBoardBriefingCreate() {
+      return hasValidBoardBriefingPayload()
+        && request.resource.data.rulesVersion == 1;
+    }
+
+    function isValidBoardBriefingUpdate() {
+      return hasValidBoardBriefingPayload()
+        && hasValidBoardVersionUpdate();
+    }
+
+    function briefingRequiresFullRulesRead(boatId) {
+      return exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
+        && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.keys().hasAll(['fullRulesRequired'])
+        && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.fullRulesRequired == true;
+    }
+
     function hasCurrentBriefingAcceptance(boatId, inviteId) {
       return hasPublishedBriefing(boatId)
         && exists(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId))
         && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.inviteId == inviteId
         && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.acceptedBy == request.auth.uid
-        && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.rulesVersion == get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion;
+        && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.rulesVersion == get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion
+        && (!briefingRequiresFullRulesRead(boatId)
+          || (get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.keys().hasAll(['fullRulesRead'])
+            && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.fullRulesRead == true));
     }
 
     function isPaymentManager(boatId) {
@@ -514,7 +582,9 @@ service cloud.firestore {
 
       match /briefing/{briefingId} {
         allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isBoatParticipant(boatId));
-        allow create, update, delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+        allow create: if isPrivateAreaOpen() && briefingId == 'board' && (isOrganizer() || isSkipper(boatId)) && isValidBoardBriefingCreate();
+        allow update: if isPrivateAreaOpen() && briefingId == 'board' && (isOrganizer() || isSkipper(boatId)) && isValidBoardBriefingUpdate();
+        allow delete: if false;
       }
 
       match /announcements/{announcementId} {

@@ -38,13 +38,82 @@ function hasPublishedBriefing() {
   return typeof activeBriefing?.rulesText === 'string' && activeBriefing.rulesText.trim().length > 0;
 }
 
+function briefingRequiresFullRulesRead() {
+  return activeBriefing?.fullRulesRequired === true;
+}
+
+function briefingSummary() {
+  const summary = activeBriefing?.rulesSummary;
+  return typeof summary === 'string' && summary.trim()
+    ? summary.trim()
+    : 'Leggi integralmente il regolamento completo: questa sintesi non sostituisce il testo.';
+}
+
 function currentBriefingVersion() {
   return Number.isInteger(activeBriefing?.rulesVersion) ? activeBriefing.rulesVersion : 1;
 }
 
 function hasAcceptedCurrentBriefing() {
   return activeRuleAcceptance?.rulesVersion === currentBriefingVersion()
-    && activeRuleAcceptance?.acceptedBy === auth.currentUser?.uid;
+    && activeRuleAcceptance?.acceptedBy === auth.currentUser?.uid
+    && (!briefingRequiresFullRulesRead() || activeRuleAcceptance?.fullRulesRead === true);
+}
+
+function hasReachedEnd(element) {
+  return element.clientHeight > 0 && element.scrollHeight - element.scrollTop - element.clientHeight <= 8;
+}
+
+function isEntireRulesTextVisible(element) {
+  return element.clientHeight > 0 && element.scrollHeight <= element.clientHeight + 8;
+}
+
+function clearPreRegistrationRulesGate() {
+  const gate = document.querySelector('#preRegistrationBriefing');
+  const scrollRegion = document.querySelector('#preRegistrationRulesScroll');
+  gate.dataset.rulesContext = '';
+  gate.dataset.rulesVersion = '';
+  gate.dataset.fullRulesRead = '';
+  scrollRegion.scrollTop = 0;
+  scrollRegion.classList.remove('is-complete');
+  document.querySelector('#preRegistrationAcknowledgement').checked = false;
+  document.querySelector('#preRegistrationAcknowledgement').disabled = true;
+  document.querySelector('#preRegistrationAcceptButton').disabled = true;
+  document.querySelector('#preRegistrationFullRulesHint').textContent = 'Scorri fino alla fine del regolamento per sbloccare la conferma.';
+}
+
+function updatePreRegistrationAcceptState() {
+  const gate = document.querySelector('#preRegistrationBriefing');
+  const acknowledgement = document.querySelector('#preRegistrationAcknowledgement');
+  const acceptButton = document.querySelector('#preRegistrationAcceptButton');
+  const fullRulesRead = gate.dataset.fullRulesRead === 'true';
+  acknowledgement.disabled = !fullRulesRead;
+  if (!fullRulesRead) acknowledgement.checked = false;
+  acceptButton.disabled = !(hasPublishedBriefing() && !hasAcceptedCurrentBriefing() && fullRulesRead && acknowledgement.checked);
+}
+
+function markPreRegistrationRulesRead() {
+  const gate = document.querySelector('#preRegistrationBriefing');
+  const scrollRegion = document.querySelector('#preRegistrationRulesScroll');
+  const acknowledgement = document.querySelector('#preRegistrationAcknowledgement');
+  if (gate.dataset.fullRulesRead === 'true') return;
+  gate.dataset.fullRulesRead = 'true';
+  scrollRegion.classList.add('is-complete');
+  document.querySelector('#preRegistrationFullRulesHint').textContent = 'Regolamento completo visualizzato. Ora puoi confermare la lettura.';
+  updatePreRegistrationAcceptState();
+  if (document.activeElement === scrollRegion) acknowledgement.focus();
+}
+
+function resetPreRegistrationRulesRead() {
+  const gate = document.querySelector('#preRegistrationBriefing');
+  const scrollRegion = document.querySelector('#preRegistrationRulesScroll');
+  gate.dataset.fullRulesRead = '';
+  scrollRegion.scrollTop = 0;
+  scrollRegion.classList.remove('is-complete');
+  document.querySelector('#preRegistrationFullRulesHint').textContent = 'Scorri fino alla fine del regolamento per sbloccare la conferma.';
+  updatePreRegistrationAcceptState();
+  requestAnimationFrame(() => {
+    if (isEntireRulesTextVisible(scrollRegion)) markPreRegistrationRulesRead();
+  });
 }
 
 function briefingSchedule() {
@@ -79,6 +148,13 @@ function stopPreRegistrationSubscriptions() {
 
 function showOpening(message = '', isError = false) {
   stopPreRegistrationSubscriptions();
+  activeInvite = null;
+  activeMember = null;
+  activatedPhone = '';
+  activeBriefing = null;
+  activeRuleAcceptance = null;
+  preRegistrationGateResolved = false;
+  clearPreRegistrationRulesGate();
   document.querySelector('#invalidLink').hidden = true;
   document.querySelector('#activationSection').hidden = true;
   document.querySelector('#preRegistrationBriefing').hidden = true;
@@ -89,6 +165,10 @@ function showOpening(message = '', isError = false) {
 
 function showActivation() {
   stopPreRegistrationSubscriptions();
+  activeBriefing = null;
+  activeRuleAcceptance = null;
+  preRegistrationGateResolved = false;
+  clearPreRegistrationRulesGate();
   document.querySelector('#invalidLink').hidden = true;
   document.querySelector('#signInSection').hidden = true;
   document.querySelector('#preRegistrationBriefing').hidden = true;
@@ -99,6 +179,13 @@ function showActivation() {
 
 function showInvalid() {
   stopPreRegistrationSubscriptions();
+  activeInvite = null;
+  activeMember = null;
+  activatedPhone = '';
+  activeBriefing = null;
+  activeRuleAcceptance = null;
+  preRegistrationGateResolved = false;
+  clearPreRegistrationRulesGate();
   document.querySelector('#signInSection').hidden = true;
   document.querySelector('#activationSection').hidden = true;
   document.querySelector('#preRegistrationBriefing').hidden = true;
@@ -157,8 +244,11 @@ function renderPreRegistrationGate() {
     content.hidden = true;
     waiting.hidden = false;
     acknowledgement.checked = false;
+    acknowledgement.disabled = true;
     acceptButton.disabled = true;
+    gate.dataset.rulesContext = '';
     gate.dataset.rulesVersion = '';
+    gate.dataset.fullRulesRead = '';
     status.textContent = 'Il briefing di sicurezza è obbligatorio prima di inserire i dati nella Crew List.';
     return;
   }
@@ -166,12 +256,15 @@ function renderPreRegistrationGate() {
   waiting.hidden = true;
   content.hidden = false;
   renderSchedule();
-  document.querySelector('#preRegistrationRulesTitle').textContent = activeBriefing.rulesTitle || 'Briefing di sicurezza';
-  document.querySelector('#preRegistrationRulesText').textContent = activeBriefing.rulesText;
   const version = String(currentBriefingVersion());
-  if (gate.dataset.rulesVersion !== version) {
-    acknowledgement.checked = false;
+  const rulesContext = `${activeInvite.boatId}:${activeInvite.id}:${version}`;
+  if (gate.dataset.rulesContext !== rulesContext) {
+    document.querySelector('#preRegistrationRulesTitle').textContent = activeBriefing.rulesTitle || 'Regolamento completo';
+    document.querySelector('#preRegistrationRulesSummary').textContent = briefingSummary();
+    document.querySelector('#preRegistrationRulesText').textContent = activeBriefing.rulesText;
+    gate.dataset.rulesContext = rulesContext;
     gate.dataset.rulesVersion = version;
+    resetPreRegistrationRulesRead();
   }
 
   if (hasAcceptedCurrentBriefing()) {
@@ -188,8 +281,8 @@ function renderPreRegistrationGate() {
     return;
   }
 
-  status.textContent = `Leggi il briefing di sicurezza e accetta la versione ${version}: solo dopo potrai inserire i dati nella Crew List.`;
-  acceptButton.disabled = !acknowledgement.checked;
+  status.textContent = `Leggi la sintesi e l’intero regolamento, poi accetta la versione ${version}: solo dopo potrai inserire i dati nella Crew List.`;
+  updatePreRegistrationAcceptState();
 }
 
 function openPreRegistrationBriefing({ invite, phone }) {
@@ -200,6 +293,7 @@ function openPreRegistrationBriefing({ invite, phone }) {
   activeRuleAcceptance = null;
   preRegistrationGateResolved = false;
   stopPreRegistrationSubscriptions();
+  clearPreRegistrationRulesGate();
   document.querySelector('#invalidLink').hidden = true;
   document.querySelector('#signInSection').hidden = true;
   document.querySelector('#activationSection').hidden = true;
@@ -216,7 +310,12 @@ function openPreRegistrationBriefing({ invite, phone }) {
       activeBriefing = snapshot.exists() ? snapshot.data() : null;
       renderPreRegistrationGate();
     },
-    () => setMessage(document.querySelector('#preRegistrationMessage'), 'Non riesco a leggere il briefing di sicurezza. Riprova tra poco.', true),
+    () => {
+      document.querySelector('#preRegistrationBriefingContent').hidden = true;
+      document.querySelector('#preRegistrationBriefingWaiting').hidden = false;
+      document.querySelector('#preRegistrationBriefingStatus').textContent = 'Briefing non disponibile. Controlla la connessione e ricarica la pagina.';
+      setMessage(document.querySelector('#preRegistrationMessage'), 'Non riesco a leggere il briefing di sicurezza. Riprova tra poco.', true);
+    },
   );
   stopRuleAcceptanceSubscription = onSnapshot(
     doc(db, 'boats', invite.boatId, 'ruleAcceptances', invite.id),
@@ -224,7 +323,12 @@ function openPreRegistrationBriefing({ invite, phone }) {
       activeRuleAcceptance = snapshot.exists() ? snapshot.data() : null;
       renderPreRegistrationGate();
     },
-    () => setMessage(document.querySelector('#preRegistrationMessage'), 'Non riesco a leggere la conferma del briefing. Riprova tra poco.', true),
+    () => {
+      document.querySelector('#preRegistrationBriefingContent').hidden = true;
+      document.querySelector('#preRegistrationBriefingWaiting').hidden = false;
+      document.querySelector('#preRegistrationBriefingStatus').textContent = 'Conferma non disponibile. Controlla la connessione e ricarica la pagina.';
+      setMessage(document.querySelector('#preRegistrationMessage'), 'Non riesco a leggere la conferma del briefing. Riprova tra poco.', true);
+    },
   );
 }
 
@@ -241,7 +345,8 @@ async function hasCurrentBriefingAcceptance(invite) {
     && Number.isInteger(briefing.rulesVersion)
     && acceptance.inviteId === invite.id
     && acceptance.acceptedBy === auth.currentUser?.uid
-    && acceptance.rulesVersion === briefing.rulesVersion;
+    && acceptance.rulesVersion === briefing.rulesVersion
+    && (briefing.fullRulesRequired !== true || acceptance.fullRulesRead === true);
 }
 
 document.querySelector('#activationForm').addEventListener('submit', async (event) => {
@@ -281,7 +386,7 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
   submitButton.disabled = true;
   setMessage(document.querySelector('#participantFormMessage'), 'Salvo i tuoi dati…');
   try {
-    if (!activeMember && !await hasCurrentBriefingAcceptance(activeInvite)) {
+    if (!await hasCurrentBriefingAcceptance(activeInvite)) {
       setMessage(document.querySelector('#participantFormMessage'), 'Il briefing è stato aggiornato: rileggilo e accettalo prima di comparire nella Crew List.', true);
       openPreRegistrationBriefing({ invite: activeInvite, phone: activatedPhone });
       return;
@@ -307,16 +412,30 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
 });
 
 document.querySelector('#preRegistrationAcknowledgement').addEventListener('change', (event) => {
-  const canAccept = hasPublishedBriefing() && !hasAcceptedCurrentBriefing() && event.currentTarget.checked;
-  document.querySelector('#preRegistrationAcceptButton').disabled = !canAccept;
+  if (!event.currentTarget.disabled) updatePreRegistrationAcceptState();
 });
+
+document.querySelector('#preRegistrationRulesScroll').addEventListener('scroll', (event) => {
+  if (hasPublishedBriefing() && hasReachedEnd(event.currentTarget)) markPreRegistrationRulesRead();
+});
+
+if ('ResizeObserver' in window) {
+  new ResizeObserver(() => {
+    const scrollRegion = document.querySelector('#preRegistrationRulesScroll');
+    if (hasPublishedBriefing() && scrollRegion && isEntireRulesTextVisible(scrollRegion)) markPreRegistrationRulesRead();
+  }).observe(document.querySelector('#preRegistrationRulesScroll'));
+}
+
+document.querySelector('#preRegistrationBriefingStatus').setAttribute('role', 'status');
+document.querySelector('#preRegistrationBriefingStatus').setAttribute('aria-live', 'polite');
 
 document.querySelector('#preRegistrationAcceptButton').addEventListener('click', async () => {
   if (!hasPublishedBriefing() || !activeInvite || !auth.currentUser) return;
   if (!document.querySelector('#preRegistrationAcknowledgement').checked) {
-    setMessage(document.querySelector('#preRegistrationMessage'), 'Conferma di aver letto briefing e regole prima di proseguire.', true);
+    setMessage(document.querySelector('#preRegistrationMessage'), 'Scorri il regolamento completo e conferma di averlo letto prima di proseguire.', true);
     return;
   }
+  if (document.querySelector('#preRegistrationBriefing').dataset.fullRulesRead !== 'true') return;
   const button = document.querySelector('#preRegistrationAcceptButton');
   button.disabled = true;
   setMessage(document.querySelector('#preRegistrationMessage'), 'Registro la conferma del briefing…');
@@ -326,6 +445,7 @@ document.querySelector('#preRegistrationAcceptButton').addEventListener('click',
       inviteId: activeInvite.id,
       acceptedBy: auth.currentUser.uid,
       rulesVersion,
+      ...(briefingRequiresFullRulesRead() ? { fullRulesRead: true } : {}),
       acceptedAt: serverTimestamp(),
     };
     const batch = writeBatch(db);
@@ -343,8 +463,18 @@ if (isEditMode) {
     onOpening: showOpening,
     onInvalid: showInvalid,
     onReady: async ({ invite }) => {
-      const member = await getDoc(doc(db, 'boats', invite.boatId, 'members', invite.id));
-      if (!member.exists()) {
+      let member;
+      let briefingAccepted = false;
+      try {
+        [member, briefingAccepted] = await Promise.all([
+          getDoc(doc(db, 'boats', invite.boatId, 'members', invite.id)),
+          hasCurrentBriefingAcceptance(invite),
+        ]);
+      } catch {
+        openPreRegistrationBriefing({ invite, phone: '' });
+        return;
+      }
+      if (!member.exists() || !briefingAccepted) {
         openPreRegistrationBriefing({ invite, phone: '' });
         return;
       }

@@ -29,6 +29,52 @@ const PAYMENT_METHODS = [
 const FLEET_BOAT_TYPES = new Set(['Catamarano', 'Monoscafo', 'Gommone', 'Altro']);
 const FLEET_BERTH_PREFERENCES = new Set(['not_specified', 'cabin_female', 'cabin_male', 'cabin_mixed', 'dinette', 'crew_cabin', 'other']);
 const CREW_CABIN_USES = new Set(['not_specified', 'skipper', 'crew']);
+const DEFAULT_RULES_SUMMARY = [
+  '1. Seguo sempre le decisioni dello skipper su sicurezza, manovre, meteo, rotta, rada e porto.',
+  '2. Partecipo al briefing pratico e uso le dotazioni di sicurezza quando richiesto.',
+  '3. In navigazione mi muovo con prudenza: una mano per me e una per la barca.',
+  '4. In emergenza avviso subito lo skipper e seguo le istruzioni senza improvvisare.',
+  '5. Non uso gas, tender, VHF, verricello, motore o dotazioni senza autorizzazione.',
+  '6. Uso con cura acqua, corrente, WC, cucina e rifiuti; rispetto cabine, spazi comuni, silenzio e orari.',
+  '7. Niente droghe; alcol con responsabilità; fumo solo nelle zone comunicate dallo skipper.',
+  '8. Avviso se mi allontano, tengo in ordine bagagli e oggetti e collaboro alla vita comune della barca.',
+].join('\n');
+const DEFAULT_FULL_RULES = [
+  'REGOLAMENTO DI BORDO · EGADI SAILING EXPERIENCE 2026',
+  '',
+  'Premessa',
+  'Questo regolamento si applica alla vita a bordo della barca indicata nell’invito. Meteo, rotta, rada, porto e programma possono cambiare: la sicurezza viene prima del programma. Le condizioni specifiche della barca, del charter e del porto vengono confermate dallo skipper.',
+  '',
+  '1. Skipper e decisioni di navigazione',
+  'Le decisioni su sicurezza, manovre, navigazione, rada e porto spettano allo skipper. In caso di dubbio chiedi prima di agire; non prendere iniziative che possano mettere a rischio persone, barca o ambiente.',
+  '',
+  '2. Sicurezza e movimenti a bordo',
+  'In navigazione una mano per te e una per la barca. Cammina piano, non correre a piedi nudi e usa scarpe idonee quando richiesto. Fai attenzione a boma, cime in tensione, winch, gallocce, oblò, scalette, ponti bagnati e oggetti in movimento. Bagagli e oggetti personali devono restare ordinati e assicurati.',
+  '',
+  '3. Briefing pratico ed emergenze',
+  'Partecipa al briefing pratico svolto a bordo su giubbotti, life line, zattera, estintori, VHF, gas, uomo a mare e dotazioni reali della barca. Indossa il giubbotto quando richiesto. In caso di uomo a mare avvisa subito, indica la persona senza perderla di vista e segui le istruzioni dello skipper.',
+  '',
+  '4. Dotazioni, risorse e WC',
+  'Non usare gas, tender, VHF, verricello, motore o altre dotazioni senza autorizzazione e istruzioni. Non lasciare ricariche incustodite o in carica durante la notte salvo indicazione dello skipper. Acqua ed elettricità sono risorse limitate: usa docce, rubinetti e dispositivi con attenzione. Nel WC va solo materiale biologico; niente carta, salviette, assorbenti o altri oggetti.',
+  '',
+  '5. Salute e comportamento responsabile',
+  'Non fare nulla che possa mettere in pericolo te stesso o gli altri. Le droghe sono vietate; l’alcol va consumato con responsabilità, soprattutto prima o durante manovre, tender e navigazione. Comunica in privato allo skipper allergie, intolleranze, esigenze alimentari o informazioni utili alla sicurezza. Porta eventuali farmaci personali secondo le indicazioni del tuo medico o farmacista.',
+  '',
+  '6. Rispetto e vita comune',
+  'Rispetta cabine e spazi personali: non entrare senza permesso. Mantieni puliti e ordinati gli spazi comuni, rispetta il silenzio e il riposo degli altri, usa cuffie o un volume discreto. Cambusa, cucina, riordino e pulizia si gestiscono con collaborazione equa: chi cucina non deve restare da solo con tutto il resto.',
+  '',
+  '7. Fumo, rifiuti e rispetto dell’ambiente',
+  'Fuma solo nelle zone indicate dallo skipper e dal charter; mai sottocoperta. Usa il posacenere e non gettare mai mozziconi o rifiuti in mare. Rispetta anche i vicini di rada, il porto e le aree marine protette.',
+  '',
+  '8. Tender, uscite e orari',
+  'Usa il tender solo se autorizzato e con le istruzioni ricevute. Avvisa sempre qualcuno se ti allontani dalla barca, soprattutto di sera o di notte. Rispetta gli orari comunicati per imbarco, partenze, rientri e incontri. Eventuali turni di guardia o navigazione notturna esistono solo se annunciati espressamente dallo skipper.',
+  '',
+  '9. Preparazione personale',
+  'Porta documento valido, borsa morbida invece di trolley, abbigliamento a strati per vento e sera, protezione solare, cappellino, scarpe con suola chiara/non-marking e una piccola borsa stagna per le uscite a terra. Le istruzioni della barca prevalgono su questa lista generale.',
+  '',
+  '10. Cambusa, costi e condizioni specifiche',
+  'Cambusa, extra, eventuali quote, cauzioni e condizioni del charter non sono stabiliti da questo regolamento generale: vengono comunicati separatamente dallo skipper della singola barca prima di qualsiasi richiesta. La conferma online attesta la lettura integrale di questo testo; non sostituisce il briefing pratico obbligatorio a bordo.',
+].join('\n');
 let activeBoat = null;
 let activeMembers = [];
 let activePayments = [];
@@ -52,6 +98,35 @@ const fleetPublicationInProgress = new Set();
 function setMessage(element, message, isError = false) {
   element.textContent = message;
   element.classList.toggle('is-error', isError);
+}
+
+function setupBriefingEditor() {
+  const form = document.querySelector('#briefingForm');
+  const fullRules = form?.elements.rulesText;
+  const fullRulesLabel = fullRules?.closest('label');
+  if (!form || !fullRules || !fullRulesLabel || form.elements.rulesSummary) return;
+
+  const labelText = Array.from(fullRulesLabel.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
+  if (labelText) labelText.textContent = 'Regolamento completo obbligatorio';
+  fullRules.maxLength = 9000;
+  fullRules.defaultValue = DEFAULT_FULL_RULES;
+  fullRules.value = DEFAULT_FULL_RULES;
+  const fullRulesHint = fullRulesLabel.querySelector('.field-hint');
+  if (fullRulesHint) fullRulesHint.textContent = 'Questo è il testo integrale che l’equipaggio deve leggere e scorrere prima dell’accettazione. Personalizza solo le indicazioni reali della barca, del charter e dello skipper.';
+
+  const summaryLabel = document.createElement('label');
+  const summary = document.createElement('textarea');
+  const hint = document.createElement('small');
+  summary.name = 'rulesSummary';
+  summary.required = true;
+  summary.maxLength = 1800;
+  summary.rows = 9;
+  summary.value = DEFAULT_RULES_SUMMARY;
+  summary.defaultValue = DEFAULT_RULES_SUMMARY;
+  hint.className = 'field-hint';
+  hint.textContent = 'Questa sintesi orienta l’equipaggio, ma non sostituisce il regolamento completo sottostante.';
+  summaryLabel.append('Sintesi da conoscere prima dell’accettazione', summary, hint);
+  fullRulesLabel.before(summaryLabel);
 }
 
 function getAuthErrorMessage(error) {
@@ -765,6 +840,9 @@ function renderBriefingForm() {
     if (!input) continue;
     input.value = input.type === 'datetime-local' ? toDateTimeLocal(value) : value || '';
   }
+  if (typeof activeBriefing.rulesSummary !== 'string' || !activeBriefing.rulesSummary.trim()) {
+    form.elements.rulesSummary.value = DEFAULT_RULES_SUMMARY;
+  }
   form.dataset.loadedVersion = String(activeBriefing.rulesVersion || 1);
 }
 
@@ -775,7 +853,8 @@ function renderBriefingStatus() {
     return;
   }
   const version = activeBriefing.rulesVersion || 1;
-  const accepted = activeAcceptances.filter((item) => item.rulesVersion === version).length;
+  const accepted = activeAcceptances.filter((item) => item.rulesVersion === version
+    && (activeBriefing.fullRulesRequired !== true || item.fullRulesRead === true)).length;
   status.textContent = `Briefing safety versione ${version} pubblicato. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} completato l’accettazione.`;
 }
 
@@ -1116,6 +1195,7 @@ document.querySelector('#memberList').addEventListener('click', async (event) =>
 });
 
 document.querySelector('#cancelMemberEdit').addEventListener('click', resetMemberForm);
+setupBriefingEditor();
 document.querySelector('#briefingForm').addEventListener('input', () => {
   document.querySelector('#briefingForm').dataset.editing = 'true';
 });
@@ -1127,10 +1207,13 @@ document.querySelector('#briefingForm').addEventListener('submit', async (event)
   const fields = new FormData(form);
   const submitButton = form.querySelector('button[type="submit"]');
   const rulesTitle = fields.get('rulesTitle').trim();
+  const rulesSummary = fields.get('rulesSummary').trim();
   const rulesText = fields.get('rulesText').trim();
   const briefingData = {
     rulesTitle,
+    rulesSummary,
     rulesText,
+    fullRulesRequired: true,
     meetingPoint: fields.get('meetingPoint').trim(),
     boardingAt: fields.get('boardingAt'),
     departureAt: fields.get('departureAt'),
@@ -1139,15 +1222,16 @@ document.querySelector('#briefingForm').addEventListener('submit', async (event)
   };
   const briefingChanged = !activeBriefing || Object.entries(briefingData).some(([field, value]) => {
     const previous = field.endsWith('At') ? toDateTimeLocal(activeBriefing[field]) : String(activeBriefing[field] || '');
-    return previous !== value;
+    return String(previous) !== String(value);
   });
-  const rulesVersion = activeBriefing ? (activeBriefing.rulesVersion || 1) + (briefingChanged ? 1 : 0) : 1;
+  const currentRulesVersion = Number.isInteger(activeBriefing?.rulesVersion) ? activeBriefing.rulesVersion : 0;
+  const rulesVersion = activeBriefing ? currentRulesVersion + (briefingChanged ? 1 : 0) : 1;
   submitButton.disabled = true;
   setMessage(document.querySelector('#briefingFormMessage'), 'Pubblico la bacheca…');
   try {
     await setDoc(doc(db, 'boats', activeBoat.id, 'briefing', 'board'), {
       ...briefingData, rulesVersion, updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid,
-    }, { merge: true });
+    });
     form.dataset.editing = '';
     setMessage(document.querySelector('#briefingFormMessage'), briefingChanged && activeBriefing ? `Briefing aggiornato: l’equipaggio dovrà accettare la versione ${rulesVersion}.` : 'Briefing obbligatorio pubblicato.');
   } catch (error) {
