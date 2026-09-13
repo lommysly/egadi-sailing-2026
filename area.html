@@ -51,13 +51,14 @@
           <label>Comandante / skipper<input name="skipperName" autocomplete="name" required maxlength="100" /></label>
         </div>
         <fieldset class="boat-accommodation-fieldset">
-          <legend>Sistemazioni a bordo · private</legend>
-          <p class="field-hint">Descrivi le cuccette della barca: questo riepilogo aiuta a impostare il limite della Crew List, ma non compare nella flotta pubblica.</p>
+          <legend>Sistemazioni e servizi a bordo · privati</legend>
+          <p class="field-hint">Descrivi le cuccette e il numero totale dei bagni: il riepilogo aiuta a impostare il limite della Crew List, ma non compare nella flotta pubblica.</p>
           <div class="form-grid">
             <label>Cabine doppie<input name="doubleCabins" type="number" min="0" max="12" value="0" inputmode="numeric" data-berth-layout-input /></label>
             <label>Cabine singole<input name="singleCabins" type="number" min="0" max="12" value="0" inputmode="numeric" data-berth-layout-input /></label>
             <label>Posti in dinette<input name="dinetteBerths" type="number" min="0" max="12" value="0" inputmode="numeric" data-berth-layout-input /></label>
             <label>Cabina marinaio<select name="crewCabinUse" data-berth-layout-input><option value="not_specified">Non presente / non indicata</option><option value="skipper">Riservata allo skipper o staff</option><option value="crew">Disponibile alla Crew List</option></select></label>
+            <label>Bagni a bordo<input name="bathroomCount" type="number" min="0" max="12" inputmode="numeric" placeholder="Es. 4" data-berth-layout-input /><small class="field-hint">Per ora indica solo il totale: non serve distinguere bagni privati o condivisi.</small></label>
             <label>Altri posti Crew List<input name="otherCrewBerths" type="number" min="0" max="12" value="0" inputmode="numeric" data-berth-layout-input /><small class="field-hint">Es. cuccetta aggiuntiva o sistemazione non inclusa sopra.</small></label>
           </div>
           <p id="berthLayoutSummary" class="field-hint" aria-live="polite"></p>
@@ -120,6 +121,6 @@
   </main>
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
   <script src="app.js?v=20260911-menu2"></script>
-  <script type="module" src="area.js?v=20260912-safety1"></script>
+  <script type="module" src="area.js?v=20260913-bathrooms1"></script>
 </body>
 </html>

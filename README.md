@@ -104,7 +104,7 @@ Il pulsante **Genera Crew List PDF** apre un foglio A4 orizzontale prestampato. 
 
 `capacity` indica i posti per l'equipaggio, escluso lo skipper. L'interfaccia conta inviti e membri unici e non aggiunge oltre il limite; non è un vincolo atomico server-side e non sostituisce la valutazione nautica dello skipper.
 
-`berthLayout` è facoltativo e privato: cabine doppie o singole, dinette, cabina marinaio e altri posti. Serve allo skipper per descrivere la configurazione reale e controllare il limite della Crew List; non alimenta la flotta pubblica né il PDF per il charter.
+`berthLayout` è facoltativo e privato: cabine doppie o singole, dinette, cabina marinaio, altri posti e numero totale dei bagni. Serve allo skipper per descrivere la configurazione reale e controllare il limite della Crew List; il numero dei bagni non incide sulla capienza e per ora non distingue bagni privati o condivisi. Non alimenta la flotta pubblica né il PDF per il charter.
 
 Ogni skipper gestisce una sola barca: per le nuove registrazioni l'ID della barca coincide con l'UID dello skipper e le Rules impediscono una seconda creazione. Il nome della barca, ad esempio `Karibu`, è modificabile dallo skipper.
 
