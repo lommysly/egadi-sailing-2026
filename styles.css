@@ -277,3 +277,17 @@ body.menu-open { overflow:hidden; }
 .boat-accommodation-fieldset .field-hint { margin:0; }
 #berthLayoutSummary.is-error { color:#a53d2c; font-weight:700; }
 .boat-accommodation { max-width:680px; margin:8px 0 0; color:#087b8a; font-size:.9rem; line-height:1.5; }
+
+.rules-summary-card { margin:18px 0; padding:18px; border-radius:12px; background:rgba(255,255,255,.1); }
+.rules-summary-card .eyebrow { margin-bottom:8px; }
+.rules-summary-card h3,.rules-summary-card h4 { margin:0 0 12px; }
+.rules-scroll-hint { margin:0 0 10px; color:#9ff5ed; font-size:.86rem; line-height:1.45; }
+.rules-scroll-region { max-height:min(48vh,520px); overflow-y:auto; padding:18px; border:1px solid rgba(255,255,255,.3); border-radius:12px; background:rgba(0,0,0,.14); }
+.rules-scroll-region:focus { outline:3px solid #9ff5ed; outline-offset:3px; }
+.rules-scroll-region.is-complete { border-color:#9ff5ed; }
+.rules-scroll-region .rules-text { padding-bottom:8px; }
+.boarding-rules-card .rules-summary-card { background:rgba(255,255,255,.09); }
+.boarding-rules-card .rules-summary-card h3 { color:white; }
+.briefing-recap .rules-summary-card { background:#e8eee9; }
+
+@media (max-width:800px) { .rules-scroll-region { max-height:52vh; padding:15px; } }

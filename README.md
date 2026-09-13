@@ -28,9 +28,10 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 1. Lo skipper crea un invito con nome e numero WhatsApp internazionale.
 2. Il sito genera un link personale casuale, valido 14 giorni. Lo skipper lo invia direttamente su WhatsApp.
 3. Al primo accesso la persona apre quel link, conferma il numero WhatsApp e sceglie il proprio codice personale di **esattamente 6 cifre**. Non è il PIN di sblocco del telefono.
-4. Il codice viene verificato da Firebase Authentication e non viene salvato nella Crew List, in Firestore o nel browser.
-5. Dopo aver completato la scheda, la persona torna quando vuole da `crew.html`: inserisce numero + codice e viene portata soltanto nella barca e nell'area dello skipper associati. Per il weekend un numero WhatsApp può avere una sola barca attiva.
-6. Se dimentica il codice o perde il link, lo skipper usa **Revoca e genera nuovo link**. L'invito conserva lo stesso identificativo, quindi anagrafica, richieste e associazione al PDF restano nella stessa posizione; il precedente accesso smette di funzionare.
+4. Prima della Crew List la persona legge una sintesi, scorre il regolamento completo della propria barca e conferma esplicitamente la versione pubblicata dallo skipper. La sintesi non sostituisce il testo integrale né il briefing pratico a bordo.
+5. Il codice viene verificato da Firebase Authentication e non viene salvato nella Crew List, in Firestore o nel browser.
+6. Dopo aver completato la scheda, la persona torna quando vuole da `crew.html`: inserisce numero + codice e viene portata soltanto nella barca e nell'area dello skipper associati. Per il weekend un numero WhatsApp può avere una sola barca attiva.
+7. Se dimentica il codice o perde il link, lo skipper usa **Revoca e genera nuovo link**. L'invito conserva lo stesso identificativo, quindi anagrafica, richieste e associazione al PDF restano nella stessa posizione; il precedente accesso smette di funzionare.
 
 Il link WhatsApp è un codice di attivazione, non un accesso permanente. Se viene inoltrato e usato **prima** della persona destinataria, chi lo possiede può attivarlo: un link diretto non può dimostrare l'identità del destinatario senza OTP o verifica esterna. Per questo scade, non va inoltrato e lo skipper può revocarlo.
 
@@ -82,10 +83,13 @@ boats/{skipperUid}
     collectorId, collectorName, paymentMethods, status, createdAt, createdBy
     verifiedAt, verifiedBy, cancelledAt, cancelledBy
   briefing/board
+    rulesTitle, rulesSummary, rulesText, fullRulesRequired, rulesVersion
+    meetingPoint, boardingAt, departureAt, returnAt, scheduleNote
   announcements/{announcementId}
   ruleAcceptances/{inviteId}
+    inviteId, acceptedBy, rulesVersion, fullRulesRead, acceptedAt
     history/{rulesVersion}-{participantUid}
-      inviteId, acceptedBy, rulesVersion, acceptedAt
+      inviteId, acceptedBy, rulesVersion, fullRulesRead, acceptedAt
 
 crewAccess/{participantUid}
   boatId, inviteId, userId, loginEmail, updatedAt
@@ -110,7 +114,9 @@ Ogni skipper gestisce una sola barca: per le nuove registrazioni l'ID della barc
 
 ## Bacheca e contributi
 
-Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Ogni persona vede soltanto la bacheca della propria barca. Quando cambia il testo delle regole, aumenta la versione e la persona deve confermare di nuovo la lettura.
+Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Il regolamento è composto da una sintesi iniziale e dal testo completo: la sintesi orienta ma non sostituisce mai il testo integrale. Ogni persona vede soltanto la bacheca della propria barca. Per i briefing pubblicati con `fullRulesRequired: true`, l'interfaccia sblocca la conferma solo dopo lo scorrimento del testo completo e Firestore richiede la dichiarazione `fullRulesRead: true` prima della Crew List o dell'aggiornamento della propria scheda. Quando cambia il regolamento, aumenta la versione e la persona deve confermare di nuovo la lettura della nuova versione.
+
+Lo scorrimento e la conferma registrano una dichiarazione di lettura della versione, non possono dimostrare materialmente che ogni parola sia stata compresa. Indicazioni operative reali della singola barca, del charter, delle dotazioni e di eventuali cauzioni devono essere verificate dallo skipper e pubblicate solo quando confermate.
 
 Il sito non incassa denaro, non genera o valida link dei provider e non dichiara pagamenti come eseguiti. Lo skipper configura il proprio nome e i tag PayPal, Satispay, Revolut e/o bonifico, quindi crea una richiesta con importo, causale, scadenza e una o più alternative. Eventuali link, alias o coordinate vengono scritti solo nel messaggio WhatsApp al momento dell'invio e non sono salvati. Il pagamento avviene fuori dal sito e può essere segnato come verificato solo dopo controllo manuale dell'accredito reale.
 
