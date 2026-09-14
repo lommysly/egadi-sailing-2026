@@ -31,19 +31,19 @@ const FLEET_BOAT_TYPES = new Set(['Catamarano', 'Monoscafo', 'Gommone', 'Altro']
 const FLEET_BERTH_PREFERENCES = new Set(['not_specified', 'cabin_female', 'cabin_male', 'cabin_mixed', 'dinette', 'other']);
 const LEGACY_CREW_CABIN_USES = new Set(['not_specified', 'skipper', 'crew']);
 const BERTH_RATE_TYPES = [
-  { id: 'double_cabin', label: 'Posto in cabina doppia', rateKey: 'doubleCabinCents', defaultReason: 'Quota posto in cabina doppia', count: (totals) => totals.doubleCabins * 2 },
-  { id: 'single_cabin', label: 'Posto in cabina singola', rateKey: 'singleCabinCents', defaultReason: 'Quota posto in cabina singola', count: (totals) => totals.singleCabins },
-  { id: 'dinette', label: 'Posto in dinette', rateKey: 'dinetteCents', defaultReason: 'Quota posto in dinette', count: (totals) => totals.dinetteBerths },
-  { id: 'other', label: 'Altra sistemazione', rateKey: 'otherBerthCents', defaultReason: 'Quota altra sistemazione', count: (totals) => totals.otherCrewBerths },
+  { id: 'double_cabin', label: 'Posto in cabina da 2 posti', rateKey: 'doubleCabinCents', defaultReason: 'Quota posto in cabina da 2 posti', count: (totals) => totals.doubleCabins * 2 },
+  { id: 'single_cabin', label: 'Posto in cabina da 1 posto', rateKey: 'singleCabinCents', defaultReason: 'Quota posto in cabina da 1 posto', count: (totals) => totals.singleCabins },
+  { id: 'dinette', label: 'Posto in dinette trasformabile', rateKey: 'dinetteCents', defaultReason: 'Quota posto in dinette trasformabile', count: (totals) => totals.dinetteBerths },
+  { id: 'other', label: 'Altro posto letto', rateKey: 'otherBerthCents', defaultReason: 'Quota altro posto letto', count: (totals) => totals.otherCrewBerths },
 ];
 // Etichette tecniche chiuse: consentono di mostrare a ciascuno solo le
 // proprie voci, senza dedurle dalla causale libera del messaggio WhatsApp.
 const PAYMENT_CONTRIBUTION_ITEM_LABELS = Object.freeze({
   berth_base: 'Quota posto consigliata',
-  berth_double_cabin: 'Posto in cabina doppia',
-  berth_single_cabin: 'Posto in cabina singola',
-  berth_dinette: 'Posto in dinette',
-  berth_other: 'Altra sistemazione',
+  berth_double_cabin: 'Posto in cabina da 2 posti',
+  berth_single_cabin: 'Posto in cabina da 1 posto',
+  berth_dinette: 'Posto in dinette trasformabile',
+  berth_other: 'Altro posto letto',
   starter_pack: 'Starter Pack',
   linen_towels: 'Lenzuola e asciugamani',
   protection_insurance: 'Assicurazione cauzione',
@@ -55,21 +55,21 @@ const PAYMENT_CONTRIBUTION_ITEM_LABELS = Object.freeze({
 const PAYMENT_CONTRIBUTION_ITEM_IDS = new Set(Object.keys(PAYMENT_CONTRIBUTION_ITEM_LABELS));
 const PROJECTION_BERTH_TYPES = Object.freeze({
   to_define: 'Da definire',
-  double_cabin: 'Cabina doppia',
-  single_cabin: 'Cabina singola',
-  dinette: 'Dinette',
-  other: 'Altra sistemazione',
+  double_cabin: 'Cabina da 2 posti',
+  single_cabin: 'Cabina da 1 posto',
+  dinette: 'Dinette trasformabile',
+  other: 'Altro posto letto',
 });
 const CONTRIBUTION_ITEM_STATES = new Map([
   ['to_define', 'Da definire'],
   ['included', 'Compreso nella quota'],
   ['extra', 'Da richiedere a parte'],
-  ['local', 'Da regolare in loco / da dividere'],
+  ['local', 'Da regolare a parte / da dividere'],
   ['not_applicable', 'Non previsto'],
 ]);
 const DEFAULT_CONTRIBUTION_ITEMS = [
   { id: 'berth', label: 'Quota posto in barca' },
-  { id: 'starter_pack', label: 'Starter Pack · lenzuola/asciugamani, SUP e fuoribordo · solo contanti in loco' },
+  { id: 'starter_pack', label: 'Starter Pack · lenzuola/asciugamani, SUP e fuoribordo · solo contanti a bordo' },
   { id: 'linen_towels', label: 'Lenzuola e asciugamani · inclusi nello Starter Pack' },
   { id: 'protection_insurance', label: 'Assicurazione cauzione' },
   { id: 'provisions', label: 'Cambusa' },
@@ -85,7 +85,7 @@ const DEFAULT_RULES_SUMMARY = [
   '2. Partecipo al briefing pratico e uso le dotazioni di sicurezza quando richiesto.',
   '3. In navigazione mi muovo con prudenza: una mano per me e una per la barca.',
   '4. In emergenza avviso subito lo skipper e seguo le istruzioni senza improvvisare.',
-  '5. Non uso gas, tender, VHF, verricello, motore o dotazioni senza autorizzazione.',
+  '5. Non uso gas, tender, radio di bordo, verricello dell’ancora, motore o dotazioni senza autorizzazione.',
   '6. Uso con cura acqua, corrente, WC, cucina e rifiuti; rispetto cabine, spazi comuni, silenzio e orari.',
   '7. Niente droghe; alcol con responsabilità; fumo solo nelle zone comunicate dallo skipper.',
   '8. Avviso se mi allontano, tengo in ordine bagagli e oggetti e collaboro alla vita comune della barca.',
@@ -94,19 +94,19 @@ const DEFAULT_FULL_RULES = [
   'REGOLAMENTO DI BORDO · EGADI SAILING EXPERIENCE 2026',
   '',
   'Premessa',
-  'Questo regolamento si applica alla vita a bordo della barca indicata nell’invito. Meteo, rotta, rada, porto e programma possono cambiare: la sicurezza viene prima del programma. Le condizioni specifiche della barca, del charter e del porto vengono confermate dallo skipper.',
+  'Questo regolamento si applica alla vita a bordo della barca indicata nell’invito. Meteo, rotta, rada (sosta o notte con la barca ancorata fuori dal porto), porto e programma possono cambiare: la sicurezza viene prima del programma. Le condizioni specifiche della barca, del charter e del porto vengono confermate dallo skipper.',
   '',
   '1. Skipper e decisioni di navigazione',
   'Le decisioni su sicurezza, manovre, navigazione, rada e porto spettano allo skipper. In caso di dubbio chiedi prima di agire; non prendere iniziative che possano mettere a rischio persone, barca o ambiente.',
   '',
   '2. Sicurezza e movimenti a bordo',
-  'In navigazione una mano per te e una per la barca. Cammina piano, non correre a piedi nudi e usa scarpe idonee quando richiesto. Fai attenzione a boma, cime in tensione, winch, gallocce, oblò, scalette, ponti bagnati e oggetti in movimento. Bagagli e oggetti personali devono restare ordinati e assicurati.',
+  'In navigazione una mano per te e una per la barca. Cammina piano, non correre a piedi nudi e usa scarpe idonee quando richiesto. Fai attenzione al boma (la barra orizzontale della vela), alle cime in tensione (corde che tirano), ai winch (tamburi che avvolgono le cime), alle gallocce dove sono fissate, agli oblò, alle scalette, ai ponti bagnati e agli oggetti in movimento. Bagagli e oggetti personali devono restare ordinati e assicurati.',
   '',
   '3. Briefing pratico ed emergenze',
-  'Partecipa al briefing pratico svolto a bordo su giubbotti, life line, zattera, estintori, VHF, gas, uomo a mare e dotazioni reali della barca. Indossa il giubbotto quando richiesto. In caso di uomo a mare avvisa subito, indica la persona senza perderla di vista e segui le istruzioni dello skipper.',
+  'Partecipa al briefing pratico svolto a bordo su giubbotti, life line (cavi di sicurezza), zattera di salvataggio, estintori, radio VHF, gas, procedure per una persona caduta in acqua e dotazioni reali della barca. Indossa il giubbotto quando richiesto. Se una persona cade in acqua, avvisa subito, indicala senza perderla di vista e segui le istruzioni dello skipper.',
   '',
   '4. Dotazioni, risorse e WC',
-  'Non usare gas, tender, VHF, verricello, motore o altre dotazioni senza autorizzazione e istruzioni. Non lasciare ricariche incustodite o in carica durante la notte salvo indicazione dello skipper. Acqua ed elettricità sono risorse limitate: usa docce, rubinetti e dispositivi con attenzione. Nel WC va solo materiale biologico; niente carta, salviette, assorbenti o altri oggetti.',
+  'Non usare gas, tender (il piccolo gommone di servizio), radio VHF, verricello dell’ancora, motore o altre dotazioni senza autorizzazione e istruzioni. Non lasciare ricariche incustodite o in carica durante la notte salvo indicazione dello skipper. Acqua ed elettricità sono risorse limitate: usa docce, rubinetti e dispositivi con attenzione. Nel WC va solo materiale biologico; niente carta, salviette, assorbenti o altri oggetti.',
   '',
   '5. Salute e comportamento responsabile',
   'Non fare nulla che possa mettere in pericolo te stesso o gli altri. Le droghe sono vietate; l’alcol va consumato con responsabilità, soprattutto prima o durante manovre, tender e navigazione. Comunica in privato allo skipper allergie, intolleranze, esigenze alimentari o informazioni utili alla sicurezza. Porta eventuali farmaci personali secondo le indicazioni del tuo medico o farmacista.',
@@ -123,15 +123,15 @@ const DEFAULT_FULL_RULES = [
   '9. Preparazione personale',
   'Porta documento valido, borsa morbida invece di trolley, abbigliamento a strati per vento e sera, protezione solare, cappellino, scarpe con suola chiara/non-marking e una piccola borsa stagna per le uscite a terra. Le istruzioni della barca prevalgono su questa lista generale.',
   '',
-  '10. Cambusa, costi e condizioni specifiche',
-  'Cambusa, extra, eventuali quote, cauzioni e condizioni del charter non sono stabiliti da questo regolamento generale: vengono comunicati separatamente dallo skipper della singola barca prima di qualsiasi richiesta. La conferma online attesta la lettura integrale di questo testo; non sostituisce il briefing pratico obbligatorio a bordo.',
+  '10. Spesa a bordo, costi e condizioni specifiche',
+  'Spesa e cucina di bordo, extra, eventuali quote, cauzioni e condizioni del charter non sono stabiliti da questo regolamento generale: vengono comunicati separatamente dallo skipper della singola barca prima di qualsiasi richiesta. La conferma online attesta la lettura integrale di questo testo; non sostituisce il briefing pratico obbligatorio a bordo.',
 ].join('\n');
 const DEFAULT_RULES_SUMMARY_EN = [
   '1. I always follow the skipper’s decisions on safety, manoeuvres, weather, route, anchorage and harbour.',
   '2. I take part in the practical briefing and use safety equipment whenever requested.',
   '3. While under way, I move carefully: one hand for myself and one for the boat.',
   '4. In an emergency, I alert the skipper immediately and follow instructions without improvising.',
-  '5. I do not use gas, the tender, VHF, windlass, engine or other equipment without permission.',
+  '5. I do not use gas, the tender, the VHF radio, the windlass (anchor motor), engine or other equipment without permission.',
   '6. I use water, power, heads, galley and waste facilities with care; I respect cabins, shared spaces, quiet hours and timings.',
   '7. No drugs; alcohol responsibly; smoking only in areas specified by the skipper.',
   '8. I let the crew know if I leave the boat, keep my belongings secure and contribute to life on board.',
@@ -140,19 +140,19 @@ const DEFAULT_FULL_RULES_EN = [
   'BOARD RULES · EGADI SAILING EXPERIENCE 2026',
   '',
   'Introduction',
-  'These rules apply to life on board the boat named in the invitation. Weather, route, anchorage, harbour and programme may change: safety always takes priority over the programme. The skipper confirms the specific arrangements for the boat, charter and harbour.',
+  'These rules apply to life on board the boat named in the invitation. Weather, route, anchorage (staying outside a harbour with the boat secured or anchored), harbour and programme may change: safety always takes priority over the programme. The skipper confirms the specific arrangements for the boat, charter and harbour.',
   '',
   '1. Skipper and navigation decisions',
   'The skipper is responsible for decisions about safety, manoeuvres, navigation, anchorage and harbour. If you are unsure, ask before acting. Do not take any initiative that could put people, the boat or the environment at risk.',
   '',
   '2. Safety and moving around on board',
-  'While under way, keep one hand for yourself and one for the boat. Walk slowly, do not run barefoot, and wear suitable footwear when asked. Watch out for the boom, loaded lines, winches, cleats, hatches, ladders, wet decks and moving objects. Luggage and personal belongings must be kept tidy and secured.',
+  'While under way, keep one hand for yourself and one for the boat. Walk slowly, do not run barefoot, and wear suitable footwear when asked. Watch out for the boom (the horizontal bar at the base of a sail), loaded lines (ropes under tension), winches (drums that tighten lines), cleats where lines are secured, hatches, ladders, wet decks and moving objects. Luggage and personal belongings must be kept tidy and secured.',
   '',
   '3. Practical briefing and emergencies',
-  'Take part in the practical briefing on board covering lifejackets, lifelines, liferaft, extinguishers, VHF, gas, man overboard procedures and the boat’s actual equipment. Wear a lifejacket when asked. If someone goes overboard, raise the alarm immediately, keep pointing to the person without losing sight of them, and follow the skipper’s instructions.',
+  'Take part in the practical briefing on board covering lifejackets, lifelines (safety lines), the liferaft, extinguishers, the VHF radio, gas, procedures for someone overboard and the boat’s actual equipment. Wear a lifejacket when asked. If someone goes overboard, raise the alarm immediately, keep pointing to the person without losing sight of them, and follow the skipper’s instructions.',
   '',
   '4. Equipment, resources and heads',
-  'Do not use gas, the tender, VHF, windlass, engine or other equipment without permission and instruction. Do not leave chargers unattended or charging overnight unless the skipper says otherwise. Water and electricity are limited resources: use showers, taps and devices carefully. Only biological waste goes into the heads—never paper, wipes, sanitary products or other objects.',
+  'Do not use gas, the tender (the small service dinghy), the VHF radio, the windlass (the anchor motor), the engine or other equipment without permission and instruction. Do not leave chargers unattended or charging overnight unless the skipper says otherwise. Water and electricity are limited resources: use showers, taps and devices carefully. Only biological waste goes into the heads—never paper, wipes, sanitary products or other objects.',
   '',
   '5. Health and responsible behaviour',
   'Do nothing that could endanger yourself or others. Drugs are not allowed. Alcohol must be consumed responsibly, especially before or during manoeuvres, tender trips and sailing. Tell the skipper privately about allergies, intolerances, dietary needs or anything relevant to safety. Bring any personal medication according to your doctor’s or pharmacist’s advice.',
@@ -325,7 +325,7 @@ function setupSkipperFinanceDashboard() {
   const financeDashboard = document.createElement('section');
   financeDashboard.id = 'skipperFinanceDashboard';
   financeDashboard.className = 'skipper-finance-dashboard-shell';
-  financeDashboard.setAttribute('aria-label', 'Quote e conti');
+  financeDashboard.setAttribute('aria-label', 'Contributi e conti');
 
   const overviewPanel = document.createElement('section');
   overviewPanel.id = 'skipperFinancePanel-overview';
@@ -338,32 +338,32 @@ function setupSkipperFinanceDashboard() {
   overviewEyebrow.className = 'eyebrow';
   overviewEyebrow.textContent = 'Area economica privata';
   const overviewTitle = document.createElement('h4');
-  overviewTitle.textContent = 'Quote e conti, senza confondere i passaggi.';
+  overviewTitle.textContent = 'I conti della barca, un passaggio alla volta.';
   const overviewLead = document.createElement('p');
   overviewLead.className = 'panel-lead';
-  overviewLead.textContent = 'Prima imposti il quadro, poi prepari una richiesta personale e infine controlli quanto è stato verificato. Il sito non incassa denaro.';
+  overviewLead.textContent = 'Qui inserisci le spese, prepari messaggi personali e segni i contributi che hai verificato. Il sito non incassa denaro.';
   overviewHeading.append(overviewEyebrow, overviewTitle, overviewLead);
 
   const hub = document.createElement('div');
   hub.className = 'dashboard-hub finance-dashboard-hub';
-  hub.setAttribute('aria-label', 'Azioni quote e conti');
+  hub.setAttribute('aria-label', 'Azioni per contributi e conti');
   hub.append(
     financeDashboardCard({
       view: SKIPPER_FINANCE_VIEWS.setup,
       title: 'Imposta',
-      detail: 'Metodi d’incasso, preventivo barca e composizione delle quote.',
+      detail: 'Metodi di pagamento, spese della barca e cosa è incluso.',
       icon: 'setup',
     }),
     financeDashboardCard({
       view: SKIPPER_FINANCE_VIEWS.request,
       title: 'Richiedi',
-      detail: 'Prepara una richiesta personale e apri WhatsApp.',
+      detail: 'Prepara un messaggio personale e apri WhatsApp.',
       icon: 'request',
     }),
     financeDashboardCard({
       view: SKIPPER_FINANCE_VIEWS.review,
       title: 'Controlla',
-      detail: 'Riepilogo, richieste emesse e accrediti verificati.',
+      detail: 'Riepilogo delle richieste e dei contributi verificati.',
       icon: 'review',
     }),
   );
@@ -373,19 +373,19 @@ function setupSkipperFinanceDashboard() {
     view: SKIPPER_FINANCE_VIEWS.setup,
     eyebrow: '1 · Imposta',
     title: 'Prepara il quadro economico',
-    lead: 'Queste informazioni restano nella tua area skipper: l’equipaggio non vede i metodi di incasso né la tua Cassa skipper.',
+    lead: 'Queste informazioni restano nella tua area skipper: l’equipaggio non vede i metodi di incasso né il totale delle spese da recuperare.',
   });
   const requestPanel = createFinanceDashboardPanel({
     view: SKIPPER_FINANCE_VIEWS.request,
     eyebrow: '2 · Richiedi',
-    title: 'Crea una richiesta personale',
-    lead: 'Scegli persona, importo, causale e metodi; poi WhatsApp si apre con il messaggio già pronto. Il pagamento avviene sempre fuori dal sito.',
+    title: 'Prepara una richiesta',
+    lead: 'Scegli persona, importo, causale e metodo. WhatsApp apre il messaggio già pronto; il pagamento resta fuori dal sito.',
   });
   const reviewPanel = createFinanceDashboardPanel({
     view: SKIPPER_FINANCE_VIEWS.review,
     eyebrow: '3 · Controlla',
     title: 'Segui richieste e accrediti',
-    lead: 'Riepiloga la Cassa skipper, ricontrolla le richieste inviate e conferma un accredito solo dopo averlo verificato davvero.',
+    lead: 'Riepiloga le spese della barca, ricontrolla le richieste inviate e conferma un contributo solo dopo averlo verificato davvero.',
   });
 
   const profileLead = profileIntro.find((element) => element.classList.contains('panel-lead'));
@@ -457,27 +457,27 @@ function setupSkipperDashboard() {
   overview.innerHTML = `
     <div class="dashboard-overview-heading">
       <div>
-        <p class="eyebrow">Centro di comando</p>
-        <h3>Quattro aree, <em>una barca alla volta.</em></h3>
+        <p class="eyebrow">Area skipper</p>
+        <h3>Gestisci la barca,<br /><em>una cosa alla volta.</em></h3>
       </div>
-      <p>Apri soltanto ciò che devi gestire: equipaggio, quote, barca oppure briefing. I dati restano separati e aggiornati.</p>
+      <p>Equipaggio, conti, dati della barca e regole di sicurezza: apri l’area che ti serve.</p>
     </div>
     <div class="dashboard-hub" aria-label="Aree skipper">
       <button class="dashboard-hub-card dashboard-hub-card-crew" type="button" data-skipper-view="crew">
         <span class="dashboard-hub-icon">${skipperDashboardIcon('crew')}</span><span class="dashboard-hub-label">Equipaggio</span>
-        <strong data-skipper-summary="crew">Carico i posti…</strong><small data-skipper-detail="crew">Inviti, Crew List e PDF charter.</small>
+        <strong data-skipper-summary="crew">Carico i posti…</strong><small data-skipper-detail="crew">Inviti, elenco per il charter e PDF.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-skipper-view="money">
-        <span class="dashboard-hub-icon">${skipperDashboardIcon('money')}</span><span class="dashboard-hub-label">Quote e conti</span>
-        <strong data-skipper-summary="money">Carico i conti…</strong><small data-skipper-detail="money">Metodi, quote, cassa e richieste.</small>
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('money')}</span><span class="dashboard-hub-label">Contributi e conti</span>
+        <strong data-skipper-summary="money">Carico i conti…</strong><small data-skipper-detail="money">Metodi, importi, spese e richieste.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-boat" type="button" data-skipper-view="boat">
         <span class="dashboard-hub-icon">${skipperDashboardIcon('boat')}</span><span class="dashboard-hub-label">Barca e flotta</span>
         <strong data-skipper-summary="boat">Carico la barca…</strong><small data-skipper-detail="boat">Sistemazioni e visibilità pubblica.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-board" type="button" data-skipper-view="board">
-        <span class="dashboard-hub-icon">${skipperDashboardIcon('board')}</span><span class="dashboard-hub-label">Briefing e bacheca</span>
-        <strong data-skipper-summary="board">Carico il briefing…</strong><small data-skipper-detail="board">Regole, orari e comunicazioni.</small>
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('board')}</span><span class="dashboard-hub-label">Regole e bacheca</span>
+        <strong data-skipper-summary="board">Carico le regole…</strong><small data-skipper-detail="board">Sicurezza, orari e comunicazioni.</small>
       </button>
     </div>
     <div class="dashboard-next-step"><div><span>Prossimo passo</span><strong id="skipperNextActionText">Preparo la tua panoramica.</strong></div><button id="skipperNextActionButton" class="button button-primary" type="button" data-skipper-view="crew">Apri</button></div>
@@ -600,11 +600,11 @@ function renderSkipperDashboardOverview() {
     nextActionButton.textContent = 'Apri quote e conti';
     nextActionButton.dataset.skipperView = 'money';
   } else if (!allocated) {
-    nextActionText.textContent = 'La barca è pronta: invita la prima persona con un link WhatsApp personale.';
+    nextActionText.textContent = 'La barca è configurata. Ora puoi riservare il primo posto.';
     nextActionButton.textContent = 'Invita una persona';
     nextActionButton.dataset.skipperView = 'crew';
   } else {
-    nextActionText.textContent = 'Tutto sotto controllo: apri l’area che vuoi aggiornare.';
+    nextActionText.textContent = 'Tutto è aggiornato. Scegli cosa vuoi fare adesso.';
     nextActionButton.textContent = 'Gestisci equipaggio';
     nextActionButton.dataset.skipperView = 'crew';
   }
@@ -616,8 +616,8 @@ function contributionConfigSummary(itemId, { deposit = false } = {}) {
     return {
       value: 'Da configurare',
       detail: deposit
-        ? 'Indica importo a persona e consegna in loco.'
-        : 'Definisci se la voce è compresa, a parte o in loco.',
+        ? 'Indica l’importo a persona e come sarà regolata all’imbarco.'
+        : 'Definisci se la voce è compresa, richiesta a parte o regolata separatamente.',
     };
   }
   const amount = item.amountCents > 0 ? `${formatCurrency(item.amountCents / 100)} a persona` : 'Importo da definire';
@@ -625,21 +625,21 @@ function contributionConfigSummary(itemId, { deposit = false } = {}) {
   if (item.state === 'not_applicable') return { value: 'Non previsto', detail: 'Non entra nel riepilogo personale.' };
   if (item.state === 'extra') {
     return deposit
-      ? { value: amount, detail: 'Configurazione da correggere: la cauzione va regolata in loco, non richiesta via WhatsApp.' }
+      ? { value: amount, detail: 'Configurazione da correggere: la cauzione va regolata all’imbarco, non richiesta via WhatsApp.' }
       : { value: amount, detail: 'Voce separata, richiedibile con messaggio personale.' };
   }
   if (item.state === 'local') {
     return {
       value: amount,
       detail: deposit
-        ? 'Da portare e regolare in loco; rimborsabile secondo charter e skipper.'
-        : 'Da regolare in loco o da dividere a bordo.',
+        ? 'Da portare e regolare all’imbarco; rimborsabile secondo charter e skipper.'
+        : 'Da regolare separatamente o da dividere a bordo.',
     };
   }
   return {
     value: 'Da definire',
     detail: deposit
-      ? 'Non è inclusa nella quota né nella Cassa skipper.'
+      ? 'Non è inclusa nell’importo del posto né nel totale delle spese della barca.'
       : 'Non è ancora inclusa né richiesta a parte.',
   };
 }
@@ -710,17 +710,17 @@ function renderSkipperFinanceOverview() {
     ? `${formatCurrency(projectedPayableCents / 100)} previsti`
     : 'Nessuna previsione';
   const projectionDetail = activeProjections.length
-    ? `${activeProjections.length} ${activeProjections.length === 1 ? 'posto riservato' : 'posti riservati'} · ${formatCurrency(projectedBerthCents / 100)} posti${projectedInsuranceCents ? ` · ${formatCurrency(projectedInsuranceCents / 100)} assicurazione` : ''}${projectedStarterPackCashCents ? ` · ${formatCurrency(projectedStarterPackCashCents / 100)} Starter Pack cash` : ''}${projectedDepositCashCents ? ` · ${formatCurrency(projectedDepositCashCents / 100)} cauzioni cash` : ''}. Non è un incasso.`
-    : 'Aggiungi una persona nel Piano equipaggio per stimare gli scenari, senza inviare alcuna richiesta.';
+    ? `${activeProjections.length} ${activeProjections.length === 1 ? 'posto riservato' : 'posti riservati'} · ${formatCurrency(projectedBerthCents / 100)} posti${projectedInsuranceCents ? ` · ${formatCurrency(projectedInsuranceCents / 100)} assicurazione` : ''}${projectedStarterPackCashCents ? ` · ${formatCurrency(projectedStarterPackCashCents / 100)} Starter Pack in contanti` : ''}${projectedDepositCashCents ? ` · ${formatCurrency(projectedDepositCashCents / 100)} cauzioni in contanti` : ''}. Non è un incasso.`
+    : 'Aggiungi una persona nell’elenco provvisorio per stimare gli importi, senza inviare alcuna richiesta.';
   overview.innerHTML = `
-    <div class="finance-overview-heading"><p class="eyebrow">Cabina di regia economica</p><p>Il preventivo divide solo costi reali tra gli ospiti paganti. Lo Starter Pack e la cauzione restano cash/in loco: nessun margine, nessun incasso nel sito.</p></div>
+    <div class="finance-overview-heading"><p class="eyebrow">I conti della barca</p><p>Il calcolo divide le spese reali tra chi partecipa ai costi. Il totale da recuperare è la tua “cassa skipper”; Starter Pack e cauzione si regolano in contanti a bordo. Il sito non trattiene denaro.</p></div>
     <div class="finance-overview-grid">
-      <article class="finance-overview-card"><span>Cassa skipper</span><strong>${escapeHtml(recoveryValue)}</strong><small>${escapeHtml(recoveryDetail)}</small></article>
+      <article class="finance-overview-card"><span>Totale da recuperare</span><strong>${escapeHtml(recoveryValue)}</strong><small>${escapeHtml(recoveryDetail)}</small></article>
       <article class="finance-overview-card"><span>Quota cabina calcolata</span><strong>${escapeHtml(cabinValue)}</strong><small>${escapeHtml(cabinDetail)}</small></article>
       <article class="finance-overview-card"><span>Quota dinette calcolata</span><strong>${escapeHtml(dinetteValue)}</strong><small>${escapeHtml(dinetteDetail)}</small></article>
-      <article class="finance-overview-card finance-overview-card-projection"><span>Proiezione equipaggio</span><strong>${escapeHtml(projectionValue)}</strong><small>${escapeHtml(projectionDetail)}</small></article>
-      <article class="finance-overview-card finance-overview-card-extras"><span>Starter Pack · cash in loco</span><strong>${escapeHtml(starterValue)}</strong><small>Lenzuola e asciugamani, SUP e fuoribordo. Non appare nelle richieste WhatsApp.</small><strong>Assicurazione cauzione · ${escapeHtml(insuranceValue)}</strong><small>Separata dalla quota cabina; puoi richiederla con i metodi scelti.</small></article>
-      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile · cash in loco</span><strong>${escapeHtml(depositValue)}</strong><small>${escapeHtml(depositDetail)}</small></article>
+      <article class="finance-overview-card finance-overview-card-projection"><span>Elenco provvisorio dell’equipaggio</span><strong>${escapeHtml(projectionValue)}</strong><small>${escapeHtml(projectionDetail)}</small></article>
+      <article class="finance-overview-card finance-overview-card-extras"><span>Starter Pack · contanti a bordo</span><strong>${escapeHtml(starterValue)}</strong><small>Lenzuola e asciugamani, SUP e fuoribordo. Non appare nelle richieste WhatsApp.</small><strong>Assicurazione cauzione · ${escapeHtml(insuranceValue)}</strong><small>Separata dall’importo del posto; puoi richiederla con i metodi scelti.</small></article>
+      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile · contanti a bordo</span><strong>${escapeHtml(depositValue)}</strong><small>${escapeHtml(depositDetail)}</small></article>
     </div>
   `;
 }
@@ -1084,7 +1084,7 @@ function costPlanContributionTypes(plan = activeCostPlan) {
         ? 'Quota dinette calcolata · prezzo fisso'
         : `Quota dinette calcolata · ${model.dinetteWeightPercent}% cabina`,
       cents: model.dinetteBerthCents,
-      defaultReason: 'Quota posto in dinette · recupero costi barca e skipper',
+      defaultReason: 'Quota posto in dinette trasformabile · recupero costi barca e skipper',
       accountingCategory: 'cost_recovery',
     });
   }
@@ -1166,17 +1166,55 @@ function extraContributionTypes(plan = activeContributionPlan) {
     }));
 }
 
+function normalizeAccommodationLabel(value, maximumLength = 120) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, maximumLength);
+}
+
+function normalizeAccommodationLabels(value, maximumItems = 12, maximumLength = 100) {
+  const source = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/\r?\n/)
+      : [];
+  return source
+    .slice(0, maximumItems)
+    .map((item) => normalizeAccommodationLabel(item, maximumLength));
+}
+
+function nonEmptyAccommodationLabels(labels = []) {
+  return labels.filter(Boolean);
+}
+
 function normalizeBerthLayout(layout = {}) {
+  const doubleCabins = asNonNegativeInteger(layout?.doubleCabins);
+  const singleCabins = asNonNegativeInteger(layout?.singleCabins);
+  const dinetteBerths = asNonNegativeInteger(layout?.dinetteBerths);
+  const otherCrewBerths = asNonNegativeInteger(layout?.otherCrewBerths);
+  const rawCrewCabinCount = Number(layout?.crewCabinCount);
+  const hasExplicitCrewCabinCount = Number.isInteger(rawCrewCabinCount)
+    && rawCrewCabinCount >= 0
+    && rawCrewCabinCount <= 12;
+  // Le barche già salvate avevano il solo flag booleano. Un vecchio layout
+  // continua quindi a significare una cabina equipaggio da un posto.
+  const hasLegacyCrewCabin = layout?.hasCrewCabin === true
+    || (LEGACY_CREW_CABIN_USES.has(layout?.crewCabinUse) && layout.crewCabinUse !== 'not_specified');
+  const crewCabinCount = hasExplicitCrewCabinCount
+    ? rawCrewCabinCount
+    : hasLegacyCrewCabin ? 1 : 0;
   return {
-    doubleCabins: asNonNegativeInteger(layout?.doubleCabins),
-    singleCabins: asNonNegativeInteger(layout?.singleCabins),
-    dinetteBerths: asNonNegativeInteger(layout?.dinetteBerths),
-    // Le registrazioni precedenti distinguevano impropriamente l'uso della
-    // cabina marinaio. Per la descrizione della barca conta solo se esiste.
-    hasCrewCabin: layout?.hasCrewCabin === true
-      || (LEGACY_CREW_CABIN_USES.has(layout?.crewCabinUse) && layout.crewCabinUse !== 'not_specified'),
+    doubleCabins,
+    singleCabins,
+    dinetteBerths,
+    crewCabinCount,
+    // Conservato per i record e i client precedenti; il numero è ora la fonte
+    // autorevole e permette di descrivere anche due cabine equipaggio.
+    hasCrewCabin: crewCabinCount > 0,
     bathroomCount: asNonNegativeInteger(layout?.bathroomCount),
-    otherCrewBerths: asNonNegativeInteger(layout?.otherCrewBerths),
+    otherCrewBerths,
+    doubleCabinLabels: normalizeAccommodationLabels(layout?.doubleCabinLabels).slice(0, doubleCabins),
+    crewCabinLabels: normalizeAccommodationLabels(layout?.crewCabinLabels).slice(0, crewCabinCount),
+    dinetteDescription: normalizeAccommodationLabel(layout?.dinetteDescription),
+    otherBerthsDescription: normalizeAccommodationLabel(layout?.otherBerthsDescription),
   };
 }
 
@@ -1186,7 +1224,7 @@ function berthLayoutTotals(layout) {
     + normalized.singleCabins
     + normalized.dinetteBerths
     + normalized.otherCrewBerths;
-  const physicalBerths = standardBerths + (normalized.hasCrewCabin ? 1 : 0);
+  const physicalBerths = standardBerths + normalized.crewCabinCount;
   const skipperBerths = physicalBerths > 0 ? 1 : 0;
   const participantBerths = Math.max(0, physicalBerths - skipperBerths);
   return {
@@ -1206,11 +1244,21 @@ function describeBerthLayout(layout) {
   const totals = berthLayoutTotals(layout);
   if (!hasAccommodationDetails(totals) && !totals.bathroomCount) return '';
   const parts = [];
-  if (totals.doubleCabins) parts.push(`${totals.doubleCabins} ${totals.doubleCabins === 1 ? 'cabina doppia' : 'cabine doppie'}`);
-  if (totals.singleCabins) parts.push(`${totals.singleCabins} ${totals.singleCabins === 1 ? 'cabina singola' : 'cabine singole'}`);
-  if (totals.dinetteBerths) parts.push(`${totals.dinetteBerths} ${totals.dinetteBerths === 1 ? 'posto in dinette' : 'posti in dinette'}`);
-  if (totals.hasCrewCabin) parts.push('cabina marinaio · posto skipper');
-  if (totals.otherCrewBerths) parts.push(`${totals.otherCrewBerths} ${totals.otherCrewBerths === 1 ? 'posto letto extra' : 'posti letto extra'}`);
+  const doubleLabels = nonEmptyAccommodationLabels(totals.doubleCabinLabels);
+  const crewLabels = nonEmptyAccommodationLabels(totals.crewCabinLabels);
+  if (totals.doubleCabins) {
+    parts.push(`${totals.doubleCabins} ${totals.doubleCabins === 1 ? 'cabina da 2 posti' : 'cabine da 2 posti'}${doubleLabels.length ? ` (${doubleLabels.join(', ')})` : ''}`);
+  }
+  if (totals.singleCabins) parts.push(`${totals.singleCabins} ${totals.singleCabins === 1 ? 'cabina da 1 posto' : 'cabine da 1 posto'}`);
+  if (totals.dinetteBerths) {
+    parts.push(`${totals.dinetteBerths} ${totals.dinetteBerths === 1 ? 'posto in dinette trasformabile' : 'posti in dinette trasformabile'}${totals.dinetteDescription ? ` (${totals.dinetteDescription})` : ''}`);
+  }
+  if (totals.crewCabinCount) {
+    parts.push(`${totals.crewCabinCount} ${totals.crewCabinCount === 1 ? 'cabina equipaggio / marinaio' : 'cabine equipaggio / marinaio'}${crewLabels.length ? ` (${crewLabels.join(', ')})` : ''}`);
+  }
+  if (totals.otherCrewBerths) {
+    parts.push(`${totals.otherCrewBerths} ${totals.otherCrewBerths === 1 ? 'altro posto letto fisso' : 'altri posti letto fissi'}${totals.otherBerthsDescription ? ` (${totals.otherBerthsDescription})` : ''}`);
+  }
   if (totals.bathroomCount) parts.push(`${totals.bathroomCount} ${totals.bathroomCount === 1 ? 'bagno a bordo' : 'bagni a bordo'}`);
   return parts.join(' · ');
 }
@@ -1220,9 +1268,14 @@ function readBerthLayout(form) {
     doubleCabins: form.elements.doubleCabins?.value,
     singleCabins: form.elements.singleCabins?.value,
     dinetteBerths: form.elements.dinetteBerths?.value,
+    crewCabinCount: form.elements.crewCabinCount?.value,
     hasCrewCabin: form.elements.hasCrewCabin?.checked === true,
     bathroomCount: form.elements.bathroomCount?.value,
     otherCrewBerths: form.elements.otherCrewBerths?.value,
+    doubleCabinLabels: form.elements.doubleCabinLabels?.value,
+    crewCabinLabels: form.elements.crewCabinLabels?.value,
+    dinetteDescription: form.elements.dinetteDescription?.value,
+    otherBerthsDescription: form.elements.otherBerthsDescription?.value,
   });
 }
 
@@ -1231,9 +1284,13 @@ function fillBerthLayoutForm(form, layout) {
   form.elements.doubleCabins.value = String(normalized.doubleCabins);
   form.elements.singleCabins.value = String(normalized.singleCabins);
   form.elements.dinetteBerths.value = String(normalized.dinetteBerths);
-  form.elements.hasCrewCabin.checked = normalized.hasCrewCabin;
+  if (form.elements.crewCabinCount) form.elements.crewCabinCount.value = String(normalized.crewCabinCount);
   form.elements.bathroomCount.value = normalized.bathroomCount ? String(normalized.bathroomCount) : '';
   form.elements.otherCrewBerths.value = String(normalized.otherCrewBerths);
+  if (form.elements.doubleCabinLabels) form.elements.doubleCabinLabels.value = normalized.doubleCabinLabels.join('\n');
+  if (form.elements.crewCabinLabels) form.elements.crewCabinLabels.value = normalized.crewCabinLabels.join('\n');
+  if (form.elements.dinetteDescription) form.elements.dinetteDescription.value = normalized.dinetteDescription;
+  if (form.elements.otherBerthsDescription) form.elements.otherBerthsDescription.value = normalized.otherBerthsDescription;
 }
 
 function readBerthRates(form) {
@@ -1258,11 +1315,16 @@ function describeTotalBerths(totalBerths, layout = {}) {
   const normalizedLayout = normalizeBerthLayout(layout);
   const participantCapacity = participantCapacityFromTotal(totalBerths);
   const totalLabel = totalBerths === 1 ? 'posto totale a bordo' : 'posti totali a bordo';
-  const participantLabel = participantCapacity === 1 ? 'posto per partecipante' : 'posti per partecipanti';
-  const skipperDetail = normalizedLayout.hasCrewCabin
-    ? '1 è riservato allo skipper nella cabina marinaio'
-    : '1 è riservato allo skipper';
-  return `${totalBerths} ${totalLabel}: ${skipperDetail}; ${participantCapacity} ${participantLabel} invitabili e quotabili`;
+  const participantLabel = participantCapacity === 1 ? 'posto assegnabile a un partecipante' : 'posti assegnabili ai partecipanti';
+  const skipperDetail = normalizedLayout.crewCabinCount
+    ? 'uno è riservato allo skipper nella cabina equipaggio'
+    : 'uno è riservato allo skipper';
+  const additionalCrewCabins = normalizedLayout.crewCabinCount === 2
+    ? '; l’altra cabina equipaggio è conteggiata tra i posti assegnabili'
+    : normalizedLayout.crewCabinCount > 2
+      ? `; le altre ${normalizedLayout.crewCabinCount - 1} cabine equipaggio sono conteggiate tra i posti assegnabili`
+      : '';
+  return `${totalBerths} ${totalLabel}: ${skipperDetail}${additionalCrewCabins}; restano ${participantCapacity} ${participantLabel}, con o senza importo previsto.`;
 }
 
 function describeBerthCapacity(totals) {
@@ -1283,10 +1345,10 @@ function syncTotalBerthsFromLayout() {
 function describeBerthRates(rates) {
   const normalized = normalizeBerthRates(rates);
   const labels = {
-    doubleCabinCents: 'cabina doppia',
-    singleCabinCents: 'cabina singola',
-    dinetteCents: 'dinette',
-    otherBerthCents: 'altra sistemazione',
+    doubleCabinCents: 'cabina da 2 posti',
+    singleCabinCents: 'cabina da 1 posto',
+    dinetteCents: 'dinette trasformabile',
+    otherBerthCents: 'altro posto letto',
   };
   return Object.entries(labels)
     .filter(([key]) => normalized[key] > 0)
@@ -1659,10 +1721,10 @@ function ensurePaymentAccountingCategoryField() {
   input.name = 'accountingCategory';
   input.type = 'checkbox';
   input.value = 'cost_recovery';
-  label.append(input, ' Conta questo contributo nella Cassa skipper.');
+  label.append(input, ' Conta questo contributo nel totale delle spese della barca.');
   const hint = document.createElement('p');
   hint.className = 'field-hint';
-  hint.textContent = 'Selezionalo solo per gli importi che recuperano charter e costi dello skipper. Cambusa, assicurazione, transfer o altri extra restano fuori dal bilancio della Cassa.';
+  hint.textContent = 'Selezionalo solo per gli importi che recuperano charter e costi dello skipper. Cambusa, assicurazione, transfer o altri extra restano fuori da questo totale.';
   optionalInput.closest('label')?.after(label, hint);
 }
 
@@ -1814,7 +1876,7 @@ function renderCostPlanSummary() {
     || model.refundableDepositTotalCents > 0
     || model.dinetteFixedCents > 0;
   if (!hasAnyTotal) {
-    summary.textContent = `Inserisci i totali della barca. Lo skipper è escluso; al momento il divisore proposto è ${model.payingParticipants} ${model.payingParticipants === 1 ? 'ospite pagante' : 'ospiti paganti'}. La dinette, se presente, usa ${model.dinetteWeightPercent}% della quota cabina. Contributi Cassa skipper verificati: ${formatCurrency(verifiedCents / 100)}${pendingCents ? ` · ancora da verificare: ${formatCurrency(pendingCents / 100)}` : ''}.${legacyNote}`;
+    summary.textContent = `Inserisci i totali della barca. Lo skipper è escluso; al momento il calcolo divide per ${model.payingParticipants} ${model.payingParticipants === 1 ? 'ospite pagante' : 'ospiti paganti'}. La dinette, se presente, usa ${model.dinetteWeightPercent}% dell’importo cabina. Contributi verificati per le spese della barca: ${formatCurrency(verifiedCents / 100)}${pendingCents ? ` · ancora da verificare: ${formatCurrency(pendingCents / 100)}` : ''}.${legacyNote}`;
     return;
   }
   const balanceCents = verifiedCents - totalCents;
@@ -1834,17 +1896,17 @@ function renderCostPlanSummary() {
       : `${model.standardPayingParticipants} quote cabina + ${model.dinettePayingParticipants} dinette al ${model.dinetteWeightPercent}% = ${model.weightedUnits.toFixed(2).replace('.', ',')} quote equivalenti`
     : `${model.standardPayingParticipants} quote cabina`;
   const berthSummary = totalCents > 0
-    ? `Cassa da recuperare: ${formatCurrency(totalCents / 100)} su ${berthFormula}. Quota cabina standard: ${formatCurrency(model.standardBerthCents / 100)}; quota dinette: ${model.dinettePayingParticipants > 0 ? formatCurrency(model.dinetteBerthCents / 100) : 'non prevista'}.`
+    ? `Totale da recuperare: ${formatCurrency(totalCents / 100)} su ${berthFormula}. Quota cabina standard: ${formatCurrency(model.standardBerthCents / 100)}; quota dinette: ${model.dinettePayingParticipants > 0 ? formatCurrency(model.dinetteBerthCents / 100) : 'non prevista'}.`
     : 'Nessun costo barca o skipper da recuperare nel preventivo.';
   const insuranceSummary = model.protectionInsuranceTotalCents > 0
     ? ` Assicurazione: ${formatCurrency(model.protectionInsurancePerPersonCents / 100)} per ospite pagante, separata e richiedibile.`
     : ' Assicurazione: da definire.';
   const starterSummary = model.starterPackTotalCents > 0
-    ? ` Starter Pack: ${formatCurrency(model.starterPackPerPersonCents / 100)} per ospite pagante, solo contanti in loco.`
-    : ' Starter Pack: da definire, solo contanti in loco.';
+    ? ` Starter Pack: ${formatCurrency(model.starterPackPerPersonCents / 100)} per ospite pagante, solo contanti a bordo.`
+    : ' Starter Pack: da definire, solo contanti a bordo.';
   const depositSummary = model.refundableDepositTotalCents > 0
-    ? ` Cauzione rimborsabile: ${formatCurrency(model.refundableDepositPerPersonCents / 100)} per ${model.depositParticipants} ${model.depositParticipants === 1 ? 'persona' : 'persone'}, solo contanti in loco.`
-    : ' Cauzione rimborsabile: da definire, separata e in loco.';
+    ? ` Cauzione rimborsabile: ${formatCurrency(model.refundableDepositPerPersonCents / 100)} per ${model.depositParticipants} ${model.depositParticipants === 1 ? 'persona' : 'persone'}, in contanti all’imbarco.`
+    : ' Cauzione rimborsabile: da definire, separata e da regolare all’imbarco.';
   const roundedRecoveryNote = model.roundingDeltaCents
     ? ` Arrotondamento tecnico delle quote: ${model.roundingDeltaCents > 0 ? '+' : ''}${formatCurrency(model.roundingDeltaCents / 100)} da riallocare.`
     : '';
@@ -1858,15 +1920,15 @@ function renderCostPlanSummary() {
     .filter((projection) => normalizedProjectionAmount(projection.refundableDepositCents) > 0)
     .length;
   const contributorProjectionNote = activeProjections.length && projectedPayingCount !== model.payingParticipants
-    ? ` Nota: il preventivo divide per ${model.payingParticipants} ospiti paganti; il Piano equipaggio ne registra finora ${projectedPayingCount}. Aggiorna il divisore quando la composizione è definita.`
+    ? ` Nota: il calcolo divide per ${model.payingParticipants} ospiti paganti; nell’elenco provvisorio ce ne sono finora ${projectedPayingCount}. Aggiorna il numero quando la composizione è definita.`
     : '';
   const dinetteProjectionNote = activeProjections.length && projectedDinetteCount !== model.dinettePayingParticipants
-    ? ` Attenzione: nel preventivo risultano ${model.dinettePayingParticipants} ${model.dinettePayingParticipants === 1 ? 'dinette pagante' : 'dinette paganti'}, mentre il Piano equipaggio ne assegna ${projectedDinetteCount}; aggiorna il preventivo quando la composizione è definita.`
+    ? ` Attenzione: nel calcolo risultano ${model.dinettePayingParticipants} ${model.dinettePayingParticipants === 1 ? 'posto dinette pagante' : 'posti dinette paganti'}, mentre nell’elenco provvisorio ce ne sono ${projectedDinetteCount}; aggiorna il numero quando la composizione è definita.`
     : '';
   const depositProjectionNote = activeProjections.length && projectedDepositCount !== model.depositParticipants
-    ? ` Nota: la cauzione è divisa per ${model.depositParticipants} ${model.depositParticipants === 1 ? 'persona' : 'persone'}, mentre il Piano equipaggio ne registra finora ${projectedDepositCount} con cauzione prevista; aggiorna il numero quando la composizione è definita.`
+    ? ` Nota: la cauzione è divisa per ${model.depositParticipants} ${model.depositParticipants === 1 ? 'persona' : 'persone'}, mentre nell’elenco provvisorio ce ne sono ${projectedDepositCount} con cauzione prevista; aggiorna il numero quando la composizione è definita.`
     : '';
-  summary.textContent = `${berthSummary}${insuranceSummary}${starterSummary}${depositSummary} Contributi Cassa skipper verificati: ${formatCurrency(verifiedCents / 100)}${pendingCents ? ` · ${formatCurrency(pendingCents / 100)} in attesa di verifica` : ''}. Bilancio Cassa skipper: ${balance}${roundedRecoveryNote}${contributorProjectionNote}${dinetteProjectionNote}${depositProjectionNote}${legacyNote}`;
+  summary.textContent = `${berthSummary}${insuranceSummary}${starterSummary}${depositSummary} Contributi verificati per le spese della barca: ${formatCurrency(verifiedCents / 100)}${pendingCents ? ` · ${formatCurrency(pendingCents / 100)} in attesa di verifica` : ''}. Bilancio delle spese della barca: ${balance}${roundedRecoveryNote}${contributorProjectionNote}${dinetteProjectionNote}${depositProjectionNote}${legacyNote}`;
 }
 
 function renderCostPlan(plan) {
@@ -2091,9 +2153,9 @@ function renderPaymentRecipientOptions() {
 }
 
 function contributionStateOptions(item) {
-  if (item.id === 'starter_pack') return '<option value="local" selected>Solo contanti, in loco</option>';
+  if (item.id === 'starter_pack') return '<option value="local" selected>Solo contanti a bordo</option>';
   if (item.id === 'linen_towels') return '<option value="included" selected>Compreso nello Starter Pack</option>';
-  if (item.id === 'refundable_deposit') return '<option value="local" selected>Solo contanti, in loco</option>';
+  if (item.id === 'refundable_deposit') return '<option value="local" selected>Contanti all’imbarco</option>';
   return [...CONTRIBUTION_ITEM_STATES.entries()]
     .map(([value, label]) => `<option value="${value}"${value === item.state ? ' selected' : ''}>${label}</option>`)
     .join('');
@@ -2102,15 +2164,15 @@ function contributionStateOptions(item) {
 function contributionCatalogRow(item) {
   const automatic = AUTOMATIC_COST_PLAN_ITEM_IDS.has(item.id);
   const stateHint = item.id === 'starter_pack'
-    ? '<small>Gestito dal Preventivo barca: lenzuola e asciugamani, SUP e fuoribordo. Solo contanti, in loco; non crea richieste WhatsApp.</small>'
+    ? '<small>Gestito dal Preventivo barca: lenzuola e asciugamani, SUP e fuoribordo. Solo contanti a bordo; non crea richieste WhatsApp.</small>'
     : item.id === 'linen_towels'
       ? '<small>Già incluso nello Starter Pack: non va richiesto una seconda volta.</small>'
       : item.id === 'protection_insurance'
         ? '<small>La quota per persona arriva dal totale assicurazione nel Preventivo barca; può essere richiesta separatamente.</small>'
         : item.id === 'refundable_deposit'
-          ? '<small>Gestita dal Preventivo barca: sempre rimborsabile, solo contanti in loco e mai in una richiesta WhatsApp.</small>'
+          ? '<small>Gestita dal Preventivo barca: sempre rimborsabile, in contanti all’imbarco e mai in una richiesta WhatsApp.</small>'
           : '';
-  const amountLabel = automatic ? '€ a persona · calcolato' : '€ a persona · solo a parte / in loco';
+  const amountLabel = automatic ? '€ a persona · calcolato' : '€ a persona · richiesto a parte / regolato separatamente';
   return `<article class="contribution-catalog-row" data-contribution-id="${escapeHtml(item.id)}"><div class="contribution-catalog-label">${escapeHtml(item.label)}${stateHint}</div><label>Gestione<select data-contribution-state${automatic ? ' disabled' : ''}>${contributionStateOptions(item)}</select></label><label>${amountLabel}<input data-contribution-amount type="number" min="0" max="10000" step="0.01" inputmode="decimal" value="${euroInputValue(item.amountCents)}" placeholder="Es. 30,00"${automatic ? ' disabled' : ''} /></label></article>`;
 }
 
@@ -2123,7 +2185,7 @@ function syncContributionCatalogRow(row) {
   amount.disabled = !canSetAmount;
   amount.title = canSetAmount
     ? 'Importo indicativo facoltativo per persona.'
-    : 'L’importo è disponibile solo per voci a parte o da regolare in loco.';
+    : 'L’importo è disponibile solo per voci richieste a parte o regolate separatamente.';
   if (!canSetAmount) amount.value = '';
 }
 
@@ -2271,16 +2333,19 @@ function normalizeCabinGroupId(value) {
 }
 
 function doubleCabinGroups(boat = activeBoat) {
-  const total = berthLayoutTotals(boat?.berthLayout).doubleCabins;
+  const layout = normalizeBerthLayout(boat?.berthLayout);
+  const total = layout.doubleCabins;
   return Array.from({ length: total }, (_, index) => ({
     id: `double-${index + 1}`,
-    label: `Cabina doppia ${index + 1}`,
+    label: layout.doubleCabinLabels[index]
+      ? `Cabina da 2 posti · ${layout.doubleCabinLabels[index]}`
+      : `Cabina da 2 posti ${index + 1}`,
   }));
 }
 
 function cabinGroupLabel(cabinGroupId) {
   const group = doubleCabinGroups().find((candidate) => candidate.id === cabinGroupId);
-  return group?.label || 'Cabina doppia da riallocare';
+  return group?.label || 'Cabina da 2 posti da riallocare';
 }
 
 function projectionCabinGroupId(projection) {
@@ -2300,7 +2365,7 @@ function projectionCabinAssignmentText(projection) {
   const cabinGroupId = projectionCabinGroupId(projection);
   if (!cabinGroupId) {
     return projection.berthType === 'double_cabin'
-      ? 'Cabina doppia da assegnare'
+      ? 'Cabina da 2 posti da assegnare'
       : '';
   }
   const groupIsAvailable = doubleCabinGroups().some((group) => group.id === cabinGroupId);
@@ -2339,7 +2404,7 @@ function syncProjectionCabinGroupField() {
   const currentGroupId = normalizeCabinGroupId(select.value);
   select.innerHTML = cabinGroupOptionsHtml(currentGroupId, editingProjectionId);
   if (!doubleCabinGroups().length) {
-    select.innerHTML = '<option value="">Nessuna cabina doppia configurata</option>';
+    select.innerHTML = '<option value="">Nessuna cabina da 2 posti configurata</option>';
     select.disabled = true;
     return;
   }
@@ -2432,8 +2497,8 @@ function projectionQuoteSummary(projection) {
   const summary = projectionCostBreakdown(projection);
   if (!summary.normalized.contributesToCosts) {
     const deposit = summary.refundableDepositCents > 0
-      ? ` Cauzione rimborsabile ${formatCurrency(summary.refundableDepositCents / 100)} separata, in loco.`
-      : ' Cauzione rimborsabile da definire, separata e in loco.';
+      ? ` Cauzione rimborsabile ${formatCurrency(summary.refundableDepositCents / 100)} separata, da regolare a bordo.`
+      : ' Cauzione rimborsabile da definire, separata e da regolare a bordo.';
     return `Esente da quota posto, Starter Pack e assicurazione.${deposit}`;
   }
   const parts = summary.items
@@ -2443,8 +2508,8 @@ function projectionQuoteSummary(projection) {
     ? formatCurrency(summary.payableCents / 100)
     : 'da definire';
   const starter = summary.starterPackCents > 0
-    ? ` · Starter Pack ${formatCurrency(summary.starterPackCents / 100)} cash in loco`
-    : ' · Starter Pack cash in loco da definire';
+    ? ` · Starter Pack ${formatCurrency(summary.starterPackCents / 100)} in contanti a bordo`
+    : ' · Starter Pack in contanti a bordo da definire';
   return `${parts} · Totale richiesta prevista ${total}${starter}`;
 }
 
@@ -2471,7 +2536,7 @@ function projectionInvite(projection) {
 
 function projectionStatusLabel(projection) {
   const invite = projectionInvite(projection);
-  if (!invite) return 'Proiezione salvata · invito WhatsApp da creare';
+  if (!invite) return 'Scheda salvata · invito WhatsApp da creare';
   if (invite.status === 'active') {
     return activeMembers.some((member) => member.id === invite.id)
       ? 'Accesso attivo · anagrafica completata'
@@ -2512,7 +2577,7 @@ function renderCapacityStatus() {
   const available = Math.max(0, limit - allocated);
   const projected = activeProjections.length;
   status.textContent = 'Posti partecipanti: ' + allocated + ' di ' + limit + ' occupati o riservati'
-    + (projected ? ` · ${projected} nella proiezione equipaggio` : '') + '. '
+    + (projected ? ` · ${projected} nelle schede dell’equipaggio` : '') + '. '
     + (available ? available + ' ancora disponibili.' : 'Nessun posto ancora disponibile.');
 }
 
@@ -2534,19 +2599,19 @@ function renderProjectionSummary() {
   const title = document.createElement('strong');
   title.className = 'projection-summary-title';
   title.textContent = payableCents > 0
-    ? `Proiezione complessiva: ${formatCurrency(payableCents / 100)} previsti`
-    : 'Proiezione complessiva: quote da definire';
+    ? `Riepilogo equipaggio: ${formatCurrency(payableCents / 100)} previsti`
+    : 'Riepilogo equipaggio: importi da definire';
   const detail = document.createElement('span');
   detail.className = 'projection-summary-detail';
   detail.textContent = `${activeProjections.length} ${activeProjections.length === 1 ? 'posto riservato' : 'posti riservati'} · ${invitationReady} ${invitationReady === 1 ? 'invito da creare' : 'inviti da creare'}${invited ? ` · ${invited} ${invited === 1 ? 'link già creato' : 'link già creati'}` : ''}${historicalInvites ? ` · ${historicalInvites} ${historicalInvites === 1 ? 'scheda da completare' : 'schede da completare'}` : ''}.`;
   const note = document.createElement('small');
   note.className = 'projection-summary-note';
   const starterPackNote = starterPackCashCents > 0
-    ? `Starter Pack previsti: ${formatCurrency(starterPackCashCents / 100)}, solo contanti in loco.`
-    : 'Starter Pack solo contanti in loco.';
+    ? `Starter Pack previsti: ${formatCurrency(starterPackCashCents / 100)}, solo contanti a bordo.`
+    : 'Starter Pack solo contanti a bordo.';
   const depositNote = refundableDepositCents > 0
-    ? ` Cauzioni rimborsabili previste: ${formatCurrency(refundableDepositCents / 100)}, separate e in loco.`
-    : ' Le cauzioni rimborsabili restano separate e da regolare in loco.';
+    ? ` Cauzioni rimborsabili previste: ${formatCurrency(refundableDepositCents / 100)}, separate e da regolare a bordo.`
+    : ' Le cauzioni rimborsabili restano separate e da regolare a bordo.';
   note.textContent = starterPackNote + depositNote;
   summary.replaceChildren(title, detail, note);
 }
@@ -2568,8 +2633,8 @@ function renderProjectionCostPreview() {
   if (form.elements.contributesToCosts?.checked !== true) {
     const deposit = projectionPreviewItem(form, 'refundableDepositAmount', 'Cauzione rimborsabile');
     const depositText = deposit.defined
-      ? ` Cauzione rimborsabile: ${formatCurrency(deposit.cents / 100)}, separata e in loco.`
-      : ' Cauzione rimborsabile: da definire, separata e in loco.';
+      ? ` Cauzione rimborsabile: ${formatCurrency(deposit.cents / 100)}, separata e da regolare all’imbarco.`
+      : ' Cauzione rimborsabile: da definire, separata e da regolare all’imbarco.';
     preview.textContent = `Persona esente da quota posto, Starter Pack e assicurazione.${depositText} Non crea una richiesta o un pagamento.`;
     return;
   }
@@ -2587,11 +2652,11 @@ function renderProjectionCostPreview() {
     : `Richiesta prevista: ${formatCurrency(payableCents / 100)}`;
   const missingText = missing.length ? ` · Da definire: ${missing.join(', ')}.` : '.';
   const depositText = deposit.defined
-    ? ` Cauzione rimborsabile: ${formatCurrency(deposit.cents / 100)}, separata e in loco.`
-    : ' Cauzione rimborsabile: da definire, separata e in loco.';
+    ? ` Cauzione rimborsabile: ${formatCurrency(deposit.cents / 100)}, separata e da regolare all’imbarco.`
+    : ' Cauzione rimborsabile: da definire, separata e da regolare all’imbarco.';
   const starterPackText = starterPack.defined
-    ? ` Starter Pack: ${formatCurrency(starterPack.cents / 100)}, solo contanti in loco.`
-    : ' Starter Pack: da definire, solo contanti in loco.';
+    ? ` Starter Pack: ${formatCurrency(starterPack.cents / 100)}, solo contanti a bordo.`
+    : ' Starter Pack: da definire, solo contanti a bordo.';
   preview.textContent = `${total} (${details})${missingText}${starterPackText}${depositText} Non crea una richiesta o un pagamento.`;
 }
 
@@ -2613,7 +2678,7 @@ function resetProjectionForm() {
   syncProjectionCostParticipation();
   editingProjectionId = null;
   linkingLegacyInviteId = null;
-  document.querySelector('#projectionSubmitButton').textContent = 'Salva proiezione e riserva posto';
+  document.querySelector('#projectionSubmitButton').textContent = 'Salva la scheda e riserva il posto';
   document.querySelector('#cancelProjectionEdit').hidden = true;
   document.querySelector('#cancelProjectionEdit').textContent = 'Annulla modifica';
   const legacyLinkHint = document.querySelector('#projectionLegacyLinkHint');
@@ -2695,7 +2760,7 @@ function projectionCabinControl(projection) {
   if (projection.berthType !== 'double_cabin') return '';
   const cabinGroupId = projectionCabinGroupId(projection);
   if (!doubleCabinGroups().length) {
-    return '<span class="projection-cabin-note">Configura prima le cabine doppie della barca.</span>';
+    return '<span class="projection-cabin-note">Configura prima le cabine da 2 posti della barca.</span>';
   }
   return `<label class="projection-cabin-control">Cabina<select data-cabin-group="${escapeHtml(projection.id)}" aria-label="Cabina assegnata a ${escapeHtml(projection.displayName)}">${cabinGroupOptionsHtml(cabinGroupId, projection.id)}</select></label>`;
 }
@@ -2730,14 +2795,14 @@ function renderProjectionCard(projection) {
   const starterPack = isExemptFromCosts
     ? 'Non previsto per il ruolo gratuito'
     : cost.starterPackCents > 0
-      ? `${formatCurrency(cost.starterPackCents / 100)} · solo contanti in loco`
-      : 'Da definire · solo contanti in loco';
+      ? `${formatCurrency(cost.starterPackCents / 100)} · solo contanti a bordo`
+      : 'Da definire · solo contanti a bordo';
   const deposit = cost.refundableDepositCents > 0
-    ? `${formatCurrency(cost.refundableDepositCents / 100)} · separata, in loco`
-    : 'Da definire · separata, in loco';
+    ? `${formatCurrency(cost.refundableDepositCents / 100)} · separata, a bordo`
+    : 'Da definire · separata, a bordo';
   const cabinAssignment = projectionCabinAssignmentText(projection);
   const assignment = `<b>Ruolo previsto:</b> ${escapeHtml(projection.plannedRole)} · <b>Sistemazione:</b> ${escapeHtml(projectionBerthLabel(projection.berthType))}${cabinAssignment ? ` · <b>Cabina:</b> ${escapeHtml(cabinAssignment)}` : ''}`;
-  return `<article class="projection-row projection-card"><div class="projection-row-person"><strong>${escapeHtml(projection.displayName)}</strong><span class="projection-row-assignment">${assignment}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small>${projectionCabinControl(projection)}</div><div class="projection-row-cost"><span class="projection-row-cost-label">Richiesta prevista · non è un pagamento</span><strong>${escapeHtml(total)}</strong><span class="projection-row-cost-breakdown">${escapeHtml(quote)}</span><span class="projection-row-deposit"><b>Starter Pack:</b> ${escapeHtml(starterPack)}</span><span class="projection-row-deposit"><b>Cauzione rimborsabile:</b> ${escapeHtml(deposit)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(projection.displayName)}">${projectionCardActions(projection, invite)}</div></article>`;
+  return `<article class="projection-row projection-card"><div class="projection-row-person"><strong>${escapeHtml(projection.displayName)}</strong><span class="projection-row-assignment">${assignment}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small>${projectionCabinControl(projection)}</div><div class="projection-row-cost"><span class="projection-row-cost-label">Importo previsto · non è un pagamento</span><strong>${escapeHtml(total)}</strong><span class="projection-row-cost-breakdown">${escapeHtml(quote)}</span><span class="projection-row-deposit"><b>Starter Pack:</b> ${escapeHtml(starterPack)}</span><span class="projection-row-deposit"><b>Cauzione rimborsabile:</b> ${escapeHtml(deposit)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(projection.displayName)}">${projectionCardActions(projection, invite)}</div></article>`;
 }
 
 function renderLegacyInviteCard(invite) {
@@ -2745,7 +2810,7 @@ function renderLegacyInviteCard(invite) {
   const linkReady = invite.status === 'pending' && !expired && invite.accessKey;
   const linkable = isLegacyInviteLinkable(invite);
   const status = invite.status === 'active'
-    ? 'Accesso attivo · completa comunque il Piano equipaggio'
+    ? 'Accesso attivo · completa comunque la scheda equipaggio'
     : expired
       ? 'Invito scaduto · rinnova il link prima di completare la scheda'
       : 'Invito già creato · completa la scheda persona';
@@ -2757,9 +2822,9 @@ function renderLegacyInviteCard(invite) {
   }
   if (invite.status !== 'revoked') actions.push(projectionActionButton('reissue-invite', invite.id, `Revoca e genera un nuovo link per ${invite.displayName}`, '↻', 'release'));
   const instruction = linkable
-    ? 'Aggiungi cognome, ruolo, sistemazione, cabina e quota: il link personale resta identico.'
+    ? 'Aggiungi cognome, ruolo, sistemazione, cabina e importo previsto: il link personale resta identico.'
     : 'Questo invito storico non è più collegabile: il suo accesso resta invariato.';
-  return `<article class="projection-row projection-card projection-card-legacy"><div class="projection-row-person"><strong>${escapeHtml(invite.displayName)}</strong><span class="projection-row-assignment"><b>Ruolo:</b> da definire · <b>Sistemazione:</b> da definire</span><small>${escapeHtml(status)}</small></div><div class="projection-row-cost"><span class="projection-row-cost-label">Scheda da completare</span><strong>Quota da definire</strong><span class="projection-row-cost-breakdown">${escapeHtml(instruction)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(invite.displayName)}">${actions.join('')}</div></article>`;
+  return `<article class="projection-row projection-card projection-card-legacy"><div class="projection-row-person"><strong>${escapeHtml(invite.displayName)}</strong><span class="projection-row-assignment"><b>Ruolo:</b> da definire · <b>Sistemazione:</b> da definire</span><small>${escapeHtml(status)}</small></div><div class="projection-row-cost"><span class="projection-row-cost-label">Scheda da completare</span><strong>Importo da definire</strong><span class="projection-row-cost-breakdown">${escapeHtml(instruction)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(invite.displayName)}">${actions.join('')}</div></article>`;
 }
 
 function renderProjections() {
@@ -2774,7 +2839,7 @@ function renderProjections() {
   ];
   list.innerHTML = cards.length
     ? cards.join('')
-    : '<p class="empty-state">Nessun posto ancora riservato nella proiezione.</p>';
+    : '<p class="empty-state">Nessun posto ancora riservato nell’elenco provvisorio.</p>';
   syncProjectionCabinGroupField();
   renderCapacityStatus();
   renderSkipperDashboardOverview();
@@ -2847,7 +2912,7 @@ function renderPayments(snapshot) {
     const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
     const methods = paymentMethodTags(payment) || '<span>Metodo da concordare nello scambio WhatsApp.</span>';
     const accountingTag = paymentCountsTowardCostPlan(payment)
-      ? '<span class="payment-accounting-tag">Cassa skipper</span>'
+      ? '<span class="payment-accounting-tag">Spese della barca</span>'
       : '';
     const contributionLabel = paymentContributionItemLabel(payment);
     const contributionTag = contributionLabel
@@ -2891,7 +2956,7 @@ function renderBriefingStatus() {
   const accepted = activeAcceptances.filter((item) => item.rulesVersion === version
     && (activeBriefing.fullRulesRequired !== true || item.fullRulesRead === true)).length;
   const hasOfficialEnglish = hasOfficialEnglishBriefing();
-  status.textContent = `Briefing safety versione ${version} pubblicato. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} completato l’accettazione.${hasOfficialEnglish ? ' Versione inglese ufficiale disponibile.' : ' Versione inglese ufficiale non ancora pubblicata.'}`;
+  status.textContent = `Briefing di sicurezza versione ${version} pubblicato. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} completato l’accettazione.${hasOfficialEnglish ? ' Versione inglese ufficiale disponibile.' : ' Versione inglese ufficiale non ancora pubblicata.'}`;
   renderSkipperDashboardOverview();
 }
 
@@ -2961,7 +3026,7 @@ function subscribeToBoat(boat) {
     renderCostPlan(snapshot.exists() ? snapshot.data() : null);
   }, () => {
     renderCostPlan(null);
-    setMessage(document.querySelector('#costPlanMessage'), 'Impossibile leggere la cassa skipper.', true);
+    setMessage(document.querySelector('#costPlanMessage'), 'Non riesco a leggere i conti della barca.', true);
   });
   stopContributionPlanSubscription = onSnapshot(doc(db, 'boats', boat.id, 'contributionPlan', 'default'), (snapshot) => {
     activeContributionPlan = snapshot.exists() ? snapshot.data() : null;
@@ -2989,7 +3054,7 @@ function subscribeToBoat(boat) {
     renderProjections();
     renderCapacityStatus();
     renderSkipperDashboardOverview();
-  }, () => setMessage(document.querySelector('#projectionFormMessage'), 'Impossibile leggere la proiezione equipaggio.', true));
+  }, () => setMessage(document.querySelector('#projectionFormMessage'), 'Non riesco a leggere l’elenco provvisorio dell’equipaggio.', true));
   stopBriefingSubscription = onSnapshot(doc(db, 'boats', boat.id, 'briefing', 'board'), (snapshot) => {
     activeBriefing = snapshot.exists() ? snapshot.data() : null;
     renderBriefingForm();
@@ -3095,7 +3160,7 @@ boatForm.addEventListener('submit', async (event) => {
     const projectionsOutsideLayout = projectionsOutsideDoubleCabinLayout(berthLayout);
     if (projectionsOutsideLayout.length) {
       const names = projectionsOutsideLayout.map((projection) => projection.displayName).join(', ');
-      setMessage(document.querySelector('#boatFormMessage'), `Prima riassegna ${names}: la nuova configurazione non include più la loro cabina doppia.`, true);
+      setMessage(document.querySelector('#boatFormMessage'), `Prima riassegna ${names}: la nuova configurazione non include più la loro cabina da 2 posti.`, true);
       return;
     }
     if (activeBoat && allocatedCrewSeatCount() > capacity) {
@@ -3227,16 +3292,16 @@ function prepareLegacyInviteProjection(invite) {
   const legacyLinkHint = document.querySelector('#projectionLegacyLinkHint');
   if (legacyLinkHint) {
     legacyLinkHint.hidden = false;
-    legacyLinkHint.textContent = `Stai aggiungendo ${invite.displayName} al Piano equipaggio. Completa ruolo, sistemazione e quota, poi salva: il link personale esistente non verrà creato, revocato o modificato.`;
+    legacyLinkHint.textContent = `Stai aggiungendo ${invite.displayName} all’elenco provvisorio. Completa ruolo, sistemazione e importo previsto, poi salva: il link personale esistente non verrà creato, revocato o modificato.`;
   }
-  document.querySelector('#projectionSubmitButton').textContent = 'Salva nel Piano senza creare un nuovo invito';
+  document.querySelector('#projectionSubmitButton').textContent = 'Salva la scheda senza creare un nuovo invito';
   const cancelButton = document.querySelector('#cancelProjectionEdit');
   cancelButton.textContent = 'Annulla collegamento';
   cancelButton.hidden = false;
   const nameGuidance = /^[^\s]+$/.test(invite.displayName)
     ? `Il numero WhatsApp deve coincidere esattamente. Il nome “${invite.displayName}” resta invariato e qui puoi aggiungere il cognome.`
     : 'Nome e numero WhatsApp devono coincidere esattamente con l’invito esistente.';
-  setMessage(document.querySelector('#projectionFormMessage'), `${nameGuidance} Poi salva posto e quota prevista.`);
+  setMessage(document.querySelector('#projectionFormMessage'), `${nameGuidance} Poi salva posto e importo previsto.`);
   form.scrollIntoView({ behavior: 'smooth', block: 'center' });
   form.elements.berthType.focus();
 }
@@ -3367,11 +3432,11 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
     ? activeInvites.find((candidate) => candidate.id === linkingLegacyInviteId)
     : null;
   if (legacyLinkRequested && (!legacyInvite || !isLegacyInviteLinkable(legacyInvite) || !legacyInvite.createdAt?.toDate)) {
-    setMessage(message, 'Questo invito storico non è più compatibile con il Piano equipaggio. Il suo accesso non è stato modificato.', true);
+    setMessage(message, 'Questo invito precedente non è più compatibile con l’elenco provvisorio. Il suo accesso non è stato modificato.', true);
     return;
   }
   if (legacyInvite && activeProjections.some((projection) => projectionMatchesInvite(projection, legacyInvite.id))) {
-    setMessage(message, 'Questo invito è già collegato al Piano equipaggio.', true);
+    setMessage(message, 'Questo invito è già collegato all’elenco provvisorio.', true);
     return;
   }
   if (!editingProjectionId && !legacyInvite && needsCapacityAlignment(activeBoat)) {
@@ -3439,7 +3504,7 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
       });
       setMessage(message, existingInvite
         ? 'Scheda aggiornata: il link personale e lo stato di accesso restano invariati.'
-        : 'Proiezione aggiornata: posto, ruolo, sistemazione e quota prevista restano associati alla stessa persona.');
+        : 'Scheda aggiornata: posto, ruolo, sistemazione e importo previsto restano associati alla stessa persona.');
     } else if (legacyInvite) {
       await setDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), {
         ...projection,
@@ -3451,7 +3516,7 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
         updatedAt: serverTimestamp(),
         updatedBy: auth.currentUser.uid,
       });
-      setMessage(message, `Piano equipaggio salvato per ${legacyInvite.displayName}: usa lo stesso ID dell’invito esistente, che non è stato creato, revocato o modificato.`);
+      setMessage(message, `Scheda equipaggio salvata per ${legacyInvite.displayName}: usa lo stesso ID dell’invito esistente, che non è stato creato, revocato o modificato.`);
     } else {
       await setDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), {
         ...projection,
@@ -3463,11 +3528,11 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
         updatedAt: serverTimestamp(),
         updatedBy: auth.currentUser.uid,
       });
-      setMessage(message, 'Proiezione salvata: controlla il riepilogo accanto alla persona e, quando vuoi, crea l’invito WhatsApp dalla stessa riga.');
+      setMessage(message, 'Scheda salvata: controlla il riepilogo accanto alla persona e, quando vuoi, crea l’invito WhatsApp dalla stessa riga.');
     }
     resetProjectionForm();
   } catch (error) {
-    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare la proiezione equipaggio.'), true);
+    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare la scheda dell’equipaggio.'), true);
   } finally {
     submitButton.disabled = false;
   }
@@ -3510,7 +3575,7 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     const invite = activeInvites.find((candidate) => candidate.id === legacyLinkButton.dataset.linkLegacyInvite);
     if (!invite || !isLegacyInviteLinkable(invite)) return;
     if (activeProjections.some((projection) => projectionMatchesInvite(projection, invite.id))) {
-      setMessage(message, 'Questa persona è già collegata al Piano equipaggio.', true);
+      setMessage(message, 'Questa persona è già presente nell’elenco provvisorio dell’equipaggio.', true);
       return;
     }
     prepareLegacyInviteProjection(invite);
@@ -3526,11 +3591,11 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     setProjectionIdentityFieldsLocked(Boolean(invite));
     if (invite) projectionForm.elements.preferredLocale.disabled = true;
     syncProjectionCabinGroupField();
-    document.querySelector('#projectionSubmitButton').textContent = 'Salva proiezione';
+    document.querySelector('#projectionSubmitButton').textContent = 'Salva la scheda';
     document.querySelector('#cancelProjectionEdit').hidden = false;
     setMessage(message, invite
-      ? 'Puoi aggiornare ruolo, sistemazione, cabina e quote. Nome, WhatsApp, lingua e link personale restano invariati.'
-      : 'Modifica posto, ruolo, sistemazione, cabina e quota prevista, poi salva.');
+      ? 'Puoi aggiornare ruolo, sistemazione, cabina e importi. Nome, WhatsApp, lingua e link personale restano invariati.'
+      : 'Modifica posto, ruolo, sistemazione, cabina e importo previsto, poi salva.');
     projectionForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
@@ -3543,7 +3608,7 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     try {
       await deleteDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projection.id));
       if (editingProjectionId === projection.id) resetProjectionForm();
-      setMessage(message, 'Posto liberato: torna disponibile per una nuova proiezione.');
+      setMessage(message, 'Posto liberato: torna disponibile per una nuova scheda equipaggio.');
     } catch (error) {
       releaseButton.disabled = false;
       setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a liberare questo posto.'), true);
@@ -3562,10 +3627,10 @@ document.querySelector('#projectionList').addEventListener('click', async (event
       const url = whatsappUrl(invite);
       if (whatsappWindow && url) {
         whatsappWindow.location.replace(url);
-        setMessage(message, `Invito pronto per ${projection.displayName}: WhatsApp è aperto con il messaggio già preparato. La proiezione resta collegata allo stesso posto, ruolo, sistemazione e quota prevista.`);
+        setMessage(message, `Invito pronto per ${projection.displayName}: WhatsApp è aperto con il messaggio già preparato. La scheda resta collegata allo stesso posto, ruolo, sistemazione e importo previsto.`);
       } else {
         whatsappWindow?.close();
-        setMessage(message, `Invito pronto per ${projection.displayName}: copia il link dalla sua card. La proiezione resta collegata allo stesso posto, ruolo, sistemazione e quota prevista.`);
+        setMessage(message, `Invito pronto per ${projection.displayName}: copia il link dalla sua card. La scheda resta collegata allo stesso posto, ruolo, sistemazione e importo previsto.`);
       }
     } catch (error) {
       whatsappWindow?.close();
@@ -3573,7 +3638,7 @@ document.querySelector('#projectionList').addEventListener('click', async (event
       const fallback = error.code === 'phone-already-assigned'
         ? 'Questo numero è già associato a una barca dell’evento. Verifica prima con l’organizzatore.'
         : error.code === 'english-briefing-required'
-          ? 'Prima di creare un invito in inglese, pubblica il briefing safety ufficiale in inglese dalla bacheca di bordo.'
+          ? 'Prima di creare un invito in inglese, pubblica dalla bacheca la versione inglese ufficiale del briefing di sicurezza.'
           : 'Non riesco a creare l’invito personale.';
       setMessage(message, getFirestoreErrorMessage(error, fallback), true);
     }
