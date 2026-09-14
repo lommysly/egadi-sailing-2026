@@ -190,18 +190,62 @@ service cloud.firestore {
         && hasValidCrewProjectionPayloadCore(projectionId);
     }
 
+    // V3 aggiunge facoltativamente il gruppo cabina. Il gruppo non contiene
+    // nomi: due persone con lo stesso valore condividono la cabina doppia.
+    // Il numero nel gruppo deve esistere anche nel layout della barca. Si usa
+    // `getAfter` per non accettare, nello stesso batch, una cabina rimossa
+    // contestualmente dalla configurazione. Il form limita il layout a 12
+    // cabine doppie; oltre quel limite si nega l'assegnazione invece di
+    // accettare un riferimento non rappresentabile nell'interfaccia.
+    function isConfiguredDoubleCabinGroup(boatId, cabinGroupId) {
+      let boat = getAfter(/databases/$(database)/documents/boats/$(boatId));
+      return existsAfter(/databases/$(database)/documents/boats/$(boatId))
+        && boat.data.keys().hasAll(['berthLayout'])
+        && boat.data.berthLayout is map
+        && boat.data.berthLayout.keys().hasAll(['doubleCabins'])
+        && boat.data.berthLayout.doubleCabins is int
+        && boat.data.berthLayout.doubleCabins >= 1
+        && boat.data.berthLayout.doubleCabins <= 12
+        && (cabinGroupId == 'double-1'
+          || (boat.data.berthLayout.doubleCabins >= 2 && cabinGroupId == 'double-2')
+          || (boat.data.berthLayout.doubleCabins >= 3 && cabinGroupId == 'double-3')
+          || (boat.data.berthLayout.doubleCabins >= 4 && cabinGroupId == 'double-4')
+          || (boat.data.berthLayout.doubleCabins >= 5 && cabinGroupId == 'double-5')
+          || (boat.data.berthLayout.doubleCabins >= 6 && cabinGroupId == 'double-6')
+          || (boat.data.berthLayout.doubleCabins >= 7 && cabinGroupId == 'double-7')
+          || (boat.data.berthLayout.doubleCabins >= 8 && cabinGroupId == 'double-8')
+          || (boat.data.berthLayout.doubleCabins >= 9 && cabinGroupId == 'double-9')
+          || (boat.data.berthLayout.doubleCabins >= 10 && cabinGroupId == 'double-10')
+          || (boat.data.berthLayout.doubleCabins >= 11 && cabinGroupId == 'double-11')
+          || (boat.data.berthLayout.doubleCabins >= 12 && cabinGroupId == 'double-12'));
+    }
+
+    function hasCrewProjectionCabinGroupWithinBoat(boatId) {
+      return !request.resource.data.keys().hasAny(['cabinGroupId'])
+        || request.resource.data.cabinGroupId == ''
+        || (request.resource.data.berthType == 'double_cabin'
+          && request.resource.data.cabinGroupId is string
+          && isConfiguredDoubleCabinGroup(boatId, request.resource.data.cabinGroupId));
+    }
+
     function hasValidCrewProjectionPayload(projectionId) {
       return request.resource.data.keys().hasAll(['contributesToCosts'])
-        && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
         && hasValidCrewProjectionPayloadCore(projectionId)
         && request.resource.data.contributesToCosts is bool
+        && (!request.resource.data.keys().hasAny(['cabinGroupId'])
+          || (request.resource.data.cabinGroupId is string
+            && (request.resource.data.cabinGroupId == ''
+              || request.resource.data.cabinGroupId.matches('^double-[1-9][0-9]*$'))
+            && (request.resource.data.berthType == 'double_cabin'
+              || request.resource.data.cabinGroupId == '')))
         && (request.resource.data.contributesToCosts == true
           || (request.resource.data.berthCents == 0
             && request.resource.data.starterPackCents == 0
             && request.resource.data.protectionInsuranceCents == 0));
     }
 
-    // Ogni impronta V2, anche incompleta, blocca un set legacy che potrebbe
+    // Ogni impronta V2/V3, anche incompleta, blocca un set legacy che potrebbe
     // cancellare il flag e quindi alterare il significato delle quote automatiche.
     function isCrewProjectionV2(data) {
       return data is map
@@ -211,7 +255,8 @@ service cloud.firestore {
     function isValidCrewProjectionCreate(boatId, projectionId) {
       return !exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId))
         && (hasValidLegacyCrewProjectionPayload(projectionId)
-          || hasValidCrewProjectionPayload(projectionId))
+          || (hasValidCrewProjectionPayload(projectionId)
+            && hasCrewProjectionCabinGroupWithinBoat(boatId)))
         && request.resource.data.status == 'projected'
         && request.resource.data.inviteId == null
         && request.resource.data.invitedAt == null
@@ -219,8 +264,9 @@ service cloud.firestore {
         && request.resource.data.createdBy == request.auth.uid;
     }
 
-    function isValidCrewProjectionDraftUpdate(projectionId) {
-      return (hasValidCrewProjectionPayload(projectionId)
+    function isValidCrewProjectionDraftUpdate(boatId, projectionId) {
+      return ((hasValidCrewProjectionPayload(projectionId)
+          && hasCrewProjectionCabinGroupWithinBoat(boatId))
           || (!isCrewProjectionV2(resource.data)
             && hasValidLegacyCrewProjectionPayload(projectionId)))
         && resource.data.status == 'projected'
@@ -231,7 +277,33 @@ service cloud.firestore {
         && request.resource.data.invitedAt == null
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'updatedAt', 'updatedBy']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'updatedAt', 'updatedBy']);
+    }
+
+    // Dopo l'invito lo skipper può ancora aggiornare piano, quota e cabina,
+    // ma non può trasformare il link personale in un'altra identità.
+    function isValidCrewProjectionInvitedPlanUpdate(boatId, projectionId) {
+      return ((hasValidCrewProjectionPayload(projectionId)
+          && hasCrewProjectionCabinGroupWithinBoat(boatId))
+          || (!isCrewProjectionV2(resource.data)
+            && hasValidLegacyCrewProjectionPayload(projectionId)))
+        && resource.data.id == projectionId
+        && resource.data.status == 'invited'
+        && resource.data.inviteId == projectionId
+        && resource.data.invitedAt is timestamp
+        && request.resource.data.status == 'invited'
+        && request.resource.data.inviteId == resource.data.inviteId
+        && request.resource.data.invitedAt == resource.data.invitedAt
+        && request.resource.data.firstName == resource.data.firstName
+        && request.resource.data.lastName == resource.data.lastName
+        && request.resource.data.displayName == resource.data.displayName
+        && request.resource.data.whatsappNumber == resource.data.whatsappNumber
+        && request.resource.data.preferredLocale == resource.data.preferredLocale
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contactConsent', 'contributesToCosts', 'updatedAt', 'updatedBy']);
     }
 
     // Il collegamento diventa reale solo nel batch che crea l'invito con lo
@@ -249,7 +321,8 @@ service cloud.firestore {
 
     function isValidCrewProjectionInviteTransition(boatId, projectionId) {
       return (hasValidLegacyCrewProjectionPayload(projectionId)
-          || hasValidCrewProjectionPayload(projectionId))
+          || (hasValidCrewProjectionPayload(projectionId)
+            && hasCrewProjectionCabinGroupWithinBoat(boatId)))
         && resource.data.id == projectionId
         && resource.data.status == 'projected'
         && resource.data.inviteId == null
@@ -273,7 +346,9 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId))
         && invite.data.id == projectionId
         && invite.data.boatId == boatId
-        && invite.data.displayName == request.resource.data.displayName
+        && (invite.data.displayName == request.resource.data.displayName
+          || (invite.data.displayName.matches('^[^ ]+$')
+            && invite.data.displayName == request.resource.data.firstName))
         && invite.data.whatsappNumber == request.resource.data.whatsappNumber
         && invite.data.createdAt is timestamp
         && request.resource.data.invitedAt == invite.data.createdAt
@@ -287,7 +362,8 @@ service cloud.firestore {
 
     function isValidCrewProjectionLegacyInviteCreate(boatId, projectionId) {
       return (hasValidLegacyCrewProjectionPayload(projectionId)
-          || hasValidCrewProjectionPayload(projectionId))
+          || (hasValidCrewProjectionPayload(projectionId)
+            && hasCrewProjectionCabinGroupWithinBoat(boatId)))
         && request.resource.data.status == 'invited'
         && request.resource.data.inviteId == projectionId
         && request.resource.data.createdAt == request.time
@@ -1011,7 +1087,10 @@ service cloud.firestore {
             || (isSkipper(boatId) && isValidCrewProjectionLegacyInviteCreate(boatId, projectionId)));
         allow update: if isPrivateAreaOpen()
           && (isOrganizer() || isSkipper(boatId))
-          && isValidCrewProjectionDraftUpdate(projectionId);
+          && isValidCrewProjectionDraftUpdate(boatId, projectionId);
+        allow update: if isPrivateAreaOpen()
+          && (isOrganizer() || isSkipper(boatId))
+          && isValidCrewProjectionInvitedPlanUpdate(boatId, projectionId);
         allow update: if isPrivateAreaOpen()
           && (isOrganizer() || isSkipper(boatId))
           && isValidCrewProjectionInviteTransition(boatId, projectionId);
