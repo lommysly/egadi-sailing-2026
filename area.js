@@ -71,8 +71,8 @@ const CONTRIBUTION_ITEM_STATES = new Map([
 ]);
 const DEFAULT_CONTRIBUTION_ITEMS = [
   { id: 'berth', label: 'Quota posto in barca' },
-  { id: 'starter_pack', label: 'Starter Pack · lenzuola/asciugamani, SUP e fuoribordo' },
-  { id: 'linen_towels', label: 'Lenzuola e asciugamani · inclusi nello Starter Pack' },
+  { id: 'starter_pack', label: 'Starter Pack · servizi selezionati' },
+  { id: 'linen_towels', label: 'Lenzuola e asciugamani · voce tecnica Starter Pack' },
   { id: 'protection_insurance', label: 'Assicurazione cauzione' },
   { id: 'provisions', label: 'Cambusa' },
   { id: 'fuel', label: 'Gasolio per la navigazione' },
@@ -88,23 +88,61 @@ const PROTECTION_INSURANCE_RATE_MODES = new Set(['total_divided', 'fixed_per_per
 const BERTH_ROUNDING_MODES = new Set(['automatic', 'ceil_increment', 'manual_up']);
 const BERTH_ROUNDING_INCREMENT_CENTS = new Set([100, 500, 1000]);
 const FREE_SUPPORT_ROLES = new Set(['co_skipper', 'hostess', 'collaborator']);
+const STARTER_PACK_ITEMS = Object.freeze([
+  { id: 'bed_linen', label: 'Lenzuola' },
+  { id: 'bath_towels', label: 'Asciugamani' },
+  { id: 'bath_kit', label: 'Kit bagno / consumabili' },
+  { id: 'beach_towel', label: 'Telo mare' },
+  { id: 'outboard', label: 'Fuoribordo' },
+  { id: 'final_cleaning', label: 'Pulizie finali' },
+  { id: 'sup', label: 'SUP' },
+  { id: 'egadi_navigation_permit', label: 'Permesso / contributo di navigazione Egadi' },
+  { id: 'tender', label: 'Tender, se previsto dal charter' },
+]);
+const STARTER_PACK_ITEM_IDS = new Set(STARTER_PACK_ITEMS.map((item) => item.id));
+const DEFAULT_STARTER_PACK_ITEM_IDS = Object.freeze(['bed_linen', 'bath_towels', 'outboard', 'sup']);
 const DEFAULT_COST_PLAN_DESCRIPTIONS = Object.freeze({
   starterPackDescription: 'Lenzuola e asciugamani, SUP e fuoribordo.',
   protectionInsuranceDescription: 'Copertura assicurativa della cauzione, separata dalla quota del posto.',
-  refundableDepositDescription: 'Cauzione rimborsabile da consegnare in contanti all’imbarco e restituita secondo charter.',
+  refundableDepositDescription: 'Cauzione cash all’imbarco: restituzione dopo il check-out del charter; in caso di danno, dopo la chiusura della pratica.',
 });
 const DEFAULT_CONTRIBUTION_DESCRIPTIONS = Object.freeze({
   berth: 'Il valore dipende dalla sistemazione assegnata dallo skipper.',
   starter_pack: DEFAULT_COST_PLAN_DESCRIPTIONS.starterPackDescription,
-  linen_towels: 'Compresi nello Starter Pack.',
+  linen_towels: 'Gestita dentro lo Starter Pack.',
   protection_insurance: DEFAULT_COST_PLAN_DESCRIPTIONS.protectionInsuranceDescription,
-  provisions: 'Da confermare con lo skipper.',
-  fuel: 'Da confermare con lo skipper.',
-  transfer: 'Da confermare con lo skipper.',
-  shore_dinner: 'Da confermare con lo skipper.',
-  mooring_fee: 'Da confermare con lo skipper.',
+  provisions: 'Cambusa da dividere tra chi partecipa.',
+  fuel: 'Gasolio effettivamente consumato: si calcola a parte al rientro.',
+  transfer: 'Transfer aeroporto ↔ porto, andata e ritorno: sempre fuori dallo Starter Pack.',
+  shore_dinner: 'Cena a terra, solo se organizzata per quella serata.',
+  mooring_fee: 'Porto, ormeggio o boa: solo se non già compresi.',
   refundable_deposit: DEFAULT_COST_PLAN_DESCRIPTIONS.refundableDepositDescription,
 });
+
+function normalizeStarterPackItems(value, { fallbackToDefault = false } = {}) {
+  const selected = Array.isArray(value)
+    ? value.filter((itemId) => typeof itemId === 'string' && STARTER_PACK_ITEM_IDS.has(itemId))
+    : [];
+  const unique = [...new Set(selected)];
+  if (unique.length || Array.isArray(value) || !fallbackToDefault) return unique;
+  return [...DEFAULT_STARTER_PACK_ITEM_IDS];
+}
+
+function starterPackItemsLabel(value) {
+  const labels = normalizeStarterPackItems(value)
+    .map((itemId) => STARTER_PACK_ITEMS.find((item) => item.id === itemId)?.label)
+    .filter(Boolean);
+  return labels.length ? labels.join(', ') : 'servizi da definire con lo skipper';
+}
+
+function starterPackDescriptionFor(value) {
+  return `Comprende: ${starterPackItemsLabel(value)}.`;
+}
+
+function contributionDescriptionFor(itemId, starterPackItems = []) {
+  if (itemId === 'starter_pack') return `${starterPackDescriptionFor(starterPackItems)} Si regola solo in contanti a bordo.`;
+  return DEFAULT_CONTRIBUTION_DESCRIPTIONS[itemId] || '';
+}
 const DEFAULT_RULES_SUMMARY = [
   '1. Seguo sempre le decisioni dello skipper su sicurezza, manovre, meteo, rotta, rada e porto.',
   '2. Partecipo al briefing pratico e uso le dotazioni di sicurezza quando richiesto.',
@@ -149,7 +187,10 @@ const DEFAULT_FULL_RULES = [
   'Porta documento valido, borsa morbida invece di trolley, abbigliamento a strati per vento e sera, protezione solare, cappellino, scarpe con suola chiara/non-marking e una piccola borsa stagna per le uscite a terra. Le istruzioni della barca prevalgono su questa lista generale.',
   '',
   '10. Spesa a bordo, costi e condizioni specifiche',
-  'Spesa e cucina di bordo, extra, eventuali quote, cauzioni e condizioni del charter non sono stabiliti da questo regolamento generale: vengono comunicati separatamente dallo skipper della singola barca prima di qualsiasi richiesta. La conferma online attesta la lettura integrale di questo testo; non sostituisce il briefing pratico obbligatorio a bordo.',
+  'Cambusa, extra, eventuali quote e condizioni del charter vengono comunicati dallo skipper della singola barca prima di qualsiasi richiesta. La conferma online attesta la lettura integrale di questo testo; non sostituisce il briefing pratico obbligatorio a bordo.',
+  '',
+  '11. Cauzione rimborsabile',
+  'La cauzione si consegna in contanti all’imbarco e resta custodita dal charter. Dopo il check-out viene restituita se non emergono danni. Se invece si verifica un danno, il charter può trattenere la somma necessaria finché non conclude la perizia; l’eventuale parte residua viene restituita quando la pratica assicurativa è chiusa.',
 ].join('\n');
 const DEFAULT_RULES_SUMMARY_EN = [
   '1. I always follow the skipper’s decisions on safety, manoeuvres, weather, route, anchorage and harbour.',
@@ -195,7 +236,10 @@ const DEFAULT_FULL_RULES_EN = [
   'Bring a valid document, a soft bag rather than a rigid suitcase, layers for wind and evenings, sunscreen, a hat, light-soled non-marking shoes and a small dry bag for trips ashore. Instructions for the specific boat take priority over this general list.',
   '',
   '10. Provisions, costs and boat-specific arrangements',
-  'Provisions, extras, any contributions, deposits and charter conditions are not set by these general rules. They are communicated separately by the skipper of each boat before any request is made. Online acceptance confirms that you have read this text in full; it does not replace the compulsory practical briefing on board.',
+  'Provisions, extras, any contributions and charter conditions are communicated by the skipper of each boat before any request is made. Online acceptance confirms that you have read this text in full; it does not replace the compulsory practical briefing on board.',
+  '',
+  '11. Refundable deposit',
+  'The deposit is handed over in cash at boarding and held by the charter company. It is returned after check-out if no damage is found. If damage occurs, the charter company may retain the amount needed until its assessment is complete; any remaining balance is returned when the insurance process is closed.',
 ].join('\n');
 let activeBoat = null;
 let activeMembers = [];
@@ -731,6 +775,10 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
   const hasPlan = Boolean(planOverride);
   const plan = normalizeCostPlan(planOverride);
   const model = hasPlan ? costPlanQuoteModel(plan) : null;
+  const starterPackItems = normalizeStarterPackItems(activeContributionPlan?.starterPackItems, {
+    fallbackToDefault: !Array.isArray(activeContributionPlan?.starterPackItems),
+  });
+  const starterPackDescription = starterPackDescriptionFor(starterPackItems);
   const projections = activeProjections.map((projection) => projectionCostBreakdown(projection));
   const projectedBerthCents = projections.reduce((total, projection) => total + projection.normalized.berthCents, 0);
   const projectedInsuranceCents = projections.reduce((total, projection) => total + projection.normalized.protectionInsuranceCents, 0);
@@ -796,7 +844,7 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
     : !model?.starterPackSourceSelected
       ? 'Scegli se è già nel charter oppure esterno: fino ad allora il sito non propone quote automatiche.'
       : starterIncluded
-        ? `${model.starterPackDescription} · Parte del totale charter: è già escluso dalla quota cabina e si raccoglie in contanti a bordo. ${starterDetailBase}`
+      ? `${starterPackDescription} · Parte del totale charter: è già escluso dalla quota cabina e si raccoglie in contanti a bordo. ${starterDetailBase}`
         : starterDetailBase;
   const insuranceValue = !hasPlan || !automaticPricingReady
     ? 'Da compilare'
@@ -814,7 +862,7 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
       <article class="finance-overview-card"><span>Posto cabina standard · persona</span><strong>${escapeHtml(breakEven)}</strong><small>${escapeHtml(breakEvenDetail)}</small></article>
       <article class="finance-overview-card finance-overview-card-extras"><span>${escapeHtml(starterTitle)}</span><strong>${escapeHtml(starterValue)}</strong><small>${escapeHtml(starterDetail)}</small></article>
       <article class="finance-overview-card finance-overview-card-extras"><span>Assicurazione cauzione · totale</span><strong>${escapeHtml(insuranceValue)}</strong><small>${escapeHtml(insuranceDetail)}</small></article>
-      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile · totale cash</span><strong>${escapeHtml(hasPlan ? formatCurrency(depositTargetCents / 100) : 'Da definire')}</strong><small>${escapeHtml(financeAllocationText(depositTargetCents, projectedDepositCashCents, 0, 0, { cash: true, hasTarget: hasPlan }))}</small></article>
+      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile · totale cash</span><strong>${escapeHtml(hasPlan ? formatCurrency(depositTargetCents / 100) : 'Da definire')}</strong><small>${escapeHtml(financeAllocationText(depositTargetCents, projectedDepositCashCents, 0, 0, { cash: true, hasTarget: hasPlan }))} <a class="rules-reference-link" href="#skipper-bacheca">Leggi la regola sulla cauzione</a></small></article>
       <article class="finance-overview-card finance-overview-card-projection"><span>Richieste personali</span><strong>${escapeHtml(formatCurrency(allPayments.requestedCents / 100))}</strong><small>${escapeHtml(`${activeProjections.length} ${activeProjections.length === 1 ? 'scheda equipaggio' : 'schede equipaggio'} · ${formatCurrency(allPayments.pendingCents / 100)} in attesa di verifica · ${formatCurrency(allPayments.verifiedCents / 100)} verificati. Extra programmati restano fuori dal pareggio finché non vengono classificati come spesa della barca.`)}</small></article>
     </div>
   `;
@@ -920,7 +968,7 @@ function getFirestoreErrorMessage(error, fallbackMessage) {
 
 function getCostPlanSaveErrorMessage(error) {
   if (error?.code === 'permission-denied') {
-    return 'Il preventivo non è stato salvato. Ricarica la pagina per usare la versione più recente, poi riprova. Se il problema resta, verifica i tre dettagli mostrati all’equipaggio (senza contatti o istruzioni di pagamento) e di essere nell’area skipper della tua barca.';
+    return 'Non riesco a salvare il preventivo. Controlla di essere nell’area della tua barca e riprova; se il problema resta, non modificare altri importi e avvisa lo skipper o l’organizzatore.';
   }
   return getFirestoreErrorMessage(error, 'Non riesco a salvare il preventivo barca.');
 }
@@ -1163,10 +1211,15 @@ function normalizeCostPlan(plan = {}) {
     manualStandardBerthCents: berthRoundingMode === 'manual_up'
       ? asNonNegativeInteger(plan?.manualStandardBerthCents, 1_000_000)
       : 0,
-    starterPackDescription: normalizeCostPlanDescription(
-      plan?.starterPackDescription,
-      DEFAULT_COST_PLAN_DESCRIPTIONS.starterPackDescription,
-    ),
+    // La lista selezionata vive nel piano quote V4, non nel preventivo
+    // privato. La teniamo qui solo mentre il form prepara il salvataggio.
+    starterPackItems: normalizeStarterPackItems(plan?.starterPackItems),
+    starterPackDescription: Array.isArray(plan?.starterPackItems)
+      ? starterPackDescriptionFor(plan.starterPackItems)
+      : normalizeCostPlanDescription(
+        plan?.starterPackDescription,
+        DEFAULT_COST_PLAN_DESCRIPTIONS.starterPackDescription,
+      ),
     protectionInsuranceDescription: normalizeCostPlanDescription(
       plan?.protectionInsuranceDescription,
       DEFAULT_COST_PLAN_DESCRIPTIONS.protectionInsuranceDescription,
@@ -1175,6 +1228,39 @@ function normalizeCostPlan(plan = {}) {
       plan?.refundableDepositDescription,
       DEFAULT_COST_PLAN_DESCRIPTIONS.refundableDepositDescription,
     ),
+  };
+}
+
+function costPlanForStorage(plan) {
+  const normalized = normalizeCostPlan(plan);
+  return {
+    charterCents: normalized.charterCents,
+    skipperFlightTrainCents: normalized.skipperFlightTrainCents,
+    skipperCarCents: normalized.skipperCarCents,
+    skipperLocalTransferCents: normalized.skipperLocalTransferCents,
+    otherRecoverableCents: normalized.otherRecoverableCents,
+    starterPackTotalCents: normalized.starterPackTotalCents,
+    starterPackRateMode: normalized.starterPackRateMode,
+    starterPackFixedPerPersonCents: normalized.starterPackFixedPerPersonCents,
+    starterPackIncludedInCharter: normalized.starterPackIncludedInCharter,
+    protectionInsuranceTotalCents: normalized.protectionInsuranceTotalCents,
+    protectionInsuranceRateMode: normalized.protectionInsuranceRateMode,
+    protectionInsuranceFixedPerPersonCents: normalized.protectionInsuranceFixedPerPersonCents,
+    refundableDepositTotalCents: normalized.refundableDepositTotalCents,
+    payingParticipants: normalized.payingParticipants,
+    depositParticipants: normalized.depositParticipants,
+    dinettePayingParticipants: normalized.dinettePayingParticipants,
+    dinetteWeightPercent: normalized.dinetteWeightPercent,
+    dinetteRateMode: normalized.dinetteRateMode,
+    dinetteFixedCents: normalized.dinetteFixedCents,
+    berthRoundingMode: normalized.berthRoundingMode,
+    berthRoundingIncrementCents: normalized.berthRoundingIncrementCents,
+    manualStandardBerthCents: normalized.manualStandardBerthCents,
+    // Campi V7 mantenuti per compatibilità, ma non vengono più mostrati come
+    // testo libero nell'area equipaggio.
+    starterPackDescription: starterPackDescriptionFor(normalized.starterPackItems),
+    protectionInsuranceDescription: DEFAULT_COST_PLAN_DESCRIPTIONS.protectionInsuranceDescription,
+    refundableDepositDescription: DEFAULT_COST_PLAN_DESCRIPTIONS.refundableDepositDescription,
   };
 }
 
@@ -1544,19 +1630,19 @@ function effectiveProjectionPricing(projection) {
 
 function normalizeContributionPlan(plan = {}) {
   const sourceItems = plan?.items && typeof plan.items === 'object' ? plan.items : {};
-  const starterPackSettlementMode = plan?.starterPackSettlementMode === 'included_in_charter'
-    || sourceItems.starter_pack?.state === 'included'
-    ? 'included_in_charter'
-    : 'cash_on_board';
+  // Il Pack viene sempre regolato in contanti a bordo: anche se il suo costo
+  // nasce nel charter, non deve confondersi con una richiesta online.
+  const starterPackItems = normalizeStarterPackItems(plan?.starterPackItems, {
+    fallbackToDefault: !Array.isArray(plan?.starterPackItems),
+  });
   const items = Object.fromEntries(DEFAULT_CONTRIBUTION_ITEMS.map((item) => {
     const source = sourceItems[item.id] || {};
     const forcedStates = {
+      starter_pack: 'local',
       linen_towels: 'included',
       refundable_deposit: 'local',
     };
-    const state = item.id === 'starter_pack'
-      ? (starterPackSettlementMode === 'included_in_charter' ? 'included' : 'local')
-      : forcedStates[item.id]
+    const state = forcedStates[item.id]
       || (CONTRIBUTION_ITEM_STATES.has(source.state) ? source.state : 'to_define');
     const amountCents = state === 'extra' || state === 'local'
       ? asNonNegativeInteger(source.amountCents, 1_000_000)
@@ -1564,10 +1650,12 @@ function normalizeContributionPlan(plan = {}) {
     return [item.id, {
       state,
       amountCents,
-      description: normalizeCostPlanDescription(source.description, DEFAULT_CONTRIBUTION_DESCRIPTIONS[item.id] || ''),
+      // Descrizione calcolata localmente: non viene mai scritta nel documento
+      // leggibile dall'equipaggio.
+      description: contributionDescriptionFor(item.id, starterPackItems),
     }];
   }));
-  return { items, starterPackSettlementMode };
+  return { items, starterPackItems, starterPackSettlementMode: 'cash_on_board' };
 }
 
 function contributionCatalog(plan = activeContributionPlan) {
@@ -1580,7 +1668,7 @@ function contributionCatalog(plan = activeContributionPlan) {
         ...value,
         state: 'local',
         amountCents: model ? model.starterPackPerPersonCents : value.amountCents,
-        description: model?.starterPackDescription || value.description,
+        description: contributionDescriptionFor(item.id, normalized.starterPackItems),
       };
     }
     if (item.id === 'linen_towels') return { ...value, state: 'included', amountCents: 0 };
@@ -1589,7 +1677,7 @@ function contributionCatalog(plan = activeContributionPlan) {
         ...value,
         state: 'extra',
         amountCents: model.protectionInsurancePerPersonCents,
-        description: model.protectionInsuranceDescription,
+        description: contributionDescriptionFor(item.id, normalized.starterPackItems),
       } : value;
     }
     if (item.id === 'refundable_deposit') {
@@ -1597,7 +1685,7 @@ function contributionCatalog(plan = activeContributionPlan) {
         ...value,
         state: 'local',
         amountCents: model ? model.refundableDepositPerPersonCents : value.amountCents,
-        description: model?.refundableDepositDescription || value.description,
+        description: contributionDescriptionFor(item.id, normalized.starterPackItems),
       };
     }
     return value;
@@ -1608,33 +1696,40 @@ function contributionPlanForCostPlan(plan, contributionPlan = activeContribution
   const normalizedPlan = normalizeCostPlan(plan);
   const model = costPlanQuoteModel(normalizedPlan);
   const normalizedContributionPlan = normalizeContributionPlan(contributionPlan);
-  const items = { ...normalizedContributionPlan.items };
+  const starterPackItems = Array.isArray(plan?.starterPackItems)
+    ? normalizeStarterPackItems(plan.starterPackItems)
+    : normalizedContributionPlan.starterPackItems;
+  const items = Object.fromEntries(DEFAULT_CONTRIBUTION_ITEMS.map((item) => {
+    const source = normalizedContributionPlan.items[item.id];
+    return [item.id, { state: source.state, amountCents: source.amountCents }];
+  }));
   items.starter_pack = {
-    ...items.starter_pack,
     state: 'local',
     amountCents: model?.starterPackPerPersonCents || 0,
-    description: normalizedPlan.starterPackDescription,
   };
   items.linen_towels = {
-    ...items.linen_towels,
     state: 'included',
     amountCents: 0,
-    description: DEFAULT_CONTRIBUTION_DESCRIPTIONS.linen_towels,
   };
   items.protection_insurance = {
-    ...items.protection_insurance,
     state: 'extra',
     amountCents: model?.protectionInsurancePerPersonCents || 0,
-    description: normalizedPlan.protectionInsuranceDescription,
   };
   items.refundable_deposit = {
-    ...items.refundable_deposit,
     state: 'local',
     amountCents: model?.refundableDepositPerPersonCents || 0,
-    description: normalizedPlan.refundableDepositDescription,
   };
+  return normalizeContributionPlan({ items, starterPackItems, starterPackSettlementMode: 'cash_on_board' });
+}
+
+function contributionPlanForStorage(plan) {
+  const normalized = normalizeContributionPlan(plan);
   return {
-    items,
+    items: Object.fromEntries(DEFAULT_CONTRIBUTION_ITEMS.map((item) => [item.id, {
+      state: normalized.items[item.id].state,
+      amountCents: normalized.items[item.id].amountCents,
+    }])),
+    starterPackItems: normalized.starterPackItems,
     starterPackSettlementMode: 'cash_on_board',
   };
 }
@@ -2268,9 +2363,12 @@ function fillCostPlanForm(plan = activeCostPlan) {
   form.elements.berthRoundingMode.value = normalized.berthRoundingMode;
   form.elements.berthRoundingIncrement.value = String(normalized.berthRoundingIncrementCents || 100);
   form.elements.manualStandardBerthPrice.value = euroInputValue(normalized.manualStandardBerthCents);
-  form.elements.starterPackDescription.value = normalized.starterPackDescription;
-  form.elements.protectionInsuranceDescription.value = normalized.protectionInsuranceDescription;
-  form.elements.refundableDepositDescription.value = normalized.refundableDepositDescription;
+  const selectedStarterPackItems = normalizeStarterPackItems(activeContributionPlan?.starterPackItems, {
+    fallbackToDefault: !Array.isArray(activeContributionPlan?.starterPackItems),
+  });
+  form.querySelectorAll('[name="starterPackItems"]').forEach((input) => {
+    input.checked = selectedStarterPackItems.includes(input.value);
+  });
   syncCostPlanDinetteFieldAvailability();
   syncCostPlanRateMode();
   syncCostPlanBerthPricingMode();
@@ -2375,6 +2473,9 @@ function readCostPlanForm() {
   const starterPackRateMode = normalizeStarterPackRateMode(form?.elements.starterPackRateMode?.value);
   const protectionInsuranceRateMode = normalizeProtectionInsuranceRateMode(form?.elements.protectionInsuranceRateMode?.value);
   const berthRoundingMode = normalizeBerthRoundingMode(form?.elements.berthRoundingMode?.value);
+  const starterPackItems = normalizeStarterPackItems(
+    [...(form?.querySelectorAll('[name="starterPackItems"]:checked') || [])].map((input) => input.value),
+  );
   return {
     charterCents: toEuroCents(form?.elements.charterCost?.value),
     skipperFlightTrainCents: toEuroCents(form?.elements.skipperFlightTrainCost?.value),
@@ -2415,18 +2516,10 @@ function readCostPlanForm() {
     manualStandardBerthCents: berthRoundingMode === 'manual_up'
       ? toEuroCents(form?.elements.manualStandardBerthPrice?.value)
       : 0,
-    starterPackDescription: normalizeCostPlanDescription(
-      form?.elements.starterPackDescription?.value,
-      DEFAULT_COST_PLAN_DESCRIPTIONS.starterPackDescription,
-    ),
-    protectionInsuranceDescription: normalizeCostPlanDescription(
-      form?.elements.protectionInsuranceDescription?.value,
-      DEFAULT_COST_PLAN_DESCRIPTIONS.protectionInsuranceDescription,
-    ),
-    refundableDepositDescription: normalizeCostPlanDescription(
-      form?.elements.refundableDepositDescription?.value,
-      DEFAULT_COST_PLAN_DESCRIPTIONS.refundableDepositDescription,
-    ),
+    starterPackItems,
+    starterPackDescription: starterPackDescriptionFor(starterPackItems),
+    protectionInsuranceDescription: DEFAULT_COST_PLAN_DESCRIPTIONS.protectionInsuranceDescription,
+    refundableDepositDescription: DEFAULT_COST_PLAN_DESCRIPTIONS.refundableDepositDescription,
   };
 }
 
@@ -2656,11 +2749,103 @@ function selectedPaymentProfileDetails(payment, profile = activePaymentProfile, 
     .filter(Boolean);
 }
 
+function isBerthOrInsurancePayment(payment) {
+  return String(payment?.contributionItemId || '').startsWith('berth_')
+    || payment?.contributionItemId === 'protection_insurance';
+}
+
+function starterPackContentsForPaymentMessage(value, locale) {
+  const englishLabels = {
+    bed_linen: 'bed linen',
+    bath_towels: 'bath towels',
+    bath_kit: 'bath kit / essentials',
+    beach_towel: 'beach towel',
+    outboard: 'outboard engine',
+    final_cleaning: 'final cleaning',
+    sup: 'SUP',
+    egadi_navigation_permit: 'Egadi navigation permit / contribution',
+    tender: 'tender, if included by the charter',
+  };
+  const labels = normalizeStarterPackItems(value)
+    .map((itemId) => locale === 'en'
+      ? englishLabels[itemId]
+      : STARTER_PACK_ITEMS.find((item) => item.id === itemId)?.label)
+    .filter(Boolean);
+  if (!labels.length) return '';
+  return locale === 'en' ? `includes ${labels.join(', ')}` : `include ${labels.join(', ')}`;
+}
+
+function paymentTripBreakdownMessage(payment, locale) {
+  if (!isBerthOrInsurancePayment(payment)) return '';
+  const recipientId = payment.recipientId || payment.memberId || payment.payerInviteId;
+  const projection = projectionForPaymentRecipient(recipientId);
+  if (!projection) return '';
+
+  const summary = projectionCostBreakdown(projection);
+  const { normalized, payableCents, starterPackCents, refundableDepositCents } = summary;
+  const berthCents = normalized.berthCents;
+  const insuranceCents = normalized.protectionInsuranceCents;
+  const participationCents = payableCents + starterPackCents;
+  const cashAtBoardCents = starterPackCents + refundableDepositCents;
+  if (!berthCents && !insuranceCents && !starterPackCents && !refundableDepositCents) return '';
+
+  const euro = (cents) => formatCurrency(cents / 100, locale);
+  const starterPackItems = normalizeStarterPackItems(activeContributionPlan?.starterPackItems, {
+    fallbackToDefault: !Array.isArray(activeContributionPlan?.starterPackItems),
+  });
+  const starterPackContents = starterPackContentsForPaymentMessage(starterPackItems, locale);
+  const quoteRows = [];
+  if (berthCents > 0) {
+    quoteRows.push(locale === 'en'
+      ? `• Berth: ${euro(berthCents)}`
+      : `• Posto/cabina: ${euro(berthCents)}`);
+  }
+  if (insuranceCents > 0) {
+    quoteRows.push(locale === 'en'
+      ? `• Deposit-protection insurance: ${euro(insuranceCents)}`
+      : `• Assicurazione sulla cauzione: ${euro(insuranceCents)}`);
+  }
+  if (starterPackCents > 0) {
+    quoteRows.push(locale === 'en'
+      ? `• Starter Pack: ${euro(starterPackCents)} · cash on board${starterPackContents ? ` (${starterPackContents})` : ''}`
+      : `• Starter Pack: ${euro(starterPackCents)} · contanti a bordo${starterPackContents ? ` (${starterPackContents})` : ''}`);
+  }
+
+  const participationLine = participationCents > 0
+    ? (locale === 'en'
+      ? `→ Planned participation cost: ${euro(participationCents)} (excluding the refundable deposit)`
+      : `→ Costo previsto di partecipazione: ${euro(participationCents)} (cauzione esclusa)`)
+    : '';
+  const amountToSetAsideLine = refundableDepositCents > 0
+    ? (locale === 'en'
+      ? `→ Total amount to set aside: ${euro(participationCents + refundableDepositCents)} (including the refundable deposit)`
+      : `→ Importo complessivo da predisporre: ${euro(participationCents + refundableDepositCents)} (cauzione rimborsabile inclusa)`)
+    : '';
+  const depositLines = refundableDepositCents > 0
+    ? (locale === 'en'
+      ? [
+        `• Refundable security deposit: ${euro(refundableDepositCents)} · cash at boarding`,
+        `Cash at boarding: ${euro(cashAtBoardCents)} in total${starterPackCents > 0 ? ` (${euro(starterPackCents)} Starter Pack + ${euro(refundableDepositCents)} refundable deposit)` : ''}.`,
+        'The refundable deposit is not a cost: it remains separate and is handled by the charter according to the onboard rules.',
+      ]
+      : [
+        `• Cauzione rimborsabile: ${euro(refundableDepositCents)} · contanti all’imbarco`,
+        `Contanti all’imbarco: ${euro(cashAtBoardCents)} in totale${starterPackCents > 0 ? ` (${euro(starterPackCents)} Starter Pack + ${euro(refundableDepositCents)} cauzione rimborsabile)` : ''}.`,
+        'La cauzione rimborsabile non è un costo: resta separata ed è gestita dal charter secondo le regole di bordo.',
+      ])
+    : [];
+  const heading = locale === 'en'
+    ? 'Summary of your place (for reference, not a second request):'
+    : 'Riepilogo del tuo posto (promemoria, non è una seconda richiesta):';
+  return `\n\n${[heading, ...quoteRows, participationLine, amountToSetAsideLine, ...depositLines].filter(Boolean).join('\n')}`;
+}
+
 function paymentWhatsappMessage(payment, { messageDetails = '', profile = activePaymentProfile } = {}) {
   const recipientId = payment.recipientId || payment.memberId || payment.payerInviteId;
   const locale = inviteLocale(inviteForRecipient(recipientId));
   const amount = formatCurrency(paymentAmount(payment), locale);
   const reason = payment.reason || (locale === 'en' ? 'your weekend contribution' : 'il contributo del weekend');
+  const tripBreakdown = paymentTripBreakdownMessage(payment, locale);
   const dueDate = payment.dueDate
     ? (locale === 'en' ? `\nIf possible, please complete it by ${formatDate(payment.dueDate, locale)}.` : `\nSe possibile entro il ${formatDate(payment.dueDate, locale)}.`)
     : '';
@@ -2676,8 +2861,8 @@ function paymentWhatsappMessage(payment, { messageDetails = '', profile = active
     ? (locale === 'en' ? `\n\nPayment details:\n${details.join('\n\n')}` : `\n\nDettagli per il pagamento:\n${details.join('\n\n')}`)
     : (locale === 'en' ? '\n\nFor details of the method you choose, reply to me here on WhatsApp.' : '\n\nPer i dettagli del metodo scelto, rispondimi qui su WhatsApp.');
   return locale === 'en'
-    ? `Hi ${recipientName(recipientId)} 🌊\n\nFor ${reason}, the contribution is ${amount}.${dueDate}${methodText}${detailsText}\n\nThe website does not receive payments. Once you have paid, please message me here so I can check the actual transfer. Thank you! ⛵`
-    : `Ciao ${recipientName(recipientId)} 🌊\n\nPer ${reason}, il contributo è di ${amount}.${dueDate}${methodText}${detailsText}\n\nIl sito non riceve denaro: dopo il contributo avvisami qui, così controllo l’accredito reale. Grazie! ⛵`;
+    ? `Hi ${recipientName(recipientId)} 🌊\n\nFor ${reason}, pay now: ${amount}.${dueDate}${methodText}${detailsText}${tripBreakdown}\n\nThe website does not receive payments. Once you have paid, please message me here so I can check the actual transfer. Thank you! ⛵`
+    : `Ciao ${recipientName(recipientId)} 🌊\n\nPer ${reason}, da versare ora: ${amount}.${dueDate}${methodText}${detailsText}${tripBreakdown}\n\nIl sito non riceve denaro: dopo il contributo avvisami qui, così controllo l’accredito reale. Grazie! ⛵`;
 }
 
 function paymentWhatsappUrl(payment, options = {}) {
@@ -2840,7 +3025,7 @@ function contributionCatalogRow(item) {
           ? '<small>Gestita dal Preventivo barca: sempre rimborsabile, in contanti all’imbarco e mai in una richiesta WhatsApp.</small>'
           : '';
   const amountLabel = automatic ? '€ a persona · calcolato' : '€ a persona · richiesto a parte / regolato separatamente';
-  return `<article class="contribution-catalog-row" data-contribution-id="${escapeHtml(item.id)}"><div class="contribution-catalog-label">${escapeHtml(item.label)}${stateHint}</div><label>Gestione<select data-contribution-state${automatic ? ' disabled' : ''}>${contributionStateOptions(item)}</select></label><label>${amountLabel}<input data-contribution-amount type="number" min="0" max="10000" step="0.01" inputmode="decimal" value="${euroInputValue(item.amountCents)}" placeholder="Es. 30,00"${automatic ? ' disabled' : ''} /></label><label>Dettaglio per l’equipaggio<textarea data-contribution-description maxlength="320" rows="2" placeholder="Es. Cena di sabato a Favignana"${automatic ? ' disabled' : ''}>${escapeHtml(item.description || '')}</textarea></label></article>`;
+  return `<article class="contribution-catalog-row" data-contribution-id="${escapeHtml(item.id)}"><div class="contribution-catalog-label">${escapeHtml(item.label)}${stateHint}</div><label>Gestione<select data-contribution-state${automatic ? ' disabled' : ''}>${contributionStateOptions(item)}</select></label><label>${amountLabel}<input data-contribution-amount type="number" min="0" max="10000" step="0.01" inputmode="decimal" value="${euroInputValue(item.amountCents)}" placeholder="Es. 30,00"${automatic ? ' disabled' : ''} /></label></article>`;
 }
 
 function syncContributionCatalogRow(row) {
@@ -2859,18 +3044,27 @@ function syncContributionCatalogRow(row) {
 function renderContributionCatalogForm(items = contributionCatalog()) {
   const rows = document.querySelector('#contributionCatalogRows');
   if (!rows) return;
-  rows.innerHTML = items.map(contributionCatalogRow).join('');
+  // Lenzuola e asciugamani sono una riga tecnica: nel V4 vengono raccontati
+  // dentro lo Starter Pack, così non sembrano una seconda spesa.
+  rows.innerHTML = items.filter((item) => item.id !== 'linen_towels').map(contributionCatalogRow).join('');
   rows.querySelectorAll('[data-contribution-id]').forEach(syncContributionCatalogRow);
 }
 
 function readContributionPlanForm() {
   const rows = [...document.querySelectorAll('#contributionCatalogRows [data-contribution-id]')];
-  return normalizeContributionPlan({
-    items: Object.fromEntries(rows.map((row) => [row.dataset.contributionId, {
+  const current = normalizeContributionPlan(activeContributionPlan);
+  const items = { ...current.items };
+  rows.forEach((row) => {
+    const itemId = row.dataset.contributionId;
+    items[itemId] = {
       state: row.querySelector('[data-contribution-state]')?.value,
       amountCents: toEuroCents(row.querySelector('[data-contribution-amount]')?.value),
-      description: row.querySelector('[data-contribution-description]')?.value,
-    }])),
+    };
+  });
+  return normalizeContributionPlan({
+    items,
+    starterPackItems: current.starterPackItems,
+    starterPackSettlementMode: 'cash_on_board',
   });
 }
 
@@ -2884,8 +3078,8 @@ function contributionPlanWithEditedExtras(latestPlan, submittedPlan, costPlan = 
       items[item.id] = submitted.items[item.id];
     });
   return costPlan
-    ? contributionPlanForCostPlan(costPlan, { items })
-    : normalizeContributionPlan({ items, starterPackSettlementMode: latest.starterPackSettlementMode });
+    ? contributionPlanForCostPlan(costPlan, { items, starterPackItems: latest.starterPackItems })
+    : normalizeContributionPlan({ items, starterPackItems: latest.starterPackItems, starterPackSettlementMode: 'cash_on_board' });
 }
 
 function berthRateType(typeId) {
@@ -4939,15 +5133,6 @@ costPlanForm.addEventListener('submit', async (event) => {
     setMessage(message, 'Indica almeno una persona che porta la cauzione rimborsabile.', true);
     return;
   }
-  const descriptionMessage = crewFacingDescriptionValidationMessage([
-    { label: 'Starter Pack', value: plan.starterPackDescription },
-    { label: 'Assicurazione cauzione', value: plan.protectionInsuranceDescription },
-    { label: 'Cauzione rimborsabile', value: plan.refundableDepositDescription },
-  ]);
-  if (descriptionMessage) {
-    setMessage(message, descriptionMessage, true);
-    return;
-  }
   const model = costPlanQuoteModel(plan);
   const rateModeMessage = costPlanRateModeValidationMessage(model);
   if (rateModeMessage) {
@@ -4970,17 +5155,31 @@ costPlanForm.addEventListener('submit', async (event) => {
   try {
     const boatId = activeBoat.id;
     const skipperId = auth.currentUser.uid;
+    let savedContributionPlan = null;
     await runTransaction(db, async (transaction) => {
-      transaction.set(doc(db, 'boats', boatId, 'costPlan', COST_PLAN_ID), {
-        ...plan,
+      const costPlanRef = doc(db, 'boats', boatId, 'costPlan', COST_PLAN_ID);
+      const contributionPlanRef = doc(db, 'boats', boatId, 'contributionPlan', 'default');
+      const latestContributionPlan = await transaction.get(contributionPlanRef);
+      savedContributionPlan = contributionPlanForCostPlan(
+        plan,
+        latestContributionPlan.exists() ? latestContributionPlan.data() : null,
+      );
+      transaction.set(costPlanRef, {
+        ...costPlanForStorage(plan),
+        updatedAt: serverTimestamp(),
+        updatedBy: skipperId,
+      });
+      transaction.set(contributionPlanRef, {
+        ...contributionPlanForStorage(savedContributionPlan),
         updatedAt: serverTimestamp(),
         updatedBy: skipperId,
       });
     });
     activeCostPlan = normalizeCostPlan(plan);
+    activeContributionPlan = savedContributionPlan;
     renderCostPlan(activeCostPlan);
     renderProjections();
-    setMessage(message, 'Dashboard salvata: le schede senza invito sono state aggiornate con le quote automatiche. Inviti già creati, schede storiche ed eccezioni restano fissati. Il riepilogo delle voci già visibile all’equipaggio non viene riscritto da questo salvataggio.');
+    setMessage(message, 'Dashboard salvata: quote, Starter Pack e riepilogo per l’equipaggio sono stati aggiornati. Inviti già creati e accordi già fissati restano invariati.');
   } catch (error) {
     setMessage(message, getCostPlanSaveErrorMessage(error), true);
   } finally {
@@ -5001,16 +5200,6 @@ contributionCatalogForm.addEventListener('submit', async (event) => {
   if (!activeBoat || !auth.currentUser) return;
   const submitButton = contributionCatalogForm.querySelector('button[type="submit"]');
   const submittedPlan = readContributionPlanForm();
-  const descriptionMessage = crewFacingDescriptionValidationMessage(
-    DEFAULT_CONTRIBUTION_ITEMS.map((item) => ({
-      label: item.label,
-      value: submittedPlan.items[item.id]?.description,
-    })),
-  );
-  if (descriptionMessage) {
-    setMessage(message, descriptionMessage, true);
-    return;
-  }
   submitButton.disabled = true;
   setMessage(message, 'Salvo la composizione delle quote…');
   try {
@@ -5033,7 +5222,7 @@ contributionCatalogForm.addEventListener('submit', async (event) => {
         latestCostPlan.exists() ? latestCostPlan.data() : null,
       );
       transaction.set(contributionPlanRef, {
-        ...mergedPlan,
+        ...contributionPlanForStorage(mergedPlan),
         updatedAt: serverTimestamp(),
         updatedBy: skipperId,
       });
