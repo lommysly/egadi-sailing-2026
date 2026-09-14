@@ -91,8 +91,10 @@ function crewDashboardCopy() {
       eyebrow: 'Your onboard hub',
       title: 'Your trip, <em>clear and personal.</em>',
       description: 'Open only what you need. Your personal details, payments and skipper updates remain visible only to you.',
-      activity: 'Trip status',
-      activityDetail: 'What is ready for your trip.',
+      activity: 'My activity',
+      activityDetail: 'Your completed personal steps.',
+      activityTimelineEyebrow: 'Your trip status',
+      activityTimelineTitle: 'What you have already done',
       board: 'My boat',
       boardDetail: 'Safety briefing and skipper updates.',
       money: 'My contributions',
@@ -102,16 +104,16 @@ function crewDashboardCopy() {
       nextStep: 'Next step',
       nextButton: 'Open',
       noPayments: 'No requests at the moment',
-      paymentsPending: '{count} request{suffix} awaiting verification',
-      paymentsVerified: '{count} contribution{suffix} verified by the skipper',
+      paymentsPending: '{count} request{suffix} to settle',
+      paymentsVerified: '{count} confirmed contribution{suffix}',
       briefingReady: 'Safety briefing accepted',
       briefingWaiting: 'Safety briefing to be accepted',
       profileReady: 'Details submitted',
       profileWaiting: 'Details to complete',
       announcements: '{count} skipper update{suffix}',
-      activityProgress: '{count} of 2 steps ready',
+      activityProgress: '{count} completed step{suffix}',
       allReady: 'Everything is ready. Keep this area handy for new updates or requests.',
-      pendingAction: 'You have a payment request awaiting verification. Check the details shared by the skipper.',
+      pendingAction: 'You have a payment request to settle. Check the details shared by the skipper.',
       boardAction: 'The boat is ready. Check the latest skipper updates before departure.',
       profileAction: 'Complete your details to enter your personal onboard area.',
       openBoard: 'Open boat area',
@@ -123,8 +125,10 @@ function crewDashboardCopy() {
     eyebrow: 'Il tuo centro di bordo',
     title: 'Tutto il tuo viaggio, <em>chiaro e personale.</em>',
     description: 'Apri solo ciò che ti serve. I tuoi dati, le richieste e le comunicazioni dello skipper restano visibili soltanto a te.',
-    activity: 'Stato del viaggio',
-    activityDetail: 'Quello che è pronto per la tua partenza.',
+    activity: 'La mia attività',
+    activityDetail: 'I passaggi personali già completati.',
+    activityTimelineEyebrow: 'Stato del viaggio',
+    activityTimelineTitle: 'Quello che hai già fatto',
     board: 'La mia barca',
     boardDetail: 'Briefing safety e aggiornamenti dello skipper.',
     money: 'Le mie quote',
@@ -134,16 +138,16 @@ function crewDashboardCopy() {
     nextStep: 'Prossimo passo',
     nextButton: 'Apri',
     noPayments: 'Nessuna richiesta al momento',
-    paymentsPending: '{count} richiest{suffix} in attesa di verifica',
-    paymentsVerified: '{count} contribut{suffix} verificat{suffixVerified} dallo skipper',
+    paymentsPending: '{count} richiest{suffix} da regolare',
+    paymentsVerified: '{count} contribut{suffix} confermat{suffixVerified}',
     briefingReady: 'Briefing safety accettato',
     briefingWaiting: 'Briefing safety da accettare',
     profileReady: 'Dati inviati',
     profileWaiting: 'Dati da completare',
     announcements: '{count} comunicazion{suffix} dello skipper',
-    activityProgress: '{count} di 2 passaggi pronti',
+    activityProgress: '{count} passagg{suffix} completat{suffixCompleted}',
     allReady: 'Tutto pronto. Tieni questa area a portata di mano per nuovi avvisi o richieste.',
-    pendingAction: 'Hai una richiesta in attesa di verifica. Controlla i dettagli condivisi dallo skipper.',
+    pendingAction: 'Hai una richiesta da regolare. Controlla i dettagli condivisi dallo skipper.',
     boardAction: 'La barca è pronta: controlla gli ultimi aggiornamenti dello skipper prima della partenza.',
     profileAction: 'Completa i tuoi dati per entrare nella tua area personale di bordo.',
     openBoard: 'Apri la barca',
@@ -183,11 +187,15 @@ function renderCrewDashboardShell() {
         <span class="dashboard-hub-icon">${crewDashboardIcon('profile')}</span><span class="dashboard-hub-label">${escapeHtml(copy.profile)}</span>
         <strong data-crew-summary="profile">${escapeHtml(copy.profileReady)}</strong><small data-crew-detail="profile">${escapeHtml(copy.profileDetail)}</small>
       </button>
-      <button class="dashboard-hub-card dashboard-hub-card-activity" type="button" data-crew-view="overview">
+      <article class="dashboard-hub-card dashboard-hub-card-activity crew-dashboard-activity-card">
         <span class="dashboard-hub-icon">${crewDashboardIcon('activity')}</span><span class="dashboard-hub-label">${escapeHtml(copy.activity)}</span>
         <strong data-crew-summary="activity">${escapeHtml(copy.briefingReady)}</strong><small data-crew-detail="activity">${escapeHtml(copy.activityDetail)}</small>
-      </button>
+      </article>
     </div>
+    <section id="crewActivityTimeline" class="crew-activity-timeline" aria-live="polite" aria-labelledby="crewActivityTimelineTitle">
+      <div class="crew-activity-timeline-heading"><p class="eyebrow">${escapeHtml(copy.activityTimelineEyebrow)}</p><h4 id="crewActivityTimelineTitle">${escapeHtml(copy.activityTimelineTitle)}</h4></div>
+      <ol class="crew-activity-timeline-list"></ol>
+    </section>
     <div class="dashboard-next-step"><div><span>${escapeHtml(copy.nextStep)}</span><strong id="crewNextActionText">${escapeHtml(copy.boardAction)}</strong></div><button id="crewNextActionButton" class="button button-primary" type="button" data-crew-view="board">${escapeHtml(copy.nextButton)}</button></div>
   `;
   navigation.innerHTML = Object.entries(CREW_DASHBOARD_LABELS)
@@ -270,6 +278,78 @@ function setCrewDashboardMetric(name, value, detail) {
   if (detailTarget) detailTarget.textContent = detail;
 }
 
+function paymentActivitySummary(pendingPayments, verifiedPayments, pendingPaymentCents, verifiedPaymentCents) {
+  if (pendingPayments) {
+    const countLabel = localized(
+      pendingPayments === 1 ? '1 richiesta da regolare' : `${pendingPayments} richieste da regolare`,
+      pendingPayments === 1 ? '1 request to settle' : `${pendingPayments} requests to settle`,
+    );
+    const amount = pendingPaymentCents ? ` · ${formatCurrency(pendingPaymentCents / 100)}` : '';
+    const confirmed = verifiedPayments
+      ? localized(
+        verifiedPayments === 1 ? '1 accredito già confermato' : `${verifiedPayments} accrediti già confermati`,
+        verifiedPayments === 1 ? '1 payment already confirmed' : `${verifiedPayments} payments already confirmed`,
+      )
+      : '';
+    const confirmedAmount = verifiedPaymentCents ? ` · ${formatCurrency(verifiedPaymentCents / 100)}` : '';
+    return { tone: 'attention', label: localized('Richieste personali', 'Personal requests'), detail: `${countLabel}${amount}${confirmed ? ` · ${confirmed}${confirmedAmount}` : ''}` };
+  }
+  if (verifiedPayments) {
+    const countLabel = localized(
+      verifiedPayments === 1 ? '1 accredito confermato' : `${verifiedPayments} accrediti confermati`,
+      verifiedPayments === 1 ? '1 payment confirmed' : `${verifiedPayments} payments confirmed`,
+    );
+    const amount = verifiedPaymentCents ? ` · ${formatCurrency(verifiedPaymentCents / 100)}` : '';
+    return { tone: 'complete', label: localized('Richieste personali', 'Personal requests'), detail: `${countLabel}${amount}` };
+  }
+  return { tone: 'waiting', label: localized('Richieste personali', 'Personal requests'), detail: localized('Nessuna richiesta personale al momento.', 'No personal requests at the moment.') };
+}
+
+function renderCrewActivityTimeline({ profileReady, briefingReady, pendingPayments, verifiedPayments, pendingPaymentCents, verifiedPaymentCents }) {
+  const list = document.querySelector('#crewActivityTimeline .crew-activity-timeline-list');
+  if (!list) return;
+  const profileUpdatedAt = formatDateTime(activeMember?.updatedAt || activeMember?.createdAt);
+  const briefingAcceptedAt = formatDateTime(activeRuleAcceptance?.acceptedAt);
+  const paymentActivity = paymentActivitySummary(pendingPayments, verifiedPayments, pendingPaymentCents, verifiedPaymentCents);
+  const latestAnnouncement = activeCrewAnnouncements[0];
+  const activity = [
+    {
+      tone: profileReady ? 'complete' : 'waiting',
+      label: localized('Dati personali', 'Personal details'),
+      detail: profileReady
+        ? profileUpdatedAt
+          ? localized(`Dati aggiornati il ${profileUpdatedAt}.`, `Details updated on ${profileUpdatedAt}.`)
+          : localized('Dati inviati per il charter.', 'Details submitted for the charter.')
+        : localized('Dati ancora da completare.', 'Details still need to be completed.'),
+    },
+    {
+      tone: briefingReady ? 'complete' : 'waiting',
+      label: localized('Briefing safety', 'Safety briefing'),
+      detail: briefingReady
+        ? briefingAcceptedAt
+          ? localized(`Accettato il ${briefingAcceptedAt}.`, `Accepted on ${briefingAcceptedAt}.`)
+          : localized('Regole di bordo accettate.', 'Board rules accepted.')
+        : localized('Da leggere e accettare prima di salpare.', 'Read and accept it before departure.'),
+    },
+    paymentActivity,
+  ];
+  if (latestAnnouncement) {
+    const title = latestAnnouncement.title || localized('Comunicazione dello skipper', 'Skipper update');
+    const publishedAt = formatDateTime(latestAnnouncement.createdAt);
+    activity.push({
+      tone: 'update',
+      label: localized('Ultimo aggiornamento dello skipper', 'Latest skipper update'),
+      detail: `${title}${publishedAt ? ` · ${publishedAt}` : ''}`,
+    });
+  }
+  list.innerHTML = activity.map((item) => `
+    <li class="crew-activity-row crew-activity-row-${item.tone}">
+      <span class="crew-activity-marker" aria-hidden="true">${item.tone === 'complete' ? '✓' : item.tone === 'attention' ? '!' : '•'}</span>
+      <div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.detail)}</small></div>
+    </li>
+  `).join('');
+}
+
 function renderCrewDashboardOverview() {
   if (!crewDashboardInitialized) return;
   const copy = crewDashboardCopy();
@@ -305,9 +385,9 @@ function renderCrewDashboardOverview() {
   setCrewDashboardMetric(
     'money',
     pendingPayments
-      ? `${formatCurrency(pendingPaymentCents / 100)} ${localized('da verificare', 'awaiting verification')}`
+      ? `${formatCurrency(pendingPaymentCents / 100)} ${localized('da regolare', 'to settle')}`
       : verifiedPayments
-        ? `${formatCurrency(verifiedPaymentCents / 100)} ${localized('verificati', 'verified')}`
+        ? `${formatCurrency(verifiedPaymentCents / 100)} ${localized('confermati', 'confirmed')}`
         : projectedPaymentSummary,
     verifiedPayments
       ? `${verifiedPaymentSummary} · ${localized('Cauzione rimborsabile separata.', 'Refundable deposit kept separate.')}`
@@ -317,7 +397,15 @@ function renderCrewDashboardOverview() {
   );
   setCrewDashboardMetric('profile', profileReady ? copy.profileReady : copy.profileWaiting, copy.profileDetail);
   const readyItems = [profileReady, briefingReady].filter(Boolean).length;
-  setCrewDashboardMetric('activity', copy.activityProgress.replace('{count}', String(readyItems)), copy.activityDetail);
+  setCrewDashboardMetric(
+    'activity',
+    copy.activityProgress
+      .replace('{count}', String(readyItems))
+      .replace('{suffix}', crewPluralSuffix(readyItems, 'o', 'i'))
+      .replace('{suffixCompleted}', crewPluralSuffix(readyItems, 'o', 'i')),
+    copy.activityDetail,
+  );
+  renderCrewActivityTimeline({ profileReady, briefingReady, pendingPayments, verifiedPayments, pendingPaymentCents, verifiedPaymentCents });
   const participantStatus = document.querySelector('#participantStatus');
   if (participantStatus) {
     participantStatus.textContent = [
@@ -381,9 +469,9 @@ function paymentMethodTags(payment) {
 }
 
 function paymentStatusLabel(payment) {
-  if (payment.status === 'verified') return translate('crew.flow.paymentVerified', 'Accredito verificato dallo skipper');
-  if (payment.status === 'cancelled') return translate('crew.flow.paymentCancelled', 'Richiesta annullata');
-  return translate('crew.flow.paymentPending', 'In attesa di verifica');
+  if (payment.status === 'verified') return localized('Accredito confermato', 'Payment confirmed');
+  if (payment.status === 'cancelled') return localized('Richiesta annullata', 'Request cancelled');
+  return localized('Da regolare', 'To be settled');
 }
 
 function paymentAmountCents(payment) {
@@ -489,18 +577,18 @@ function personalContributionSummary(groupId, planItemId, projectionField) {
   if (!totals.payments.length) return projectedContributionSummary(projectionField) || contributionPlanFallback(planItemId);
   if (totals.pendingCents && totals.verifiedCents) {
     return {
-      value: `${formatCurrency(totals.pendingCents / 100)} ${localized('da verificare', 'awaiting verification')}`,
-      detail: `${formatCurrency(totals.verifiedCents / 100)} ${localized('già verificati dallo skipper.', 'already verified by the skipper.')}`,
+      value: `${formatCurrency(totals.pendingCents / 100)} ${localized('da regolare', 'to settle')}`,
+      detail: `${formatCurrency(totals.verifiedCents / 100)} ${localized('già confermati dallo skipper.', 'already confirmed by the skipper.')}`,
     };
   }
   if (totals.pendingCents) {
     return {
-      value: `${formatCurrency(totals.pendingCents / 100)} ${localized('da verificare', 'awaiting verification')}`,
+      value: `${formatCurrency(totals.pendingCents / 100)} ${localized('da regolare', 'to settle')}`,
       detail: localized('I dettagli del metodo scelto sono nel messaggio WhatsApp dello skipper.', 'The chosen payment method details are in the skipper’s WhatsApp message.'),
     };
   }
   return {
-    value: `${formatCurrency(totals.verifiedCents / 100)} ${localized('verificati', 'verified')}`,
+    value: `${formatCurrency(totals.verifiedCents / 100)} ${localized('confermati', 'confirmed')}`,
     detail: localized('Accredito confermato manualmente dallo skipper.', 'The contribution was manually confirmed by the skipper.'),
   };
 }
@@ -546,12 +634,12 @@ function renderParticipantFinanceSummary() {
   const acceptedAt = formatDateTime(activeRuleAcceptance?.acceptedAt);
   const rulesTitle = briefingTitle();
   const paymentStatus = pendingCents
-    ? `${formatCurrency(pendingCents / 100)} ${localized('in attesa di verifica', 'awaiting verification')}`
+    ? `${formatCurrency(pendingCents / 100)} ${localized('da regolare', 'to settle')}`
     : verifiedCents
-      ? `${formatCurrency(verifiedCents / 100)} ${localized('verificati dallo skipper', 'verified by the skipper')}`
+      ? `${formatCurrency(verifiedCents / 100)} ${localized('accrediti confermati', 'payments confirmed')}`
       : localized('Nessuna richiesta personale attiva', 'No personal requests at the moment');
   const paymentDetailBase = verifiedCents && pendingCents
-    ? `${formatCurrency(verifiedCents / 100)} ${localized('già verificati. La cauzione rimborsabile resta separata.', 'already verified. The refundable deposit remains separate.')}`
+    ? `${formatCurrency(verifiedCents / 100)} ${localized('già confermati. La cauzione rimborsabile resta separata.', 'already confirmed. The refundable deposit remains separate.')}`
     : localized('Il sito non incassa denaro; le richieste vengono confermate manualmente dallo skipper.', 'The site does not collect money; requests are confirmed manually by the skipper.');
   const paymentDetail = unclassifiedPayments
     ? `${paymentDetailBase} ${unclassifiedPayments} ${localized(unclassifiedPayments === 1 ? 'richiesta precedente resta nell’elenco sotto, ma non può essere assegnata automaticamente a una voce.' : 'richieste precedenti restano nell’elenco sotto, ma non possono essere assegnate automaticamente a una voce.', unclassifiedPayments === 1 ? 'earlier request remains in the list below, but cannot be assigned to an item automatically.' : 'earlier requests remain in the list below, but cannot be assigned to an item automatically.')}`
