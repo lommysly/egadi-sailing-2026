@@ -1837,10 +1837,10 @@ function renderCostPlanSummary() {
     ? `Cassa da recuperare: ${formatCurrency(totalCents / 100)} su ${berthFormula}. Quota cabina standard: ${formatCurrency(model.standardBerthCents / 100)}; quota dinette: ${model.dinettePayingParticipants > 0 ? formatCurrency(model.dinetteBerthCents / 100) : 'non prevista'}.`
     : 'Nessun costo barca o skipper da recuperare nel preventivo.';
   const insuranceSummary = model.protectionInsuranceTotalCents > 0
-    ? ` Assicurazione: ${formatCurrency(model.protectionInsurancePerPersonCents / 100)} per ospite, separata e richiedibile.`
+    ? ` Assicurazione: ${formatCurrency(model.protectionInsurancePerPersonCents / 100)} per ospite pagante, separata e richiedibile.`
     : ' Assicurazione: da definire.';
   const starterSummary = model.starterPackTotalCents > 0
-    ? ` Starter Pack: ${formatCurrency(model.starterPackPerPersonCents / 100)} per ospite, solo contanti in loco.`
+    ? ` Starter Pack: ${formatCurrency(model.starterPackPerPersonCents / 100)} per ospite pagante, solo contanti in loco.`
     : ' Starter Pack: da definire, solo contanti in loco.';
   const depositSummary = model.refundableDepositTotalCents > 0
     ? ` Cauzione rimborsabile: ${formatCurrency(model.refundableDepositPerPersonCents / 100)} per ${model.depositParticipants} ${model.depositParticipants === 1 ? 'persona' : 'persone'}, solo contanti in loco.`
