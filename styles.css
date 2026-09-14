@@ -203,13 +203,21 @@ body.menu-open { overflow:hidden; }
 .cost-result-heading span,.cost-result-card > span { color:#087b8a; font:700 .62rem "DM Mono",monospace; letter-spacing:.06em; text-transform:uppercase; }
 .cost-result-heading strong { color:#063644; font:600 1.02rem/1.2 "Fraunces",serif; }
 .cost-result-heading > small { max-width:180px; color:#416b6d; font-size:.7rem; line-height:1.35; text-align:right; }
-.cost-result-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; }
+.cost-result-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+.cost-result-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; margin-top:12px; padding:12px; border:1px solid rgba(8,123,138,.18); border-radius:11px; background:rgba(255,255,255,.48); }
+.cost-result-actions-heading { grid-column:1 / -1; display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.cost-result-actions-heading strong { color:#063644; font:600 .94rem/1.2 "Fraunces",serif; }
+.cost-result-actions-heading small { color:#416b6d; font-size:.72rem; line-height:1.35; text-align:right; }
 .cost-result-card { display:grid; align-content:start; gap:6px; min-width:0; padding:12px; border:1px solid rgba(8,123,138,.18); border-radius:10px; background:rgba(255,255,255,.8); }
 .cost-result-card > strong { color:#0a3d49; font:600 1rem/1.12 "Fraunces",serif; overflow-wrap:anywhere; }
 .cost-result-card > small { color:#416b6d; font-size:.7rem; line-height:1.38; }
 .cost-result-card-local { border-color:rgba(8,123,138,.28); background:#f5fffe; }
 .cost-result-card-deposit { border-color:rgba(175,122,34,.28); background:#fff9e8; }
 .cost-result-card-deposit > span { color:#986914; }
+.cost-result-card-action { border-color:rgba(8,123,138,.36); background:#e8fbf8; }
+.cost-result-card-action > strong { font-size:1.08rem; }
+.cost-result-card-action-cash { border-color:rgba(175,122,34,.3); background:#fff9e8; }
+.cost-result-card-action-cash > span { color:#986914; }
 .cost-result-check { margin-top:11px; border-top:1px solid rgba(8,123,138,.18); }
 .cost-result-check summary { padding:11px 0 0; color:#075d69; cursor:pointer; font-size:.78rem; font-weight:700; }
 .cost-result-check p { margin:8px 0 0; color:#416b6d; font-size:.75rem; line-height:1.45; }
@@ -256,6 +264,10 @@ body.menu-open { overflow:hidden; }
 .participant-finance-row > span { color:#087b8a; font:700 .64rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; }
 .participant-finance-row > strong { color:#0a3d49; font:600 1rem/1.15 "Fraunces",serif; overflow-wrap:anywhere; }
 .participant-finance-row > small { color:#416b6d; font-size:.74rem; line-height:1.4; }
+.participant-finance-row-action { border-color:rgba(8,123,138,.36); background:#e8fbf8; }
+.participant-finance-row-action > strong { font-size:1.08rem; }
+.participant-finance-row-cash { border-color:rgba(175,122,34,.3); background:#fff9e8; }
+.participant-finance-row-cash > span { color:#986914; }
 .participant-finance-row-deposit { border-color:rgba(175,122,34,.24); background:#fff9e8; }
 .participant-finance-row-deposit > span { color:#986914; }
 .participant-finance-acceptance { margin-top:12px; padding:12px 13px; border-radius:10px; background:#e0f4f1; color:#16494f; font-size:.8rem; line-height:1.45; }
@@ -371,8 +383,8 @@ body.menu-open { overflow:hidden; }
 .passage-safety p { max-width:780px; line-height:1.6; }
 @media (max-width:800px) { .passage-status,.passage-data-grid,.passage-stop-grid,.passage-mooring-guide { grid-template-columns:1fr; }.passage-day-heading { display:grid; gap:0; }.passage-day-card,.passage-introduction,.passage-safety,.passage-mooring-guide { padding:24px; } }
 @media (max-width:800px) { .form-grid,.dashboard-grid,.schedule-list { grid-template-columns:1fr; }.dashboard-heading { display:grid; align-items:start; }.dashboard-actions { justify-content:start; }.form-actions { display:grid; align-items:start; }.form-actions .form-message { margin:0; }.dashboard-overview-heading { grid-template-columns:1fr; gap:14px; }.dashboard-hub { grid-template-columns:repeat(2,minmax(0,1fr)); }.dashboard-hub-card { min-height:160px; padding:15px; }.dashboard-next-step { display:grid; align-items:start; }.dashboard-next-step .button { width:100%; }.dashboard-view-navigation { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }.dashboard-view-navigation button { flex:0 0 auto; } }
-@media (max-width:800px) { .contribution-catalog-row { grid-template-columns:1fr; }.finance-overview-heading { grid-template-columns:1fr; }.finance-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.cost-result-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.cost-result-heading { align-items:start; }.cost-result-heading > small { text-align:left; }.finance-dashboard-hub { grid-template-columns:1fr; }.finance-dashboard-panel { padding:22px; }.crew-activity-timeline-heading { display:grid; align-items:start; gap:6px; }.projection-row { grid-template-columns:1fr; grid-template-areas:"person" "cost" "actions"; gap:12px; }.projection-actions { display:flex; }.projection-action { justify-content:center; width:auto; }.projection-action-icon-only { width:34px; } }
-@media (max-width:430px) { .finance-overview-grid,.participant-finance-grid,.cost-result-grid { grid-template-columns:1fr; }.projection-action { min-height:40px; }.projection-action-icon-only { width:40px; min-width:40px; } }
+@media (max-width:800px) { .contribution-catalog-row { grid-template-columns:1fr; }.finance-overview-heading { grid-template-columns:1fr; }.finance-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.cost-result-grid,.cost-result-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }.cost-result-heading { align-items:start; }.cost-result-heading > small { text-align:left; }.cost-result-actions-heading { display:grid; gap:3px; }.cost-result-actions-heading small { text-align:left; }.finance-dashboard-hub { grid-template-columns:1fr; }.finance-dashboard-panel { padding:22px; }.crew-activity-timeline-heading { display:grid; align-items:start; gap:6px; }.projection-row { grid-template-columns:1fr; grid-template-areas:"person" "cost" "actions"; gap:12px; }.projection-actions { display:flex; }.projection-action { justify-content:center; width:auto; }.projection-action-icon-only { width:34px; } }
+@media (max-width:430px) { .finance-overview-grid,.participant-finance-grid,.cost-result-grid,.cost-result-actions { grid-template-columns:1fr; }.projection-action { min-height:40px; }.projection-action-icon-only { width:40px; min-width:40px; } }
 @media (max-width:800px) { .charter-export { display:grid; align-items:start; } }
 
 /* Arrivi e partenze: la pagina pubblica spiega il flusso, senza raccogliere dati o contatti. */

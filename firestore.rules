@@ -805,8 +805,8 @@ service cloud.firestore {
     }
 
     // Descrizioni visibili all'equipaggio: servono a spiegare una voce, mai
-    // a ripetere un canale d'incasso. Blocchiamo URL, e-mail, IBAN e i nomi
-    // dei metodi di pagamento anche con maiuscole/minuscole miste.
+    // a ripetere contatti o canali d'incasso. Blocchiamo URL, e-mail, numeri
+    // di telefono, IBAN e metodi di pagamento anche con maiuscole/minuscole miste.
     function hasSafeCrewFacingDescription(value) {
       return value is string
         && value.size() > 0
@@ -814,7 +814,8 @@ service cloud.firestore {
         && !(value.matches('.*[Hh][Tt][Tt][Pp][Ss]?://.*'))
         && !(value.matches('.*[Ww][Ww][Ww][.].*'))
         && !(value.matches('.*@[A-Za-z0-9._-]+[.][A-Za-z]{2,}.*'))
-        && !(value.matches('.*[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}.*'))
+        && !(value.matches('.*[A-Za-z]{2}[0-9]{2}[A-Za-z0-9]{11,30}.*'))
+        && !(value.matches('.*[+]?[0-9][0-9 -]{6,}[0-9].*'))
         && !(value.matches('.*([Pp][Aa][Yy][Pp][Aa][Ll]|[Ss][Aa][Tt][Ii][Ss][Pp][Aa][Yy]|[Rr][Ee][Vv][Oo][Ll][Uu][Tt]|[Ii][Bb][Aa][Nn]|[Bb][Oo][Nn][Ii][Ff][Ii][Cc][Oo]|[Cc][Aa][Uu][Ss][Aa][Ll][Ee]).*'));
     }
 
@@ -866,7 +867,7 @@ service cloud.firestore {
     }
 
     // V3 dichiara il trattamento mostrato all'equipaggio. La provenienza del
-    // Pack (dentro o fuori charter) vive nel costPlan V6: la dashboard attuale
+    // Pack (dentro o fuori charter) vive nel costPlan V7: la dashboard attuale
     // salva sempre la quota cash_on_board, senza confondere i due concetti.
     function hasValidContributionPlanV3() {
       let items = request.resource.data.items;
@@ -1029,9 +1030,8 @@ service cloud.firestore {
     // V6 rende esplicito il significato delle due voci variabili. I campi
     // "totale" non vengono mai riutilizzati come quota individuale: evita
     // che una pagina vecchia divida due volte un importo fisso per persona.
-    function hasValidSkipperCostPlanV6() {
+    function hasValidSkipperCostPlanV6Core() {
       return request.resource.data.keys().hasAll(['starterPackRateMode', 'starterPackFixedPerPersonCents', 'starterPackIncludedInCharter', 'protectionInsuranceRateMode', 'protectionInsuranceFixedPerPersonCents'])
-        && request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'starterPackRateMode', 'starterPackFixedPerPersonCents', 'starterPackIncludedInCharter', 'protectionInsuranceTotalCents', 'protectionInsuranceRateMode', 'protectionInsuranceFixedPerPersonCents', 'refundableDepositTotalCents', 'payingParticipants', 'depositParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'dinetteRateMode', 'dinetteFixedCents', 'starterPackDescription', 'protectionInsuranceDescription', 'refundableDepositDescription', 'updatedAt', 'updatedBy'])
         && request.resource.data.starterPackRateMode is string
         && request.resource.data.starterPackRateMode in ['total_divided', 'fixed_per_person']
         && request.resource.data.starterPackFixedPerPersonCents is int
@@ -1088,6 +1088,45 @@ service cloud.firestore {
         // attraversare anche i vecchi controlli V3/V4/V5: la condizione
         // fixed sopra è più restrittiva perché considera il Pack scorporato.
         && hasValidSkipperCostPlanV2Core();
+    }
+
+    function hasValidSkipperCostPlanV6() {
+      return request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'starterPackRateMode', 'starterPackFixedPerPersonCents', 'starterPackIncludedInCharter', 'protectionInsuranceTotalCents', 'protectionInsuranceRateMode', 'protectionInsuranceFixedPerPersonCents', 'refundableDepositTotalCents', 'payingParticipants', 'depositParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'dinetteRateMode', 'dinetteFixedCents', 'starterPackDescription', 'protectionInsuranceDescription', 'refundableDepositDescription', 'updatedAt', 'updatedBy'])
+        && hasValidSkipperCostPlanV6Core();
+    }
+
+    // V7 conserva il costo reale della barca e salva soltanto la scelta con
+    // cui comunicare una quota tonda. Totali e avanzo restano derivati nel
+    // browser: non diventano un falso costo charter né un campo di incasso.
+    function hasValidSkipperCostPlanV7() {
+      return request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'starterPackRateMode', 'starterPackFixedPerPersonCents', 'starterPackIncludedInCharter', 'protectionInsuranceTotalCents', 'protectionInsuranceRateMode', 'protectionInsuranceFixedPerPersonCents', 'refundableDepositTotalCents', 'payingParticipants', 'depositParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'dinetteRateMode', 'dinetteFixedCents', 'berthRoundingMode', 'berthRoundingIncrementCents', 'manualStandardBerthCents', 'starterPackDescription', 'protectionInsuranceDescription', 'refundableDepositDescription', 'updatedAt', 'updatedBy'])
+        && request.resource.data.berthRoundingMode is string
+        && request.resource.data.berthRoundingMode in ['automatic', 'ceil_increment', 'manual_up']
+        && request.resource.data.berthRoundingIncrementCents is int
+        && request.resource.data.berthRoundingIncrementCents >= 0
+        && request.resource.data.berthRoundingIncrementCents <= 10000
+        && request.resource.data.manualStandardBerthCents is int
+        && request.resource.data.manualStandardBerthCents >= 0
+        && request.resource.data.manualStandardBerthCents <= 1000000
+        && ((request.resource.data.berthRoundingMode == 'automatic'
+            && request.resource.data.berthRoundingIncrementCents == 0
+            && request.resource.data.manualStandardBerthCents == 0)
+          || (request.resource.data.berthRoundingMode == 'ceil_increment'
+            && request.resource.data.berthRoundingIncrementCents in [100, 500, 1000]
+            && request.resource.data.manualStandardBerthCents == 0)
+          || (request.resource.data.berthRoundingMode == 'manual_up'
+            && request.resource.data.berthRoundingIncrementCents == 0
+            && request.resource.data.manualStandardBerthCents >= 1))
+        && hasValidSkipperCostPlanV6Core();
+    }
+
+    // GitHub Pages e Firestore non hanno un rilascio atomico. Durante il
+    // passaggio V6 → V7 lasciamo salvare il vecchio payload solo finché il
+    // documento non ha già i marcatori V7. Una pagina cache non può quindi
+    // cancellare l'arrotondamento dopo la prima migrazione riuscita.
+    function isSkipperCostPlanV7(data) {
+      return data is map
+        && data.keys().hasAny(['berthRoundingMode', 'berthRoundingIncrementCents', 'manualStandardBerthCents']);
     }
 
     // Il rilevamento usa qualsiasi marcatore: anche un documento migrato a
@@ -1471,14 +1510,16 @@ service cloud.firestore {
         allow create: if isPrivateAreaOpen()
           && planId == 'default'
           && isSkipper(boatId)
-          && hasValidSkipperCostPlanV6();
-        // V6 è il formato canonico. Un piano storico può passare a V6 con un
-        // solo salvataggio completo dalla pagina aggiornata; una pagina cache
-        // non può invece cancellare campi nuovi riscrivendo V1–V5.
+          && (hasValidSkipperCostPlanV7() || hasValidSkipperCostPlanV6());
+        // V7 è il formato canonico. La compatibilità V6 è soltanto una
+        // passerella di rilascio: resta disponibile finché il piano è V6,
+        // poi il primo salvataggio V7 blocca per sempre il downgrade cache.
         allow update: if isPrivateAreaOpen()
           && planId == 'default'
           && isSkipper(boatId)
-          && hasValidSkipperCostPlanV6();
+          && (hasValidSkipperCostPlanV7()
+            || (!isSkipperCostPlanV7(resource.data)
+              && hasValidSkipperCostPlanV6()));
         allow delete: if false;
       }
 

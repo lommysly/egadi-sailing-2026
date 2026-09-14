@@ -85,6 +85,8 @@ const AUTOMATIC_COST_PLAN_ITEM_IDS = new Set(['starter_pack', 'linen_towels', 'p
 const DINETTE_RATE_MODES = new Set(['percentage', 'fixed']);
 const STARTER_PACK_RATE_MODES = new Set(['total_divided', 'fixed_per_person']);
 const PROTECTION_INSURANCE_RATE_MODES = new Set(['total_divided', 'fixed_per_person']);
+const BERTH_ROUNDING_MODES = new Set(['automatic', 'ceil_increment', 'manual_up']);
+const BERTH_ROUNDING_INCREMENT_CENTS = new Set([100, 500, 1000]);
 const FREE_SUPPORT_ROLES = new Set(['co_skipper', 'hostess', 'collaborator']);
 const DEFAULT_COST_PLAN_DESCRIPTIONS = Object.freeze({
   starterPackDescription: 'Lenzuola e asciugamani, SUP e fuoribordo.',
@@ -737,8 +739,8 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
   const recoveryPayments = paymentTotalsForDashboard(paymentCountsTowardCostPlan);
   const insurancePayments = paymentTotalsForDashboard((payment) => payment.contributionItemId === 'protection_insurance');
   const allPayments = paymentTotalsForDashboard(() => true);
-  const recoveryTargetCents = model?.recoveryCents || 0;
-  const onlineRecoveryTargetCents = model?.berthRecoveryCents || 0;
+  const berthCostTargetCents = model?.berthRecoveryCents || 0;
+  const onlineRecoveryTargetCents = model?.allocatedRecoveryCents || 0;
   const insuranceTargetCents = model?.protectionInsuranceTargetCents || 0;
   const starterTargetCents = model?.starterPackTargetCents || 0;
   const depositTargetCents = model?.refundableDepositTotalCents || 0;
@@ -746,8 +748,8 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
   const pricingMessage = model ? automaticCostPlanPricingMessage(model) : '';
   const automaticPricingReady = Boolean(hasPlan && !pricingMessage);
   const totalContributionTargetCents = automaticPricingReady
-    ? recoveryTargetCents
-      + (starterIncluded ? 0 : starterTargetCents)
+    ? onlineRecoveryTargetCents
+      + starterTargetCents
       + insuranceTargetCents
     : 0;
   const projectedContributionCents = projectedBerthCents
@@ -759,7 +761,7 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
       ? pricingMessage
       : !totalContributionTargetCents
         ? 'Inserisci costi e ospiti paganti per confrontare la quota proposta con il fabbisogno reale.'
-        : `Previsto nelle schede: ${formatCurrency(projectedContributionCents / 100)} · quota posto, Pack cash e assicurazione; cauzione esclusa perché rimborsabile.`;
+      : `Previsto nelle schede: ${formatCurrency(projectedContributionCents / 100)} · quota posto, Pack cash e assicurazione; cauzione esclusa perché rimborsabile. ${model.roundingReserveCents > 0 ? `Riserva da arrotondamento: ${formatCurrency(model.roundingReserveCents / 100)}.` : model.roundingReserveCents < 0 ? `Da coprire nelle quote posto: ${formatCurrency(Math.abs(model.roundingReserveCents) / 100)}.` : 'Quote posto in pareggio.'}`;
   const onlineRecoveryDetail = financeAllocationText(
     onlineRecoveryTargetCents,
     projectedBerthCents,
@@ -772,8 +774,8 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
     : 'Da calcolare';
   const breakEvenDetail = automaticPricingReady && model?.standardBerthCents
     ? model.dinettePayingParticipants
-      ? `Pareggio indicativo: cabina ${formatCurrency(model.standardBerthCents / 100)} · dinette ${formatCurrency(model.dinetteBerthCents / 100)}.`
-      : `Quota proposta per ${model.payingParticipants} ospiti paganti. È quella applicata alle nuove schede finché non scegli un’eccezione personale.`
+      ? `Pareggio cabina ${formatCurrency(model.calculatedStandardBerthCents / 100)} · quota proposta ${formatCurrency(model.standardBerthCents / 100)} · dinette ${formatCurrency(model.dinetteBerthCents / 100)}.`
+      : `Pareggio ${formatCurrency(model.calculatedStandardBerthCents / 100)} · quota proposta per ${model.payingParticipants} ospiti paganti: ${formatCurrency(model.standardBerthCents / 100)}. È quella applicata alle nuove schede finché non scegli un’eccezione personale.`
     : 'Questo numero diventa la quota proposta alle nuove schede quando il preventivo è completo.';
   const starterTitle = !hasPlan || !model?.starterPackSourceSelected
     ? 'Starter Pack · origine da scegliere'
@@ -805,10 +807,10 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
     ? financeAllocationText(insuranceTargetCents, projectedInsuranceCents, insurancePayments.requestedCents, insurancePayments.verifiedCents, { hasTarget: true })
     : 'Nessuna assicurazione cauzione è stata aggiunta al preventivo.';
   overview.innerHTML = `
-    <div class="finance-overview-heading"><p class="eyebrow">Contabilità della barca</p><p>Qui gli importi sono totali, tranne la quota cabina che è per persona. Le cinque quote da comunicare sono in <strong>Imposta</strong>. Una richiesta WhatsApp non è un incasso: il residuo scende soltanto dopo la verifica manuale.</p></div>
+    <div class="finance-overview-heading"><p class="eyebrow">Contabilità della barca</p><p>Qui gli importi sono totali, tranne la quota cabina che è per persona. In <strong>Imposta</strong> trovi sia il totale da versare con il metodo concordato sia i contanti da portare a bordo. Una richiesta WhatsApp non è un incasso: il residuo scende soltanto dopo la verifica manuale.</p></div>
     <div class="finance-overview-grid">
       <article class="finance-overview-card"><span>Quote da organizzare · totale</span><strong>${escapeHtml(automaticPricingReady ? formatCurrency(totalContributionTargetCents / 100) : 'Da completare')}</strong><small>${escapeHtml(coverageDetail)}</small></article>
-      <article class="finance-overview-card"><span>Quota posto da richiedere · totale</span><strong>${escapeHtml(automaticPricingReady ? formatCurrency(onlineRecoveryTargetCents / 100) : 'Da completare')}</strong><small>${escapeHtml(onlineRecoveryDetail)}</small></article>
+      <article class="finance-overview-card"><span>Quote posto da richiedere · totale</span><strong>${escapeHtml(automaticPricingReady ? formatCurrency(onlineRecoveryTargetCents / 100) : 'Da completare')}</strong><small>${escapeHtml(`${onlineRecoveryDetail} Costi reali attraverso i posti: ${formatCurrency(berthCostTargetCents / 100)}.`)}</small></article>
       <article class="finance-overview-card"><span>Posto cabina standard · persona</span><strong>${escapeHtml(breakEven)}</strong><small>${escapeHtml(breakEvenDetail)}</small></article>
       <article class="finance-overview-card finance-overview-card-extras"><span>${escapeHtml(starterTitle)}</span><strong>${escapeHtml(starterValue)}</strong><small>${escapeHtml(starterDetail)}</small></article>
       <article class="finance-overview-card finance-overview-card-extras"><span>Assicurazione cauzione · totale</span><strong>${escapeHtml(insuranceValue)}</strong><small>${escapeHtml(insuranceDetail)}</small></article>
@@ -916,6 +918,13 @@ function getFirestoreErrorMessage(error, fallbackMessage) {
   return fallbackMessage;
 }
 
+function getCostPlanSaveErrorMessage(error) {
+  if (error?.code === 'permission-denied') {
+    return 'Il preventivo non è stato salvato. Ricarica la pagina per usare la versione più recente, poi riprova. Se il problema resta, verifica i tre dettagli mostrati all’equipaggio (senza contatti o istruzioni di pagamento) e di essere nell’area skipper della tua barca.';
+  }
+  return getFirestoreErrorMessage(error, 'Non riesco a salvare il preventivo barca.');
+}
+
 function isGoogleSkipperAccount(user) {
   return user?.providerData?.some((profile) => profile.providerId === 'google.com');
 }
@@ -1017,10 +1026,10 @@ function normalizeCostPlanDescription(value, fallback) {
 }
 
 function crewFacingDescriptionValidationMessage(entries) {
-  const forbidden = /https?:\/\/|www\.|@[A-Za-z0-9._-]+\.[A-Za-z]{2,}|\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b|paypal|satispay|revolut|iban|bonifico|causale/i;
+  const forbidden = /https?:\/\/|www\.|@[A-Za-z0-9._-]+\.[A-Za-z]{2,}|\b[A-Za-z]{2}\d{2}[A-Za-z0-9]{11,30}\b|[+]?\d[\d -]{6,}\d|paypal|satispay|revolut|iban|bonifico|causale/i;
   const unsafe = entries.find((entry) => forbidden.test(String(entry.value || '')));
   if (!unsafe) return '';
-  return `Nel dettaglio “${unsafe.label}” non inserire link, email, IBAN, causali o metodi di pagamento: questi restano nel profilo privato e nel messaggio WhatsApp.`;
+  return `Nel dettaglio “${unsafe.label}” non inserire link, email, telefono, IBAN, causali o metodi di pagamento: questi restano nel profilo privato e nel messaggio WhatsApp.`;
 }
 
 function defaultCostPlan() {
@@ -1047,6 +1056,9 @@ function defaultCostPlan() {
     dinetteRateMode: 'percentage',
     dinetteWeightPercent: 65,
     dinetteFixedCents: 0,
+    berthRoundingMode: 'automatic',
+    berthRoundingIncrementCents: 0,
+    manualStandardBerthCents: 0,
     ...DEFAULT_COST_PLAN_DESCRIPTIONS,
   };
 }
@@ -1081,6 +1093,20 @@ function normalizeProtectionInsuranceRateMode(value) {
   return PROTECTION_INSURANCE_RATE_MODES.has(value) ? value : 'total_divided';
 }
 
+function normalizeBerthRoundingMode(value) {
+  return BERTH_ROUNDING_MODES.has(value) ? value : 'automatic';
+}
+
+function normalizeBerthRoundingIncrementCents(value) {
+  const numericValue = Number(value);
+  return BERTH_ROUNDING_INCREMENT_CENTS.has(numericValue) ? numericValue : 100;
+}
+
+function roundUpToIncrement(cents, incrementCents) {
+  if (!cents || incrementCents < 1) return 0;
+  return Math.ceil(cents / incrementCents) * incrementCents;
+}
+
 function normalizeCostPlan(plan = {}) {
   const defaults = defaultCostPlan();
   const payingParticipants = asNonNegativeInteger(plan?.payingParticipants, maximumPayingParticipants());
@@ -1096,6 +1122,7 @@ function normalizeCostPlan(plan = {}) {
     : Math.min(defaults.dinettePayingParticipants, maxDinetteParticipants);
   const starterPackRateMode = normalizeStarterPackRateMode(plan?.starterPackRateMode);
   const protectionInsuranceRateMode = normalizeProtectionInsuranceRateMode(plan?.protectionInsuranceRateMode);
+  const berthRoundingMode = normalizeBerthRoundingMode(plan?.berthRoundingMode);
   const starterPackTotalCents = starterPackRateMode === 'total_divided'
     ? asNonNegativeInteger(plan?.starterPackTotalCents, 1_000_000)
     : 0;
@@ -1129,6 +1156,13 @@ function normalizeCostPlan(plan = {}) {
     dinetteRateMode: normalizeDinetteRateMode(plan?.dinetteRateMode),
     dinetteWeightPercent: normalizeDinetteWeightPercent(plan?.dinetteWeightPercent),
     dinetteFixedCents: asNonNegativeInteger(plan?.dinetteFixedCents, 1_000_000),
+    berthRoundingMode,
+    berthRoundingIncrementCents: berthRoundingMode === 'ceil_increment'
+      ? normalizeBerthRoundingIncrementCents(plan?.berthRoundingIncrementCents)
+      : 0,
+    manualStandardBerthCents: berthRoundingMode === 'manual_up'
+      ? asNonNegativeInteger(plan?.manualStandardBerthCents, 1_000_000)
+      : 0,
     starterPackDescription: normalizeCostPlanDescription(
       plan?.starterPackDescription,
       DEFAULT_COST_PLAN_DESCRIPTIONS.starterPackDescription,
@@ -1193,6 +1227,45 @@ function rateModeAllocation({ rateMode, totalCents, fixedPerPersonCents, partici
   };
 }
 
+function percentageDinetteAllocation(standardBerthCents, standardPayingParticipants, dinettePayingParticipants, dinetteWeightPercent) {
+  const dinetteBerthCents = standardBerthCents > 0
+    ? Math.round((standardBerthCents * dinetteWeightPercent) / 100)
+    : 0;
+  return {
+    standardBerthCents,
+    dinetteBerthCents,
+    allocatedRecoveryCents: (standardBerthCents * standardPayingParticipants)
+      + (dinetteBerthCents * dinettePayingParticipants),
+  };
+}
+
+function minimumPercentageDinetteAllocation(berthRecoveryCents, standardPayingParticipants, dinettePayingParticipants, dinetteWeightPercent) {
+  const weightedUnitsInHundredths = (standardPayingParticipants * 100)
+    + (dinettePayingParticipants * dinetteWeightPercent);
+  if (berthRecoveryCents < 1 || weightedUnitsInHundredths < 1) {
+    return percentageDinetteAllocation(0, standardPayingParticipants, dinettePayingParticipants, dinetteWeightPercent);
+  }
+  let standardBerthCents = Math.max(1, Math.ceil((berthRecoveryCents * 100) / weightedUnitsInHundredths));
+  let allocation = percentageDinetteAllocation(
+    standardBerthCents,
+    standardPayingParticipants,
+    dinettePayingParticipants,
+    dinetteWeightPercent,
+  );
+  // La dinette viene arrotondata al centesimo: alziamo la cabina di un
+  // centesimo finché il totale non lascia neppure un centesimo scoperto.
+  while (allocation.allocatedRecoveryCents < berthRecoveryCents) {
+    standardBerthCents += 1;
+    allocation = percentageDinetteAllocation(
+      standardBerthCents,
+      standardPayingParticipants,
+      dinettePayingParticipants,
+      dinetteWeightPercent,
+    );
+  }
+  return allocation;
+}
+
 function costPlanQuoteModel(plan = activeCostPlan) {
   if (!plan) return null;
   const normalized = normalizeCostPlan(plan);
@@ -1225,20 +1298,69 @@ function costPlanQuoteModel(plan = activeCostPlan) {
     || fixedDinetteTotalCents >= berthRecoveryCents
   );
   const weightedUnits = standardPayingParticipants + (normalized.dinettePayingParticipants * dinetteWeight);
-  const standardBerthCents = berthRecoveryCents > 0 && !starterPackExceedsCharter && !fixedDinetteError
+  const calculatedPercentageAllocation = !usesFixedDinetteRate && !starterPackExceedsCharter
+    ? minimumPercentageDinetteAllocation(
+      berthRecoveryCents,
+      standardPayingParticipants,
+      normalized.dinettePayingParticipants,
+      normalized.dinetteWeightPercent,
+    )
+    : null;
+  const calculatedStandardBerthCents = berthRecoveryCents > 0 && !starterPackExceedsCharter && !fixedDinetteError
     ? usesFixedDinetteRate
-      ? Math.round((berthRecoveryCents - fixedDinetteTotalCents) / standardPayingParticipants)
-      : weightedUnits > 0
-        ? Math.round(berthRecoveryCents / weightedUnits)
-        : 0
+      ? Math.ceil((berthRecoveryCents - fixedDinetteTotalCents) / standardPayingParticipants)
+      : calculatedPercentageAllocation.standardBerthCents
+    : 0;
+  const calculatedDinetteBerthCents = !starterPackExceedsCharter && !fixedDinetteError
+    ? usesFixedDinetteRate
+      ? normalized.dinetteFixedCents
+      : calculatedPercentageAllocation.dinetteBerthCents
+    : 0;
+  const manualAllocation = normalized.berthRoundingMode === 'manual_up' && !usesFixedDinetteRate
+    ? percentageDinetteAllocation(
+      normalized.manualStandardBerthCents,
+      standardPayingParticipants,
+      normalized.dinettePayingParticipants,
+      normalized.dinetteWeightPercent,
+    )
+    : null;
+  const manualAllocatedRecoveryCents = normalized.berthRoundingMode === 'manual_up'
+    ? usesFixedDinetteRate
+      ? (normalized.manualStandardBerthCents * standardPayingParticipants) + fixedDinetteTotalCents
+      : manualAllocation.allocatedRecoveryCents
+    : 0;
+  const manualAllocationShortfallCents = normalized.berthRoundingMode === 'manual_up'
+    ? Math.max(0, berthRecoveryCents - manualAllocatedRecoveryCents)
+    : 0;
+  const manualStandardBerthError = normalized.berthRoundingMode === 'manual_up' && (
+    normalized.manualStandardBerthCents < 1
+    || manualAllocationShortfallCents > 0
+  );
+  const standardBerthCents = manualStandardBerthError
+    ? calculatedStandardBerthCents
+    : normalized.berthRoundingMode === 'ceil_increment'
+      ? roundUpToIncrement(calculatedStandardBerthCents, normalized.berthRoundingIncrementCents)
+      : normalized.berthRoundingMode === 'manual_up'
+        ? normalized.manualStandardBerthCents
+        : calculatedStandardBerthCents;
+  const calculatedAllocation = (calculatedStandardBerthCents * standardPayingParticipants)
+    + (calculatedDinetteBerthCents * normalized.dinettePayingParticipants);
+  const unroundedDinetteBerthCents = !starterPackExceedsCharter && !fixedDinetteError && !usesFixedDinetteRate
+    ? percentageDinetteAllocation(
+      standardBerthCents,
+      standardPayingParticipants,
+      normalized.dinettePayingParticipants,
+      normalized.dinetteWeightPercent,
+    ).dinetteBerthCents
     : 0;
   const dinetteBerthCents = !starterPackExceedsCharter && !fixedDinetteError
     ? usesFixedDinetteRate
       ? normalized.dinetteFixedCents
-      : standardBerthCents > 0
-        ? Math.round(standardBerthCents * dinetteWeight)
-        : 0
+      : normalized.berthRoundingMode === 'ceil_increment'
+        ? roundUpToIncrement(unroundedDinetteBerthCents, normalized.berthRoundingIncrementCents)
+        : unroundedDinetteBerthCents
     : 0;
+  const calculatedAllocatedRecoveryCents = calculatedAllocation;
   const allocatedRecoveryCents = (standardBerthCents * standardPayingParticipants)
     + (dinetteBerthCents * normalized.dinettePayingParticipants);
   const refundableDepositAllocation = evenlyAllocatedAmount(
@@ -1254,10 +1376,18 @@ function costPlanQuoteModel(plan = activeCostPlan) {
     weightedUnits,
     fixedDinetteTotalCents,
     fixedDinetteError,
+    calculatedStandardBerthCents,
+    calculatedDinetteBerthCents,
+    calculatedAllocatedRecoveryCents,
+    calculatedAllocationShortfallCents: Math.max(0, berthRecoveryCents - calculatedAllocatedRecoveryCents),
+    manualAllocatedRecoveryCents,
+    manualAllocationShortfallCents,
+    manualStandardBerthError,
     standardBerthCents,
     dinetteBerthCents,
     allocatedRecoveryCents,
     roundingDeltaCents: allocatedRecoveryCents - berthRecoveryCents,
+    roundingReserveCents: allocatedRecoveryCents - berthRecoveryCents,
     starterPackPerPersonCents: starterPackAllocation.perPersonCents,
     starterPackTargetCents: starterPackAllocation.targetCents,
     starterPackAllocatedCents: starterPackAllocation.allocatedCents,
@@ -1282,8 +1412,21 @@ function fixedDinetteConfigurationMessage(model) {
   return 'Il totale delle dinette lascerebbe la cabina gratuita: riduci il prezzo dinette oppure aumenta i costi della barca.';
 }
 
+function berthRoundingConfigurationMessage(model) {
+  if (!model?.manualStandardBerthError) return '';
+  if (model.manualStandardBerthCents < 1) {
+    return 'Indica la quota cabina che vuoi comunicare oppure torna al calcolo automatico.';
+  }
+  if (model.manualAllocationShortfallCents > 0) {
+    return `Con questa quota mancherebbero ${formatCurrency(model.manualAllocationShortfallCents / 100)} per coprire i costi: scegli almeno ${formatCurrency(model.calculatedStandardBerthCents / 100)} per cabina.`;
+  }
+  return `La quota cabina scelta non può essere inferiore al pareggio di ${formatCurrency(model.calculatedStandardBerthCents / 100)}.`;
+}
+
 function automaticCostPlanPricingMessage(model) {
-  return costPlanRateModeValidationMessage(model) || fixedDinetteConfigurationMessage(model);
+  return costPlanRateModeValidationMessage(model)
+    || fixedDinetteConfigurationMessage(model)
+    || berthRoundingConfigurationMessage(model);
 }
 
 function costPlanRateModeValidationMessage(model) {
@@ -1306,9 +1449,10 @@ function costPlanRateModeValidationMessage(model) {
 function costPlanBaseContribution(plan = activeCostPlan) {
   const model = costPlanQuoteModel(plan);
   if (!model || automaticCostPlanPricingMessage(model) || !model.standardBerthCents) return null;
+  const hasPriceAdjustment = model.berthRoundingMode !== 'automatic';
   return {
     id: 'cost:base',
-    label: 'Quota di pareggio · controllo dashboard',
+    label: hasPriceAdjustment ? 'Quota cabina proposta' : 'Quota cabina di pareggio',
     cents: model.standardBerthCents,
     defaultReason: 'Quota cabina · recupero costi barca e skipper',
     accountingCategory: 'cost_recovery',
@@ -2121,11 +2265,15 @@ function fillCostPlanForm(plan = activeCostPlan) {
   form.elements.dinetteRateMode.value = normalized.dinetteRateMode;
   form.elements.dinetteRatePercent.value = String(normalized.dinetteWeightPercent);
   form.elements.dinetteFixedPrice.value = euroInputValue(normalized.dinetteFixedCents);
+  form.elements.berthRoundingMode.value = normalized.berthRoundingMode;
+  form.elements.berthRoundingIncrement.value = String(normalized.berthRoundingIncrementCents || 100);
+  form.elements.manualStandardBerthPrice.value = euroInputValue(normalized.manualStandardBerthCents);
   form.elements.starterPackDescription.value = normalized.starterPackDescription;
   form.elements.protectionInsuranceDescription.value = normalized.protectionInsuranceDescription;
   form.elements.refundableDepositDescription.value = normalized.refundableDepositDescription;
   syncCostPlanDinetteFieldAvailability();
   syncCostPlanRateMode();
+  syncCostPlanBerthPricingMode();
   syncCostPlanDepositParticipantAvailability();
 }
 
@@ -2161,6 +2309,23 @@ function syncCostPlanRateMode() {
   form.querySelectorAll('[data-protection-insurance-fixed]').forEach((field) => {
     field.hidden = protectionInsuranceRateMode !== 'fixed_per_person';
   });
+}
+
+function syncCostPlanBerthPricingMode() {
+  const form = document.querySelector('#costPlanForm');
+  if (!form) return;
+  const mode = normalizeBerthRoundingMode(form.elements.berthRoundingMode?.value);
+  form.querySelectorAll('[data-berth-rounding-increment]').forEach((field) => {
+    field.hidden = mode !== 'ceil_increment';
+  });
+  form.querySelectorAll('[data-manual-standard-berth]').forEach((field) => {
+    field.hidden = mode !== 'manual_up';
+  });
+  const model = costPlanQuoteModel(readCostPlanForm());
+  const manualInput = form.elements.manualStandardBerthPrice;
+  if (manualInput && model.calculatedStandardBerthCents > 0) {
+    manualInput.min = (model.calculatedStandardBerthCents / 100).toFixed(2);
+  }
 }
 
 function syncCostPlanDinetteFieldAvailability() {
@@ -2209,6 +2374,7 @@ function readCostPlanForm() {
       : null;
   const starterPackRateMode = normalizeStarterPackRateMode(form?.elements.starterPackRateMode?.value);
   const protectionInsuranceRateMode = normalizeProtectionInsuranceRateMode(form?.elements.protectionInsuranceRateMode?.value);
+  const berthRoundingMode = normalizeBerthRoundingMode(form?.elements.berthRoundingMode?.value);
   return {
     charterCents: toEuroCents(form?.elements.charterCost?.value),
     skipperFlightTrainCents: toEuroCents(form?.elements.skipperFlightTrainCost?.value),
@@ -2241,6 +2407,13 @@ function readCostPlanForm() {
     dinetteWeightPercent: normalizeDinetteWeightPercent(form?.elements.dinetteRatePercent?.value),
     dinetteFixedCents: dinetteRateMode === 'fixed'
       ? toEuroCents(form?.elements.dinetteFixedPrice?.value)
+      : 0,
+    berthRoundingMode,
+    berthRoundingIncrementCents: berthRoundingMode === 'ceil_increment'
+      ? normalizeBerthRoundingIncrementCents(form?.elements.berthRoundingIncrement?.value)
+      : 0,
+    manualStandardBerthCents: berthRoundingMode === 'manual_up'
+      ? toEuroCents(form?.elements.manualStandardBerthPrice?.value)
       : 0,
     starterPackDescription: normalizeCostPlanDescription(
       form?.elements.starterPackDescription?.value,
@@ -2294,6 +2467,11 @@ function renderCostPlanSummary() {
     summary.innerHTML = `<p class="cost-result-intro"><strong>Controlla il prezzo della dinette.</strong> ${escapeHtml(fixedDinetteMessage)}</p>`;
     return;
   }
+  const berthRoundingMessage = berthRoundingConfigurationMessage(model);
+  if (berthRoundingMessage) {
+    summary.innerHTML = `<p class="cost-result-intro"><strong>Controlla la quota cabina.</strong> ${escapeHtml(berthRoundingMessage)}</p>`;
+    return;
+  }
   const perPerson = (cents) => cents > 0 ? `${formatCurrency(cents / 100)} a persona` : 'Non prevista';
   const starterValue = perPerson(model.starterPackPerPersonCents);
   const starterDetail = model.starterPackIncludedInCharter
@@ -2313,8 +2491,20 @@ function renderCostPlanSummary() {
   const depositDetail = model.refundableDepositPerPersonCents > 0
     ? `${model.refundableDepositDescription} · in contanti all’imbarco, rimborsabile.`
     : 'È separata dalle quote e dai pagamenti online.';
+  const standardPaymentCents = model.standardBerthCents + model.protectionInsurancePerPersonCents;
+  const dinettePaymentCents = model.dinetteBerthCents + model.protectionInsurancePerPersonCents;
+  const standardCashAtBoardCents = model.starterPackPerPersonCents + model.refundableDepositPerPersonCents;
+  const priceModeDetail = model.berthRoundingMode === 'ceil_increment'
+    ? `Quota arrotondata per eccesso al prossimo ${formatCurrency(model.berthRoundingIncrementCents / 100)}.`
+    : model.berthRoundingMode === 'manual_up'
+      ? 'Quota cabina scelta dallo skipper.'
+      : 'Quota calcolata esattamente al centesimo.';
+  const roundingReserveText = model.roundingReserveCents > 0
+    ? `Le quote proposte raccolgono ${formatCurrency(model.roundingReserveCents / 100)} in più dei costi da recuperare: è una riserva da riallocare nella cassa comune, non un guadagno.`
+    : model.roundingReserveCents < 0
+      ? `Le quote proposte lasciano ${formatCurrency(Math.abs(model.roundingReserveCents) / 100)} da coprire: aumenta la quota cabina prima di inviare gli inviti.`
+      : 'Le quote proposte sono in pareggio con i costi da recuperare.';
   const roundingNotes = [
-    [model.roundingDeltaCents, 'quote posto'],
     [model.starterPackRoundingDeltaCents, 'Starter Pack'],
     [model.protectionInsuranceRoundingDeltaCents, 'assicurazione'],
     [model.refundableDepositRoundingDeltaCents, 'cauzione rimborsabile'],
@@ -2343,7 +2533,7 @@ function renderCostPlanSummary() {
   // Gli accrediti verificati qui sono solo quelli delle richieste online.
   // Se il Pack è già nel charter, la sua parte resta cash e non deve far
   // apparire come un falso residuo da ricevere online.
-  const onlineRecoveryTargetCents = model.berthRecoveryCents;
+  const onlineRecoveryTargetCents = model.allocatedRecoveryCents;
   const onlineBalanceCents = verifiedCents - onlineRecoveryTargetCents;
   const onlineBalance = onlineBalanceCents === 0
     ? 'Quota online coperta dagli accrediti verificati.'
@@ -2354,15 +2544,21 @@ function renderCostPlanSummary() {
     ? `Starter Pack cash previsto: ${formatCurrency(model.starterPackTargetCents / 100)}${model.starterPackIncludedInCharter ? ', già dentro il charter e scorporato dalla quota cabina.' : ', esterno al charter.'}`
     : 'Nessuno Starter Pack cash è stato configurato.';
   summary.innerHTML = `
-    <div class="cost-result-heading"><div><span>Quote per persona</span><strong>I cinque importi da comunicare.</strong></div><small>La cauzione è separata.</small></div>
+    <div class="cost-result-heading"><div><span>Quote per persona</span><strong>Le voci sono separate; i tre totali d’azione sono qui sotto.</strong></div><small>La cauzione è sempre separata e rimborsabile.</small></div>
     <div class="cost-result-grid">
-      <article class="cost-result-card"><span>Posto cabina standard</span><strong>${escapeHtml(perPerson(model.standardBerthCents))}</strong><small>${escapeHtml(model.standardBerthCents > 0 ? 'Quota del posto; Starter Pack, assicurazione e cauzione sono indicati a fianco.' : 'Quota di pareggio del posto in cabina.')}</small></article>
-      <article class="cost-result-card"><span>Posto in dinette</span><strong>${escapeHtml(model.dinettePayingParticipants > 0 ? perPerson(model.dinetteBerthCents) : 'Non prevista')}</strong><small>${escapeHtml(model.dinettePayingParticipants > 0 ? `${model.dinetteRateMode === 'fixed' ? 'Prezzo fisso scelto dallo skipper.' : `${model.dinetteWeightPercent}% della quota cabina.`} Starter Pack, assicurazione e cauzione sono indicati a fianco.` : 'Nessun posto dinette nel calcolo.')}</small></article>
-      <article class="cost-result-card cost-result-card-local"><span>Starter Pack · cash a bordo</span><strong>${escapeHtml(starterValue)}</strong><small>${escapeHtml(starterDetail)}</small></article>
+      <article class="cost-result-card"><span>Costo cabina standard</span><strong>${escapeHtml(perPerson(model.standardBerthCents))}</strong><small>${escapeHtml(`${priceModeDetail} L’assicurazione si aggiunge nel totale da versare.`)}</small></article>
+      <article class="cost-result-card"><span>Costo posto dinette</span><strong>${escapeHtml(model.dinettePayingParticipants > 0 ? perPerson(model.dinetteBerthCents) : 'Non previsto')}</strong><small>${escapeHtml(model.dinettePayingParticipants > 0 ? `Si aggiunge l’assicurazione nel totale da versare. ${model.dinetteRateMode === 'fixed' ? 'Prezzo fisso scelto.' : `È il ${model.dinetteWeightPercent}% della quota cabina.`}` : 'Nessun posto dinette nel calcolo.')}</small></article>
+      <article class="cost-result-card cost-result-card-local"><span>Starter Pack · cosa comprende</span><strong>${escapeHtml(starterValue)}</strong><small>${escapeHtml(starterDetail)}</small></article>
       <article class="cost-result-card"><span>Assicurazione sulla cauzione</span><strong>${escapeHtml(insuranceValue)}</strong><small>${escapeHtml(insuranceDetail)}</small></article>
       <article class="cost-result-card cost-result-card-deposit"><span>Cauzione rimborsabile · cash all’imbarco</span><strong>${escapeHtml(depositValue)}</strong><small>${escapeHtml(model.refundableDepositPerPersonCents > 0 ? `${model.refundableDepositDescription} · Non è un costo finale: viene restituita secondo charter.` : depositDetail)}</small></article>
     </div>
-    <details class="cost-result-check"><summary>Controllo della quota barca</summary><p>Costi charter e skipper: <strong>${escapeHtml(formatCurrency(totalCents / 100))}</strong> · quota da richiedere: <strong>${escapeHtml(formatCurrency(onlineRecoveryTargetCents / 100))}</strong> · richieste in attesa: <strong>${escapeHtml(formatCurrency(pendingCents / 100))}</strong> · accrediti verificati: <strong>${escapeHtml(formatCurrency(verifiedCents / 100))}</strong> · ${escapeHtml(onlineBalance)}</p><p>${escapeHtml(starterCashCheck)} ${escapeHtml(checkNotes)}</p></details>
+    <div class="cost-result-actions">
+      <div class="cost-result-actions-heading"><strong>Cosa chiedere e cosa portare</strong><small>Questi sono gli importi conclusivi, pronti per il messaggio WhatsApp.</small></div>
+      <article class="cost-result-card cost-result-card-action"><span>Totale da bonificare / versare · cabina standard</span><strong>${escapeHtml(perPerson(standardPaymentCents))}</strong><small>${escapeHtml(`Posto cabina ${formatCurrency(model.standardBerthCents / 100)} + assicurazione ${formatCurrency(model.protectionInsurancePerPersonCents / 100)}. Il metodo scelto (bonifico, PayPal, Satispay o Revolut) arriva nel messaggio WhatsApp.`)}</small></article>
+      <article class="cost-result-card cost-result-card-action"><span>Totale da bonificare / versare · dinette</span><strong>${escapeHtml(model.dinettePayingParticipants > 0 ? perPerson(dinettePaymentCents) : 'Non prevista')}</strong><small>${escapeHtml(model.dinettePayingParticipants > 0 ? `Posto dinette ${formatCurrency(model.dinetteBerthCents / 100)} + assicurazione ${formatCurrency(model.protectionInsurancePerPersonCents / 100)}.` : 'Nessun posto dinette nel calcolo.')}</small></article>
+      <article class="cost-result-card cost-result-card-action cost-result-card-action-cash"><span>Totale da portare in contanti · ogni ospite</span><strong>${escapeHtml(perPerson(standardCashAtBoardCents))}</strong><small>${escapeHtml(`Starter Pack ${formatCurrency(model.starterPackPerPersonCents / 100)} + cauzione rimborsabile ${formatCurrency(model.refundableDepositPerPersonCents / 100)}. La cauzione non è un costo finale.`)}</small></article>
+    </div>
+    <details class="cost-result-check"><summary>Controllo delle quote e dell’arrotondamento</summary><p>Costi reali da recuperare attraverso i posti: <strong>${escapeHtml(formatCurrency(model.berthRecoveryCents / 100))}</strong> · pareggio cabina: <strong>${escapeHtml(formatCurrency(model.calculatedStandardBerthCents / 100))}</strong> · quota cabina proposta: <strong>${escapeHtml(formatCurrency(model.standardBerthCents / 100))}</strong> · ${escapeHtml(priceModeDetail)} ${escapeHtml(roundingReserveText)}</p><p>Quote posto da richiedere: <strong>${escapeHtml(formatCurrency(onlineRecoveryTargetCents / 100))}</strong> · richieste in attesa: <strong>${escapeHtml(formatCurrency(pendingCents / 100))}</strong> · accrediti verificati: <strong>${escapeHtml(formatCurrency(verifiedCents / 100))}</strong> · ${escapeHtml(onlineBalance)}</p><p>${escapeHtml(starterCashCheck)} ${escapeHtml(checkNotes)}</p></details>
   `;
 }
 
@@ -3054,8 +3250,11 @@ function projectionQuoteSummary(projection) {
   const total = summary.hasPayableEstimate
     ? formatCurrency(summary.payableCents / 100)
     : 'da definire';
-  const starter = ` · Starter Pack ${starterPackQuoteText(summary.starterPackCents, { fallback: 'da definire' })}`;
-  return `${parts} · Totale richiesta prevista ${total}${starter}`;
+  const cashAtBoardCents = summary.starterPackCents + summary.refundableDepositCents;
+  const cashAtBoard = cashAtBoardCents > 0
+    ? formatCurrency(cashAtBoardCents / 100)
+    : 'da definire';
+  return `Totale da bonificare / versare ${total} (${parts}) · Totale contanti all’imbarco ${cashAtBoard} (Starter Pack ${starterPackQuoteText(summary.starterPackCents, { fallback: 'da definire' })} + cauzione rimborsabile ${projectionAmountOrPending(summary.refundableDepositCents)}).`;
 }
 
 function projectionMatchesInvite(projection, inviteId) {
@@ -3214,13 +3413,11 @@ function renderProjectionCostPreview() {
   const missing = payableItems.filter((item) => !item.defined).map((item) => item.label);
   const details = payableItems.map((item) => `${item.label}: ${item.defined ? formatCurrency(item.cents / 100) : 'da definire'}`).join(' · ');
   const total = missing.length
-    ? `Richiesta prevista finora: ${formatCurrency(payableCents / 100)}`
-    : `Richiesta prevista: ${formatCurrency(payableCents / 100)}`;
+    ? `Totale da bonificare / versare finora: ${formatCurrency(payableCents / 100)}`
+    : `Totale da bonificare / versare: ${formatCurrency(payableCents / 100)}`;
   const missingText = missing.length ? ` · Da definire: ${missing.join(', ')}.` : '.';
-  const depositText = deposit.defined
-    ? ` Cauzione rimborsabile: ${formatCurrency(deposit.cents / 100)}, separata e da regolare all’imbarco.`
-    : ' Cauzione rimborsabile: da definire, separata e da regolare all’imbarco.';
-  const starterPackText = ` Starter Pack: ${starterPackQuoteText(starterPack.cents, { fallback: 'da definire' })}.`;
+  const cashAtBoardCents = starterPack.cents + deposit.cents;
+  const cashAtBoardText = ` Totale da portare in contanti: ${cashAtBoardCents > 0 ? formatCurrency(cashAtBoardCents / 100) : 'da definire'} (Starter Pack ${starterPackQuoteText(starterPack.cents, { fallback: 'da definire' })} + cauzione rimborsabile ${deposit.defined ? formatCurrency(deposit.cents / 100) : 'da definire'}).`;
   const source = usesCustomPricing
     ? 'Eccezione personale: questi importi restano fissi finché non li modifichi.'
     : keepsInvitationPricing
@@ -3228,7 +3425,7 @@ function renderProjectionCostPreview() {
       : dashboardPricingReady
         ? 'Quota proposta dalla dashboard: segue i conti della barca fino alla creazione dell’invito.'
         : 'Il preventivo non è completo: per ora il sito usa solo il listino base della barca.';
-  preview.textContent = `${total} (${details})${missingText}${starterPackText}${depositText} ${source} Non crea una richiesta o un pagamento.`;
+  preview.textContent = `${total} (${details})${missingText}${cashAtBoardText} ${source} Non crea una richiesta o un pagamento.`;
 }
 
 function resetMemberForm() {
@@ -4722,6 +4919,7 @@ function handleCostPlanFormChange(event) {
   }
   if (event.target?.name === 'dinetteRateMode') syncCostPlanDinettePricingMode();
   if (event.target?.name === 'starterPackRateMode' || event.target?.name === 'protectionInsuranceRateMode') syncCostPlanRateMode();
+  syncCostPlanBerthPricingMode();
   renderCostPlanSummary();
   renderSkipperFinanceOverview(readCostPlanForm());
 }
@@ -4761,6 +4959,11 @@ costPlanForm.addEventListener('submit', async (event) => {
     setMessage(message, fixedDinetteMessage, true);
     return;
   }
+  const berthRoundingMessage = berthRoundingConfigurationMessage(model);
+  if (berthRoundingMessage) {
+    setMessage(message, berthRoundingMessage, true);
+    return;
+  }
   const submitButton = costPlanForm.querySelector('button[type="submit"]');
   submitButton.disabled = true;
   setMessage(message, 'Salvo il preventivo barca…');
@@ -4795,7 +4998,7 @@ costPlanForm.addEventListener('submit', async (event) => {
     renderProjections();
     setMessage(message, 'Dashboard salvata: le schede senza invito sono state aggiornate con le quote automatiche. Inviti già creati, schede storiche ed eccezioni restano fissati.');
   } catch (error) {
-    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare il preventivo barca.'), true);
+    setMessage(message, getCostPlanSaveErrorMessage(error), true);
   } finally {
     submitButton.disabled = false;
   }

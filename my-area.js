@@ -552,6 +552,17 @@ function projectedRefundableDepositSummary() {
   };
 }
 
+function starterPackCashAmountCents() {
+  if (activeProjection?.contributesToCosts === false) {
+    return 0;
+  }
+  const projectedCents = projectionAmountCents('starterPackCents');
+  const plannedItem = contributionPlanItems().find((item) => item.id === 'starter_pack');
+  return projectionHasFrozenPricing()
+    ? projectedCents
+    : projectedCents || contributionAmountCents(plannedItem);
+}
+
 function starterPackCashSummary() {
   if (activeProjection?.contributesToCosts === false) {
     return {
@@ -565,9 +576,7 @@ function starterPackCashSummary() {
   // la quota individuale. Non facciamolo sembrare già pagato: il modello
   // attuale lo regola comunque cash a bordo.
   const legacyIncludedInCharter = plannedItem?.state === 'included' && !projectedCents;
-  const amountCents = projectionHasFrozenPricing()
-    ? projectedCents
-    : projectedCents || contributionAmountCents(plannedItem);
+  const amountCents = starterPackCashAmountCents();
   const value = amountCents
     ? `${formatCurrency(amountCents / 100)} ${localized('in contanti a bordo', 'cash on board')}`
     : legacyIncludedInCharter
@@ -602,6 +611,21 @@ function paymentTotalsForGroup(groupId) {
       .filter(isPendingCrewPayment)
       .reduce((total, payment) => total + paymentAmountCents(payment), 0),
   };
+}
+
+function personalAmountCents(groupId, planItemId, projectionField) {
+  const projectedCents = projectionAmountCents(projectionField);
+  if (projectedCents || projectionHasFrozenPricing()) return projectedCents;
+  const payments = paymentTotalsForGroup(groupId).payments;
+  const requestedCents = payments.reduce((total, payment) => total + paymentAmountCents(payment), 0);
+  if (requestedCents > 0) return requestedCents;
+  return contributionAmountCents(contributionPlanItems().find((item) => item.id === planItemId));
+}
+
+function refundableDepositCashAmountCents() {
+  const projectedCents = projectionAmountCents('refundableDepositCents');
+  if (projectedCents || projectionHasFrozenPricing()) return projectedCents;
+  return contributionAmountCents(contributionPlanItems().find((item) => item.id === 'refundable_deposit'));
 }
 
 function contributionPlanFallback(itemId, { deposit = false } = {}) {
@@ -705,6 +729,45 @@ function renderParticipantFinanceSummary() {
   const starterPack = starterPackCashSummary();
   const protectionInsurance = personalContributionSummary('protection_insurance', 'protection_insurance', 'protectionInsuranceCents');
   const refundableDeposit = projectedRefundableDepositSummary();
+  const berthCents = personalAmountCents('berth', 'berth', 'berthCents');
+  const insuranceCents = personalAmountCents('protection_insurance', 'protection_insurance', 'protectionInsuranceCents');
+  const starterPackCents = starterPackCashAmountCents();
+  const depositCents = refundableDepositCashAmountCents();
+  const amountToTransferCents = berthCents + insuranceCents;
+  const cashAtBoardCents = starterPackCents + depositCents;
+  const accommodationLabel = projectionBerthLabel();
+  const isDinette = activeProjection?.berthType === 'dinette';
+  const hasProjection = Boolean(activeProjection);
+  const transferLabel = localized(
+    hasProjection ? `Totale da bonificare / versare · ${isDinette ? 'dinette' : 'cabina'}` : 'Totale da bonificare / versare',
+    hasProjection ? `Total to pay · ${isDinette ? 'dinette' : 'cabin'}` : 'Total to pay',
+  );
+  const berthLabel = localized(
+    hasProjection ? (isDinette ? 'Costo posto dinette' : 'Costo posto cabina') : 'Costo del posto',
+    hasProjection ? (isDinette ? 'Dinette berth cost' : 'Cabin berth cost') : 'Berth cost',
+  );
+  const transferAction = {
+    value: amountToTransferCents > 0
+      ? `${formatCurrency(amountToTransferCents / 100)} ${localized('da versare', 'to pay')}`
+      : localized('Da definire', 'To be confirmed'),
+    detail: amountToTransferCents > 0
+      ? localized(
+        `${hasProjection ? accommodationLabel : 'Quota del posto'}: ${formatCurrency(berthCents / 100)} + assicurazione: ${formatCurrency(insuranceCents / 100)}. Il messaggio WhatsApp dello skipper indica il metodo scelto.`,
+        `${hasProjection ? accommodationLabel : 'Berth contribution'}: ${formatCurrency(berthCents / 100)} + deposit insurance: ${formatCurrency(insuranceCents / 100)}. The skipper’s WhatsApp message states the chosen method.`,
+      )
+      : localized('Lo skipper deve ancora fissare il tuo importo personale.', 'The skipper still needs to set your personal amount.'),
+  };
+  const cashAction = {
+    value: cashAtBoardCents > 0
+      ? `${formatCurrency(cashAtBoardCents / 100)} ${localized('in contanti', 'in cash')}`
+      : localized('Da definire', 'To be confirmed'),
+    detail: cashAtBoardCents > 0
+      ? localized(
+        `Starter Pack: ${formatCurrency(starterPackCents / 100)} + cauzione rimborsabile: ${formatCurrency(depositCents / 100)}. La cauzione non è un costo finale e viene restituita secondo charter.`,
+        `Starter Pack: ${formatCurrency(starterPackCents / 100)} + refundable deposit: ${formatCurrency(depositCents / 100)}. The deposit is not a final cost and is returned under the charter terms.`,
+      )
+      : localized('Starter Pack e cauzione non sono ancora stati definiti per il tuo posto.', 'Starter Pack and deposit have not yet been set for your berth.'),
+  };
   const pendingCents = activeCrewPayments
     .filter(isPendingCrewPayment)
     .reduce((total, payment) => total + paymentAmountCents(payment), 0);
@@ -728,10 +791,12 @@ function renderParticipantFinanceSummary() {
   summary.innerHTML = `
     <p class="eyebrow">${escapeHtml(localized('Il tuo riepilogo dei costi', 'Your cost summary'))}</p>
     <h4>${escapeHtml(localized('Cosa pagare e cosa portare a bordo', 'What to pay and what to bring on board'))}</h4>
-    <p>${escapeHtml(localized('Qui vedi solo i tuoi importi. Lo Starter Pack può essere già compreso nel charter oppure esterno: in entrambi i casi la sua quota resta distinta dall’importo del tuo posto/cabina e, quando prevista, si regola in contanti a bordo. La cauzione rimborsabile resta separata. Le richieste personali arrivano invece dallo skipper e vengono verificate manualmente.', 'Here you only see your own amounts. The Starter Pack may already be included in the charter or be external: in both cases its share remains separate from your berth/cabin amount and, whenever planned, is settled in cash on board. The refundable deposit remains separate. Personal requests come from the skipper and are checked manually.'))}</p>
+    <p>${escapeHtml(localized('Prima trovi i due totali pratici: quello da versare allo skipper con il metodo concordato e quello da portare in contanti all’imbarco. Sotto trovi sempre il dettaglio, così non confondi Starter Pack e cauzione con la quota del posto.', 'First you find the two practical totals: what to pay the skipper using the agreed method and what to bring in cash at boarding. The breakdown remains below, so the Starter Pack and deposit are never confused with your berth contribution.'))}</p>
     <div class="participant-finance-grid">
+      ${participantFinanceRow(transferLabel, transferAction, 'participant-finance-row-action')}
+      ${participantFinanceRow(localized('Totale da portare in contanti', 'Total to bring in cash'), cashAction, 'participant-finance-row-action participant-finance-row-cash')}
       ${participantProjectionRows()}
-      ${participantFinanceRow(localized('Posto / cabina', 'Berth / cabin'), berth)}
+      ${participantFinanceRow(berthLabel, berth)}
       ${participantFinanceRow('Starter Pack', starterPack)}
       ${participantFinanceRow(localized('Assicurazione cauzione', 'Deposit insurance'), protectionInsurance)}
       ${participantFinanceRow(localized('Cauzione rimborsabile', 'Refundable deposit'), refundableDeposit, 'participant-finance-row-deposit')}
