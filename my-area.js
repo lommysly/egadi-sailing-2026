@@ -50,8 +50,8 @@ const CONTRIBUTION_ITEM_STATES = new Map([
 ]);
 const CONTRIBUTION_ITEMS = [
   { id: 'berth', label: localized('Quota posto in barca', 'Berth contribution') },
-  { id: 'starter_pack', label: localized('Starter Pack · pulizie finali, fuoribordo e tender', 'Starter Pack · final cleaning, outboard and tender') },
-  { id: 'linen_towels', label: localized('Lenzuola e asciugamani', 'Bed linen and towels') },
+  { id: 'starter_pack', label: localized('Starter Pack · lenzuola/asciugamani, SUP e fuoribordo · solo contanti in loco', 'Starter Pack · bed linen/towels, SUP and outboard · cash on board only') },
+  { id: 'linen_towels', label: localized('Lenzuola e asciugamani · inclusi nello Starter Pack', 'Bed linen and towels · included in the Starter Pack') },
   { id: 'protection_insurance', label: localized('Assicurazione cauzione', 'Deposit insurance') },
   { id: 'provisions', label: localized('Cambusa', 'Provisions') },
   { id: 'fuel', label: localized('Gasolio per la navigazione', 'Fuel for navigation') },
@@ -60,7 +60,6 @@ const CONTRIBUTION_ITEMS = [
 ];
 const PERSONAL_PAYMENT_GROUPS = Object.freeze({
   berth: new Set(['berth_base', 'berth_double_cabin', 'berth_single_cabin', 'berth_dinette', 'berth_other']),
-  starter_pack: new Set(['starter_pack']),
   protection_insurance: new Set(['protection_insurance']),
 });
 
@@ -483,12 +482,13 @@ function isPendingCrewPayment(payment) {
 }
 
 function projectionAmountCents(fieldName) {
+  if (activeProjection?.contributesToCosts === false && fieldName !== 'refundableDepositCents') return 0;
   const amountCents = Number(activeProjection?.[fieldName]);
   return Number.isInteger(amountCents) && amountCents > 0 ? amountCents : 0;
 }
 
 function projectionPayableCents() {
-  return ['berthCents', 'starterPackCents', 'protectionInsuranceCents']
+  return ['berthCents', 'protectionInsuranceCents']
     .reduce((total, fieldName) => total + projectionAmountCents(fieldName), 0);
 }
 
@@ -503,6 +503,12 @@ function projectionBerthLabel() {
 }
 
 function projectedContributionSummary(fieldName) {
+  if (activeProjection?.contributesToCosts === false) {
+    return {
+      value: localized('Esente dalle quote', 'Exempt from contributions'),
+      detail: localized('Lo skipper ti ha escluso dalle quote automatiche della barca.', 'The skipper has excluded you from the boat’s automatic contributions.'),
+    };
+  }
   const amountCents = projectionAmountCents(fieldName);
   if (!amountCents) return null;
   return {
@@ -517,6 +523,28 @@ function projectedRefundableDepositSummary() {
   return {
     value: `${formatCurrency(amountCents / 100)} ${localized('in loco', 'locally')}`,
     detail: localized('Cauzione rimborsabile: da portare e regolare in loco, separata dalle richieste di pagamento.', 'Refundable deposit: bring and settle it locally, separate from payment requests.'),
+  };
+}
+
+function starterPackCashSummary() {
+  if (activeProjection?.contributesToCosts === false) {
+    return {
+      value: localized('Non previsto', 'Not applicable'),
+      detail: localized('Lo Starter Pack non è previsto per il tuo ruolo gratuito.', 'The Starter Pack is not planned for your complimentary role.'),
+    };
+  }
+  const projectedCents = projectionAmountCents('starterPackCents');
+  const plannedItem = contributionPlanItems().find((item) => item.id === 'starter_pack');
+  const amountCents = projectedCents || contributionAmountCents(plannedItem);
+  const value = amountCents
+    ? `${formatCurrency(amountCents / 100)} ${localized('in contanti, in loco', 'cash on board')}`
+    : localized('Da definire · contanti in loco', 'To be confirmed · cash on board');
+  return {
+    value,
+    detail: localized(
+      'Starter Pack da regolare esclusivamente in contanti a bordo: non entra nella quota richiesta online e non usa link di pagamento.',
+      'The Starter Pack is settled in cash on board only: it is not included in the online contribution and does not use payment links.',
+    ),
   };
 }
 
@@ -574,6 +602,12 @@ function contributionPlanFallback(itemId, { deposit = false } = {}) {
 
 function personalContributionSummary(groupId, planItemId, projectionField) {
   const totals = paymentTotalsForGroup(groupId);
+  if (!totals.payments.length && activeProjection?.contributesToCosts === false) {
+    return {
+      value: localized('Esente dalle quote', 'Exempt from contributions'),
+      detail: localized('Lo skipper ti ha escluso dalle quote automatiche della barca.', 'The skipper has excluded you from the boat’s automatic contributions.'),
+    };
+  }
   if (!totals.payments.length) return projectedContributionSummary(projectionField) || contributionPlanFallback(planItemId);
   if (totals.pendingCents && totals.verifiedCents) {
     return {
@@ -621,7 +655,7 @@ function renderParticipantFinanceSummary() {
     return;
   }
   const berth = personalContributionSummary('berth', 'berth', 'berthCents');
-  const starterPack = personalContributionSummary('starter_pack', 'starter_pack', 'starterPackCents');
+  const starterPack = starterPackCashSummary();
   const protectionInsurance = personalContributionSummary('protection_insurance', 'protection_insurance', 'protectionInsuranceCents');
   const refundableDeposit = projectedRefundableDepositSummary();
   const pendingCents = activeCrewPayments
@@ -648,7 +682,7 @@ function renderParticipantFinanceSummary() {
   summary.innerHTML = `
     <p class="eyebrow">${escapeHtml(localized('Il mio riepilogo', 'My personal summary'))}</p>
     <h4>${escapeHtml(localized('Le tue voci, senza conti degli altri', 'Your items, with no one else’s finances'))}</h4>
-    <p>${escapeHtml(localized('Qui vedi soltanto la tua previsione, le tue richieste, la cauzione da regolare in loco e il briefing che hai accettato.', 'Here you only see your plan, your requests, the refundable deposit settled locally, and the briefing you accepted.'))}</p>
+    <p>${escapeHtml(localized('Qui vedi soltanto la tua previsione, le tue richieste, lo Starter Pack e la cauzione da regolare in contanti/in loco, oltre al briefing che hai accettato.', 'Here you only see your plan, your requests, the Starter Pack and refundable deposit settled in cash/on board, plus the briefing you accepted.'))}</p>
     <div class="participant-finance-grid">
       ${participantProjectionRows()}
       ${participantFinanceRow(localized('Posto / cabina', 'Berth / cabin'), berth)}
@@ -761,14 +795,25 @@ function contributionPlanItems(plan = activeContributionPlan) {
   const sourceItems = plan?.items && typeof plan.items === 'object' ? plan.items : {};
   return CONTRIBUTION_ITEMS.map((item) => {
     const source = sourceItems[item.id] || {};
-    const state = CONTRIBUTION_ITEM_STATES.has(source.state) ? source.state : 'to_define';
-    return { ...item, state, amountCents: contributionAmountCents(source) };
+    const state = item.id === 'starter_pack'
+      ? 'local'
+      : item.id === 'linen_towels'
+        ? 'included'
+      : CONTRIBUTION_ITEM_STATES.has(source.state) ? source.state : 'to_define';
+    return {
+      ...item,
+      state,
+      amountCents: item.id === 'linen_towels' ? 0 : contributionAmountCents(source),
+    };
   });
 }
 
 function contributionItemMarkup(item) {
   const amount = item.amountCents > 0 ? ` · ${formatCurrency(item.amountCents / 100)} ${translate('crew.flow.perPerson', 'a persona')}` : '';
-  return `<div><span>${escapeHtml(CONTRIBUTION_ITEM_STATES.get(item.state))}</span><strong>${escapeHtml(item.label)}${escapeHtml(amount)}</strong></div>`;
+  const stateLabel = item.id === 'starter_pack'
+    ? localized('Solo contanti, in loco', 'Cash on board only')
+    : CONTRIBUTION_ITEM_STATES.get(item.state);
+  return `<div><span>${escapeHtml(stateLabel)}</span><strong>${escapeHtml(item.label)}${escapeHtml(amount)}</strong></div>`;
 }
 
 function contributionNotApplicableContainer(plan) {
