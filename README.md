@@ -15,7 +15,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - `passage-plan.html`: unica pagina pubblica per meteo e Passage Plan, alimentata da `passage-plan-data.js`.
 - `arrivi-partenze.html`: sezione pubblica che spiega le quattro tratte, la finestra di match ±2 ore e la visibilità controllata dei contatti; non raccoglie dati in pagina.
 - `film.html` e `VIDEO_STORYBOARD.md`: storyboard del film; nessun filmato di terzi viene incorporato senza licenza.
-- `area.html`: area skipper con Google Sign-In, una barca per skipper, Crew List, PDF, bacheca, inviti WhatsApp e richieste di contributo con tag dei metodi e messaggio WhatsApp diretto.
+- `area.html`: area skipper con Google Sign-In, una barca per skipper, Crew List, PDF, bacheca, inviti WhatsApp, profilo privato di incasso, piano quote a otto voci e richieste di contributo con messaggio WhatsApp diretto.
 - `participant.html`: primo accesso dal link WhatsApp; la persona conferma il suo numero e sceglie il proprio codice di 6 cifre, poi completa i dati necessari alla Crew List.
 - `crew.html`: ingresso quotidiano dell'equipaggio con numero WhatsApp e codice personale.
 - `my-area.html`: area personale con scheda, bacheca, regole e richieste dedicate.
@@ -57,7 +57,7 @@ Nel progetto `egadi-sailing-2026`:
 6. Lasciare autorizzati soltanto i domini necessari in Authentication, compreso `egadi.thatsablast.it` e, per i test locali, `127.0.0.1`.
 7. Il documento `events/egadi-2026` contiene `organizerIds` con il solo UID autorizzato e `privateAreaEnabled: true`. Per chiudere l'operatività, riportare il flag a `false` e pubblicare anche `PRIVATE_AREA_ENABLED=false`.
 
-Non inserire in Firestore credenziali PayPal, Satispay o Revolut, carte, coordinate o IBAN, alias o link dei provider, PIN, OTP o chiavi di pagamento. Il sito conserva soltanto il nome di chi raccoglie il contributo e i tag PayPal, Satispay, Revolut o bonifico.
+Nel profilo privato dello skipper possono essere conservati solo i dettagli necessari per ricevere il contributo: link HTTPS PayPal/Satispay, link HTTPS o Revtag Revolut e, per bonifico, IBAN più intestatario. Non inserire mai password, OTP, numeri di carta, chiavi API o credenziali dei provider. I dettagli non entrano nella Crew List o nella richiesta di pagamento e vengono composti solo nel messaggio WhatsApp per il destinatario scelto.
 
 ## Modello dati
 
@@ -67,7 +67,8 @@ events/egadi-2026
   privateAreaEnabled: true
 
 boats/{skipperUid}
-  name, model, capacity (partecipanti), berthLayout e berthRates (privati), homePort, flag, skipperId, eventId
+  name, model, totalBerths (skipper incluso), capacity (partecipanti derivati)
+  berthLayout e berthRates (privati), homePort, flag, skipperId, eventId
   members/{inviteId}
     firstName, lastName, birthDate, birthPlace, nationality, gender
     documentType, documentNumber, documentExpiry, charterConsent
@@ -77,9 +78,17 @@ boats/{skipperUid}
     participantUid, status, accessVersion, expiresAt, createdAt
   collectionProfile/default
     collectorId, collectorName, paypalEnabled, satispayEnabled
-    revolutEnabled, bankTransferEnabled, updatedAt, updatedBy
+    revolutEnabled, bankTransferEnabled, paymentDetails (privati), updatedAt, updatedBy
+  contributionPlan/default
+    items: { berth, starter_pack, linen_towels, protection_insurance,
+             provisions, fuel, transfer, refundable_deposit }
+    ogni voce: { state, amountCents }; updatedAt, updatedBy
+  costPlan/default
+    charterCents, skipperFlightTrainCents, skipperCarCents
+    skipperLocalTransferCents, otherRecoverableCents, payingParticipants
+    updatedAt, updatedBy
   paymentRequests/{requestId}
-    recipientId, memberId, payerInviteId, amountCents, currency, reason, isOptional, dueDate
+    recipientId, memberId, payerInviteId, amountCents, currency, reason, accountingCategory, isOptional, dueDate
     collectorId, collectorName, paymentMethods, status, createdAt, createdBy
     verifiedAt, verifiedBy, cancelledAt, cancelledBy
   briefing/board
@@ -106,9 +115,9 @@ Il vincolo operativo è **un numero WhatsApp, una barca attiva** nello stesso ev
 
 Il pulsante **Genera Crew List PDF** apre un foglio A4 orizzontale prestampato. Lo skipper sceglie “Salva come PDF” dalla finestra di stampa. Il PDF si attiva solo con dati della barca, dati richiesti per ogni persona e conferma di condivisione completati. Il porto di iscrizione non è un campo necessario.
 
-`capacity` indica i posti per partecipanti / Crew List, escluso lo skipper. L'interfaccia conta inviti e membri unici e non aggiunge oltre il limite; non è un vincolo atomico server-side e non sostituisce la valutazione nautica dello skipper.
+Lo skipper inserisce `totalBerths`, cioè i posti totali a bordo incluso lo skipper. Il sito salva anche `capacity`, derivato come `totalBerths - 1`, per inviti, Crew List e flotta pubblica. Per Karibu: 4 cabine doppie + 1 posto dinette + cabina marinaio = 10 posti totali; 1 è dello skipper e 9 sono partecipanti invitabili o quotabili. L'interfaccia conta inviti e membri unici rispetto a `capacity`; non è un vincolo atomico server-side e non sostituisce la valutazione nautica dello skipper.
 
-`berthLayout` è facoltativo e privato: cabine doppie o singole, posti letto in dinette, cabina marinaio, altri posti letto e numero totale dei bagni. La cabina marinaio aggiunge un posto letto fisico riservato allo skipper; non è assegnabile alla Crew List. Il riepilogo distingue quindi i posti letto totali a bordo dai posti per partecipanti: se non esiste una cabina marinaio, lo skipper occupa una delle cuccette configurate. Il numero dei bagni non incide sulla capienza e per ora non distingue bagni privati o condivisi. Non alimenta la flotta pubblica né il PDF per il charter.
+`berthLayout` è facoltativo e privato: cabine doppie o singole, posti letto in dinette, cabina marinaio, altri posti letto reali e numero totale dei bagni. Quando è compilato, deve coincidere con `totalBerths`; non va mai aggiunto un posto fittizio per far quadrare i conti. La cabina marinaio conta come posto fisico riservato allo skipper, ma non è assegnabile alla Crew List o a una quota. Il numero dei bagni non incide sulla capienza e per ora non distingue bagni privati o condivisi. Il layout non alimenta la flotta pubblica né il PDF per il charter.
 
 `berthRates` è un listino privato e facoltativo in centesimi per singolo posto letto: cabina doppia, cabina singola, dinette o altra sistemazione. Non esiste una quota per la cabina marinaio. Il listino precompila importo e causale nella richiesta personale WhatsApp, ma lo skipper può sempre modificarli. Non riserva automaticamente una cuccetta a una persona e non rende il pagamento automatico o verificato.
 
@@ -120,7 +129,30 @@ Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvis
 
 Lo scorrimento e la conferma registrano una dichiarazione di lettura della versione, non possono dimostrare materialmente che ogni parola sia stata compresa. Indicazioni operative reali della singola barca, del charter, delle dotazioni e di eventuali cauzioni devono essere verificate dallo skipper e pubblicate solo quando confermate.
 
-Il sito non incassa denaro, non genera o valida link dei provider e non dichiara pagamenti come eseguiti. Lo skipper configura il proprio nome e i tag PayPal, Satispay, Revolut e/o bonifico, quindi crea una richiesta con importo, causale, scadenza e una o più alternative. Eventuali link, alias o coordinate vengono scritti solo nel messaggio WhatsApp al momento dell'invio e non sono salvati. Il pagamento avviene fuori dal sito e può essere segnato come verificato solo dopo controllo manuale dell'accredito reale.
+Il sito non incassa denaro, non genera o valida link dei provider e non dichiara pagamenti come eseguiti. Lo skipper configura una volta il proprio nome, i metodi e i dettagli privati di PayPal, Satispay, Revolut e/o bonifico; quindi crea una richiesta con importo, causale, scadenza e una o più alternative. Ogni nuova richiesta porta anche una classificazione tecnica chiusa: `cost_recovery` se il versamento deve concorrere al recupero dei costi della barca, `other` negli altri casi. Il messaggio WhatsApp prende soltanto i dettagli dei metodi selezionati e non li copia nella richiesta Firestore, che resta leggibile soltanto dallo skipper e dalla persona destinataria. Il pagamento avviene fuori dal sito e può essere segnato come verificato solo dallo skipper, dopo controllo manuale dell'accredito reale. Le richieste create prima dell'introduzione della classificazione restano aggiornabili soltanto nelle normali transizioni di stato, così possono essere verificate o annullate senza riscriverne il contenuto; restano fuori dal bilancio Cassa finché non sono già classificate, perché il sito non può attribuirle automaticamente.
+
+Prima di chiedere una quota, lo skipper può pubblicare il **piano quote** della propria barca. È un riepilogo a otto voci fisse, non un listino libero e non una prova di pagamento:
+
+| Voce mostrata | Stato possibile |
+| --- | --- |
+| Quota posto in barca (noleggio) | da definire, compreso nella quota, da richiedere a parte, da regolare in loco / da dividere, non previsto |
+| Starter Pack · pulizie finali, fuoribordo e tender | gli stessi stati |
+| Lenzuola e asciugamani | gli stessi stati |
+| Assicurazione cauzione | gli stessi stati |
+| Cambusa | gli stessi stati |
+| Gasolio per la navigazione | gli stessi stati |
+| Transfer da/per il porto | gli stessi stati |
+| Cauzione rimborsabile | gli stessi stati tranne “compreso nella quota” |
+
+Tutte le voci partono da **da definire**: il sito non presume cosa sia incluso. Un importo per persona può comparire soltanto per “da richiedere a parte” o “da regolare in loco / da dividere”; “compreso”, “da definire” e “non previsto” restano a zero. Il piano non contiene link, IBAN, Revtag, contatti, causali libere o istruzioni di pagamento. È leggibile dallo skipper, dall'organizzatore e dall'equipaggio solo dopo l'accettazione della versione corrente delle regole di bordo; le coordinate di incasso restano invece nel profilo privato dello skipper.
+
+### Cassa skipper privata
+
+La **Cassa skipper / costi da ripartire** è un prospetto interno separato dal piano quote e dalle richieste personali. Serve a evitare che lo skipper sostenga da solo i costi necessari alla barca: costo charter, viaggio andata/ritorno dello skipper (volo o treno), auto, transfer locale e un unico totale per altre spese recuperabili. Non contiene nominativi dell'equipaggio, quote individuali, istruzioni di pagamento, note libere o una voce per le cene a terra.
+
+Lo skipper non rientra nei partecipanti paganti: nel modello operativo non paga quota posto né spese collettive come cambusa, Starter Pack o navigazione. Le sole cene a terra restano personali e non entrano nel prospetto. La stima è `(<costo charter> + <viaggio skipper> + <auto skipper> + <transfer locale skipper> + <altre spese recuperabili>) / <partecipanti paganti>`. L'eventuale arrotondamento al centesimo va reso esplicito nella richiesta individuale. Il prospetto non calcola profitto, non invia richieste e non riserva posti: per il bilancio considera soltanto le richieste della stessa barca marcate `cost_recovery` e verificate manualmente dallo skipper. Cambusa, assicurazione, transfer ed extra marcati `other` restano fuori; un avanzo è da riallocare, non un guadagno automatico.
+
+Il documento `costPlan/default` è leggibile e modificabile soltanto dallo skipper della relativa barca. Organizzatore, equipaggio, altri skipper e web pubblico non hanno accesso; non è cancellabile dall'area skipper. La procedura amministrativa di conservazione e cancellazione deve quindi essere definita prima dell'uso reale.
 
 ## Arrivi e partenze
 

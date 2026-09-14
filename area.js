@@ -20,10 +20,11 @@ const dashboard = document.querySelector('#dashboard');
 const signInButton = document.querySelector('#signInButton');
 const authMessage = document.querySelector('#authMessage');
 const PAYMENT_PROFILE_ID = 'default';
+const COST_PLAN_ID = 'default';
 const PAYMENT_METHODS = [
-  { id: 'paypal', label: 'PayPal', profileField: 'paypalEnabled' },
-  { id: 'satispay', label: 'Satispay', profileField: 'satispayEnabled' },
-  { id: 'revolut', label: 'Revolut', profileField: 'revolutEnabled' },
+  { id: 'paypal', label: 'PayPal', profileField: 'paypalEnabled', detailsField: 'paypalDetails' },
+  { id: 'satispay', label: 'Satispay', profileField: 'satispayEnabled', detailsField: 'satispayDetails' },
+  { id: 'revolut', label: 'Revolut', profileField: 'revolutEnabled', detailsField: 'revolutDetails' },
   { id: 'bankTransfer', label: 'Bonifico', profileField: 'bankTransferEnabled' },
 ];
 const FLEET_BOAT_TYPES = new Set(['Catamarano', 'Monoscafo', 'Gommone', 'Altro']);
@@ -34,6 +35,23 @@ const BERTH_RATE_TYPES = [
   { id: 'single_cabin', label: 'Posto in cabina singola', rateKey: 'singleCabinCents', defaultReason: 'Quota posto in cabina singola', count: (totals) => totals.singleCabins },
   { id: 'dinette', label: 'Posto in dinette', rateKey: 'dinetteCents', defaultReason: 'Quota posto in dinette', count: (totals) => totals.dinetteBerths },
   { id: 'other', label: 'Altra sistemazione', rateKey: 'otherBerthCents', defaultReason: 'Quota altra sistemazione', count: (totals) => totals.otherCrewBerths },
+];
+const CONTRIBUTION_ITEM_STATES = new Map([
+  ['to_define', 'Da definire'],
+  ['included', 'Compreso nella quota'],
+  ['extra', 'Da richiedere a parte'],
+  ['local', 'Da regolare in loco / da dividere'],
+  ['not_applicable', 'Non previsto'],
+]);
+const DEFAULT_CONTRIBUTION_ITEMS = [
+  { id: 'berth', label: 'Quota posto in barca' },
+  { id: 'starter_pack', label: 'Starter Pack · pulizie finali, fuoribordo e tender' },
+  { id: 'linen_towels', label: 'Lenzuola e asciugamani' },
+  { id: 'protection_insurance', label: 'Assicurazione cauzione' },
+  { id: 'provisions', label: 'Cambusa' },
+  { id: 'fuel', label: 'Gasolio per la navigazione' },
+  { id: 'transfer', label: 'Transfer da/per il porto' },
+  { id: 'refundable_deposit', label: 'Cauzione rimborsabile' },
 ];
 const DEFAULT_RULES_SUMMARY = [
   '1. Seguo sempre le decisioni dello skipper su sicurezza, manovre, meteo, rotta, rada e porto.',
@@ -86,12 +104,16 @@ let activeMembers = [];
 let activePayments = [];
 let activeInvites = [];
 let activePaymentProfile = null;
+let activeContributionPlan = null;
+let activeCostPlan = null;
 let activeBriefing = null;
 let activeAcceptances = [];
 let stopBoatSubscription = null;
 let stopMemberSubscription = null;
 let stopPaymentSubscription = null;
 let stopPaymentProfileSubscription = null;
+let stopContributionPlanSubscription = null;
+let stopCostPlanSubscription = null;
 let stopInviteSubscription = null;
 let stopBriefingSubscription = null;
 let stopAnnouncementSubscription = null;
@@ -197,6 +219,38 @@ function asNonNegativeInteger(value, maximum = 12) {
   return Number.isInteger(numericValue) && numericValue >= 0 && numericValue <= maximum ? numericValue : 0;
 }
 
+function participantCapacityFromTotal(totalBerths) {
+  return totalBerths >= 2 ? totalBerths - 1 : 0;
+}
+
+function declaredTotalBerths(boat) {
+  const storedTotal = asNonNegativeInteger(boat?.totalBerths, 31);
+  if (storedTotal >= 2) return storedTotal;
+  const layoutTotal = berthLayoutTotals(boat?.berthLayout).physicalBerths;
+  if (layoutTotal >= 2) return layoutTotal;
+  const legacyParticipantCapacity = asNonNegativeInteger(boat?.capacity, 30);
+  return legacyParticipantCapacity ? legacyParticipantCapacity + 1 : 0;
+}
+
+function effectiveParticipantCapacity(boat) {
+  const totalBerths = declaredTotalBerths(boat);
+  if (totalBerths >= 2) return participantCapacityFromTotal(totalBerths);
+  const capacity = asNonNegativeInteger(boat?.capacity, 30);
+  return capacity;
+}
+
+function needsCapacityAlignment(boat) {
+  const storedCapacity = asNonNegativeInteger(boat?.capacity, 30);
+  const totalBerths = declaredTotalBerths(boat);
+  return totalBerths >= 2 && storedCapacity !== participantCapacityFromTotal(totalBerths);
+}
+
+function capacityAlignmentMessage(boat) {
+  const totalBerths = declaredTotalBerths(boat);
+  const capacity = effectiveParticipantCapacity(boat);
+  return `Configurazione da confermare: il layout indica ${totalBerths} persone totali, skipper incluso, quindi ${capacity} partecipanti. Apri “Modifica questa barca” e salva prima di inviare altri inviti.`;
+}
+
 function toEuroCents(value) {
   const rawValue = String(value ?? '').trim().replace(',', '.');
   if (!rawValue) return 0;
@@ -215,6 +269,83 @@ function normalizeBerthRates(rates = {}) {
     dinetteCents: asNonNegativeInteger(rates?.dinetteCents, 1_000_000),
     otherBerthCents: asNonNegativeInteger(rates?.otherBerthCents, 1_000_000),
   };
+}
+
+function defaultCostPlan() {
+  return {
+    charterCents: 0,
+    skipperFlightTrainCents: 0,
+    skipperCarCents: 0,
+    skipperLocalTransferCents: 0,
+    otherRecoverableCents: 0,
+    payingParticipants: Math.max(1, effectiveParticipantCapacity(activeBoat) || 1),
+  };
+}
+
+function normalizeCostPlan(plan = {}) {
+  const defaults = defaultCostPlan();
+  const payingParticipants = asNonNegativeInteger(plan?.payingParticipants, 30);
+  return {
+    charterCents: asNonNegativeInteger(plan?.charterCents, 1_000_000),
+    skipperFlightTrainCents: asNonNegativeInteger(plan?.skipperFlightTrainCents, 1_000_000),
+    skipperCarCents: asNonNegativeInteger(plan?.skipperCarCents, 1_000_000),
+    skipperLocalTransferCents: asNonNegativeInteger(plan?.skipperLocalTransferCents, 1_000_000),
+    otherRecoverableCents: asNonNegativeInteger(plan?.otherRecoverableCents, 1_000_000),
+    payingParticipants: payingParticipants || defaults.payingParticipants,
+  };
+}
+
+function costPlanTotalCents(plan = activeCostPlan) {
+  const normalized = normalizeCostPlan(plan);
+  return normalized.charterCents
+    + normalized.skipperFlightTrainCents
+    + normalized.skipperCarCents
+    + normalized.skipperLocalTransferCents
+    + normalized.otherRecoverableCents;
+}
+
+function costPlanBaseContribution(plan = activeCostPlan) {
+  if (!plan) return null;
+  const normalized = normalizeCostPlan(plan);
+  const totalCents = costPlanTotalCents(normalized);
+  if (!totalCents || !normalized.payingParticipants) return null;
+  return {
+    id: 'cost:base',
+    label: 'Quota base calcolata · recupero costi',
+    cents: Math.round(totalCents / normalized.payingParticipants),
+    defaultReason: 'Quota base · recupero costi barca e skipper',
+  };
+}
+
+function normalizeContributionPlan(plan = {}) {
+  const sourceItems = plan?.items && typeof plan.items === 'object' ? plan.items : {};
+  const items = Object.fromEntries(DEFAULT_CONTRIBUTION_ITEMS.map((item) => {
+    const source = sourceItems[item.id] || {};
+    const state = CONTRIBUTION_ITEM_STATES.has(source.state) ? source.state : 'to_define';
+    const amountCents = state === 'extra' || state === 'local'
+      ? asNonNegativeInteger(source.amountCents, 1_000_000)
+      : 0;
+    return [item.id, { state, amountCents }];
+  }));
+  return { items };
+}
+
+function contributionCatalog(plan = activeContributionPlan) {
+  const normalized = normalizeContributionPlan(plan);
+  return DEFAULT_CONTRIBUTION_ITEMS.map((item) => ({ ...item, ...normalized.items[item.id] }));
+}
+
+function extraContributionTypes(plan = activeContributionPlan) {
+  return contributionCatalog(plan)
+    .filter((item) => item.state === 'extra')
+    .map((item) => ({
+      id: `extra:${item.id}`,
+      label: item.label,
+      cents: item.amountCents,
+      defaultReason: item.id === 'refundable_deposit'
+        ? 'Cauzione rimborsabile · restituzione esterna da concordare'
+        : item.label,
+    }));
 }
 
 function normalizeBerthLayout(layout = {}) {
@@ -246,14 +377,6 @@ function berthLayoutTotals(layout) {
     skipperBerths,
     participantBerths,
   };
-}
-
-function hasParticipantSleepingLayout(layout) {
-  const totals = berthLayoutTotals(layout);
-  return totals.doubleCabins > 0
-    || totals.singleCabins > 0
-    || totals.dinetteBerths > 0
-    || totals.otherCrewBerths > 0;
 }
 
 function hasAccommodationDetails(layout) {
@@ -312,14 +435,31 @@ function fillBerthRatesForm(form, rates) {
   form.elements.otherBerthRate.value = euroInputValue(normalized.otherBerthCents);
 }
 
+function describeTotalBerths(totalBerths, layout = {}) {
+  if (totalBerths < 2) return '';
+  const normalizedLayout = normalizeBerthLayout(layout);
+  const participantCapacity = participantCapacityFromTotal(totalBerths);
+  const totalLabel = totalBerths === 1 ? 'posto totale a bordo' : 'posti totali a bordo';
+  const participantLabel = participantCapacity === 1 ? 'posto per partecipante' : 'posti per partecipanti';
+  const skipperDetail = normalizedLayout.hasCrewCabin
+    ? '1 è riservato allo skipper nella cabina marinaio'
+    : '1 è riservato allo skipper';
+  return `${totalBerths} ${totalLabel}: ${skipperDetail}; ${participantCapacity} ${participantLabel} invitabili e quotabili`;
+}
+
 function describeBerthCapacity(totals) {
-  if (!totals.physicalBerths) return '';
-  const totalLabel = totals.physicalBerths === 1 ? 'posto letto totale' : 'posti letto totali';
-  const participantLabel = totals.participantBerths === 1 ? 'posto per partecipante' : 'posti per partecipanti';
-  const skipperDetail = totals.hasCrewCabin
-    ? '1 riservato allo skipper nella cabina marinaio'
-    : '1 occupato dallo skipper';
-  return `${totals.physicalBerths} ${totalLabel}: ${skipperDetail} e ${totals.participantBerths} ${participantLabel}`;
+  return describeTotalBerths(totals.physicalBerths, totals);
+}
+
+function syncTotalBerthsFromLayout() {
+  const form = document.querySelector('#boatForm');
+  if (!form) return;
+  const physicalBerths = berthLayoutTotals(readBerthLayout(form)).physicalBerths;
+  const totalInput = form.elements.totalBerths;
+  if (physicalBerths >= 2 && (!totalInput.value || totalInput.dataset.autoFromLayout === 'true')) {
+    totalInput.value = String(physicalBerths);
+    totalInput.dataset.autoFromLayout = 'true';
+  }
 }
 
 function describeBerthRates(rates) {
@@ -342,37 +482,24 @@ function renderBerthLayoutSummary() {
   if (!form || !summary) return;
   const layout = readBerthLayout(form);
   const totals = berthLayoutTotals(layout);
+  const totalBerths = asNonNegativeInteger(form.elements.totalBerths?.value, 31);
   summary.classList.remove('is-error');
   const description = describeBerthLayout(layout);
-  if (!hasAccommodationDetails(layout) && !layout.bathroomCount) {
-    summary.textContent = 'Facoltativo: se preferisci puoi indicare solo il totale della Crew List.';
+  if (totalBerths < 2) {
+    summary.textContent = 'Inserisci il numero totale delle persone a bordo, skipper compreso.';
     return;
   }
 
-  if (!hasParticipantSleepingLayout(layout)) {
-    const capacity = Number(form.elements.capacity?.value);
-    if (totals.physicalBerths && Number.isInteger(capacity) && capacity > totals.participantBerths) {
-      summary.classList.add('is-error');
-      summary.textContent = `${description}. ${describeBerthCapacity(totals)}. Aggiungi posti per partecipanti oppure riduci il limite.`;
-      return;
-    }
-    summary.textContent = `${description}. Aggiungi anche i posti per partecipanti: la cabina marinaio resta riservata allo skipper.`;
-    return;
-  }
-
-  const capacityDescription = describeBerthCapacity(totals);
-  const capacity = Number(form.elements.capacity?.value);
-  if (Number.isInteger(capacity) && capacity > totals.participantBerths) {
-    const difference = capacity - totals.participantBerths;
+  if (totals.physicalBerths && totals.physicalBerths !== totalBerths) {
     summary.classList.add('is-error');
-    summary.textContent = `${description}. ${capacityDescription}. Il limite partecipanti sopra è ${capacity}: aggiungi ${difference} ${difference === 1 ? 'posto letto' : 'posti letto'} o riduci il limite.`;
+    summary.textContent = `${description}. La configurazione descrive ${totals.physicalBerths} posti totali a bordo, mentre sopra hai indicato ${totalBerths}. Correggi il totale oppure la configurazione: non aggiungere posti fittizi in “altri posti letto”.`;
     return;
   }
 
-  const limitText = Number.isInteger(capacity) && capacity > 0
-    ? ` Limite partecipanti impostato: ${capacity}.`
-    : ' Inserisci sopra il limite per partecipanti.';
-  summary.textContent = `${description}. ${capacityDescription}.${limitText}`;
+  const totalDescription = describeTotalBerths(totalBerths, layout);
+  summary.textContent = description
+    ? `${description}. ${totalDescription}.`
+    : `${totalDescription}. Se vuoi, completa anche la configurazione reale di cabine e dinette.`;
 }
 
 function isFleetAvailabilityPublic(boat) {
@@ -475,6 +602,8 @@ function resetPrivateView() {
   activePayments = [];
   activeInvites = [];
   activePaymentProfile = null;
+  activeContributionPlan = null;
+  activeCostPlan = null;
   activeBriefing = null;
   activeAcceptances = [];
   creatingBoat = false;
@@ -485,6 +614,8 @@ function resetPrivateView() {
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
   stopPaymentProfileSubscription?.();
+  stopContributionPlanSubscription?.();
+  stopCostPlanSubscription?.();
   stopInviteSubscription?.();
   stopBriefingSubscription?.();
   stopAnnouncementSubscription?.();
@@ -493,6 +624,8 @@ function resetPrivateView() {
   stopMemberSubscription = null;
   stopPaymentSubscription = null;
   stopPaymentProfileSubscription = null;
+  stopContributionPlanSubscription = null;
+  stopCostPlanSubscription = null;
   stopInviteSubscription = null;
   stopBriefingSubscription = null;
   stopAnnouncementSubscription = null;
@@ -537,12 +670,82 @@ function defaultPaymentProfile() {
     satispayEnabled: false,
     revolutEnabled: false,
     bankTransferEnabled: false,
+    paymentDetails: {
+      paypal: '',
+      satispay: '',
+      revolut: '',
+      bankTransfer: { iban: '', accountHolder: '' },
+    },
   };
+}
+
+function normalizePaymentText(value, maximum = 500) {
+  return String(value || '').trim().slice(0, maximum);
+}
+
+function normalizeIban(value) {
+  return normalizePaymentText(value, 34).replace(/\s+/g, '').toUpperCase();
+}
+
+function normalizePaymentDetails(details = {}) {
+  return {
+    paypal: normalizePaymentText(details?.paypal),
+    satispay: normalizePaymentText(details?.satispay),
+    revolut: normalizePaymentText(details?.revolut),
+    bankTransfer: {
+      iban: normalizeIban(details?.bankTransfer?.iban),
+      accountHolder: normalizePaymentText(details?.bankTransfer?.accountHolder, 100),
+    },
+  };
+}
+
+function readPaymentDetails(form) {
+  return normalizePaymentDetails({
+    paypal: form.elements.paypalDetails?.value,
+    satispay: form.elements.satispayDetails?.value,
+    revolut: form.elements.revolutDetails?.value,
+    bankTransfer: {
+      iban: form.elements.bankIban?.value,
+      accountHolder: form.elements.bankAccountHolder?.value,
+    },
+  });
+}
+
+function isHttpsUrl(value) {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch (error) {
+    return false;
+  }
+}
+
+function isValidPaymentDetail(method, details) {
+  if (method.id === 'paypal' || method.id === 'satispay') return isHttpsUrl(details[method.id]);
+  if (method.id === 'revolut') return isHttpsUrl(details.revolut) || /^@[a-zA-Z0-9._-]{3,50}$/.test(details.revolut);
+  const bankTransfer = details.bankTransfer || {};
+  return /^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/.test(bankTransfer.iban || '')
+    && String(bankTransfer.accountHolder || '').trim().length >= 2;
+}
+
+function paymentDetailValidationMessage(method) {
+  if (method.id === 'paypal') return 'Inserisci un link PayPal HTTPS valido.';
+  if (method.id === 'satispay') return 'Inserisci un link Satispay HTTPS valido.';
+  if (method.id === 'revolut') return 'Inserisci un link Revolut HTTPS oppure un Revtag che inizia con @.';
+  return 'Per il bonifico inserisci IBAN e intestatario.';
+}
+
+function renderPaymentProfileDetailVisibility(form) {
+  PAYMENT_METHODS.forEach((method) => {
+    const detail = form.querySelector(`[data-payment-method-detail="${method.id}"]`);
+    const enabled = form.elements.namedItem(method.profileField)?.checked === true;
+    if (detail) detail.hidden = !enabled;
+  });
 }
 
 function availablePaymentMethods() {
   const profile = activePaymentProfile || defaultPaymentProfile();
-  return PAYMENT_METHODS.filter((method) => profile[method.profileField] === true);
+  return PAYMENT_METHODS.filter((method) => profile[method.profileField] === true
+    && isValidPaymentDetail(method, profile.paymentDetails));
 }
 
 function paymentMethodsFor(payment) {
@@ -553,6 +756,15 @@ function paymentMethodsFor(payment) {
 function paymentAmount(payment) {
   if (Number.isInteger(payment.amountCents)) return payment.amountCents / 100;
   return Number(payment.amount) || 0;
+}
+
+function paymentAmountCents(payment) {
+  if (Number.isInteger(payment.amountCents)) return payment.amountCents;
+  return Math.round(paymentAmount(payment) * 100);
+}
+
+function paymentCountsTowardCostPlan(payment) {
+  return payment.accountingCategory === 'cost_recovery';
 }
 
 function paymentMethodTags(payment) {
@@ -577,7 +789,9 @@ function renderPaymentMethodOptions() {
   const selected = new Set([...options.querySelectorAll('input[name="paymentMethod"]:checked')].map((input) => input.value));
   const methods = availablePaymentMethods();
   if (!methods.length) {
-    options.innerHTML = '<p class="field-hint">Salva prima almeno un metodo di incasso.</p>';
+    const profile = activePaymentProfile || defaultPaymentProfile();
+    const hasEnabledMethod = PAYMENT_METHODS.some((method) => profile[method.profileField] === true);
+    options.innerHTML = `<p class="field-hint">${hasEnabledMethod ? 'Completa e salva i dati del metodo di incasso prima di usarlo in una richiesta.' : 'Salva prima almeno un metodo di incasso.'}</p>`;
     return;
   }
   options.innerHTML = methods.map((method) => {
@@ -586,16 +800,104 @@ function renderPaymentMethodOptions() {
   }).join('');
 }
 
+function ensurePaymentAccountingCategoryField() {
+  const form = document.querySelector('#paymentForm');
+  const optionalInput = form?.elements.isOptional;
+  if (!form || !optionalInput || form.elements.accountingCategory) return;
+  const label = document.createElement('label');
+  label.className = 'consent-field';
+  const input = document.createElement('input');
+  input.name = 'accountingCategory';
+  input.type = 'checkbox';
+  input.value = 'cost_recovery';
+  label.append(input, ' Conta questo contributo nella Cassa skipper.');
+  const hint = document.createElement('p');
+  hint.className = 'field-hint';
+  hint.textContent = 'Selezionalo solo per gli importi che recuperano charter e costi dello skipper. Cambusa, assicurazione, transfer o altri extra restano fuori dal bilancio della Cassa.';
+  optionalInput.closest('label')?.after(label, hint);
+}
+
 function renderPaymentProfile(profile) {
-  activePaymentProfile = { ...defaultPaymentProfile(), ...(profile || {}) };
+  activePaymentProfile = {
+    ...defaultPaymentProfile(),
+    ...(profile || {}),
+    paymentDetails: normalizePaymentDetails(profile?.paymentDetails),
+  };
   const form = document.querySelector('#paymentProfileForm');
   const collectorName = form.elements.namedItem('collectorName');
   if (collectorName) collectorName.value = activePaymentProfile.collectorName || '';
   PAYMENT_METHODS.forEach((method) => {
     const input = form.elements.namedItem(method.profileField);
     if (input) input.checked = activePaymentProfile[method.profileField] === true;
+    const detailsInput = method.detailsField && form.elements.namedItem(method.detailsField);
+    if (detailsInput) detailsInput.value = activePaymentProfile.paymentDetails[method.id] || '';
   });
+  form.elements.bankIban.value = activePaymentProfile.paymentDetails.bankTransfer.iban || '';
+  form.elements.bankAccountHolder.value = activePaymentProfile.paymentDetails.bankTransfer.accountHolder || '';
+  renderPaymentProfileDetailVisibility(form);
   renderPaymentMethodOptions();
+}
+
+function fillCostPlanForm(plan = activeCostPlan) {
+  const form = document.querySelector('#costPlanForm');
+  if (!form) return;
+  const normalized = normalizeCostPlan(plan);
+  form.elements.charterCost.value = euroInputValue(normalized.charterCents);
+  form.elements.skipperFlightTrainCost.value = euroInputValue(normalized.skipperFlightTrainCents);
+  form.elements.skipperCarCost.value = euroInputValue(normalized.skipperCarCents);
+  form.elements.skipperLocalTransferCost.value = euroInputValue(normalized.skipperLocalTransferCents);
+  form.elements.otherRecoverableCost.value = euroInputValue(normalized.otherRecoverableCents);
+  form.elements.payingParticipants.value = String(normalized.payingParticipants);
+}
+
+function readCostPlanForm() {
+  const form = document.querySelector('#costPlanForm');
+  return {
+    charterCents: toEuroCents(form?.elements.charterCost?.value),
+    skipperFlightTrainCents: toEuroCents(form?.elements.skipperFlightTrainCost?.value),
+    skipperCarCents: toEuroCents(form?.elements.skipperCarCost?.value),
+    skipperLocalTransferCents: toEuroCents(form?.elements.skipperLocalTransferCost?.value),
+    otherRecoverableCents: toEuroCents(form?.elements.otherRecoverableCost?.value),
+    payingParticipants: asNonNegativeInteger(form?.elements.payingParticipants?.value, 30),
+  };
+}
+
+function renderCostPlanSummary() {
+  const summary = document.querySelector('#costPlanSummary');
+  if (!summary) return;
+  const plan = normalizeCostPlan(readCostPlanForm());
+  const totalCents = costPlanTotalCents(plan);
+  const verifiedCents = activePayments
+    .filter((payment) => payment.status === 'verified' && paymentCountsTowardCostPlan(payment))
+    .reduce((total, payment) => total + paymentAmountCents(payment), 0);
+  const pendingCents = activePayments
+    .filter((payment) => isPendingPayment(payment) && paymentCountsTowardCostPlan(payment))
+    .reduce((total, payment) => total + paymentAmountCents(payment), 0);
+  const legacyVerifiedCount = activePayments
+    .filter((payment) => payment.status === 'verified' && !payment.accountingCategory)
+    .length;
+  const legacyNote = legacyVerifiedCount
+    ? ` ${legacyVerifiedCount} ${legacyVerifiedCount === 1 ? 'accredito verificato precedente non è classificato' : 'accrediti verificati precedenti non sono classificati'} e resta fuori dal bilancio.`
+    : '';
+  if (!totalCents) {
+    summary.textContent = `Inserisci i costi che vuoi recuperare. Lo skipper è escluso; al momento il divisore proposto è ${plan.payingParticipants} ${plan.payingParticipants === 1 ? 'partecipante' : 'partecipanti'}. Contributi Cassa skipper verificati: ${formatCurrency(verifiedCents / 100)}${pendingCents ? ` · ancora da verificare: ${formatCurrency(pendingCents / 100)}` : ''}.${legacyNote}`;
+    return;
+  }
+  const baseCents = Math.round(totalCents / plan.payingParticipants);
+  const balanceCents = verifiedCents - totalCents;
+  const balance = balanceCents === 0
+    ? 'Pareggio raggiunto con gli accrediti verificati.'
+    : balanceCents > 0
+      ? `Avanzo da riallocare: ${formatCurrency(balanceCents / 100)}. Non è un guadagno automatico.`
+      : `Da recuperare: ${formatCurrency(Math.abs(balanceCents / 100))}.`;
+  summary.textContent = `Totale costi recuperabili: ${formatCurrency(totalCents / 100)} ÷ ${plan.payingParticipants} ${plan.payingParticipants === 1 ? 'partecipante' : 'partecipanti'} = quota base indicativa ${formatCurrency(baseCents / 100)} a persona. Contributi Cassa skipper verificati: ${formatCurrency(verifiedCents / 100)}${pendingCents ? ` · ancora da verificare: ${formatCurrency(pendingCents / 100)}` : ''}. Bilancio: ${balance} Le richieste per cambusa, assicurazione o altri extra restano fuori; seleziona “Conta nella Cassa skipper” soltanto per i contributi che devono recuperare questi costi.${legacyNote}`;
+}
+
+function renderCostPlan(plan) {
+  activeCostPlan = plan ? normalizeCostPlan(plan) : null;
+  fillCostPlanForm(activeCostPlan);
+  renderCostPlanSummary();
+  renderPaymentBerthOptions();
 }
 
 function formatDate(value) {
@@ -648,7 +950,20 @@ function paymentRecipientWhatsappNumber(recipientId) {
   return normalizeWhatsAppNumber(member?.phone || '');
 }
 
-function paymentWhatsappMessage(payment, { messageDetails = '' } = {}) {
+function selectedPaymentProfileDetails(payment, profile = activePaymentProfile) {
+  const details = normalizePaymentDetails(profile?.paymentDetails);
+  return paymentMethodsFor(payment)
+    .map((method) => {
+      if (!isValidPaymentDetail(method, details)) return '';
+      if (method.id === 'bankTransfer') {
+        return `${method.label}:\nIntestatario: ${details.bankTransfer.accountHolder}\nIBAN: ${details.bankTransfer.iban}`;
+      }
+      return `${method.label}: ${details[method.id]}`;
+    })
+    .filter(Boolean);
+}
+
+function paymentWhatsappMessage(payment, { messageDetails = '', profile = activePaymentProfile } = {}) {
   const recipientId = payment.recipientId || payment.memberId || payment.payerInviteId;
   const amount = formatCurrency(paymentAmount(payment));
   const reason = payment.reason || 'il contributo del weekend';
@@ -657,9 +972,12 @@ function paymentWhatsappMessage(payment, { messageDetails = '' } = {}) {
   const methodText = methods.length
     ? `\n\nPuoi scegliere il metodo che preferisci: ${methods.join(', ')}.`
     : '\n\nScrivimi qui e scegliamo insieme il metodo più comodo.';
-  const details = String(messageDetails || '').trim();
-  const detailsText = details
-    ? `\n\nDettagli per il pagamento:\n${details}`
+  const details = [
+    ...selectedPaymentProfileDetails(payment, profile),
+    String(messageDetails || '').trim(),
+  ].filter(Boolean);
+  const detailsText = details.length
+    ? `\n\nDettagli per il pagamento:\n${details.join('\n\n')}`
     : '\n\nPer i dettagli del metodo scelto, rispondimi qui su WhatsApp.';
   return `Ciao ${recipientName(recipientId)} 🌊\n\nPer ${reason}, il contributo è di ${amount}.${dueDate}${methodText}${detailsText}\n\nIl sito non riceve denaro: dopo il contributo avvisami qui, così controllo l’accredito reale. Grazie! ⛵`;
 }
@@ -736,8 +1054,58 @@ function renderPaymentRecipientOptions() {
     + (members ? `<optgroup label="Crew List">${members}</optgroup>` : '');
 }
 
+function contributionStateOptions(item) {
+  return [...CONTRIBUTION_ITEM_STATES.entries()]
+    .filter(([value]) => item.id !== 'refundable_deposit' || value !== 'included')
+    .map(([value, label]) => `<option value="${value}"${value === item.state ? ' selected' : ''}>${label}</option>`)
+    .join('');
+}
+
+function contributionCatalogRow(item) {
+  const stateHint = item.id === 'refundable_deposit' ? '<small>Non può essere inclusa nella quota.</small>' : '';
+  return `<article class="contribution-catalog-row" data-contribution-id="${escapeHtml(item.id)}"><div class="contribution-catalog-label">${escapeHtml(item.label)}${stateHint}</div><label>Gestione<select data-contribution-state>${contributionStateOptions(item)}</select></label><label>€ a persona · solo a parte / in loco<input data-contribution-amount type="number" min="0" max="10000" step="0.01" inputmode="decimal" value="${euroInputValue(item.amountCents)}" placeholder="Es. 30,00" /></label></article>`;
+}
+
+function syncContributionCatalogRow(row) {
+  const state = row?.querySelector('[data-contribution-state]')?.value;
+  const amount = row?.querySelector('[data-contribution-amount]');
+  if (!amount) return;
+  const canSetAmount = state === 'extra' || state === 'local';
+  amount.disabled = !canSetAmount;
+  amount.title = canSetAmount
+    ? 'Importo indicativo facoltativo per persona.'
+    : 'L’importo è disponibile solo per voci a parte o da regolare in loco.';
+  if (!canSetAmount) amount.value = '';
+}
+
+function renderContributionCatalogForm(items = contributionCatalog()) {
+  const rows = document.querySelector('#contributionCatalogRows');
+  if (!rows) return;
+  rows.innerHTML = items.map(contributionCatalogRow).join('');
+  rows.querySelectorAll('[data-contribution-id]').forEach(syncContributionCatalogRow);
+}
+
+function readContributionPlanForm() {
+  const rows = [...document.querySelectorAll('#contributionCatalogRows [data-contribution-id]')];
+  return normalizeContributionPlan({
+    items: Object.fromEntries(rows.map((row) => [row.dataset.contributionId, {
+      state: row.querySelector('[data-contribution-state]')?.value,
+      amountCents: toEuroCents(row.querySelector('[data-contribution-amount]')?.value),
+    }])),
+  });
+}
+
 function berthRateType(typeId) {
   return BERTH_RATE_TYPES.find((type) => type.id === typeId) || null;
+}
+
+function extraContributionType(typeId) {
+  return extraContributionTypes().find((type) => type.id === typeId) || null;
+}
+
+function costPlanContributionType(typeId) {
+  const baseContribution = costPlanBaseContribution();
+  return baseContribution?.id === typeId ? baseContribution : null;
 }
 
 function renderPaymentBerthOptions() {
@@ -746,7 +1114,7 @@ function renderPaymentBerthOptions() {
   const selectedType = select.value || 'custom';
   const totals = berthLayoutTotals(activeBoat?.berthLayout);
   const rates = normalizeBerthRates(activeBoat?.berthRates);
-  const options = BERTH_RATE_TYPES
+  const berthOptions = BERTH_RATE_TYPES
     .map((type) => ({ ...type, count: type.count(totals), cents: rates[type.rateKey] }))
     .filter((type) => type.count > 0)
     .map((type) => {
@@ -754,22 +1122,47 @@ function renderPaymentBerthOptions() {
       const priceLabel = type.cents > 0 ? `${formatCurrency(type.cents / 100)} a persona` : 'quota da indicare';
       return `<option value="${type.id}">${type.label} · ${placeLabel} · ${priceLabel}</option>`;
     }).join('');
-  select.innerHTML = '<option value="custom">Importo libero / altra voce</option>' + options;
-  select.value = berthRateType(selectedType) && [...select.options].some((option) => option.value === selectedType)
+  const extraOptions = extraContributionTypes().map((type) => {
+    const priceLabel = type.cents > 0 ? `${formatCurrency(type.cents / 100)} a persona` : 'importo da indicare';
+    return `<option value="${escapeHtml(type.id)}">${escapeHtml(type.label)} · ${priceLabel}</option>`;
+  }).join('');
+  const costBase = costPlanBaseContribution();
+  const costBaseOption = costBase
+    ? `<optgroup label="Quota base dalla Cassa skipper"><option value="${costBase.id}">${escapeHtml(costBase.label)} · ${formatCurrency(costBase.cents / 100)} a persona</option></optgroup>`
+    : '';
+  select.innerHTML = '<option value="custom">Importo libero / altra voce</option>'
+    + costBaseOption
+    + (berthOptions ? `<optgroup label="Posti letto">${berthOptions}</optgroup>` : '')
+    + (extraOptions ? `<optgroup label="Voci da richiedere a parte">${extraOptions}</optgroup>` : '');
+  select.value = (berthRateType(selectedType) || extraContributionType(selectedType) || costPlanContributionType(selectedType)) && [...select.options].some((option) => option.value === selectedType)
     ? selectedType
     : 'custom';
 }
 
 function applyPaymentBerthPreset() {
   const form = document.querySelector('#paymentForm');
-  const type = berthRateType(form?.elements.berthType?.value);
-  if (!form || !type || !activeBoat) return;
-  const totals = berthLayoutTotals(activeBoat.berthLayout);
-  if (type.count(totals) < 1) return;
-  const rates = normalizeBerthRates(activeBoat.berthRates);
+  if (!form || !activeBoat) return;
+  const selectedType = form.elements.berthType?.value;
+  const berthType = berthRateType(selectedType);
+  const extraType = extraContributionType(selectedType);
+  const costPlanType = costPlanContributionType(selectedType);
+  if (!berthType && !extraType && !costPlanType) return;
   const amount = form.elements.amount;
   const reason = form.elements.reason;
-  const cents = rates[type.rateKey];
+  let cents = 0;
+  let defaultReason = '';
+  if (berthType) {
+    const totals = berthLayoutTotals(activeBoat.berthLayout);
+    if (berthType.count(totals) < 1) return;
+    cents = normalizeBerthRates(activeBoat.berthRates)[berthType.rateKey];
+    defaultReason = berthType.defaultReason;
+  } else if (extraType) {
+    cents = extraType.cents;
+    defaultReason = extraType.defaultReason;
+  } else {
+    cents = costPlanType.cents;
+    defaultReason = costPlanType.defaultReason;
+  }
   if (cents > 0 && (!amount.value || amount.dataset.autoBerthRate === 'true')) {
     amount.value = euroInputValue(cents);
     amount.dataset.autoBerthRate = 'true';
@@ -778,8 +1171,16 @@ function applyPaymentBerthPreset() {
     delete amount.dataset.autoBerthRate;
   }
   if (!reason.value.trim() || reason.dataset.autoBerthReason === 'true') {
-    reason.value = type.defaultReason;
+    reason.value = defaultReason;
     reason.dataset.autoBerthReason = 'true';
+  }
+  const accountingCategory = form.elements.accountingCategory;
+  if (costPlanType && accountingCategory) {
+    accountingCategory.checked = true;
+    accountingCategory.dataset.autoCostRecovery = 'true';
+  } else if (accountingCategory?.dataset.autoCostRecovery === 'true') {
+    accountingCategory.checked = false;
+    delete accountingCategory.dataset.autoCostRecovery;
   }
 }
 
@@ -790,8 +1191,7 @@ function normalizeMember(id, member) {
 }
 
 function crewSeatLimit() {
-  const capacity = Number(activeBoat?.capacity);
-  return Number.isInteger(capacity) && capacity > 0 ? capacity : 0;
+  return effectiveParticipantCapacity(activeBoat);
 }
 
 function allocatedCrewSeatCount() {
@@ -811,6 +1211,10 @@ function renderCapacityStatus() {
   const allocated = allocatedCrewSeatCount();
   if (!activeBoat || !limit) {
     status.textContent = 'Definisci i posti per partecipanti prima di inviare gli inviti.';
+    return;
+  }
+  if (needsCapacityAlignment(activeBoat)) {
+    status.textContent = capacityAlignmentMessage(activeBoat);
     return;
   }
   const available = Math.max(0, limit - allocated);
@@ -835,6 +1239,7 @@ function setBoatFormDefaults(user) {
 function resetBoatForm(user) {
   const form = document.querySelector('#boatForm');
   form.reset();
+  delete form.elements.totalBerths.dataset.autoFromLayout;
   editingBoatId = null;
   document.querySelector('#boatSubmitButton').textContent = 'Registra la barca';
   document.querySelector('#cancelBoatEdit').hidden = true;
@@ -852,6 +1257,9 @@ function openBoatEdit() {
   }
   fillBerthLayoutForm(form, activeBoat.berthLayout);
   fillBerthRatesForm(form, activeBoat.berthRates);
+  const totalBerths = declaredTotalBerths(activeBoat);
+  form.elements.totalBerths.value = totalBerths ? String(totalBerths) : '';
+  delete form.elements.totalBerths.dataset.autoFromLayout;
   renderBerthLayoutSummary();
   creatingBoat = true;
   editingBoatId = activeBoat.id;
@@ -933,6 +1341,7 @@ function renderPayments(snapshot) {
   if (snapshot.empty) {
     activePayments = [];
     list.innerHTML = '<p class="empty-state">Nessuna richiesta preparata.</p>';
+    renderCostPlanSummary();
     return;
   }
   activePayments = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
@@ -955,8 +1364,12 @@ function renderPayments(snapshot) {
       : '';
     const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
     const methods = paymentMethodTags(payment) || '<span>Metodo da concordare nello scambio WhatsApp.</span>';
-    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}<button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${inviteAction}${statusActions}</div></article>`;
+    const accountingTag = paymentCountsTowardCostPlan(payment)
+      ? '<span class="payment-accounting-tag">Cassa skipper</span>'
+      : '';
+    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}<button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${inviteAction}${statusActions}</div></article>`;
   }).join('');
+  renderCostPlanSummary();
 }
 
 function renderBriefingForm() {
@@ -1005,8 +1418,10 @@ function subscribeToBoat(boat) {
   dashboard.hidden = false;
   document.querySelector('#boatTitle').textContent = boat.name;
   const berthTotals = berthLayoutTotals(boat.berthLayout);
-  const totalBerths = berthTotals.physicalBerths ? ` · ${berthTotals.physicalBerths} posti letto totali` : '';
-  document.querySelector('#boatMeta').textContent = boat.model + ' · ' + boat.capacity + ' posti partecipanti' + totalBerths + ' · ' + boat.homePort;
+  const totalBerths = declaredTotalBerths(boat);
+  const participantCapacity = effectiveParticipantCapacity(boat);
+  const totalBerthsText = totalBerths ? `${totalBerths} posti totali a bordo` : 'posti totali da completare';
+  document.querySelector('#boatMeta').textContent = boat.model + ' · ' + totalBerthsText + ' · ' + participantCapacity + ' posti partecipanti · ' + boat.homePort;
   const accommodation = document.querySelector('#boatAccommodation');
   const accommodationDescription = describeBerthLayout(boat.berthLayout);
   const accommodationCapacity = describeBerthCapacity(berthTotals);
@@ -1016,11 +1431,15 @@ function subscribeToBoat(boat) {
     ? `Sistemazioni private: ${accommodationDescription}. ${accommodationCapacity}.${rateDescription ? ` Quote per persona: ${rateDescription}.` : ''}`
     : rateDescription ? `Quote private per persona: ${rateDescription}.` : '';
   renderFleetProfileForm();
+  renderCostPlan(null);
+  renderContributionCatalogForm();
   renderPaymentBerthOptions();
   void publishExistingBoatToFleet(boat);
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
   stopPaymentProfileSubscription?.();
+  stopContributionPlanSubscription?.();
+  stopCostPlanSubscription?.();
   stopInviteSubscription?.();
   stopBriefingSubscription?.();
   stopAnnouncementSubscription?.();
@@ -1034,6 +1453,22 @@ function subscribeToBoat(boat) {
   }, () => {
     renderPaymentProfile(null);
     setMessage(document.querySelector('#paymentProfileMessage'), 'Impossibile leggere i metodi di incasso.', true);
+  });
+  stopCostPlanSubscription = onSnapshot(doc(db, 'boats', boat.id, 'costPlan', COST_PLAN_ID), (snapshot) => {
+    renderCostPlan(snapshot.exists() ? snapshot.data() : null);
+  }, () => {
+    renderCostPlan(null);
+    setMessage(document.querySelector('#costPlanMessage'), 'Impossibile leggere la cassa skipper.', true);
+  });
+  stopContributionPlanSubscription = onSnapshot(doc(db, 'boats', boat.id, 'contributionPlan', 'default'), (snapshot) => {
+    activeContributionPlan = snapshot.exists() ? snapshot.data() : null;
+    renderContributionCatalogForm();
+    renderPaymentBerthOptions();
+  }, () => {
+    activeContributionPlan = null;
+    renderContributionCatalogForm();
+    renderPaymentBerthOptions();
+    setMessage(document.querySelector('#contributionCatalogMessage'), 'Impossibile leggere la composizione delle quote.', true);
   });
   stopPaymentSubscription = onSnapshot(query(collection(db, 'boats', boat.id, 'paymentRequests'), orderBy('createdAt', 'desc')), renderPayments, () => setMessage(document.querySelector('#paymentFormMessage'), 'Impossibile leggere le richieste.', true));
   stopInviteSubscription = onSnapshot(collection(db, 'boats', boat.id, 'invites'), (snapshot) => {
@@ -1105,10 +1540,19 @@ document.querySelector('#cancelBoatEdit').addEventListener('click', () => {
 
 const boatForm = document.querySelector('#boatForm');
 boatForm.querySelectorAll('[data-berth-layout-input]').forEach((input) => {
-  input.addEventListener('input', renderBerthLayoutSummary);
-  input.addEventListener('change', renderBerthLayoutSummary);
+  input.addEventListener('input', () => {
+    syncTotalBerthsFromLayout();
+    renderBerthLayoutSummary();
+  });
+  input.addEventListener('change', () => {
+    syncTotalBerthsFromLayout();
+    renderBerthLayoutSummary();
+  });
 });
-boatForm.elements.capacity.addEventListener('input', renderBerthLayoutSummary);
+boatForm.elements.totalBerths.addEventListener('input', () => {
+  delete boatForm.elements.totalBerths.dataset.autoFromLayout;
+  renderBerthLayoutSummary();
+});
 renderBerthLayoutSummary();
 
 boatForm.addEventListener('submit', async (event) => {
@@ -1122,18 +1566,27 @@ boatForm.addEventListener('submit', async (event) => {
   submitButton.disabled = true;
   setMessage(document.querySelector('#boatFormMessage'), 'Registro la barca…');
   try {
-    const capacity = Number(fields.get('capacity'));
+    const totalBerths = asNonNegativeInteger(fields.get('totalBerths'), 31);
+    if (totalBerths < 2) {
+      setMessage(document.querySelector('#boatFormMessage'), 'Indica almeno due posti totali a bordo: skipper incluso.', true);
+      return;
+    }
+    const capacity = participantCapacityFromTotal(totalBerths);
     const berthLayout = readBerthLayout(form);
     const layoutTotals = berthLayoutTotals(berthLayout);
-    if (layoutTotals.physicalBerths > 0 && capacity > layoutTotals.participantBerths) {
-      setMessage(document.querySelector('#boatFormMessage'), `La composizione indica ${layoutTotals.participantBerths} ${layoutTotals.participantBerths === 1 ? 'posto per partecipante' : 'posti per partecipanti'} oltre allo skipper. Riduci il limite o aggiungi i posti mancanti.`, true);
+    if (layoutTotals.physicalBerths > 0 && layoutTotals.physicalBerths !== totalBerths) {
+      setMessage(document.querySelector('#boatFormMessage'), `La configurazione descrive ${layoutTotals.physicalBerths} posti totali a bordo, ma sopra hai indicato ${totalBerths}. Correggi il totale oppure le sistemazioni reali: non aggiungere posti fittizi.`, true);
+      return;
+    }
+    if (activeBoat && allocatedCrewSeatCount() > capacity) {
+      setMessage(document.querySelector('#boatFormMessage'), `Hai già ${allocatedCrewSeatCount()} partecipanti o inviti attivi. Con ${totalBerths} posti totali puoi gestirne al massimo ${capacity}: libera prima un posto oppure mantieni una capienza maggiore.`, true);
       return;
     }
     // Alla prima registrazione i posti liberi partono dal totale dichiarato;
     // nelle modifiche successive resta invece la scelta già fatta dallo skipper.
     const previousAvailability = activeBoat ? declaredFleetAvailability(activeBoat) : capacity;
     const boatData = {
-      name: fields.get('name').trim(), model: fields.get('model').trim(), boatType: fields.get('boatType'), capacity,
+      name: fields.get('name').trim(), model: fields.get('model').trim(), boatType: fields.get('boatType'), totalBerths, capacity,
       homePort: fields.get('homePort').trim(), flag: fields.get('flag').trim(),
       skipperName: fields.get('skipperName').trim(), note: fields.get('note').trim(), berthLayout, berthRates: readBerthRates(form), skipperId: user.uid,
       publicFleetId: activeBoat?.publicFleetId || createPublicFleetId(),
@@ -1210,6 +1663,10 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
   event.preventDefault();
   if (blockPrivateAction(document.querySelector('#inviteFormMessage'))) return;
   if (!activeBoat || !auth.currentUser) return;
+  if (needsCapacityAlignment(activeBoat)) {
+    setMessage(document.querySelector('#inviteFormMessage'), capacityAlignmentMessage(activeBoat), true);
+    return;
+  }
   if (isCrewCapacityReached()) {
     setMessage(document.querySelector('#inviteFormMessage'), 'Hai già riservato tutti i posti per partecipanti indicati per questa barca.', true);
     return;
@@ -1259,6 +1716,10 @@ document.querySelector('#memberForm').addEventListener('submit', async (event) =
   event.preventDefault();
   if (blockPrivateAction(document.querySelector('#memberFormMessage'))) return;
   if (!activeBoat) return;
+  if (!editingMemberId && needsCapacityAlignment(activeBoat)) {
+    setMessage(document.querySelector('#memberFormMessage'), capacityAlignmentMessage(activeBoat), true);
+    return;
+  }
   if (!editingMemberId && isCrewCapacityReached()) {
     setMessage(document.querySelector('#memberFormMessage'), 'Hai già riservato tutti i posti per partecipanti indicati per questa barca.', true);
     return;
@@ -1406,7 +1867,12 @@ document.querySelector('#generatePdfButton').addEventListener('click', () => {
   }
 });
 
-document.querySelector('#paymentProfileForm').addEventListener('submit', async (event) => {
+const paymentProfileForm = document.querySelector('#paymentProfileForm');
+paymentProfileForm.querySelectorAll('[data-payment-method-toggle]').forEach((input) => {
+  input.addEventListener('change', () => renderPaymentProfileDetailVisibility(paymentProfileForm));
+});
+
+paymentProfileForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (blockPrivateAction(document.querySelector('#paymentProfileMessage'))) return;
   if (!activeBoat || !auth.currentUser) return;
@@ -1422,20 +1888,30 @@ document.querySelector('#paymentProfileForm').addEventListener('submit', async (
     setMessage(document.querySelector('#paymentProfileMessage'), 'Seleziona almeno un metodo di incasso.', true);
     return;
   }
+  const paymentDetails = readPaymentDetails(form);
+  const invalidMethod = enabledMethods.find((method) => !isValidPaymentDetail(method, paymentDetails));
+  if (invalidMethod) {
+    setMessage(document.querySelector('#paymentProfileMessage'), paymentDetailValidationMessage(invalidMethod), true);
+    return;
+  }
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
   try {
-    await setDoc(doc(db, 'boats', activeBoat.id, 'collectionProfile', PAYMENT_PROFILE_ID), {
+    const profile = {
       collectorId: auth.currentUser.uid,
       collectorName,
       paypalEnabled: fields.get('paypalEnabled') === 'on',
       satispayEnabled: fields.get('satispayEnabled') === 'on',
       revolutEnabled: fields.get('revolutEnabled') === 'on',
       bankTransferEnabled: fields.get('bankTransferEnabled') === 'on',
+      paymentDetails,
       updatedAt: serverTimestamp(),
       updatedBy: auth.currentUser.uid,
-    });
-    setMessage(document.querySelector('#paymentProfileMessage'), 'Metodi di incasso salvati. Ora puoi usarli nelle richieste personali.');
+    };
+    await setDoc(doc(db, 'boats', activeBoat.id, 'collectionProfile', PAYMENT_PROFILE_ID), profile);
+    activePaymentProfile = { ...defaultPaymentProfile(), ...profile };
+    renderPaymentMethodOptions();
+    setMessage(document.querySelector('#paymentProfileMessage'), 'Profilo di incasso salvato. I dettagli saranno aggiunti automaticamente alle richieste WhatsApp.');
   } catch (error) {
     setMessage(document.querySelector('#paymentProfileMessage'), 'Non riesco a salvare i metodi di incasso.', true);
   } finally {
@@ -1443,6 +1919,71 @@ document.querySelector('#paymentProfileForm').addEventListener('submit', async (
   }
 });
 
+const costPlanForm = document.querySelector('#costPlanForm');
+costPlanForm.addEventListener('input', renderCostPlanSummary);
+costPlanForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = document.querySelector('#costPlanMessage');
+  if (blockPrivateAction(message)) return;
+  if (!activeBoat || !auth.currentUser) return;
+  const plan = readCostPlanForm();
+  if (plan.payingParticipants < 1) {
+    setMessage(message, 'Indica almeno un partecipante che divide i costi: lo skipper è già escluso.', true);
+    return;
+  }
+  const submitButton = costPlanForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  setMessage(message, 'Salvo la cassa skipper…');
+  try {
+    await setDoc(doc(db, 'boats', activeBoat.id, 'costPlan', COST_PLAN_ID), {
+      ...plan,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser.uid,
+    });
+    activeCostPlan = normalizeCostPlan(plan);
+    renderCostPlanSummary();
+    renderPaymentBerthOptions();
+    setMessage(message, 'Cassa skipper salvata. La quota base è solo una proposta: puoi sempre differenziare le richieste per persona o cabina.');
+  } catch (error) {
+    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare la cassa skipper.'), true);
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+const contributionCatalogForm = document.querySelector('#contributionCatalogForm');
+contributionCatalogForm.addEventListener('change', (event) => {
+  const row = event.target.closest('[data-contribution-id]');
+  if (row && event.target.matches('[data-contribution-state]')) syncContributionCatalogRow(row);
+});
+
+contributionCatalogForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = document.querySelector('#contributionCatalogMessage');
+  if (blockPrivateAction(message)) return;
+  if (!activeBoat || !auth.currentUser) return;
+  const submitButton = contributionCatalogForm.querySelector('button[type="submit"]');
+  const plan = readContributionPlanForm();
+  submitButton.disabled = true;
+  setMessage(message, 'Salvo la composizione delle quote…');
+  try {
+    await setDoc(doc(db, 'boats', activeBoat.id, 'contributionPlan', 'default'), {
+      ...plan,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser.uid,
+    });
+    activeContributionPlan = plan;
+    renderContributionCatalogForm();
+    renderPaymentBerthOptions();
+    setMessage(message, 'Composizione salvata. L’equipaggio vedrà solo voci, stato e eventuale importo: mai i tuoi dati di incasso.');
+  } catch (error) {
+    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare la composizione delle quote.'), true);
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+ensurePaymentAccountingCategoryField();
 const paymentForm = document.querySelector('#paymentForm');
 paymentForm.elements.berthType.addEventListener('change', applyPaymentBerthPreset);
 paymentForm.elements.amount.addEventListener('input', () => {
@@ -1493,6 +2034,7 @@ paymentForm.addEventListener('submit', async (event) => {
     currency: 'EUR',
     reason,
     isOptional: fields.get('isOptional') === 'on',
+    accountingCategory: fields.get('accountingCategory') === 'cost_recovery' ? 'cost_recovery' : 'other',
     dueDate: String(fields.get('dueDate') || ''),
     collectorId: auth.currentUser.uid,
     collectorName,
@@ -1519,6 +2061,7 @@ paymentForm.addEventListener('submit', async (event) => {
     form.reset();
     delete form.elements.amount.dataset.autoBerthRate;
     delete form.elements.reason.dataset.autoBerthReason;
+    delete form.elements.accountingCategory.dataset.autoCostRecovery;
     renderPaymentBerthOptions();
     renderPaymentMethodOptions();
     if (whatsappWindow) whatsappWindow.location.replace(whatsappUrl);
@@ -1570,7 +2113,7 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
     const message = paymentWhatsappMessage(payment);
     try {
       await navigator.clipboard.writeText(message);
-      setMessage(document.querySelector('#paymentFormMessage'), 'Messaggio copiato. I dettagli di pagamento vanno aggiunti solo nella chat WhatsApp.');
+      setMessage(document.querySelector('#paymentFormMessage'), 'Messaggio copiato con i dettagli privati dei metodi selezionati.');
     } catch (error) {
       setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco a copiare il messaggio. Verifica i permessi del browser.', true);
     }

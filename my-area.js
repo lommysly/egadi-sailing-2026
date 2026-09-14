@@ -5,13 +5,32 @@ import { roleConfirmationText } from './crew-roles.js?v=20260911-role1';
 let activeInvite = null;
 let activeBriefing = null;
 let activeRuleAcceptance = null;
+let activeContributionPlan = null;
 let stopPaymentSubscription = null;
 let stopAnnouncementSubscription = null;
+let stopContributionPlanSubscription = null;
 const PAYMENT_METHODS = [
   { id: 'paypal', label: 'PayPal' },
   { id: 'satispay', label: 'Satispay' },
   { id: 'revolut', label: 'Revolut' },
   { id: 'bankTransfer', label: 'Bonifico' },
+];
+const CONTRIBUTION_ITEM_STATES = new Map([
+  ['to_define', 'Da confermare con lo skipper'],
+  ['included', 'Compreso nella quota'],
+  ['extra', 'Da richiedere a parte'],
+  ['local', 'Da regolare in loco / da dividere'],
+  ['not_applicable', 'Non previsto'],
+]);
+const CONTRIBUTION_ITEMS = [
+  { id: 'berth', label: 'Quota posto in barca' },
+  { id: 'starter_pack', label: 'Starter Pack · pulizie finali, fuoribordo e tender' },
+  { id: 'linen_towels', label: 'Lenzuola e asciugamani' },
+  { id: 'protection_insurance', label: 'Assicurazione cauzione' },
+  { id: 'provisions', label: 'Cambusa' },
+  { id: 'fuel', label: 'Gasolio per la navigazione' },
+  { id: 'transfer', label: 'Transfer da/per il porto' },
+  { id: 'refundable_deposit', label: 'Cauzione rimborsabile' },
 ];
 
 function setMessage(element, message, isError = false) {
@@ -80,18 +99,24 @@ function showInvalid(error) {
 function clearPersonalDashboard() {
   stopPaymentSubscription?.();
   stopAnnouncementSubscription?.();
+  stopContributionPlanSubscription?.();
   stopPaymentSubscription = null;
   stopAnnouncementSubscription = null;
+  stopContributionPlanSubscription = null;
   activeInvite = null;
   activeBriefing = null;
   activeRuleAcceptance = null;
-  ['#participantProfileSummary', '#participantPaymentList', '#boardingSchedule', '#participantSchedule', '#boardingRulesSummary', '#boardingRulesText', '#participantRulesSummary', '#participantRulesText', '#participantAnnouncementList'].forEach((selector) => {
+  activeContributionPlan = null;
+  ['#participantProfileSummary', '#participantPaymentList', '#boardingSchedule', '#participantSchedule', '#boardingRulesSummary', '#boardingRulesText', '#participantRulesSummary', '#participantRulesText', '#participantAnnouncementList', '#participantContributionIncluded', '#participantContributionSeparate'].forEach((selector) => {
     document.querySelector(selector).replaceChildren();
   });
   document.querySelector('#boardingRulesGate').hidden = true;
   document.querySelector('#boardingBriefing').hidden = true;
   document.querySelector('#boardingGateWaiting').hidden = true;
   document.querySelector('#participantBriefing').hidden = true;
+  document.querySelector('#participantContributionPlan').hidden = true;
+  document.querySelector('#participantContributionPlanEmpty').hidden = false;
+  document.querySelector('#participantContributionNotApplicable')?.replaceChildren();
   clearBoardingRulesGateState();
 }
 
@@ -124,6 +149,69 @@ function renderPayments(snapshot) {
     const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
     return `<article class="payment-row"><div><strong>${formatCurrency(paymentAmount(payment))} · ${escapeHtml(reason)}</strong><span>${escapeHtml(dueDate)}</span>${methods}${legacyInstructions}<span class="payment-detail-note">I dettagli del pagamento sono nel messaggio WhatsApp dello skipper.</span></div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span></div></article>`;
   }).join('');
+}
+
+function contributionAmountCents(item) {
+  const amountCents = Number(item?.amountCents);
+  return Number.isInteger(amountCents) && amountCents >= 0 ? amountCents : 0;
+}
+
+function contributionPlanItems(plan = activeContributionPlan) {
+  const sourceItems = plan?.items && typeof plan.items === 'object' ? plan.items : {};
+  return CONTRIBUTION_ITEMS.map((item) => {
+    const source = sourceItems[item.id] || {};
+    const state = CONTRIBUTION_ITEM_STATES.has(source.state) ? source.state : 'to_define';
+    return { ...item, state, amountCents: contributionAmountCents(source) };
+  });
+}
+
+function contributionItemMarkup(item) {
+  const amount = item.amountCents > 0 ? ` · ${formatCurrency(item.amountCents / 100)} a persona` : '';
+  return `<div><span>${escapeHtml(CONTRIBUTION_ITEM_STATES.get(item.state))}</span><strong>${escapeHtml(item.label)}${escapeHtml(amount)}</strong></div>`;
+}
+
+function contributionNotApplicableContainer(plan) {
+  let container = document.querySelector('#participantContributionNotApplicable');
+  if (container) return container;
+  const heading = document.createElement('h4');
+  heading.textContent = 'Non previsto per questa barca';
+  container = document.createElement('div');
+  container.id = 'participantContributionNotApplicable';
+  container.className = 'schedule-list';
+  plan.querySelector('.panel-lead')?.before(heading, container);
+  return container;
+}
+
+function renderContributionPlan() {
+  const empty = document.querySelector('#participantContributionPlanEmpty');
+  const plan = document.querySelector('#participantContributionPlan');
+  const included = document.querySelector('#participantContributionIncluded');
+  const separate = document.querySelector('#participantContributionSeparate');
+  if (!activeContributionPlan) {
+    empty.hidden = false;
+    plan.hidden = true;
+    included.replaceChildren();
+    separate.replaceChildren();
+    document.querySelector('#participantContributionNotApplicable')?.replaceChildren();
+    return;
+  }
+
+  const notApplicable = contributionNotApplicableContainer(plan);
+  const items = contributionPlanItems();
+  const includedItems = items.filter((item) => item.state === 'included');
+  const separateItems = items.filter((item) => ['extra', 'local', 'to_define'].includes(item.state));
+  const notApplicableItems = items.filter((item) => item.state === 'not_applicable');
+  empty.hidden = true;
+  plan.hidden = false;
+  included.innerHTML = includedItems.length
+    ? includedItems.map(contributionItemMarkup).join('')
+    : '<p class="empty-state">Nessuna voce è stata ancora indicata come compresa nella quota.</p>';
+  separate.innerHTML = separateItems.length
+    ? separateItems.map(contributionItemMarkup).join('')
+    : '<p class="empty-state">Nessuna spesa separata o da confermare al momento.</p>';
+  notApplicable.innerHTML = notApplicableItems.length
+    ? notApplicableItems.map(contributionItemMarkup).join('')
+    : '<p class="empty-state">Nessuna voce è stata esclusa.</p>';
 }
 
 function hasPublishedBriefing() {
@@ -226,22 +314,38 @@ function renderSchedule(selector) {
 function stopDashboardSubscriptions() {
   stopPaymentSubscription?.();
   stopAnnouncementSubscription?.();
+  stopContributionPlanSubscription?.();
   stopPaymentSubscription = null;
   stopAnnouncementSubscription = null;
+  stopContributionPlanSubscription = null;
 }
 
 function startDashboardSubscriptions() {
-  if (!activeInvite || stopPaymentSubscription || stopAnnouncementSubscription) return;
-  stopPaymentSubscription = onSnapshot(
-    query(collection(db, 'boats', activeInvite.boatId, 'paymentRequests'), where('recipientId', '==', activeInvite.id)),
-    renderPayments,
-    (error) => handlePrivateReadError(error, document.querySelector('#accessLinkMessage'), 'Non riesco a leggere le richieste personali.'),
-  );
-  stopAnnouncementSubscription = onSnapshot(
-    query(collection(db, 'boats', activeInvite.boatId, 'announcements'), orderBy('createdAt', 'desc')),
-    renderAnnouncements,
-    (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere le comunicazioni.'),
-  );
+  if (!activeInvite) return;
+  if (!stopPaymentSubscription) {
+    stopPaymentSubscription = onSnapshot(
+      query(collection(db, 'boats', activeInvite.boatId, 'paymentRequests'), where('recipientId', '==', activeInvite.id)),
+      renderPayments,
+      (error) => handlePrivateReadError(error, document.querySelector('#accessLinkMessage'), 'Non riesco a leggere le richieste personali.'),
+    );
+  }
+  if (!stopAnnouncementSubscription) {
+    stopAnnouncementSubscription = onSnapshot(
+      query(collection(db, 'boats', activeInvite.boatId, 'announcements'), orderBy('createdAt', 'desc')),
+      renderAnnouncements,
+      (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), 'Non riesco a leggere le comunicazioni.'),
+    );
+  }
+  if (!stopContributionPlanSubscription) {
+    stopContributionPlanSubscription = onSnapshot(
+      doc(db, 'boats', activeInvite.boatId, 'contributionPlan', 'default'),
+      (snapshot) => {
+        activeContributionPlan = snapshot.exists() ? snapshot.data() : null;
+        renderContributionPlan();
+      },
+      (error) => handlePrivateReadError(error, document.querySelector('#accessLinkMessage'), 'Non riesco a leggere la composizione delle quote.'),
+    );
+  }
 }
 
 function renderDashboardBriefing() {

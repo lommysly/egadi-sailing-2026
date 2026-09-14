@@ -79,10 +79,14 @@ body.menu-open { overflow:hidden; }
 .payment-method-fieldset legend { padding:0 6px; color:rgba(17,45,56,.7); font:700 .74rem "DM Sans",sans-serif; }
 .payment-method-selector { display:flex; flex-wrap:wrap; gap:8px; }
 .payment-method-selector > .field-hint { width:100%; margin:0; }
+.payment-profile-details { display:grid; gap:10px; }
+.payment-bank-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+@media (max-width:640px) { .payment-bank-fields { grid-template-columns:1fr; } }
 .payment-method-choice,.payment-method-selector > label { display:inline-flex !important; width:auto !important; grid-template-columns:none !important; align-items:center; gap:7px; min-height:34px; padding:7px 10px; border:1px solid rgba(7,59,76,.2); border-radius:999px; background:#eaf8f6; color:var(--ink); font-size:.78rem !important; font-weight:700; cursor:pointer; }
 .payment-method-choice input,.payment-method-selector > label input { width:15px !important; min-height:15px; margin:0; accent-color:#087b8a; }
 .payment-method-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .payment-method-tag { display:inline-block !important; margin:0 !important; padding:4px 7px; border-radius:999px; background:#d8f4f1; color:#087b8a !important; font:700 .62rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
+.payment-accounting-tag { display:inline-block !important; width:fit-content; margin-top:8px !important; padding:4px 7px; border:1px solid rgba(8,123,138,.24); border-radius:999px; background:#eaf8f6; color:#087b8a !important; font:700 .62rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
 .payment-detail-note { font-size:.76rem; line-height:1.4; }
 .invite-panel { margin-top:28px; padding:22px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .invite-panel h4 { margin:0 0 10px; font:600 1.45rem "Fraunces",serif; letter-spacing:-.03em; }
@@ -112,6 +116,17 @@ body.menu-open { overflow:hidden; }
 .board-panel { grid-column:1 / -1; }
 .board-status { margin:20px 0 0; color:#416b6d; font-size:.85rem; line-height:1.45; }
 .board-divider { height:1px; margin:28px 0; background:var(--line); }
+.contribution-catalog-panel,.skipper-cost-panel { padding:16px; border:1px solid var(--line); border-radius:12px; background:#f7fffe; }
+.contribution-catalog-panel summary,.skipper-cost-panel summary { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; font:700 .98rem "DM Sans",sans-serif; }
+.contribution-catalog-panel summary small,.skipper-cost-panel summary small { color:#417174; font:500 .72rem "DM Mono",monospace; text-transform:uppercase; letter-spacing:.05em; }
+.contribution-catalog-panel .panel-lead,.skipper-cost-panel .panel-lead { margin-top:16px; }
+.skipper-cost-summary { margin:14px 0 0; padding:13px; border-radius:9px; background:#e0f4f1; color:#16494f; font-size:.86rem; line-height:1.5; }
+.contribution-catalog-rows { display:grid; gap:10px; }
+.contribution-catalog-row { display:grid; grid-template-columns:minmax(160px,1.35fr) minmax(160px,1fr) minmax(150px,.8fr); gap:10px; align-items:end; padding:12px; border:1px solid rgba(17,45,56,.14); border-radius:10px; background:white; }
+.contribution-catalog-label { display:grid; gap:5px; font-weight:700; font-size:.85rem; }
+.contribution-catalog-row label { display:grid; gap:5px; font-size:.72rem; font-weight:700; }
+.contribution-catalog-row input,.contribution-catalog-row select { width:100%; border:1px solid rgba(17,45,56,.25); border-radius:8px; padding:9px 10px; color:var(--ink); background:white; font:400 .88rem "DM Sans",sans-serif; }
+.contribution-catalog-row input:disabled { cursor:not-allowed; color:rgba(17,45,56,.5); background:#eef5f4; }
 .announcement-list { display:grid; gap:12px; margin-top:22px; }
 .announcement-row { padding:15px 0; border-top:1px solid var(--line); }
 .announcement-row:first-child { border-top:0; padding-top:0; }
@@ -195,6 +210,7 @@ body.menu-open { overflow:hidden; }
 .passage-safety p { max-width:780px; line-height:1.6; }
 @media (max-width:800px) { .passage-status,.passage-data-grid,.passage-stop-grid,.passage-mooring-guide { grid-template-columns:1fr; }.passage-day-heading { display:grid; gap:0; }.passage-day-card,.passage-introduction,.passage-safety,.passage-mooring-guide { padding:24px; } }
 @media (max-width:800px) { .form-grid,.dashboard-grid,.schedule-list { grid-template-columns:1fr; }.dashboard-heading { display:grid; align-items:start; }.dashboard-actions { justify-content:start; }.form-actions { display:grid; align-items:start; }.form-actions .form-message { margin:0; } }
+@media (max-width:800px) { .contribution-catalog-row { grid-template-columns:1fr; } }
 @media (max-width:800px) { .charter-export { display:grid; align-items:start; } }
 
 /* Arrivi e partenze: la pagina pubblica spiega il flusso, senza raccogliere dati o contatti. */
