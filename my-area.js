@@ -419,9 +419,9 @@ function renderCrewDashboardOverview() {
   const verifiedPaymentCents = activeCrewPayments
     .filter((payment) => payment.status === 'verified')
     .reduce((total, payment) => total + paymentAmountCents(payment), 0);
-  const projectedPayableCents = projectionPayableCents();
-  const projectedPaymentSummary = projectedPayableCents
-    ? `${formatCurrency(projectedPayableCents / 100)} ${localized('previsti', 'planned')}`
+  const onlineContribution = onlineContributionBalance();
+  const projectedPaymentSummary = onlineContribution.hasTarget && !onlineContribution.isExempt
+    ? `${formatCurrency(onlineContribution.targetCents / 100)} ${localized('concordati', 'agreed')}`
     : copy.noPayments;
   const announcements = activeCrewAnnouncements.length;
   const profileReady = Boolean(activeMember);
@@ -433,6 +433,38 @@ function renderCrewDashboardOverview() {
     .replace('{count}', String(verifiedPayments))
     .replace('{suffix}', crewPluralSuffix(verifiedPayments, 'o', 'i'))
     .replace('{suffixVerified}', crewPluralSuffix(verifiedPayments, 'o', 'i'));
+  const moneyValue = onlineContribution.isExempt
+    ? localized('Esente dalle quote', 'Exempt from contributions')
+    : onlineContribution.hasTarget && onlineContribution.overpaidCents > 0
+      ? `${formatCurrency(onlineContribution.overpaidCents / 100)} ${localized('oltre quota', 'over the agreed amount')}`
+      : onlineContribution.hasTarget && onlineContribution.remainingCents > 0
+        ? `${formatCurrency(onlineContribution.remainingCents / 100)} ${localized('saldo da versare', 'balance to pay')}`
+        : onlineContribution.hasTarget
+          ? localized('Quota coperta', 'Contribution covered')
+          : pendingPayments
+            ? `${formatCurrency(pendingPaymentCents / 100)} ${localized('da regolare', 'to settle')}`
+            : verifiedPayments
+              ? `${formatCurrency(verifiedPaymentCents / 100)} ${localized('confermati', 'confirmed')}`
+              : projectedPaymentSummary;
+  const verifiedDetail = verifiedContributionDetail(onlineContribution);
+  const pendingDetail = onlineContribution.pendingCents > 0
+    ? localized(
+      `Richieste già inviate: ${formatCurrency(onlineContribution.pendingCents / 100)}. Non riducono il saldo finché lo skipper non verifica l’accredito.`,
+      `Requests already sent: ${formatCurrency(onlineContribution.pendingCents / 100)}. They do not reduce the balance until the skipper verifies the payment.`,
+    )
+    : '';
+  const moneyDetail = onlineContribution.isExempt
+    ? localized('Starter Pack e cauzione rimborsabile, se previsti, restano separati.', 'Starter Pack and refundable deposit, if applicable, remain separate.')
+    : onlineContribution.hasTarget
+      ? [
+        verifiedDetail || localized('Nessun accredito è ancora stato verificato.', 'No payment has been verified yet.'),
+        pendingDetail,
+        onlineContribution.overpaidCents > 0
+          ? localized('Non inviare altri versamenti: verifica prima l’eccedenza con lo skipper.', 'Do not make further payments: check the excess with the skipper first.')
+          : '',
+        localized('Starter Pack e cauzione rimborsabile restano separati.', 'Starter Pack and refundable deposit remain separate.'),
+      ].filter(Boolean).join(' ')
+      : `${copy.moneyDetail} · ${localized('La cauzione rimborsabile è sempre separata.', 'The refundable deposit is always separate.')}`;
   setCrewDashboardMetric(
     'board',
     briefingReady ? copy.briefingReady : copy.briefingWaiting,
@@ -442,16 +474,8 @@ function renderCrewDashboardOverview() {
   );
   setCrewDashboardMetric(
     'money',
-    pendingPayments
-      ? `${formatCurrency(pendingPaymentCents / 100)} ${localized('da regolare', 'to settle')}`
-      : verifiedPayments
-        ? `${formatCurrency(verifiedPaymentCents / 100)} ${localized('confermati', 'confirmed')}`
-        : projectedPaymentSummary,
-    verifiedPayments
-      ? `${verifiedPaymentSummary} · ${localized('Cauzione rimborsabile separata.', 'Refundable deposit kept separate.')}`
-      : projectedPayableCents
-        ? `${localized('Quota prevista dallo skipper; non è ancora una richiesta di pagamento.', 'Planned by the skipper; this is not a payment request yet.')} ${localized('La cauzione rimborsabile è sempre separata.', 'The refundable deposit is always separate.')}`
-        : `${copy.moneyDetail} · ${localized('La cauzione rimborsabile è sempre separata.', 'The refundable deposit is always separate.')}`,
+    moneyValue,
+    moneyDetail,
   );
   setCrewDashboardMetric('profile', profileReady ? copy.profileReady : copy.profileWaiting, copy.profileDetail);
   const readyItems = [profileReady, briefingReady].filter(Boolean).length;
@@ -469,7 +493,9 @@ function renderCrewDashboardOverview() {
     participantStatus.textContent = [
       profileReady ? copy.profileReady : copy.profileWaiting,
       briefingReady ? copy.briefingReady : copy.briefingWaiting,
-      pendingPayments ? pendingPaymentSummary : (verifiedPayments ? verifiedPaymentSummary : projectedPaymentSummary),
+      onlineContribution.hasTarget || onlineContribution.isExempt
+        ? moneyValue
+        : (pendingPayments ? pendingPaymentSummary : (verifiedPayments ? verifiedPaymentSummary : projectedPaymentSummary)),
     ].join(' · ');
   }
 
@@ -527,6 +553,7 @@ function paymentMethodTags(payment) {
 }
 
 function paymentStatusLabel(payment) {
+  if (payment?.entryType === 'manual_receipt') return localized('Registrato e verificato', 'Recorded and verified');
   if (payment.status === 'verified') return localized('Accredito confermato', 'Payment confirmed');
   if (payment.status === 'cancelled') return localized('Richiesta annullata', 'Request cancelled');
   return localized('Da regolare', 'To be settled');
@@ -538,6 +565,98 @@ function paymentAmountCents(payment) {
 
 function isPendingCrewPayment(payment) {
   return payment.status !== 'verified' && payment.status !== 'cancelled';
+}
+
+function isManualCrewReceipt(payment) {
+  return payment?.entryType === 'manual_receipt';
+}
+
+function paymentInstallmentKind(payment) {
+  const value = String(payment?.installmentType || '').trim().toLowerCase();
+  if (value === 'advance') return 'advance';
+  if (value === 'balance') return 'balance';
+  if (value === 'full') return 'full';
+  if (value === 'extra') return 'extra';
+  return 'history';
+}
+
+function paymentInstallmentLabel(payment) {
+  const labels = {
+    advance: localized('Acconto', 'Advance'),
+    balance: localized('Saldo', 'Balance'),
+    full: localized('Quota', 'Contribution'),
+    extra: localized('Voce separata', 'Separate item'),
+    history: localized('Storico', 'History'),
+  };
+  const label = labels[paymentInstallmentKind(payment)] || labels.history;
+  if (!isManualCrewReceipt(payment) || paymentInstallmentKind(payment) === 'history') return label;
+  return localized(`${label} · registrato`, `${label} · recorded`);
+}
+
+function validPaymentAllocationCents(value) {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function paymentAllocation(payment) {
+  const amountCents = paymentAmountCents(payment);
+  const allocation = payment?.allocation;
+  const berthCents = allocation?.berthCents;
+  const protectionInsuranceCents = allocation?.protectionInsuranceCents;
+  const hasValidExplicitAllocation = allocation
+    && typeof allocation === 'object'
+    && validPaymentAllocationCents(berthCents)
+    && validPaymentAllocationCents(protectionInsuranceCents)
+    && berthCents + protectionInsuranceCents === amountCents;
+  if (hasValidExplicitAllocation) {
+    return {
+      berthCents,
+      protectionInsuranceCents,
+      source: 'allocation',
+    };
+  }
+
+  const contributionItemId = String(payment?.contributionItemId || '');
+  if (PERSONAL_PAYMENT_GROUPS.berth.has(contributionItemId)) {
+    return { berthCents: amountCents, protectionInsuranceCents: 0, source: 'legacy' };
+  }
+  if (PERSONAL_PAYMENT_GROUPS.protection_insurance.has(contributionItemId)) {
+    return { berthCents: 0, protectionInsuranceCents: amountCents, source: 'legacy' };
+  }
+  return { berthCents: 0, protectionInsuranceCents: 0, source: 'unclassified' };
+}
+
+function paymentAllocationCentsForGroup(payment, groupId) {
+  const allocation = paymentAllocation(payment);
+  if (groupId === 'berth') return allocation.berthCents;
+  if (groupId === 'protection_insurance') return allocation.protectionInsuranceCents;
+  return 0;
+}
+
+function onlineContributionPaymentTotals() {
+  const rows = activeCrewPayments
+    .filter((payment) => payment.status !== 'cancelled')
+    .map((payment) => ({
+      payment,
+      allocation: paymentAllocation(payment),
+    }))
+    .filter(({ allocation }) => allocation.berthCents + allocation.protectionInsuranceCents > 0);
+  const totalFor = (predicate) => rows
+    .filter(predicate)
+    .reduce((total, { allocation }) => total + allocation.berthCents + allocation.protectionInsuranceCents, 0);
+  const verifiedRows = rows.filter(({ payment }) => payment.status === 'verified');
+  const totalVerifiedForInstallment = (kind) => verifiedRows
+    .filter(({ payment }) => paymentInstallmentKind(payment) === kind)
+    .reduce((total, { allocation }) => total + allocation.berthCents + allocation.protectionInsuranceCents, 0);
+  return {
+    rows,
+    requestedCents: totalFor(() => true),
+    verifiedCents: totalFor(({ payment }) => payment.status === 'verified'),
+    pendingCents: totalFor(({ payment }) => isPendingCrewPayment(payment)),
+    verifiedAdvanceCents: totalVerifiedForInstallment('advance'),
+    verifiedBalanceCents: totalVerifiedForInstallment('balance'),
+    verifiedFullCents: totalVerifiedForInstallment('full'),
+    verifiedHistoryCents: totalVerifiedForInstallment('history'),
+  };
 }
 
 function projectionAmountCents(fieldName) {
@@ -655,26 +774,77 @@ function starterPackCashSummary() {
 }
 
 function paymentTotalsForGroup(groupId) {
-  const itemIds = PERSONAL_PAYMENT_GROUPS[groupId] || new Set();
-  const payments = activeCrewPayments.filter((payment) => itemIds.has(payment.contributionItemId) && payment.status !== 'cancelled');
+  const payments = activeCrewPayments.filter((payment) => payment.status !== 'cancelled'
+    && paymentAllocationCentsForGroup(payment, groupId) > 0);
+  const amountFor = (payment) => paymentAllocationCentsForGroup(payment, groupId);
   return {
     payments,
+    requestedCents: payments.reduce((total, payment) => total + amountFor(payment), 0),
     verifiedCents: payments
       .filter((payment) => payment.status === 'verified')
-      .reduce((total, payment) => total + paymentAmountCents(payment), 0),
+      .reduce((total, payment) => total + amountFor(payment), 0),
     pendingCents: payments
       .filter(isPendingCrewPayment)
-      .reduce((total, payment) => total + paymentAmountCents(payment), 0),
+      .reduce((total, payment) => total + amountFor(payment), 0),
   };
 }
 
 function personalAmountCents(groupId, planItemId, projectionField) {
   const projectedCents = projectionAmountCents(projectionField);
   if (projectedCents || projectionHasFrozenPricing()) return projectedCents;
-  const payments = paymentTotalsForGroup(groupId).payments;
-  const requestedCents = payments.reduce((total, payment) => total + paymentAmountCents(payment), 0);
+  const requestedCents = paymentTotalsForGroup(groupId).requestedCents;
   if (requestedCents > 0) return requestedCents;
   return contributionAmountCents(contributionPlanItems().find((item) => item.id === planItemId));
+}
+
+function onlineContributionBalance() {
+  const berthCents = personalAmountCents('berth', 'berth', 'berthCents');
+  const protectionInsuranceCents = personalAmountCents('protection_insurance', 'protection_insurance', 'protectionInsuranceCents');
+  const targetCents = berthCents + protectionInsuranceCents;
+  const isExempt = activeProjection?.contributesToCosts === false;
+  const hasTarget = isExempt || targetCents > 0 || projectionHasFrozenPricing();
+  const payments = onlineContributionPaymentTotals();
+  const remainingCents = hasTarget ? Math.max(0, targetCents - payments.verifiedCents) : 0;
+  const overpaidCents = hasTarget ? Math.max(0, payments.verifiedCents - targetCents) : 0;
+  return {
+    berthCents,
+    protectionInsuranceCents,
+    targetCents,
+    hasTarget,
+    isExempt,
+    remainingCents,
+    overpaidCents,
+    ...payments,
+  };
+}
+
+function verifiedContributionDetail(totals) {
+  const parts = [];
+  if (totals.verifiedAdvanceCents > 0) {
+    parts.push(localized(
+      `Acconti verificati: ${formatCurrency(totals.verifiedAdvanceCents / 100)}.`,
+      `Verified advances: ${formatCurrency(totals.verifiedAdvanceCents / 100)}.`,
+    ));
+  }
+  if (totals.verifiedBalanceCents > 0) {
+    parts.push(localized(
+      `Saldi verificati: ${formatCurrency(totals.verifiedBalanceCents / 100)}.`,
+      `Verified balances: ${formatCurrency(totals.verifiedBalanceCents / 100)}.`,
+    ));
+  }
+  if (totals.verifiedFullCents > 0) {
+    parts.push(localized(
+      `Quote verificate: ${formatCurrency(totals.verifiedFullCents / 100)}.`,
+      `Verified contributions: ${formatCurrency(totals.verifiedFullCents / 100)}.`,
+    ));
+  }
+  if (totals.verifiedHistoryCents > 0) {
+    parts.push(localized(
+      `Versamenti storici verificati: ${formatCurrency(totals.verifiedHistoryCents / 100)}.`,
+      `Verified historical payments: ${formatCurrency(totals.verifiedHistoryCents / 100)}.`,
+    ));
+  }
+  return parts.join(' ');
 }
 
 function refundableDepositCashAmountCents() {
@@ -785,33 +955,72 @@ function renderParticipantFinanceSummary() {
   const starterPack = starterPackCashSummary();
   const protectionInsurance = personalContributionSummary('protection_insurance', 'protection_insurance', 'protectionInsuranceCents');
   const refundableDeposit = projectedRefundableDepositSummary();
-  const berthCents = personalAmountCents('berth', 'berth', 'berthCents');
-  const insuranceCents = personalAmountCents('protection_insurance', 'protection_insurance', 'protectionInsuranceCents');
+  const onlineContribution = onlineContributionBalance();
+  const berthCents = onlineContribution.berthCents;
+  const insuranceCents = onlineContribution.protectionInsuranceCents;
   const starterPackCents = starterPackCashAmountCents();
   const depositCents = refundableDepositCashAmountCents();
-  const amountToTransferCents = berthCents + insuranceCents;
   const cashAtBoardCents = starterPackCents + depositCents;
   const accommodationLabel = projectionBerthLabel();
   const isDinette = activeProjection?.berthType === 'dinette';
   const hasProjection = Boolean(activeProjection);
-  const transferLabel = localized(
-    hasProjection ? `Totale da bonificare / versare · ${isDinette ? 'dinette' : 'cabina'}` : 'Totale da bonificare / versare',
-    hasProjection ? `Total to pay · ${isDinette ? 'dinette' : 'cabin'}` : 'Total to pay',
-  );
   const berthLabel = localized(
     hasProjection ? (isDinette ? 'Costo posto dinette' : 'Costo posto cabina') : 'Costo del posto',
     hasProjection ? (isDinette ? 'Dinette berth cost' : 'Cabin berth cost') : 'Berth cost',
   );
-  const transferAction = {
-    value: amountToTransferCents > 0
-      ? `${formatCurrency(amountToTransferCents / 100)} ${localized('da versare', 'to pay')}`
-      : localized('Da definire', 'To be confirmed'),
-    detail: amountToTransferCents > 0
+  const agreedContribution = {
+    value: onlineContribution.isExempt
+      ? localized('Esente dalle quote', 'Exempt from contributions')
+      : onlineContribution.hasTarget
+        ? formatCurrency(onlineContribution.targetCents / 100)
+        : localized('Da definire', 'To be confirmed'),
+    detail: onlineContribution.isExempt
+      ? localized('Lo skipper ti ha escluso da quota posto e assicurazione.', 'The skipper has excluded you from berth and insurance contributions.')
+      : onlineContribution.hasTarget
+        ? localized(
+          `${hasProjection ? accommodationLabel : 'Posto'}: ${formatCurrency(berthCents / 100)} + assicurazione: ${formatCurrency(insuranceCents / 100)}. Starter Pack e cauzione non sono compresi qui.`,
+          `${hasProjection ? accommodationLabel : 'Berth'}: ${formatCurrency(berthCents / 100)} + deposit insurance: ${formatCurrency(insuranceCents / 100)}. Starter Pack and refundable deposit are not included here.`,
+        )
+        : localized('Lo skipper deve ancora fissare la tua quota personale.', 'The skipper still needs to set your personal contribution.'),
+  };
+  const verifiedContribution = {
+    value: onlineContribution.verifiedCents > 0
+      ? formatCurrency(onlineContribution.verifiedCents / 100)
+      : localized('Nessun accredito verificato', 'No verified payment'),
+    detail: onlineContribution.verifiedCents > 0
+      ? verifiedContributionDetail(onlineContribution)
+      : localized('Il saldo scende solo dopo la conferma manuale dello skipper.', 'The balance decreases only after the skipper manually confirms the payment.'),
+  };
+  const balanceContribution = {
+    value: onlineContribution.isExempt
+      ? localized('Non previsto', 'Not applicable')
+      : !onlineContribution.hasTarget
+        ? localized('Da definire', 'To be confirmed')
+        : onlineContribution.overpaidCents > 0
+          ? `${formatCurrency(onlineContribution.overpaidCents / 100)} ${localized('oltre quota', 'over the agreed amount')}`
+          : onlineContribution.remainingCents > 0
+            ? `${formatCurrency(onlineContribution.remainingCents / 100)} ${localized('da versare', 'to pay')}`
+            : localized('Quota coperta', 'Contribution covered'),
+    detail: onlineContribution.isExempt
+      ? localized('Per il tuo ruolo non esiste un saldo automatico.', 'There is no automatic balance for your role.')
+      : !onlineContribution.hasTarget
+        ? localized('Il saldo sarà disponibile quando lo skipper avrà fissato la quota.', 'The balance will be available once the skipper sets the contribution.')
+        : onlineContribution.overpaidCents > 0
+          ? localized('Non inviare altri versamenti: verifica prima l’eccedenza con lo skipper.', 'Do not make further payments: check the excess with the skipper first.')
+          : onlineContribution.remainingCents > 0
+            ? localized('Calcolato sottraendo solo gli accrediti verificati; le richieste aperte non lo riducono.', 'Calculated by subtracting verified payments only; open requests do not reduce it.')
+            : localized('Non risulta alcun saldo da versare per quota posto e assicurazione.', 'There is no remaining balance for berth and insurance.'),
+  };
+  const sentRequests = {
+    value: onlineContribution.pendingCents > 0
+      ? `${formatCurrency(onlineContribution.pendingCents / 100)} ${localized('in attesa', 'pending')}`
+      : localized('Nessuna richiesta aperta', 'No open request'),
+    detail: onlineContribution.pendingCents > 0
       ? localized(
-        `${hasProjection ? accommodationLabel : 'Quota del posto'}: ${formatCurrency(berthCents / 100)} + assicurazione: ${formatCurrency(insuranceCents / 100)}. Il messaggio WhatsApp dello skipper indica il metodo scelto.`,
-        `${hasProjection ? accommodationLabel : 'Berth contribution'}: ${formatCurrency(berthCents / 100)} + deposit insurance: ${formatCurrency(insuranceCents / 100)}. The skipper’s WhatsApp message states the chosen method.`,
+        'Queste richieste sono già state preparate o inviate, ma non vengono sottratte dal saldo finché l’accredito non è verificato.',
+        'These requests have already been prepared or sent, but are not deducted from the balance until the payment is verified.',
       )
-      : localized('Lo skipper deve ancora fissare il tuo importo personale.', 'The skipper still needs to set your personal amount.'),
+      : localized('Le eventuali voci extra restano nell’elenco delle richieste personali.', 'Any separate extras remain in the personal requests list.'),
   };
   const cashAction = {
     value: cashAtBoardCents > 0
@@ -824,32 +1033,28 @@ function renderParticipantFinanceSummary() {
       )
       : localized('Starter Pack e cauzione non sono ancora stati definiti per il tuo posto.', 'Starter Pack and deposit have not yet been set for your berth.'),
   };
-  const pendingCents = activeCrewPayments
-    .filter(isPendingCrewPayment)
-    .reduce((total, payment) => total + paymentAmountCents(payment), 0);
-  const verifiedCents = activeCrewPayments
-    .filter((payment) => payment.status === 'verified')
-    .reduce((total, payment) => total + paymentAmountCents(payment), 0);
   const unclassifiedPayments = activeCrewPayments.filter((payment) => payment.status !== 'cancelled' && !payment.contributionItemId).length;
   const acceptedAt = formatDateTime(activeRuleAcceptance?.acceptedAt);
-  const paymentStatus = pendingCents
-    ? `${formatCurrency(pendingCents / 100)} ${localized('da regolare', 'to settle')}`
-    : verifiedCents
-      ? `${formatCurrency(verifiedCents / 100)} ${localized('accrediti confermati', 'payments confirmed')}`
-      : localized('Nessuna richiesta personale attiva', 'No personal requests at the moment');
-  const paymentDetailBase = verifiedCents && pendingCents
-    ? `${formatCurrency(verifiedCents / 100)} ${localized('già confermati. La cauzione rimborsabile resta separata.', 'already confirmed. The refundable deposit remains separate.')}`
-    : localized('Il sito non incassa denaro; le richieste vengono confermate manualmente dallo skipper.', 'The site does not collect money; requests are confirmed manually by the skipper.');
-  const paymentDetail = unclassifiedPayments
-    ? `${paymentDetailBase} ${unclassifiedPayments} ${localized(unclassifiedPayments === 1 ? 'richiesta precedente resta nell’elenco sotto, ma non può essere assegnata automaticamente a una voce.' : 'richieste precedenti restano nell’elenco sotto, ma non possono essere assegnate automaticamente a una voce.', unclassifiedPayments === 1 ? 'earlier request remains in the list below, but cannot be assigned to an item automatically.' : 'earlier requests remain in the list below, but cannot be assigned to an item automatically.')}`
-    : paymentDetailBase;
+  if (unclassifiedPayments) {
+    sentRequests.detail += ` ${unclassifiedPayments} ${localized(
+      unclassifiedPayments === 1
+        ? 'richiesta precedente resta nell’elenco sotto, ma non può essere usata automaticamente per il saldo.'
+        : 'richieste precedenti restano nell’elenco sotto, ma non possono essere usate automaticamente per il saldo.',
+      unclassifiedPayments === 1
+        ? 'earlier request remains in the list below, but cannot be used automatically for the balance.'
+        : 'earlier requests remain in the list below, but cannot be used automatically for the balance.',
+    )}`;
+  }
   summary.hidden = false;
   summary.innerHTML = `
     <p class="eyebrow">${escapeHtml(localized('Il tuo riepilogo dei costi', 'Your cost summary'))}</p>
     <h4>${escapeHtml(localized('Cosa pagare e cosa portare a bordo', 'What to pay and what to bring on board'))}</h4>
-    <p>${escapeHtml(localized('Prima trovi i due totali pratici: quello da versare allo skipper con il metodo concordato e quello da portare in contanti all’imbarco. Sotto trovi sempre il dettaglio, così non confondi Starter Pack e cauzione con la quota del posto.', 'First you find the two practical totals: what to pay the skipper using the agreed method and what to bring in cash at boarding. The breakdown remains below, so the Starter Pack and deposit are never confused with your berth contribution.'))}</p>
+    <p>${escapeHtml(localized('La quota concordata si confronta con gli accrediti che lo skipper ha realmente verificato: così acconti, saldo e richieste aperte non si confondono. Starter Pack e cauzione restano sempre separati.', 'Your agreed contribution is compared only with payments the skipper has actually verified, so advances, balance and open requests do not get mixed up. Starter Pack and refundable deposit always remain separate.'))}</p>
     <div class="participant-finance-grid">
-      ${participantFinanceRow(transferLabel, transferAction, 'participant-finance-row-action')}
+      ${participantFinanceRow(localized('Quota concordata da versare', 'Agreed contribution to pay'), agreedContribution, 'participant-finance-row-action')}
+      ${participantFinanceRow(localized('Già versato e verificato', 'Already paid and verified'), verifiedContribution, 'participant-finance-row-action')}
+      ${participantFinanceRow(localized('Saldo da versare', 'Balance to pay'), balanceContribution, 'participant-finance-row-action')}
+      ${participantFinanceRow(localized('Richieste già inviate', 'Requests already sent'), sentRequests, 'participant-finance-row-action')}
       ${participantFinanceRow(localized('Totale da portare in contanti', 'Total to bring in cash'), cashAction, 'participant-finance-row-action participant-finance-row-cash')}
       ${participantProjectionRows()}
       ${participantFinanceRow(berthLabel, berth)}
@@ -861,7 +1066,6 @@ function renderParticipantFinanceSummary() {
         'participant-finance-row-deposit',
         `${escapeHtml(refundableDeposit.detail)} <a class="rules-reference-link" href="#crew-bacheca" data-rules-reference="deposit">${escapeHtml(localized('Leggi la regola sulla cauzione', 'Read the deposit rule'))}</a>`,
       )}
-      ${participantFinanceRow(localized('Richieste personali', 'My personal requests'), { value: paymentStatus, detail: paymentDetail })}
     </div>
     <div class="participant-finance-acceptance"><strong>${escapeHtml(localized('Regole di bordo accettate', 'Board rules accepted'))}</strong>${acceptedAt ? ` · ${escapeHtml(acceptedAt)}` : ''}. <a href="#crew-bacheca">${escapeHtml(localized('Rileggi il regolamento e la bacheca', 'Read the rules and updates again'))}</a></div>
   `;
@@ -947,12 +1151,24 @@ function renderPayments(snapshot) {
   }
   list.innerHTML = snapshot.docs.map((item) => {
     const payment = item.data();
-    const dueDate = payment.dueDate ? ` · ${translate('crew.flow.dueBy', 'Entro')} ${formatDate(payment.dueDate)}` : '';
+    const isManualReceipt = isManualCrewReceipt(payment);
+    const dueDate = isManualReceipt && payment.receivedOn
+      ? ` · ${localized('ricevuto il', 'received on')} ${formatDate(payment.receivedOn)}`
+      : !isManualReceipt && payment.dueDate ? ` · ${translate('crew.flow.dueBy', 'Entro')} ${formatDate(payment.dueDate)}` : '';
     const reason = `${payment.reason || translate('crew.flow.weekendContribution', 'Contributo weekend')}${payment.isOptional ? ` · ${translate('crew.flow.optional', 'Facoltativo')}` : ''}`;
     const status = paymentStatusLabel(payment);
-    const methods = paymentMethodTags(payment) || `<span>${escapeHtml(translate('crew.flow.paymentMethodToAgree', 'Metodo da concordare con lo skipper.'))}</span>`;
-    const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
-    return `<article class="payment-row"><div><strong>${formatCurrency(paymentAmount(payment))} · ${escapeHtml(reason)}</strong><span>${escapeHtml(dueDate)}</span>${methods}${legacyInstructions}<span class="payment-detail-note">${escapeHtml(translate('crew.flow.paymentDetailsInWhatsApp', 'I dettagli del pagamento sono nel messaggio WhatsApp dello skipper.'))}</span></div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span></div></article>`;
+    const installment = `<span class="payment-contribution-tag">${escapeHtml(paymentInstallmentLabel(payment))}</span>`;
+    const methods = isManualReceipt
+      ? ''
+      : paymentMethodTags(payment) || `<span>${escapeHtml(translate('crew.flow.paymentMethodToAgree', 'Metodo da concordare con lo skipper.'))}</span>`;
+    const legacyInstructions = !isManualReceipt && payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
+    const detail = isManualReceipt
+      ? localized(
+        'Registrato dallo skipper come accredito già ricevuto: non è una nuova richiesta e non richiede WhatsApp.',
+        'Recorded by the skipper as a payment already received: this is not a new request and does not require WhatsApp.',
+      )
+      : translate('crew.flow.paymentDetailsInWhatsApp', 'I dettagli del pagamento sono nel messaggio WhatsApp dello skipper.');
+    return `<article class="payment-row"><div><strong>${formatCurrency(paymentAmount(payment))} · ${escapeHtml(reason)}</strong><span>${escapeHtml(dueDate)}</span>${installment}${methods}${legacyInstructions}<span class="payment-detail-note">${escapeHtml(detail)}</span></div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span></div></article>`;
   }).join('');
   renderParticipantFinanceSummary();
   renderCrewDashboardOverview();

@@ -643,7 +643,7 @@ function renderSkipperDashboardOverview() {
   const targetCents = automaticPricingReady ? costModel.berthRecoveryCents : 0;
   const verifiedCents = activePayments
     .filter((payment) => payment.status === 'verified' && paymentCountsTowardCostPlan(payment))
-    .reduce((total, payment) => total + paymentAmountCents(payment), 0);
+    .reduce((total, payment) => total + paymentCostRecoveryCents(payment), 0);
   const pendingPayments = activePayments.filter(isPendingPayment).length;
   const collectionMethods = availablePaymentMethods().length;
   setSkipperDashboardMetric(
@@ -729,16 +729,17 @@ function contributionConfigSummary(itemId, { deposit = false } = {}) {
   };
 }
 
-function paymentTotalsForDashboard(predicate) {
-  const payments = activePayments.filter((payment) => payment.status !== 'cancelled' && predicate(payment));
+function paymentTotalsForDashboard(amountForPayment = paymentAmountCents) {
+  const payments = activePayments.filter((payment) => payment.status !== 'cancelled');
+  const paymentCents = (payment) => Math.max(0, Number(amountForPayment(payment)) || 0);
   return {
-    requestedCents: payments.reduce((total, payment) => total + paymentAmountCents(payment), 0),
+    requestedCents: payments.reduce((total, payment) => total + paymentCents(payment), 0),
     verifiedCents: payments
       .filter((payment) => payment.status === 'verified')
-      .reduce((total, payment) => total + paymentAmountCents(payment), 0),
+      .reduce((total, payment) => total + paymentCents(payment), 0),
     pendingCents: payments
       .filter(isPendingPayment)
-      .reduce((total, payment) => total + paymentAmountCents(payment), 0),
+      .reduce((total, payment) => total + paymentCents(payment), 0),
   };
 }
 
@@ -784,9 +785,9 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
   const projectedInsuranceCents = projections.reduce((total, projection) => total + projection.normalized.protectionInsuranceCents, 0);
   const projectedStarterPackCashCents = projections.reduce((total, projection) => total + projection.starterPackCents, 0);
   const projectedDepositCashCents = projections.reduce((total, projection) => total + projection.refundableDepositCents, 0);
-  const recoveryPayments = paymentTotalsForDashboard(paymentCountsTowardCostPlan);
-  const insurancePayments = paymentTotalsForDashboard((payment) => payment.contributionItemId === 'protection_insurance');
-  const allPayments = paymentTotalsForDashboard(() => true);
+  const recoveryPayments = paymentTotalsForDashboard(paymentCostRecoveryCents);
+  const insurancePayments = paymentTotalsForDashboard(paymentProtectionInsuranceCents);
+  const allPayments = paymentTotalsForDashboard(paymentAmountCents);
   const berthCostTargetCents = model?.berthRecoveryCents || 0;
   const onlineRecoveryTargetCents = model?.allocatedRecoveryCents || 0;
   const insuranceTargetCents = model?.protectionInsuranceTargetCents || 0;
@@ -2255,8 +2256,66 @@ function paymentAmountCents(payment) {
   return Math.round(paymentAmount(payment) * 100);
 }
 
+function paymentRecipientId(payment) {
+  return String(payment?.recipientId || payment?.memberId || payment?.payerInviteId || '');
+}
+
+function paymentAllocation(payment) {
+  const amountCents = paymentAmountCents(payment);
+  const allocation = payment?.allocation;
+  const berthCents = Number(allocation?.berthCents);
+  const protectionInsuranceCents = Number(allocation?.protectionInsuranceCents);
+  if (Number.isInteger(berthCents) && berthCents >= 0
+    && Number.isInteger(protectionInsuranceCents) && protectionInsuranceCents >= 0
+    && berthCents + protectionInsuranceCents === amountCents) {
+    return { berthCents, protectionInsuranceCents, explicit: true };
+  }
+  const itemId = String(payment?.contributionItemId || '');
+  if (itemId === 'berth' || itemId.startsWith('berth_')) {
+    return { berthCents: amountCents, protectionInsuranceCents: 0, explicit: false };
+  }
+  if (itemId === 'protection_insurance') {
+    return { berthCents: 0, protectionInsuranceCents: amountCents, explicit: false };
+  }
+  return { berthCents: 0, protectionInsuranceCents: 0, explicit: false };
+}
+
+function paymentBerthCents(payment) {
+  return paymentAllocation(payment).berthCents;
+}
+
+function paymentProtectionInsuranceCents(payment) {
+  return paymentAllocation(payment).protectionInsuranceCents;
+}
+
+function paymentCoreCents(payment) {
+  const allocation = paymentAllocation(payment);
+  return allocation.berthCents + allocation.protectionInsuranceCents;
+}
+
+function paymentCostRecoveryCents(payment) {
+  const allocation = paymentAllocation(payment);
+  if (allocation.explicit) return allocation.berthCents;
+  const berthCents = allocation.berthCents;
+  if (berthCents > 0) return berthCents;
+  return payment.accountingCategory === 'cost_recovery' ? paymentAmountCents(payment) : 0;
+}
+
 function paymentCountsTowardCostPlan(payment) {
-  return payment.accountingCategory === 'cost_recovery';
+  return paymentCostRecoveryCents(payment) > 0;
+}
+
+function isManualPaymentReceipt(payment) {
+  return payment?.entryType === 'manual_receipt';
+}
+
+function paymentInstallmentLabel(payment) {
+  if (isManualPaymentReceipt(payment) && payment?.installmentType === 'advance') return 'Acconto già ricevuto';
+  if (payment?.installmentType === 'balance') return 'Saldo richiesto';
+  if (payment?.installmentType === 'full') return 'Quota richiesta';
+  if (payment?.installmentType === 'advance') return 'Acconto richiesto';
+  if (payment?.installmentType === 'extra') return 'Voce separata';
+  return payment?.status === 'verified' ? 'Versamento storico verificato' : 'Richiesta personale';
 }
 
 function paymentMethodTags(payment) {
@@ -2266,6 +2325,7 @@ function paymentMethodTags(payment) {
 }
 
 function paymentStatusLabel(payment) {
+  if (isManualPaymentReceipt(payment)) return 'Registrato e verificato';
   if (payment.status === 'verified') return 'Accredito verificato';
   if (payment.status === 'cancelled') return 'Richiesta annullata';
   return 'In attesa di verifica';
@@ -2531,10 +2591,10 @@ function renderCostPlanSummary() {
   const totalCents = model.recoveryCents;
   const verifiedCents = activePayments
     .filter((payment) => payment.status === 'verified' && paymentCountsTowardCostPlan(payment))
-    .reduce((total, payment) => total + paymentAmountCents(payment), 0);
+    .reduce((total, payment) => total + paymentCostRecoveryCents(payment), 0);
   const pendingCents = activePayments
     .filter((payment) => isPendingPayment(payment) && paymentCountsTowardCostPlan(payment))
-    .reduce((total, payment) => total + paymentAmountCents(payment), 0);
+    .reduce((total, payment) => total + paymentCostRecoveryCents(payment), 0);
   const legacyVerifiedCount = activePayments
     .filter((payment) => payment.status === 'verified' && !payment.accountingCategory)
     .length;
@@ -2785,7 +2845,8 @@ function paymentTripBreakdownMessage(payment, locale) {
   const { normalized, payableCents, starterPackCents, refundableDepositCents } = summary;
   const berthCents = normalized.berthCents;
   const insuranceCents = normalized.protectionInsuranceCents;
-  const participationCents = payableCents + starterPackCents;
+  const balance = projectionPaymentBalance(projection);
+  const requestCents = paymentAmountCents(payment);
   const cashAtBoardCents = starterPackCents + refundableDepositCents;
   if (!berthCents && !insuranceCents && !starterPackCents && !refundableDepositCents) return '';
 
@@ -2811,16 +2872,24 @@ function paymentTripBreakdownMessage(payment, locale) {
       : `• Starter Pack: ${euro(starterPackCents)} · contanti a bordo${starterPackContents ? ` (${starterPackContents})` : ''}`);
   }
 
-  const participationLine = participationCents > 0
+  const balanceRows = payableCents > 0
     ? (locale === 'en'
-      ? `→ Planned participation cost: ${euro(participationCents)} (excluding the refundable deposit)`
-      : `→ Costo previsto di partecipazione: ${euro(participationCents)} (cauzione esclusa)`)
-    : '';
-  const amountToSetAsideLine = refundableDepositCents > 0
-    ? (locale === 'en'
-      ? `→ Total amount to set aside: ${euro(participationCents + refundableDepositCents)} (including the refundable deposit)`
-      : `→ Importo complessivo da predisporre: ${euro(participationCents + refundableDepositCents)} (cauzione rimborsabile inclusa)`)
-    : '';
+      ? [
+        `• Agreed contribution (berth + insurance): ${euro(payableCents)}`,
+        `• Already paid and verified: ${euro(balance.verifiedCents)}`,
+        `• Pay now with this request: ${euro(requestCents)}`,
+      ]
+      : [
+        `• Quota concordata (posto + assicurazione): ${euro(payableCents)}`,
+        `• Già versato e verificato: ${euro(balance.verifiedCents)}`,
+        `• Da versare ora con questa richiesta: ${euro(requestCents)}`,
+      ])
+    : [];
+  if (balance.pendingCents > 0) {
+    balanceRows.push(locale === 'en'
+      ? `• Requests already sent: ${euro(balance.pendingCents)} · they do not reduce the balance until verified.`
+      : `• Richieste già inviate: ${euro(balance.pendingCents)} · non riducono il saldo finché non sono verificate.`);
+  }
   const depositLines = refundableDepositCents > 0
     ? (locale === 'en'
       ? [
@@ -2837,7 +2906,7 @@ function paymentTripBreakdownMessage(payment, locale) {
   const heading = locale === 'en'
     ? 'Summary of your place (for reference, not a second request):'
     : 'Riepilogo del tuo posto (promemoria, non è una seconda richiesta):';
-  return `\n\n${[heading, ...quoteRows, participationLine, amountToSetAsideLine, ...depositLines].filter(Boolean).join('\n')}`;
+  return `\n\n${[heading, ...quoteRows, ...balanceRows, ...depositLines].filter(Boolean).join('\n')}`;
 }
 
 function paymentWhatsappMessage(payment, { messageDetails = '', profile = activePaymentProfile } = {}) {
@@ -2986,6 +3055,7 @@ function renderPaymentRecipientOptions() {
   if (!members && !invites) {
     select.innerHTML = '<option value="">Prima crea un invito personale</option>';
     renderPaymentBerthOptions();
+    renderPaymentBalancePreview();
     return;
   }
   select.innerHTML = '<option value="">Seleziona una persona</option>'
@@ -2996,6 +3066,35 @@ function renderPaymentRecipientOptions() {
     select.value = selectedRecipientId;
   }
   renderPaymentBerthOptions();
+  renderPaymentBalancePreview();
+}
+
+function renderPaymentBalancePreview() {
+  const preview = document.querySelector('#paymentBalancePreview');
+  const recipientId = document.querySelector('#paymentMember')?.value || '';
+  const projection = projectionForPaymentRecipient(recipientId);
+  if (!preview || !projection) {
+    if (preview) {
+      preview.hidden = true;
+      preview.replaceChildren();
+    }
+    return;
+  }
+  const balance = projectionPaymentBalance(projection);
+  if (balance.expectedCents < 1) {
+    preview.hidden = true;
+    preview.replaceChildren();
+    return;
+  }
+  const euro = (cents) => formatCurrency(cents / 100);
+  const pending = balance.pendingCents > 0
+    ? `<span>Richieste già inviate: ${euro(balance.pendingCents)}. Non riducono il saldo finché l'accredito non è verificato.</span>`
+    : '';
+  const warning = balance.overpaidCents > 0
+    ? `<span>Eccedenza da verificare: ${euro(balance.overpaidCents)}.</span>`
+    : '';
+  preview.hidden = false;
+  preview.innerHTML = `<strong>Situazione di ${escapeHtml(projection.displayName)}</strong><span>Quota concordata: ${euro(balance.expectedCents)} · già ricevuto e verificato: ${euro(balance.verifiedCents)} · saldo da richiedere: ${euro(balance.remainingCents)}.</span>${pending}${warning}`;
 }
 
 function contributionStateOptions(item) {
@@ -3102,6 +3201,7 @@ function contributionItemIdForPaymentSelection(typeId) {
     other: 'berth_other',
   };
   if (berthItemIds[typeId]) return berthItemIds[typeId];
+  if (typeId === 'to_define') return 'berth_base';
   if (typeId === 'cost:base') return 'berth_base';
   if (typeId === 'cost:dinette') return 'berth_dinette';
   if (typeId === 'cost:protection_insurance') return 'protection_insurance';
@@ -3120,26 +3220,59 @@ function assignedPaymentTypes(recipientId) {
   const projection = projectionForPaymentRecipient(recipientId);
   if (!projection || projection.contributesToCosts === false) return [];
   const pricing = effectiveProjectionPricing(projection);
+  const balance = projectionPaymentBalance(projection);
   const types = [];
-  if (pricing.berthCents > 0) {
+  if (balance.remainingCents > 0) {
+    const remainingBerthCents = Math.max(0, pricing.berthCents - balance.verifiedBerthCents);
+    const remainingInsuranceCents = Math.max(0, pricing.protectionInsuranceCents - balance.verifiedInsuranceCents);
+    const remainingAllocation = {
+      berthCents: remainingBerthCents,
+      protectionInsuranceCents: remainingInsuranceCents,
+    };
     types.push({
-      id: 'assigned:berth',
-      label: `Quota assegnata · ${projectionBerthLabel(projection.berthType)}`,
-      cents: pricing.berthCents,
-      defaultReason: `Quota assegnata · ${projectionBerthLabel(projection.berthType)}`,
-      contributionItemId: contributionItemIdForPaymentSelection(projection.berthType),
-      accountingCategory: 'cost_recovery',
+      id: 'assigned:balance',
+      label: balance.verifiedCents > 0 ? 'Saldo della persona' : 'Quota concordata della persona',
+      cents: balance.remainingCents,
+      defaultReason: balance.verifiedCents > 0
+        ? `Saldo quota · ${projectionBerthLabel(projection.berthType)}`
+        : `Quota concordata · ${projectionBerthLabel(projection.berthType)}`,
+      contributionItemId: remainingBerthCents > 0
+        ? contributionItemIdForPaymentSelection(projection.berthType)
+        : 'protection_insurance',
+      accountingCategory: remainingBerthCents > 0 ? 'cost_recovery' : 'other',
+      installmentType: balance.verifiedCents > 0 ? 'balance' : 'full',
+      allocation: remainingAllocation,
     });
   }
+  if (pricing.berthCents > 0) {
+    const remainingBerthCents = Math.max(0, pricing.berthCents - balance.verifiedBerthCents);
+    if (remainingBerthCents > 0) {
+    types.push({
+      id: 'assigned:berth',
+      label: `Quota posto residua · ${projectionBerthLabel(projection.berthType)}`,
+      cents: remainingBerthCents,
+      defaultReason: `Quota posto · ${projectionBerthLabel(projection.berthType)}`,
+      contributionItemId: contributionItemIdForPaymentSelection(projection.berthType),
+      accountingCategory: 'cost_recovery',
+      installmentType: 'advance',
+      allocation: { berthCents: remainingBerthCents, protectionInsuranceCents: 0 },
+    });
+    }
+  }
   if (pricing.protectionInsuranceCents > 0) {
+    const remainingInsuranceCents = Math.max(0, pricing.protectionInsuranceCents - balance.verifiedInsuranceCents);
+    if (remainingInsuranceCents > 0) {
     types.push({
       id: 'assigned:protection_insurance',
-      label: 'Assicurazione cauzione assegnata',
-      cents: pricing.protectionInsuranceCents,
+      label: 'Assicurazione cauzione residua',
+      cents: remainingInsuranceCents,
       defaultReason: 'Assicurazione cauzione',
       contributionItemId: 'protection_insurance',
       accountingCategory: 'other',
+      installmentType: 'advance',
+      allocation: { berthCents: 0, protectionInsuranceCents: remainingInsuranceCents },
     });
+    }
   }
   return types;
 }
@@ -3155,6 +3288,37 @@ function paymentContributionItemIdForSelection(typeId, recipientId) {
 
 function paymentContributionItemLabel(payment) {
   return PAYMENT_CONTRIBUTION_ITEM_LABELS[payment?.contributionItemId] || '';
+}
+
+function coreAllocationForPaymentSelection(typeId, recipientId, amountCents) {
+  const projection = projectionForPaymentRecipient(recipientId);
+  const assigned = assignedPaymentType(typeId, recipientId);
+  if (assigned) {
+    if (assigned.id === 'assigned:balance' && projection) {
+      const balance = projectionPaymentBalance(projection);
+      const remainingBerthCents = Math.max(0, balance.expectedBerthCents - balance.verifiedBerthCents);
+      return {
+        berthCents: Math.min(amountCents, remainingBerthCents),
+        protectionInsuranceCents: Math.max(0, amountCents - remainingBerthCents),
+      };
+    }
+    if (assigned.id === 'assigned:berth') return { berthCents: amountCents, protectionInsuranceCents: 0 };
+    if (assigned.id === 'assigned:protection_insurance') return { berthCents: 0, protectionInsuranceCents: amountCents };
+  }
+  if (typeId === 'cost:protection_insurance') return { berthCents: 0, protectionInsuranceCents: amountCents };
+  const itemId = contributionItemIdForPaymentSelection(typeId);
+  if (itemId === 'berth' || itemId.startsWith('berth_')) return { berthCents: amountCents, protectionInsuranceCents: 0 };
+  return null;
+}
+
+function paymentInstallmentTypeForSelection(typeId, recipientId, amountCents) {
+  const allocation = coreAllocationForPaymentSelection(typeId, recipientId, amountCents);
+  if (!allocation) return 'extra';
+  const assigned = assignedPaymentType(typeId, recipientId);
+  if (assigned?.installmentType) return assigned.installmentType;
+  const projection = projectionForPaymentRecipient(recipientId);
+  const expectedCents = projection ? projectionPaymentBalance(projection).expectedCents : 0;
+  return allocation.berthCents + allocation.protectionInsuranceCents === expectedCents ? 'full' : 'advance';
 }
 
 function renderPaymentBerthOptions() {
@@ -3419,6 +3583,104 @@ function projectionCostBreakdown(projection) {
     starterPackCents: normalized.starterPackCents,
     refundableDepositCents: normalized.refundableDepositCents,
   };
+}
+
+function projectionPaymentBalance(projection) {
+  const cost = projectionCostBreakdown(projection);
+  const records = activePayments.filter((payment) => payment.status !== 'cancelled'
+    && paymentRecipientId(payment) === projection?.id
+    && paymentCoreCents(payment) > 0);
+  const verified = records.filter((payment) => payment.status === 'verified');
+  const pending = records.filter(isPendingPayment);
+  const sumAllocation = (payments, amountForPayment) => payments
+    .reduce((total, payment) => total + amountForPayment(payment), 0);
+  const verifiedBerthCents = sumAllocation(verified, paymentBerthCents);
+  const verifiedInsuranceCents = sumAllocation(verified, paymentProtectionInsuranceCents);
+  const verifiedCents = verifiedBerthCents + verifiedInsuranceCents;
+  const pendingCents = sumAllocation(pending, paymentCoreCents);
+  const advanceCents = sumAllocation(
+    verified.filter((payment) => payment.installmentType === 'advance'),
+    paymentCoreCents,
+  );
+  const expectedCents = cost.payableCents;
+  return {
+    expectedCents,
+    expectedBerthCents: cost.normalized.berthCents,
+    expectedInsuranceCents: cost.normalized.protectionInsuranceCents,
+    verifiedCents,
+    verifiedBerthCents,
+    verifiedInsuranceCents,
+    pendingCents,
+    pendingCount: pending.length,
+    advanceCents,
+    remainingCents: Math.max(0, expectedCents - verifiedCents),
+    overpaidCents: Math.max(0, verifiedCents - expectedCents),
+  };
+}
+
+function projectionPaymentBalanceMarkup(projection) {
+  const balance = projectionPaymentBalance(projection);
+  if (balance.expectedCents < 1) return '';
+  const euro = (cents) => formatCurrency(cents / 100);
+  const advance = balance.advanceCents > 0
+    ? `<span>Di cui acconti verificati<b>${euro(balance.advanceCents)}</b></span>`
+    : '';
+  const pending = balance.pendingCents > 0
+    ? `<span>Richieste già inviate<b>${euro(balance.pendingCents)}</b></span>`
+    : '';
+  const warning = balance.overpaidCents > 0
+    ? `<span class="projection-payment-balance-warning">Eccedenza da verificare: ${euro(balance.overpaidCents)}. Il saldo non va sotto zero.</span>`
+    : balance.pendingCents > 0
+      ? `<span class="projection-payment-balance-warning">Le richieste aperte non riducono il saldo finché l'accredito non è verificato.</span>`
+      : '';
+  return `<div class="projection-payment-balance"><span>Situazione contributi · Starter Pack e cauzione restano separati</span><span>Quota concordata<b>${euro(balance.expectedCents)}</b></span><span>Già ricevuto e verificato<b>${euro(balance.verifiedCents)}</b></span>${advance}<span class="projection-payment-balance-open">Saldo da richiedere<b>${euro(balance.remainingCents)}</b></span>${pending}${warning}</div>`;
+}
+
+function manualReceiptAllocation(projection, target, amountCents) {
+  if (target === 'berth') return { berthCents: amountCents, protectionInsuranceCents: 0 };
+  if (target === 'insurance') return { berthCents: 0, protectionInsuranceCents: amountCents };
+  const balance = projectionPaymentBalance(projection);
+  const remainingBerthCents = Math.max(0, balance.expectedBerthCents - balance.verifiedBerthCents);
+  const berthCents = Math.min(amountCents, remainingBerthCents);
+  return { berthCents, protectionInsuranceCents: amountCents - berthCents };
+}
+
+function localDateForForm() {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 10);
+}
+
+function openManualReceiptPanel(projection) {
+  const panel = document.querySelector('#manualReceiptPanel');
+  const form = document.querySelector('#manualReceiptForm');
+  const person = document.querySelector('#manualReceiptPerson');
+  if (!panel || !form || !person) return;
+  const balance = projectionPaymentBalance(projection);
+  form.reset();
+  form.elements.recipientId.value = projection.id;
+  form.elements.receivedOn.value = localDateForForm();
+  person.textContent = `${projection.displayName} · quota concordata ${formatCurrency(balance.expectedCents / 100)} · saldo attuale ${formatCurrency(balance.remainingCents / 100)}.`;
+  setMessage(document.querySelector('#manualReceiptMessage'), '');
+  panel.hidden = false;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  form.elements.amount.focus({ preventScroll: true });
+}
+
+function prepareProjectionBalanceRequest(projection) {
+  const form = document.querySelector('#paymentForm');
+  if (!form) return;
+  setSkipperDashboardView('money');
+  setSkipperFinanceDashboardView(SKIPPER_FINANCE_VIEWS.request);
+  renderPaymentRecipientOptions();
+  form.elements.recipientId.value = projection.id;
+  renderPaymentBerthOptions();
+  form.elements.berthType.value = 'assigned:balance';
+  applyPaymentBerthPreset();
+  renderPaymentBalancePreview();
+  setMessage(document.querySelector('#paymentFormMessage'), `Saldo pronto per ${projection.displayName}: controlla importo e metodi prima di aprire WhatsApp.`);
+  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  form.elements.amount.focus({ preventScroll: true });
 }
 
 function starterPackQuoteText(cents, { fallback = 'da definire' } = {}) {
@@ -3732,12 +3994,19 @@ function projectionCardActions(projection, invite) {
   const actions = [
     projectionActionButton('edit-projection', projection.id, `Modifica piano di ${projection.displayName}`, '✎'),
   ];
+  const balance = projectionPaymentBalance(projection);
+  if (balance.expectedCents > 0) {
+    actions.push(projectionActionButton('register-manual-receipt', projection.id, `Registra un acconto già ricevuto per ${projection.displayName}`, '+'));
+  }
   if (!invite) {
     actions.push(projectionActionButton('send-projection', projection.id, `Crea invito WhatsApp per ${projection.displayName}`, '↗', 'primary'));
     actions.push(projectionActionButton('release-projection', projection.id, `Libera il posto di ${projection.displayName}`, '×', 'release'));
     return actions.join('');
   }
   actions.push(projectionActionButton('edit-projection-pricing', projection.id, `Rivedi la quota concordata di ${projection.displayName}`, '€'));
+  if (balance.remainingCents > 0) {
+    actions.push(projectionActionButton('request-projection-balance', projection.id, `Prepara la richiesta di saldo per ${projection.displayName}`, '€', 'primary'));
+  }
   if (projection.pricingMode === 'dashboard') {
     actions.push(projectionActionButton('refresh-projection-pricing', projection.id, `Aggiorna gli importi di ${projection.displayName} dalla dashboard attuale`, '⟳'));
   }
@@ -3780,7 +4049,7 @@ function renderProjectionCard(projection) {
     : 'Da definire · separata, a bordo';
   const cabinAssignment = projectionCabinAssignmentText(projection);
   const assignment = `<b>Ruolo previsto:</b> ${escapeHtml(projection.plannedRole)} · <b>Sistemazione:</b> ${escapeHtml(projectionBerthLabel(projection.berthType))}${cabinAssignment ? ` · <b>Cabina:</b> ${escapeHtml(cabinAssignment)}` : ''}`;
-  return `<article class="projection-row projection-card"><div class="projection-row-person"><strong>${escapeHtml(projection.displayName)}</strong><span class="projection-row-assignment">${assignment}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small>${projectionCabinControl(projection)}</div><div class="projection-row-cost"><span class="projection-row-cost-label">Importo previsto · non è un pagamento</span><strong>${escapeHtml(total)}</strong><span class="projection-row-cost-breakdown">${escapeHtml(quote)}</span><span class="projection-row-deposit"><b>${escapeHtml(pricingSource)}</b></span><span class="projection-row-deposit"><b>Starter Pack:</b> ${escapeHtml(starterPack)}</span><span class="projection-row-deposit"><b>Cauzione rimborsabile:</b> ${escapeHtml(deposit)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(projection.displayName)}">${projectionCardActions(projection, invite)}</div></article>`;
+  return `<article class="projection-row projection-card"><div class="projection-row-person"><strong>${escapeHtml(projection.displayName)}</strong><span class="projection-row-assignment">${assignment}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small>${projectionCabinControl(projection)}</div><div class="projection-row-cost"><span class="projection-row-cost-label">Importo previsto · non è un pagamento</span><strong>${escapeHtml(total)}</strong><span class="projection-row-cost-breakdown">${escapeHtml(quote)}</span>${projectionPaymentBalanceMarkup(projection)}<span class="projection-row-deposit"><b>${escapeHtml(pricingSource)}</b></span><span class="projection-row-deposit"><b>Starter Pack:</b> ${escapeHtml(starterPack)}</span><span class="projection-row-deposit"><b>Cauzione rimborsabile:</b> ${escapeHtml(deposit)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(projection.displayName)}">${projectionCardActions(projection, invite)}</div></article>`;
 }
 
 function renderLegacyInviteCard(invite) {
@@ -3805,7 +4074,7 @@ function renderLegacyInviteCard(invite) {
   return `<article class="projection-row projection-card projection-card-legacy"><div class="projection-row-person"><strong>${escapeHtml(invite.displayName)}</strong><span class="projection-row-assignment"><b>Ruolo:</b> da definire · <b>Sistemazione:</b> da definire</span><small>${escapeHtml(status)}</small></div><div class="projection-row-cost"><span class="projection-row-cost-label">Scheda da completare</span><strong>Importo da definire</strong><span class="projection-row-cost-breakdown">${escapeHtml(instruction)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(invite.displayName)}">${actions.join('')}</div></article>`;
 }
 
-function renderProjections() {
+function renderProjections({ syncFleet = true } = {}) {
   const list = document.querySelector('#projectionList');
   if (!list) return;
   renderProjectionSummary();
@@ -3821,7 +4090,7 @@ function renderProjections() {
   syncProjectionCabinGroupField();
   renderCapacityStatus();
   renderSkipperDashboardOverview();
-  void syncPublicFleetAvailabilityFromCrew();
+  if (syncFleet) void syncPublicFleetAvailabilityFromCrew();
 }
 
 function renderMembers() {
@@ -3866,6 +4135,8 @@ function renderPayments(snapshot) {
     activePayments = [];
     list.innerHTML = '<p class="empty-state">Nessuna richiesta preparata.</p>';
     renderCostPlanSummary();
+    renderProjections({ syncFleet: false });
+    renderPaymentRecipientOptions();
     renderSkipperDashboardOverview();
     return;
   }
@@ -3874,21 +4145,28 @@ function renderPayments(snapshot) {
     const recipientId = payment.recipientId || payment.memberId || payment.payerInviteId;
     const name = recipientName(recipientId);
     const amount = formatCurrency(paymentAmount(payment));
-    const reason = `${payment.reason || 'Contributo weekend'}${payment.isOptional ? ' · Facoltativo' : ''}`;
-    const dueDate = payment.dueDate ? ` · Entro ${formatDate(payment.dueDate)}` : '';
+    const manualReceipt = isManualPaymentReceipt(payment);
+    const reason = manualReceipt
+      ? paymentInstallmentLabel(payment)
+      : `${paymentInstallmentLabel(payment)} · ${payment.reason || 'Contributo weekend'}${payment.isOptional ? ' · Facoltativo' : ''}`;
+    const dueDate = manualReceipt
+      ? payment.receivedOn ? ` · ricevuto il ${formatDate(payment.receivedOn)}` : ''
+      : payment.dueDate ? ` · Entro ${formatDate(payment.dueDate)}` : '';
     const status = paymentStatusLabel(payment);
-    const canUpdateStatus = isPendingPayment(payment);
+    const canUpdateStatus = !manualReceipt && isPendingPayment(payment);
     const statusActions = canUpdateStatus
       ? `<button class="text-button" type="button" data-verify-payment="${escapeHtml(payment.id)}">Conferma accredito</button><button class="text-button" type="button" data-cancel-payment="${escapeHtml(payment.id)}">Annulla richiesta</button>`
       : '';
     const inviteAction = activeInvites.some((invite) => invite.id === recipientId && invite.status === 'pending' && invite.accessKey)
       ? `<button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(recipientId)}">Invia invito</button>`
       : '';
-    const paymentMessageAction = paymentRecipientWhatsappNumber(recipientId)
+    const paymentMessageAction = !manualReceipt && paymentRecipientWhatsappNumber(recipientId)
       ? `<button class="text-button" type="button" data-whatsapp-payment="${escapeHtml(payment.id)}">Apri WhatsApp</button>`
       : '';
     const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
-    const methods = paymentMethodTags(payment) || '<span>Metodo da concordare nello scambio WhatsApp.</span>';
+    const methods = manualReceipt
+      ? '<span>Registrazione manuale verificata dallo skipper: non contiene link o coordinate di pagamento.</span>'
+      : paymentMethodTags(payment) || '<span>Metodo da concordare nello scambio WhatsApp.</span>';
     const accountingTag = paymentCountsTowardCostPlan(payment)
       ? '<span class="payment-accounting-tag">Spese della barca</span>'
       : '';
@@ -3896,9 +4174,12 @@ function renderPayments(snapshot) {
     const contributionTag = contributionLabel
       ? `<span class="payment-contribution-tag">${escapeHtml(contributionLabel)}</span>`
       : '';
-    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${contributionTag}${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}<button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${inviteAction}${statusActions}</div></article>`;
+    const copyAction = manualReceipt ? '' : `<button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>`;
+    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${contributionTag}${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}${copyAction}${inviteAction}${statusActions}</div></article>`;
   }).join('');
   renderCostPlanSummary();
+  renderProjections({ syncFleet: false });
+  renderPaymentRecipientOptions();
   renderSkipperDashboardOverview();
 }
 
@@ -4653,6 +4934,18 @@ document.querySelector('#cancelProjectionEdit').addEventListener('click', resetP
 document.querySelector('#projectionList').addEventListener('click', async (event) => {
   const message = document.querySelector('#projectionFormMessage');
   if (blockPrivateAction(message) || !activeBoat || !auth.currentUser) return;
+  const manualReceiptButton = event.target.closest('[data-register-manual-receipt]');
+  if (manualReceiptButton) {
+    const projection = activeProjections.find((candidate) => candidate.id === manualReceiptButton.dataset.registerManualReceipt);
+    if (projection) openManualReceiptPanel(projection);
+    return;
+  }
+  const balanceRequestButton = event.target.closest('[data-request-projection-balance]');
+  if (balanceRequestButton) {
+    const projection = activeProjections.find((candidate) => candidate.id === balanceRequestButton.dataset.requestProjectionBalance);
+    if (projection && projectionInvite(projection)) prepareProjectionBalanceRequest(projection);
+    return;
+  }
   const legacyLinkButton = event.target.closest('[data-link-legacy-invite]');
   if (legacyLinkButton) {
     const invite = activeInvites.find((candidate) => candidate.id === legacyLinkButton.dataset.linkLegacyInvite);
@@ -5240,6 +5533,80 @@ contributionCatalogForm.addEventListener('submit', async (event) => {
   }
 });
 
+const manualReceiptForm = document.querySelector('#manualReceiptForm');
+manualReceiptForm.querySelector('[data-close-manual-receipt]').addEventListener('click', () => {
+  manualReceiptForm.reset();
+  document.querySelector('#manualReceiptPanel').hidden = true;
+});
+manualReceiptForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = document.querySelector('#manualReceiptMessage');
+  if (blockPrivateAction(message) || !activeBoat || !auth.currentUser) return;
+  const form = event.currentTarget;
+  const recipientId = String(form.elements.recipientId.value || '');
+  const projection = projectionForPaymentRecipient(recipientId);
+  const amountCents = Math.round(Number(form.elements.amount.value) * 100);
+  const receivedOn = String(form.elements.receivedOn.value || '');
+  if (!projection || projection.contributesToCosts === false) {
+    setMessage(message, 'Non trovo una quota personale a cui associare questo acconto.', true);
+    return;
+  }
+  if (!Number.isInteger(amountCents) || amountCents < 1 || amountCents > 1_000_000) {
+    setMessage(message, 'Inserisci un importo valido fino a 10.000 euro.', true);
+    return;
+  }
+  if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(receivedOn)) {
+    setMessage(message, 'Indica la data in cui hai ricevuto l’acconto.', true);
+    return;
+  }
+  if (form.elements.verifiedBySkipper.checked !== true) {
+    setMessage(message, 'Conferma di avere verificato personalmente il versamento.', true);
+    return;
+  }
+  const allocation = manualReceiptAllocation(projection, form.elements.allocationTarget.value, amountCents);
+  const collectorName = String(activePaymentProfile?.collectorName || auth.currentUser.displayName || 'Skipper').trim().slice(0, 100);
+  const payment = {
+    recipientId,
+    memberId: recipientId,
+    payerInviteId: recipientId,
+    contributionItemId: allocation.berthCents > 0
+      ? contributionItemIdForPaymentSelection(projection.berthType)
+      : 'protection_insurance',
+    amountCents,
+    currency: 'EUR',
+    reason: 'Acconto registrato',
+    isOptional: false,
+    accountingCategory: 'cost_recovery',
+    dueDate: '',
+    collectorId: auth.currentUser.uid,
+    collectorName,
+    paymentMethods: {},
+    entryType: 'manual_receipt',
+    installmentType: 'advance',
+    allocation,
+    receivedOn,
+    status: 'verified',
+    createdAt: serverTimestamp(),
+    createdBy: auth.currentUser.uid,
+    verifiedAt: serverTimestamp(),
+    verifiedBy: auth.currentUser.uid,
+    cancelledAt: null,
+    cancelledBy: null,
+  };
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    await addDoc(collection(db, 'boats', activeBoat.id, 'paymentRequests'), payment);
+    form.reset();
+    document.querySelector('#manualReceiptPanel').hidden = true;
+    setMessage(document.querySelector('#projectionFormMessage'), `Acconto registrato per ${projection.displayName}. Il saldo si aggiorna solo perché l'accredito è stato verificato.`);
+  } catch (error) {
+    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a registrare questo acconto.'), true);
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
 ensurePaymentAccountingCategoryField();
 const paymentForm = document.querySelector('#paymentForm');
 paymentForm.elements.recipientId.addEventListener('change', () => {
@@ -5255,8 +5622,12 @@ paymentForm.elements.recipientId.addEventListener('change', () => {
   const assignedType = assignedPaymentTypes(paymentForm.elements.recipientId.value)[0];
   if (assignedType) paymentForm.elements.berthType.value = assignedType.id;
   applyPaymentBerthPreset();
+  renderPaymentBalancePreview();
 });
-paymentForm.elements.berthType.addEventListener('change', applyPaymentBerthPreset);
+paymentForm.elements.berthType.addEventListener('change', () => {
+  applyPaymentBerthPreset();
+  renderPaymentBalancePreview();
+});
 paymentForm.elements.amount.addEventListener('input', () => {
   delete paymentForm.elements.amount.dataset.autoBerthRate;
 });
@@ -5297,14 +5668,13 @@ paymentForm.addEventListener('submit', async (event) => {
     return;
   }
   const paymentMethods = Object.fromEntries(selectedMethodIds.map((methodId) => [methodId, true]));
+  const selectedTypeId = String(fields.get('berthType') || 'custom');
+  const allocation = coreAllocationForPaymentSelection(selectedTypeId, recipientId, amountCents);
   const payment = {
     recipientId,
     memberId: recipientId,
     payerInviteId: recipientId,
-    contributionItemId: paymentContributionItemIdForSelection(
-      String(fields.get('berthType') || 'custom'),
-      recipientId,
-    ),
+    contributionItemId: paymentContributionItemIdForSelection(selectedTypeId, recipientId),
     amountCents,
     currency: 'EUR',
     reason,
@@ -5314,6 +5684,9 @@ paymentForm.addEventListener('submit', async (event) => {
     collectorId: auth.currentUser.uid,
     collectorName,
     paymentMethods,
+    entryType: 'request',
+    installmentType: paymentInstallmentTypeForSelection(selectedTypeId, recipientId, amountCents),
+    ...(allocation ? { allocation } : {}),
     status: 'prepared',
     createdAt: serverTimestamp(),
     createdBy: auth.currentUser.uid,
@@ -5338,6 +5711,7 @@ paymentForm.addEventListener('submit', async (event) => {
     delete form.elements.reason.dataset.autoBerthReason;
     delete form.elements.accountingCategory.dataset.autoCostRecovery;
     renderPaymentBerthOptions();
+    renderPaymentBalancePreview();
     renderPaymentMethodOptions();
     if (whatsappWindow) whatsappWindow.location.replace(whatsappUrl);
     setMessage(document.querySelector('#paymentFormMessage'), whatsappWindow
