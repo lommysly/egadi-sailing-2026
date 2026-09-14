@@ -1,38 +1,38 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-i18n-attr="lang:page.shared.locale">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Meteo e Passage Plan aggiornabile per Egadi Sailing Experience, 8–11 ottobre 2026." />
-  <title>Meteo & Passage Plan · Egadi Sailing Experience</title>
+  <meta name="description" content="Meteo e Passage Plan aggiornabile per Egadi Sailing Experience, 8–11 ottobre 2026." data-i18n-attr="content:page.passage.metaDescription" />
+  <title data-i18n="page.passage.documentTitle">Meteo & Passage Plan · Egadi Sailing Experience</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260912-safety2" />
+  <link rel="stylesheet" href="styles.css?v=20260914-en2" />
   <link rel="stylesheet" href="passage-visual.css?v=20260911-visual1" />
 </head>
 <body class="area-page">
-  <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
+  <a class="skip-link" href="#main-content" data-i18n="page.shared.skipToContent">Vai al contenuto principale</a>
   <header class="site-header">
-    <a class="brand" href="index.html" aria-label="Egadi Sailing Experience, home"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
-    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-menu" aria-label="Apri menu"><span class="menu-toggle-label">Menu</span><span class="menu-toggle-icon" aria-hidden="true"></span></button>
-    <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale"><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html" aria-current="page">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a></nav>
+    <a class="brand" href="index.html" aria-label="Egadi Sailing Experience, home" data-i18n-attr="aria-label:page.shared.homeLink"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-menu" aria-label="Apri menu" data-i18n-attr="aria-label:page.shared.openMenu"><span class="menu-toggle-label" data-i18n="page.shared.menu">Menu</span><span class="menu-toggle-icon" aria-hidden="true"></span></button>
+    <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale" data-i18n-attr="aria-label:page.shared.primaryNavigation"><a href="index.html" data-i18n="page.shared.navJourney">Il viaggio</a><a href="flotta.html" data-i18n="page.shared.navFleet">Flottiglia</a><a href="passage-plan.html" aria-current="page">Passage Plan</a><a href="arrivi-partenze.html" data-i18n="page.shared.navArrivalsDepartures">Arrivi &amp; partenze</a><a href="film.html" data-i18n="page.shared.navFilm">Il film</a><a href="accesso.html" data-i18n="page.shared.navPrivateArea">Area riservata</a></nav>
   </header>
-  <button class="menu-backdrop" type="button" aria-label="Chiudi menu" hidden></button>
+  <button class="menu-backdrop" type="button" aria-label="Chiudi menu" data-i18n-attr="aria-label:page.shared.closeMenu" hidden></button>
 
   <main id="main-content" class="area-main passage-plan-main">
     <section class="area-hero">
-      <p class="eyebrow">Marsala · Levanzo · Marettimo · Favignana · 8—11 ottobre 2026</p>
-      <h1>Meteo &amp;<br /><em>Passage Plan.</em></h1>
-      <p>Un solo quadro per tutta la flotta: rotta prevista, finestre di navigazione e condizioni che possono modificarla. L’ultima decisione resta sempre allo skipper della barca.</p>
+      <p class="eyebrow" data-i18n="page.passage.heroEyebrow">Marsala · Levanzo · Marettimo · Favignana · 8—11 ottobre 2026</p>
+      <h1 data-i18n-html="page.passage.heroTitle">Meteo &amp;<br /><em>Passage Plan.</em></h1>
+      <p data-i18n="page.passage.heroText">Un solo quadro per tutta la flotta: rotta prevista, finestre di navigazione e condizioni che possono modificarla. L’ultima decisione resta sempre allo skipper della barca.</p>
     </section>
 
-    <section class="passage-status" aria-label="Stato del briefing">
-      <div><span>Stato</span><strong id="planStatus">Caricamento</strong></div>
-      <div><span>Finestra</span><strong id="planPhase">—</strong></div>
-      <div><span>Affidabilità</span><strong id="planConfidence">—</strong></div>
-      <div><span>Prossimo aggiornamento</span><strong id="planNextUpdate">—</strong></div>
+    <section class="passage-status" aria-label="Stato del briefing" data-i18n-attr="aria-label:page.passage.statusLabel">
+      <div><span data-i18n="page.passage.statusField">Stato</span><strong id="planStatus">Caricamento</strong></div>
+      <div><span data-i18n="page.passage.phaseField">Finestra</span><strong id="planPhase">—</strong></div>
+      <div><span data-i18n="page.passage.confidenceField">Affidabilità</span><strong id="planConfidence">—</strong></div>
+      <div><span data-i18n="page.passage.nextUpdateField">Prossimo aggiornamento</span><strong id="planNextUpdate">—</strong></div>
     </section>
 
     <section class="passage-introduction">
@@ -45,24 +45,24 @@
 
     <section class="passage-route-overview" aria-labelledby="routeOverviewTitle">
       <div class="passage-route-copy">
-        <p class="eyebrow">La rotta in un colpo d’occhio</p>
-        <h2 id="routeOverviewTitle">Quattro giorni,<br /><em>una direzione elastica.</em></h2>
-        <p>Le immagini raccontano i luoghi possibili; vento, mare, regole AMP e skipper scelgono invece la sosta reale.</p>
-        <p class="passage-route-safety">Una cala bella non è una cala assegnata. Ogni decisione della notte resta a bordo.</p>
+        <p class="eyebrow" data-i18n="page.passage.routeEyebrow">La rotta in un colpo d’occhio</p>
+        <h2 id="routeOverviewTitle" data-i18n-html="page.passage.routeTitle">Quattro giorni,<br /><em>una direzione elastica.</em></h2>
+        <p data-i18n="page.passage.routeText">Le immagini raccontano i luoghi possibili; vento, mare, regole AMP e skipper scelgono invece la sosta reale.</p>
+        <p class="passage-route-safety" data-i18n="page.passage.routeSafety">Una cala bella non è una cala assegnata. Ogni decisione della notte resta a bordo.</p>
       </div>
-      <ol class="passage-route-line" aria-label="Itinerario indicativo da Marsala alle Egadi e ritorno">
-        <li><span>01</span><strong>Marsala</strong><small>Partenza · giovedì</small></li>
-        <li><span>02</span><strong>Levanzo</strong><small>Scenari di rada</small></li>
-        <li><span>03</span><strong>Marettimo</strong><small>Notte in porto</small></li>
-        <li><span>04</span><strong>Favignana</strong><small>Porto e ultimo bagno</small></li>
-        <li><span>05</span><strong>Marsala</strong><small>Rientro · domenica</small></li>
+      <ol class="passage-route-line" aria-label="Itinerario indicativo da Marsala alle Egadi e ritorno" data-i18n-attr="aria-label:page.passage.routeLineLabel">
+        <li><span>01</span><strong>Marsala</strong><small data-i18n="page.passage.stop1">Partenza · giovedì</small></li>
+        <li><span>02</span><strong>Levanzo</strong><small data-i18n="page.passage.stop2">Scenari di rada</small></li>
+        <li><span>03</span><strong>Marettimo</strong><small data-i18n="page.passage.stop3">Notte in porto</small></li>
+        <li><span>04</span><strong>Favignana</strong><small data-i18n="page.passage.stop4">Porto e ultimo bagno</small></li>
+        <li><span>05</span><strong>Marsala</strong><small data-i18n="page.passage.stop5">Rientro · domenica</small></li>
       </ol>
     </section>
 
     <section id="planMooringGuide" class="passage-mooring-guide" aria-labelledby="planMooringTitle" hidden>
       <div>
-        <p class="eyebrow">Scelte di ormeggio</p>
-        <h2 id="planMooringTitle">Rada, porto<br /><em>o campo boe?</em></h2>
+        <p class="eyebrow" data-i18n="page.passage.mooringEyebrow">Scelte di ormeggio</p>
+        <h2 id="planMooringTitle" data-i18n-html="page.passage.mooringTitle">Rada, porto<br /><em>o campo boe?</em></h2>
         <p id="planMooringIntroduction"></p>
       </div>
       <ol id="planMooringChecks" class="passage-mooring-checks"></ol>
@@ -71,19 +71,23 @@
     <section id="dailyPlan" class="passage-day-list" aria-live="polite"></section>
 
     <section class="passage-safety">
-      <p class="eyebrow">Come leggerlo</p>
-      <h2>Il meteo orienta.<br />La sicurezza decide.</h2>
-      <p>Il piano indica vento, mare, temperature, correnti e luce per aiutare l’equipaggio a prepararsi. Non sostituisce gli avvisi ufficiali, le ordinanze locali, il controllo reale in banchina o la valutazione nautica dello skipper.</p>
-      <p><strong>Prossime pubblicazioni:</strong> quadro di pianificazione a un mese; tendenza a dieci giorni; briefing operativo a cinque giorni; conferme quotidiane nelle 72 ore precedenti e durante il viaggio.</p>
+      <p class="eyebrow" data-i18n="page.passage.safetyEyebrow">Come leggerlo</p>
+      <h2 data-i18n-html="page.passage.safetyTitle">Il meteo orienta.<br />La sicurezza decide.</h2>
+      <p data-i18n="page.passage.safetyText">Il piano indica vento, mare, temperature, correnti e luce per aiutare l’equipaggio a prepararsi. Non sostituisce gli avvisi ufficiali, le ordinanze locali, il controllo reale in banchina o la valutazione nautica dello skipper.</p>
+      <p data-i18n-html="page.passage.safetyPublicationText"><strong>Prossime pubblicazioni:</strong> quadro di pianificazione a un mese; tendenza a dieci giorni; briefing operativo a cinque giorni; conferme quotidiane nelle 72 ore precedenti e durante il viaggio.</p>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><p>8—11 ottobre 2026 · Marsala</p></div>
-    <div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div>
+    <div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><p data-i18n="page.shared.footerDates">8—11 ottobre 2026 · Marsala</p></div>
+    <div><a href="index.html" data-i18n="page.shared.navJourney">Il viaggio</a><a href="flotta.html" data-i18n="page.shared.navFleet">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html" data-i18n="page.shared.navArrivalsDepartures">Arrivi &amp; partenze</a><a href="film.html" data-i18n="page.shared.navFilm">Il film</a><a href="accesso.html" data-i18n="page.shared.navPrivateArea">Area riservata</a><a href="privacy.html" data-i18n="page.shared.navPrivacy">Privacy e dati</a></div>
   </footer>
+  <script src="i18n.js?v=20260914-en2"></script>
+  <script src="i18n-public-core.js?v=20260914-en2"></script>
+  <script src="i18n-public-support.js?v=20260914-en2"></script>
   <script src="passage-plan-data.js"></script>
-  <script src="passage-plan.js"></script>
-  <script src="app.js?v=20260911-menu2"></script>
+  <script src="passage-plan-data-en.js?v=20260914-en2"></script>
+  <script src="passage-plan.js?v=20260914-en2"></script>
+  <script src="app.js?v=20260914-en2"></script>
 </body>
 </html>

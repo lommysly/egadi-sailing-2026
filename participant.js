@@ -9,10 +9,16 @@ import {
   personalAreaUrl,
   startCrewAreaSession,
   startInviteActivation,
-} from './crew-session.js?v=20260911-live';
-import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260911-live';
-import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260911-role1';
+} from './crew-session.js?v=20260914-en2';
+import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260914-en2';
+import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260914-en2';
 
+const i18n = window.EgadiI18n;
+const translate = (key, fallback, params) => {
+  const translated = i18n?.t?.(key, params);
+  return translated && translated !== key ? translated : fallback;
+};
+const activeLocale = () => i18n?.getLocale?.() === 'en' ? 'en' : 'it';
 let activeInvite = null;
 let activeMember = null;
 let activatedPhone = '';
@@ -31,11 +37,27 @@ function setMessage(element, message, isError = false) {
 function formatDateTime(value) {
   if (!value) return '';
   const date = value?.toDate ? value.toDate() : new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat(activeLocale() === 'en' ? 'en-GB' : 'it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function hasItalianBriefing() {
+  return typeof activeBriefing?.rulesText === 'string' && activeBriefing.rulesText.trim().length > 0;
+}
+
+function hasOfficialEnglishBriefing() {
+  return typeof activeBriefing?.rulesTitleEn === 'string' && activeBriefing.rulesTitleEn.trim().length > 0
+    && typeof activeBriefing?.rulesSummaryEn === 'string' && activeBriefing.rulesSummaryEn.trim().length > 0
+    && typeof activeBriefing?.rulesTextEn === 'string' && activeBriefing.rulesTextEn.trim().length > 0
+    && typeof activeBriefing?.scheduleNoteEn === 'string';
 }
 
 function hasPublishedBriefing() {
-  return typeof activeBriefing?.rulesText === 'string' && activeBriefing.rulesText.trim().length > 0;
+  return hasItalianBriefing() && (activeLocale() !== 'en' || hasOfficialEnglishBriefing());
+}
+
+function briefingTitle() {
+  if (activeLocale() === 'en' && hasOfficialEnglishBriefing()) return activeBriefing.rulesTitleEn.trim();
+  return activeBriefing?.rulesTitle || translate('crew.briefing.fullRules', 'Regolamento completo');
 }
 
 function briefingRequiresFullRulesRead() {
@@ -43,10 +65,17 @@ function briefingRequiresFullRulesRead() {
 }
 
 function briefingSummary() {
-  const summary = activeBriefing?.rulesSummary;
+  const summary = activeLocale() === 'en' && hasOfficialEnglishBriefing()
+    ? activeBriefing.rulesSummaryEn
+    : activeBriefing?.rulesSummary;
   return typeof summary === 'string' && summary.trim()
     ? summary.trim()
-    : 'Leggi integralmente il regolamento completo: questa sintesi non sostituisce il testo.';
+    : translate('crew.briefing.summaryFallback', 'Leggi integralmente il regolamento completo: questa sintesi non sostituisce il testo.');
+}
+
+function briefingRulesText() {
+  if (activeLocale() === 'en' && hasOfficialEnglishBriefing()) return activeBriefing.rulesTextEn;
+  return activeBriefing?.rulesText || '';
 }
 
 function currentBriefingVersion() {
@@ -78,7 +107,7 @@ function clearPreRegistrationRulesGate() {
   document.querySelector('#preRegistrationAcknowledgement').checked = false;
   document.querySelector('#preRegistrationAcknowledgement').disabled = true;
   document.querySelector('#preRegistrationAcceptButton').disabled = true;
-  document.querySelector('#preRegistrationFullRulesHint').textContent = 'Scorri fino alla fine del regolamento per sbloccare la conferma.';
+  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Scorri fino alla fine del regolamento per sbloccare la conferma.');
 }
 
 function updatePreRegistrationAcceptState() {
@@ -98,7 +127,7 @@ function markPreRegistrationRulesRead() {
   if (gate.dataset.fullRulesRead === 'true') return;
   gate.dataset.fullRulesRead = 'true';
   scrollRegion.classList.add('is-complete');
-  document.querySelector('#preRegistrationFullRulesHint').textContent = 'Regolamento completo visualizzato. Ora puoi confermare la lettura.';
+  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.fullRulesSeen', 'Regolamento completo visualizzato. Ora puoi confermare la lettura.');
   updatePreRegistrationAcceptState();
   if (document.activeElement === scrollRegion) acknowledgement.focus();
 }
@@ -109,7 +138,7 @@ function resetPreRegistrationRulesRead() {
   gate.dataset.fullRulesRead = '';
   scrollRegion.scrollTop = 0;
   scrollRegion.classList.remove('is-complete');
-  document.querySelector('#preRegistrationFullRulesHint').textContent = 'Scorri fino alla fine del regolamento per sbloccare la conferma.';
+  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Scorri fino alla fine del regolamento per sbloccare la conferma.');
   updatePreRegistrationAcceptState();
   requestAnimationFrame(() => {
     if (isEntireRulesTextVisible(scrollRegion)) markPreRegistrationRulesRead();
@@ -117,12 +146,15 @@ function resetPreRegistrationRulesRead() {
 }
 
 function briefingSchedule() {
+  const englishScheduleNote = activeLocale() === 'en' && hasOfficialEnglishBriefing()
+    ? activeBriefing?.scheduleNoteEn
+    : activeBriefing?.scheduleNote;
   return [
-    ['Ritrovo', activeBriefing?.meetingPoint],
-    ['Imbarco', formatDateTime(activeBriefing?.boardingAt)],
-    ['Partenza', formatDateTime(activeBriefing?.departureAt)],
-    ['Rientro', formatDateTime(activeBriefing?.returnAt)],
-    ['Nota operativa', activeBriefing?.scheduleNote],
+    [translate('crew.schedule.meeting', 'Ritrovo'), activeBriefing?.meetingPoint],
+    [translate('crew.schedule.boarding', 'Imbarco'), formatDateTime(activeBriefing?.boardingAt)],
+    [translate('crew.schedule.departure', 'Partenza'), formatDateTime(activeBriefing?.departureAt)],
+    [translate('crew.schedule.return', 'Rientro'), formatDateTime(activeBriefing?.returnAt)],
+    [translate('crew.schedule.note', 'Nota operativa'), englishScheduleNote],
   ].filter(([, value]) => value);
 }
 
@@ -203,7 +235,7 @@ function showProfile({ invite, member, phone = '' }) {
   document.querySelector('#preRegistrationBriefing').hidden = true;
   document.querySelector('#invalidLink').hidden = true;
   document.querySelector('#profileSection').hidden = false;
-  document.querySelector('#participantTitle').textContent = invite.displayName || 'Dati per la Crew List';
+  document.querySelector('#participantTitle').textContent = invite.displayName || translate('crew.flow.titleFallback', 'Dati per la Crew List');
   if (member) fillProfile(member);
   if (phone && !document.querySelector('#participantForm [name="phone"]').value) {
     document.querySelector('#participantForm [name="phone"]').value = phone;
@@ -249,7 +281,13 @@ function renderPreRegistrationGate() {
     gate.dataset.rulesContext = '';
     gate.dataset.rulesVersion = '';
     gate.dataset.fullRulesRead = '';
-    status.textContent = 'Il briefing di sicurezza è obbligatorio prima di inserire i dati nella Crew List.';
+    if (hasItalianBriefing() && activeLocale() === 'en') {
+      waiting.textContent = translate('crew.flow.officialEnglishWaiting', 'The skipper has not yet published the official English version of the safety briefing. Please ask for it before accepting the rules in English.');
+      status.textContent = translate('crew.flow.officialEnglishRequired', 'An official English safety briefing is required before you can continue in English.');
+    } else {
+      waiting.textContent = translate('crew.flow.briefingWaiting', 'Lo skipper deve ancora pubblicare il briefing di sicurezza e le regole di bordo. Quando saranno pubblicati, potrai leggerli e accettarli qui prima di inserire i tuoi dati nella Crew List.');
+      status.textContent = translate('crew.briefing.required', 'Il briefing di sicurezza è obbligatorio prima di inserire i dati nella Crew List.');
+    }
     return;
   }
 
@@ -257,11 +295,11 @@ function renderPreRegistrationGate() {
   content.hidden = false;
   renderSchedule();
   const version = String(currentBriefingVersion());
-  const rulesContext = `${activeInvite.boatId}:${activeInvite.id}:${version}`;
+  const rulesContext = `${activeInvite.boatId}:${activeInvite.id}:${version}:${activeLocale()}`;
   if (gate.dataset.rulesContext !== rulesContext) {
-    document.querySelector('#preRegistrationRulesTitle').textContent = activeBriefing.rulesTitle || 'Regolamento completo';
+    document.querySelector('#preRegistrationRulesTitle').textContent = briefingTitle();
     document.querySelector('#preRegistrationRulesSummary').textContent = briefingSummary();
-    document.querySelector('#preRegistrationRulesText').textContent = activeBriefing.rulesText;
+    document.querySelector('#preRegistrationRulesText').textContent = briefingRulesText();
     gate.dataset.rulesContext = rulesContext;
     gate.dataset.rulesVersion = version;
     resetPreRegistrationRulesRead();
@@ -271,17 +309,17 @@ function renderPreRegistrationGate() {
     preRegistrationGateResolved = true;
     acknowledgement.checked = false;
     acceptButton.disabled = true;
-    setMessage(document.querySelector('#preRegistrationMessage'), 'Briefing confermato. Ora puoi completare la Crew List.');
+    setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.briefing.confirmed', 'Briefing confermato. Ora puoi completare la Crew List.'));
     window.setTimeout(() => {
       openProfile({ invite: activeInvite, phone: activatedPhone, redirectWhenCompleted: false }).catch(() => {
         preRegistrationGateResolved = false;
-        setMessage(document.querySelector('#preRegistrationMessage'), 'Non riesco ad aprire la Crew List. Riprova tra poco.', true);
+        setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.cannotOpenCrewList', 'Non riesco ad aprire la Crew List. Riprova tra poco.'), true);
       });
     }, 250);
     return;
   }
 
-  status.textContent = `Leggi la sintesi e l’intero regolamento, poi accetta la versione ${version}: solo dopo potrai inserire i dati nella Crew List.`;
+  status.textContent = translate('crew.flow.readThenComplete', `Leggi la sintesi e l’intero regolamento, poi accetta la versione ${version}: solo dopo potrai inserire i dati nella Crew List.`, { version });
   updatePreRegistrationAcceptState();
 }
 
@@ -300,7 +338,7 @@ function openPreRegistrationBriefing({ invite, phone }) {
   document.querySelector('#profileSection').hidden = true;
   document.querySelector('#preRegistrationBriefing').hidden = false;
   setMessage(document.querySelector('#preRegistrationMessage'), '');
-  document.querySelector('#preRegistrationBriefingStatus').textContent = 'Carico il briefing della tua barca…';
+  document.querySelector('#preRegistrationBriefingStatus').textContent = translate('crew.flow.loadingBriefing', 'Carico il briefing della tua barca…');
   document.querySelector('#preRegistrationBriefingWaiting').hidden = true;
   document.querySelector('#preRegistrationBriefingContent').hidden = true;
 
@@ -313,8 +351,8 @@ function openPreRegistrationBriefing({ invite, phone }) {
     () => {
       document.querySelector('#preRegistrationBriefingContent').hidden = true;
       document.querySelector('#preRegistrationBriefingWaiting').hidden = false;
-      document.querySelector('#preRegistrationBriefingStatus').textContent = 'Briefing non disponibile. Controlla la connessione e ricarica la pagina.';
-      setMessage(document.querySelector('#preRegistrationMessage'), 'Non riesco a leggere il briefing di sicurezza. Riprova tra poco.', true);
+      document.querySelector('#preRegistrationBriefingStatus').textContent = translate('crew.flow.briefingUnavailable', 'Briefing non disponibile. Controlla la connessione e ricarica la pagina.');
+      setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.cannotReadBriefing', 'Non riesco a leggere il briefing di sicurezza. Riprova tra poco.'), true);
     },
   );
   stopRuleAcceptanceSubscription = onSnapshot(
@@ -326,8 +364,8 @@ function openPreRegistrationBriefing({ invite, phone }) {
     () => {
       document.querySelector('#preRegistrationBriefingContent').hidden = true;
       document.querySelector('#preRegistrationBriefingWaiting').hidden = false;
-      document.querySelector('#preRegistrationBriefingStatus').textContent = 'Conferma non disponibile. Controlla la connessione e ricarica la pagina.';
-      setMessage(document.querySelector('#preRegistrationMessage'), 'Non riesco a leggere la conferma del briefing. Riprova tra poco.', true);
+      document.querySelector('#preRegistrationBriefingStatus').textContent = translate('crew.flow.acceptanceUnavailable', 'Conferma non disponibile. Controlla la connessione e ricarica la pagina.');
+      setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.cannotReadAcceptance', 'Non riesco a leggere la conferma del briefing. Riprova tra poco.'), true);
     },
   );
 }
@@ -358,11 +396,11 @@ document.querySelector('#activationForm').addEventListener('submit', async (even
   const pinConfirmation = fields.get('pinConfirmation').trim();
   const submitButton = form.querySelector('button[type="submit"]');
   if (pin !== pinConfirmation) {
-    setMessage(document.querySelector('#activationMessage'), 'I due codici non coincidono.', true);
+    setMessage(document.querySelector('#activationMessage'), translate('crew.flow.pinMismatch', 'I due codici non coincidono.'), true);
     return;
   }
   submitButton.disabled = true;
-  setMessage(document.querySelector('#activationMessage'), 'Attivo il tuo accesso personale…');
+  setMessage(document.querySelector('#activationMessage'), translate('crew.flow.activatingAccess', 'Attivo il tuo accesso personale…'));
   try {
     const session = await activateCrewInvite({ phone, pin });
     openPreRegistrationBriefing({ invite: session.invite, phone });
@@ -384,10 +422,10 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
   const fields = new FormData(form);
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
-  setMessage(document.querySelector('#participantFormMessage'), 'Salvo i tuoi dati…');
+  setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.savingDetails', 'Salvo i tuoi dati…'));
   try {
     if (!await hasCurrentBriefingAcceptance(activeInvite)) {
-      setMessage(document.querySelector('#participantFormMessage'), 'Il briefing è stato aggiornato: rileggilo e accettalo prima di comparire nella Crew List.', true);
+      setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.briefingUpdated', 'Il briefing è stato aggiornato: rileggilo e accettalo prima di comparire nella Crew List.'), true);
       openPreRegistrationBriefing({ invite: activeInvite, phone: activatedPhone });
       return;
     }
@@ -403,10 +441,10 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
       email: fields.get('email').trim().toLowerCase(), phone: fields.get('phone').trim() || activatedPhone, charterConsent: fields.get('charterConsent') === 'on',
       displayName: `${firstName} ${lastName}`, updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid,
     }, { merge: true });
-    setMessage(document.querySelector('#participantFormMessage'), 'Dati inviati con successo. Apro la tua area personale…');
+    setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.detailsSaved', 'Dati inviati con successo. Apro la tua area personale…'));
     window.setTimeout(() => window.location.replace(personalAreaUrl()), 900);
   } catch (error) {
-    setMessage(document.querySelector('#participantFormMessage'), 'I dati non sono stati inviati. Controlla la connessione e riprova.', true);
+    setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.detailsNotSaved', 'I dati non sono stati inviati. Controlla la connessione e riprova.'), true);
     submitButton.disabled = false;
   }
 });
@@ -432,13 +470,13 @@ document.querySelector('#preRegistrationBriefingStatus').setAttribute('aria-live
 document.querySelector('#preRegistrationAcceptButton').addEventListener('click', async () => {
   if (!hasPublishedBriefing() || !activeInvite || !auth.currentUser) return;
   if (!document.querySelector('#preRegistrationAcknowledgement').checked) {
-    setMessage(document.querySelector('#preRegistrationMessage'), 'Scorri il regolamento completo e conferma di averlo letto prima di proseguire.', true);
+    setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.confirmReadFirst', 'Scorri il regolamento completo e conferma di averlo letto prima di proseguire.'), true);
     return;
   }
   if (document.querySelector('#preRegistrationBriefing').dataset.fullRulesRead !== 'true') return;
   const button = document.querySelector('#preRegistrationAcceptButton');
   button.disabled = true;
-  setMessage(document.querySelector('#preRegistrationMessage'), 'Registro la conferma del briefing…');
+  setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.recordingAcceptance', 'Registro la conferma del briefing…'));
   try {
     const rulesVersion = currentBriefingVersion();
     const acceptance = {
@@ -446,6 +484,7 @@ document.querySelector('#preRegistrationAcceptButton').addEventListener('click',
       acceptedBy: auth.currentUser.uid,
       rulesVersion,
       ...(briefingRequiresFullRulesRead() ? { fullRulesRead: true } : {}),
+      acceptedLocale: activeLocale(),
       acceptedAt: serverTimestamp(),
     };
     const batch = writeBatch(db);
@@ -453,7 +492,7 @@ document.querySelector('#preRegistrationAcceptButton').addEventListener('click',
     batch.create(doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id, 'history', `${rulesVersion}-${auth.currentUser.uid}`), acceptance);
     await batch.commit();
   } catch (error) {
-    setMessage(document.querySelector('#preRegistrationMessage'), 'Non riesco a confermare le regole. Riprova tra poco.', true);
+    setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.cannotConfirmRules', 'Non riesco a confermare le regole. Riprova tra poco.'), true);
     button.disabled = false;
   }
 });

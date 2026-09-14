@@ -10,7 +10,7 @@ import {
 import { doc, getDoc, getFirestore, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { createCrewInviteIdentity, isCrewPin, isInviteCode, phoneFingerprintFor } from './crew-identity.js';
-import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260911-live';
+import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260914-en2';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -21,6 +21,10 @@ export const accessKey = new URLSearchParams(window.location.search).get('key') 
 export const hasValidInviteParameters = isInviteCode(inviteId)
   && /^[A-Za-z0-9_-]{1,128}$/.test(boatId)
   && isInviteCode(accessKey);
+const translate = (key, fallback, params) => {
+  const translated = window.EgadiI18n?.t?.(key, params);
+  return translated && translated !== key ? translated : fallback;
+};
 
 class CrewAccessError extends Error {
   constructor(code, cause) {
@@ -43,7 +47,8 @@ function crewLoginIndexReference(phoneFingerprint) {
 }
 
 function linkFor(page) {
-  return new URL(page, window.location.href).toString();
+  const link = new URL(page, window.location.href).toString();
+  return window.EgadiI18n?.preserveLocaleUrl?.(link) || link;
 }
 
 export function profileUrl({ edit = false } = {}) {
@@ -61,23 +66,23 @@ export function crewAccessUrl() {
 }
 
 export function crewAccessErrorMessage(error, { activation = false } = {}) {
-  if (!error) return 'Non riesco ad aprire l’accesso. Riprova tra poco.';
+  if (!error) return translate('crew.errors.openAccess', 'Non riesco ad aprire l’accesso. Riprova tra poco.');
   if (error.code === 'private-area-disabled') return privateAreaBlockMessage();
-  if (error.code === 'invalid-invite') return 'Questo link non è valido o non è più attivo. Chiedi allo skipper un nuovo invito.';
-  if (error.code === 'invalid-pin') return 'Il codice personale deve contenere esattamente 6 cifre.';
-  if (error.code === 'invalid-phone') return 'Inserisci il numero WhatsApp con prefisso internazionale, ad esempio +39 333 1234567.';
+  if (error.code === 'invalid-invite') return translate('crew.errors.invalidInvite', 'Questo link non è valido o non è più attivo. Chiedi allo skipper un nuovo invito.');
+  if (error.code === 'invalid-pin') return translate('crew.errors.invalidPin', 'Il codice personale deve contenere esattamente 6 cifre.');
+  if (error.code === 'invalid-phone') return translate('crew.errors.invalidPhoneExample', 'Inserisci il numero WhatsApp con prefisso internazionale, ad esempio +39 333 1234567.');
   if (error.code === 'phone-already-assigned') return activation
-    ? 'Questo numero è già associato a un’altra barca dell’evento. Chiedi allo skipper o all’organizzatore di verificare l’invito corretto.'
-    : 'Questo numero non è associato all’area personale che stai cercando.';
-  if (error.code === 'auth/too-many-requests') return 'Troppi tentativi. Attendi qualche minuto prima di riprovare.';
-  if (error.code === 'auth/operation-not-allowed') return 'L’accesso con numero e codice non è ancora abilitato. Avvisa lo skipper.';
+    ? translate('crew.errors.phoneAssignedActivation', 'Questo numero è già associato a un’altra barca dell’evento. Chiedi allo skipper o all’organizzatore di verificare l’invito corretto.')
+    : translate('crew.errors.phoneAssignedLogin', 'Questo numero non è associato all’area personale che stai cercando.');
+  if (error.code === 'auth/too-many-requests') return translate('crew.errors.tooManyRequests', 'Troppi tentativi. Attendi qualche minuto prima di riprovare.');
+  if (error.code === 'auth/operation-not-allowed') return translate('crew.errors.loginUnavailable', 'L’accesso con numero e codice non è ancora abilitato. Avvisa lo skipper.');
   if (error.code === 'invalid-credentials') return activation
-    ? 'Non riesco ad attivare questo invito. Verifica numero e codice oppure chiedi allo skipper un nuovo link.'
-    : 'Numero o codice personale non corretti.';
+    ? translate('crew.errors.activationCredentials', 'Non riesco ad attivare questo invito. Verifica numero e codice oppure chiedi allo skipper un nuovo link.')
+    : translate('crew.errors.invalidCredentials', 'Numero o codice personale non corretti.');
   if (error.code === 'access-not-active') return activation
-    ? 'Questo invito non è più disponibile. Chiedi allo skipper di generare un nuovo link.'
-    : 'Non risulta un accesso attivo con questo numero. Apri il link WhatsApp ricevuto dallo skipper.';
-  return 'Non riesco a completare l’accesso. Controlla la connessione e riprova.';
+    ? translate('crew.errors.activationUnavailable', 'Questo invito non è più disponibile. Chiedi allo skipper di generare un nuovo link.')
+    : translate('crew.errors.accessInactive', 'Non risulta un accesso attivo con questo numero. Apri il link WhatsApp ricevuto dallo skipper.');
+  return translate('crew.errors.completeAccess', 'Non riesco a completare l’accesso. Controlla la connessione e riprova.');
 }
 
 function ensurePrivateArea() {

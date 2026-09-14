@@ -3,24 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Accesso personale per l'equipaggio di Egadi Sailing Experience." />
-  <title>Accedi alla mia area · Egadi Sailing Experience</title>
+  <meta name="description" content="Accesso personale per l'equipaggio di Egadi Sailing Experience." data-i18n-attr="content:page.crew.metaDescription" />
+  <title data-i18n="page.crew.title">Accedi alla mia area · Egadi Sailing Experience</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260912-safety2" />
+  <link rel="stylesheet" href="styles.css?v=20260914-en2" />
 </head>
 <body class="area-page">
-  <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
-  <header class="site-header"><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-menu" aria-label="Apri menu"><span class="menu-toggle-label">Menu</span><span class="menu-toggle-icon" aria-hidden="true"></span></button><nav id="primary-menu" class="site-nav" aria-label="Navigazione principale"><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a></nav></header>
-  <button class="menu-backdrop" type="button" aria-label="Chiudi menu" hidden></button>
+  <a class="skip-link" href="#main-content" data-i18n="page.shared.skipToMain">Vai al contenuto principale</a>
+  <header class="site-header">
+    <a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-menu" aria-label="Apri menu" data-i18n-aria-label="common.openMenu"><span class="menu-toggle-label" data-i18n="common.menu">Menu</span><span class="menu-toggle-icon" aria-hidden="true"></span></button>
+    <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale" data-i18n-aria-label="common.mainNavigation"><a href="index.html" data-i18n="nav.journey">Il viaggio</a><a href="flotta.html" data-i18n="nav.fleet">Flottiglia</a><a href="passage-plan.html" data-i18n="nav.passagePlan">Passage Plan</a><a href="arrivi-partenze.html" data-i18n="nav.arrivalsDepartures">Arrivi &amp; partenze</a><a href="film.html" data-i18n="nav.film">Il film</a><a href="accesso.html" data-i18n="nav.privateArea">Area riservata</a></nav>
+  </header>
+  <button class="menu-backdrop" type="button" aria-label="Chiudi menu" data-i18n-aria-label="common.closeMenu" hidden></button>
   <main id="main-content" class="area-main participant-main">
-    <section class="area-hero participant-hero"><p class="eyebrow">Accesso equipaggio</p><h1>Rientra nella<br /><em>tua area personale.</em></h1><p>Inserisci il numero WhatsApp associato all’invito e il tuo codice personale. Sarai indirizzato automaticamente alla barca corretta.</p></section>
-    <section class="access-cards access-cards-single"><article><p class="eyebrow">Accesso personale</p><h2>Numero e codice.</h2><p>Il codice è quello scelto al primo accesso: non usare il PIN che sblocca il telefono.</p><form id="crewLoginForm" class="compact-form"><label>Numero WhatsApp *<input name="phone" type="tel" required inputmode="tel" autocomplete="tel" maxlength="30" pattern="\+[1-9][0-9 .()\-]{7,29}" placeholder="Es. +39 333 1234567" /></label><label>Codice personale *<input name="pin" type="password" required inputmode="numeric" autocomplete="current-password" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="6 cifre" /></label><button class="button button-primary" type="submit">Entra nella mia area</button><p id="crewLoginMessage" class="form-message" role="status" aria-live="polite"></p></form><p class="panel-lead"><strong>Hai perso l’invito?</strong> Se avevi già attivato l’accesso, non serve: entra qui con numero e codice. Se non lo hai mai attivato, hai dimenticato il codice o hai cambiato numero, chiedi allo skipper un nuovo link personale.</p><a class="text-button" href="accesso.html">Torna all’Area riservata</a></article></section>
+    <section class="area-hero participant-hero"><p class="eyebrow" data-i18n="page.crew.heroEyebrow">Accesso equipaggio</p><h1 data-i18n-html="page.crew.heroTitle">Rientra nella<br /><em>tua area personale.</em></h1><p data-i18n="page.crew.heroDescription">Inserisci il numero WhatsApp associato all’invito e il tuo codice personale. Sarai indirizzato automaticamente alla barca corretta.</p></section>
+    <section class="access-cards access-cards-single"><article><p class="eyebrow" data-i18n="page.crew.loginEyebrow">Accesso personale</p><h2 data-i18n="page.crew.loginTitle">Numero e codice.</h2><p data-i18n="page.crew.loginDescription">Il codice è quello scelto al primo accesso: non usare il PIN che sblocca il telefono.</p><form id="crewLoginForm" class="compact-form"><label><span data-i18n="page.crew.phoneLabel">Numero WhatsApp *</span><input name="phone" type="tel" required inputmode="tel" autocomplete="tel" maxlength="30" pattern="\+[1-9][0-9 .()\-]{7,29}" placeholder="Es. +39 333 1234567" data-i18n-placeholder="page.crew.phonePlaceholder" /></label><label><span data-i18n="page.crew.pinLabel">Codice personale *</span><input name="pin" type="password" required inputmode="numeric" autocomplete="current-password" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="6 cifre" data-i18n-placeholder="page.crew.pinPlaceholder" /></label><button class="button button-primary" type="submit" data-i18n="page.crew.loginButton">Entra nella mia area</button><p id="crewLoginMessage" class="form-message" role="status" aria-live="polite"></p></form><p class="panel-lead"><strong data-i18n="page.crew.lostInviteTitle">Hai perso l’invito?</strong> <span data-i18n="page.crew.lostInviteText">Se avevi già attivato l’accesso, non serve: entra qui con numero e codice. Se non lo hai mai attivato, hai dimenticato il codice o hai cambiato numero, chiedi allo skipper un nuovo link personale.</span></p><a class="text-button" href="accesso.html" data-i18n="page.crew.backToPrivateArea">Torna all’Area riservata</a></article></section>
   </main>
-  <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
-  <script src="app.js?v=20260911-menu2"></script>
-  <script type="module" src="crew-login.js?v=20260911-live"></script>
+  <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html" data-i18n="nav.journey">Il viaggio</a><a href="flotta.html" data-i18n="nav.fleet">Flottiglia</a><a href="passage-plan.html" data-i18n="nav.passagePlan">Passage Plan</a><a href="arrivi-partenze.html" data-i18n="nav.arrivalsDepartures">Arrivi &amp; partenze</a><a href="film.html" data-i18n="nav.film">Il film</a><a href="accesso.html" data-i18n="nav.privateArea">Area riservata</a><a href="privacy.html" data-i18n="nav.privacy">Privacy e dati</a></div></footer>
+  <script src="i18n.js?v=20260914-en2"></script>
+  <script src="i18n-crew.js?v=20260914-en2"></script>
+  <script src="app.js?v=20260914-en2"></script>
+  <script type="module" src="crew-login.js?v=20260914-en2"></script>
 </body>
 </html>

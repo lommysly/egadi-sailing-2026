@@ -1,6 +1,10 @@
 const PHONE_FINGERPRINT_PREFIX = 'egadi-crew-phone-v1:';
 const LOGIN_ALIAS_PREFIX = 'egadi-crew-login-v1:';
 const CREW_LOGIN_DOMAIN = 'crew.egadi.thatsablast.it';
+const translate = (key, fallback) => {
+  const translated = window.EgadiI18n?.t?.(key);
+  return translated && translated !== key ? translated : fallback;
+};
 
 export function isInviteCode(value) {
   return /^[a-f0-9]{48}$/.test(String(value || ''));
@@ -17,7 +21,7 @@ export function isCrewPin(value) {
 
 async function sha256Hex(value) {
   if (!globalThis.crypto?.subtle) {
-    throw new Error('La protezione del browser non è disponibile. Apri il sito in HTTPS aggiornato.');
+    throw new Error(translate('crew.errors.browserProtection', 'La protezione del browser non è disponibile. Apri il sito in HTTPS aggiornato.'));
   }
   const bytes = new TextEncoder().encode(value);
   const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
@@ -26,14 +30,14 @@ async function sha256Hex(value) {
 
 export async function phoneFingerprintFor(phone) {
   const normalizedPhone = normalizeCrewPhone(phone);
-  if (!normalizedPhone) throw new Error('Inserisci il numero WhatsApp con prefisso internazionale.');
+  if (!normalizedPhone) throw new Error(translate('crew.errors.invalidPhone', 'Inserisci il numero WhatsApp con prefisso internazionale.'));
   return sha256Hex(`${PHONE_FINGERPRINT_PREFIX}${normalizedPhone}`);
 }
 
 export async function createCrewInviteIdentity({ phone, accessKey }) {
-  if (!isInviteCode(accessKey)) throw new Error('L’invito non è valido.');
+  if (!isInviteCode(accessKey)) throw new Error(translate('crew.errors.invalidInvite', 'L’invito non è valido.'));
   const normalizedPhone = normalizeCrewPhone(phone);
-  if (!normalizedPhone) throw new Error('Inserisci il numero WhatsApp con prefisso internazionale.');
+  if (!normalizedPhone) throw new Error(translate('crew.errors.invalidPhone', 'Inserisci il numero WhatsApp con prefisso internazionale.'));
   const phoneFingerprint = await phoneFingerprintFor(normalizedPhone);
   const loginAlias = await sha256Hex(`${LOGIN_ALIAS_PREFIX}${phoneFingerprint}:${accessKey}`);
   return {

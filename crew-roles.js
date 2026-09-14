@@ -12,6 +12,16 @@ const PRESET_BY_VALUE = new Map(CREW_ROLE_PRESETS.map((role) => [role.value, rol
 const VALUE_BY_LABEL = new Map(CREW_ROLE_PRESETS
   .filter((role) => role.value !== 'other')
   .map((role) => [role.label.toLocaleLowerCase('it-IT'), role.value]));
+const ENGLISH_PRESET_LABELS = Object.freeze({
+  crew: 'Crew',
+  co_skipper: 'Co-skipper',
+  hostess: 'Hostess',
+  collaborator: 'Crew support',
+});
+
+function currentLocale() {
+  return window.EgadiI18n?.getLocale?.() === 'en' ? 'en' : 'it';
+}
 
 export function roleFromFields(fields, prefix, { allowEmpty = false } = {}) {
   const preset = String(fields.get(`${prefix}Preset`) || '');
@@ -42,7 +52,16 @@ export function fillRoleFields(form, prefix, role, { allowEmpty = false } = {}) 
 }
 
 export function roleConfirmationText(member) {
-  const role = String(member?.role || '').trim() || DEFAULT_CREW_ROLE;
+  const storedRole = String(member?.role || '').trim() || DEFAULT_CREW_ROLE;
+  const preset = VALUE_BY_LABEL.get(storedRole.toLocaleLowerCase('it-IT'));
+  const role = currentLocale() === 'en' && preset
+    ? (ENGLISH_PRESET_LABELS[preset] || storedRole)
+    : storedRole;
+  if (currentLocale() === 'en') {
+    return member?.roleConfirmed === true
+      ? `${role} · confirmed by the skipper`
+      : `${role} · to be confirmed by the skipper`;
+  }
   return member?.roleConfirmed === true
     ? `${role} · confermato dallo skipper`
     : `${role} · da confermare dallo skipper`;
