@@ -338,10 +338,10 @@ function setupSkipperFinanceDashboard() {
   overviewEyebrow.className = 'eyebrow';
   overviewEyebrow.textContent = 'Area economica privata';
   const overviewTitle = document.createElement('h4');
-  overviewTitle.textContent = 'Quote e conti, senza confondere i passaggi.';
+  overviewTitle.textContent = 'Conti in ordine, una cosa alla volta.';
   const overviewLead = document.createElement('p');
   overviewLead.className = 'panel-lead';
-  overviewLead.textContent = 'Prima imposti il quadro, poi prepari una richiesta personale e infine controlli quanto è stato verificato. Il sito non incassa denaro.';
+  overviewLead.textContent = 'Qui imposti le spese, prepari le richieste e segni gli accrediti verificati. Il sito non incassa denaro.';
   overviewHeading.append(overviewEyebrow, overviewTitle, overviewLead);
 
   const hub = document.createElement('div');
@@ -378,8 +378,8 @@ function setupSkipperFinanceDashboard() {
   const requestPanel = createFinanceDashboardPanel({
     view: SKIPPER_FINANCE_VIEWS.request,
     eyebrow: '2 · Richiedi',
-    title: 'Crea una richiesta personale',
-    lead: 'Scegli persona, importo, causale e metodi; poi WhatsApp si apre con il messaggio già pronto. Il pagamento avviene sempre fuori dal sito.',
+    title: 'Prepara una richiesta',
+    lead: 'Scegli persona, importo, causale e metodo. WhatsApp apre il messaggio già pronto; il pagamento resta fuori dal sito.',
   });
   const reviewPanel = createFinanceDashboardPanel({
     view: SKIPPER_FINANCE_VIEWS.review,
@@ -457,10 +457,10 @@ function setupSkipperDashboard() {
   overview.innerHTML = `
     <div class="dashboard-overview-heading">
       <div>
-        <p class="eyebrow">Centro di comando</p>
-        <h3>Quattro aree, <em>una barca alla volta.</em></h3>
+        <p class="eyebrow">Area skipper</p>
+        <h3>Gestisci la barca,<br /><em>una cosa alla volta.</em></h3>
       </div>
-      <p>Apri soltanto ciò che devi gestire: equipaggio, quote, barca oppure briefing. I dati restano separati e aggiornati.</p>
+      <p>Equipaggio, quote, dati della barca e briefing: apri l’area che ti serve.</p>
     </div>
     <div class="dashboard-hub" aria-label="Aree skipper">
       <button class="dashboard-hub-card dashboard-hub-card-crew" type="button" data-skipper-view="crew">
@@ -600,11 +600,11 @@ function renderSkipperDashboardOverview() {
     nextActionButton.textContent = 'Apri quote e conti';
     nextActionButton.dataset.skipperView = 'money';
   } else if (!allocated) {
-    nextActionText.textContent = 'La barca è pronta: invita la prima persona con un link WhatsApp personale.';
+    nextActionText.textContent = 'La barca è configurata. Ora puoi riservare il primo posto.';
     nextActionButton.textContent = 'Invita una persona';
     nextActionButton.dataset.skipperView = 'crew';
   } else {
-    nextActionText.textContent = 'Tutto sotto controllo: apri l’area che vuoi aggiornare.';
+    nextActionText.textContent = 'Tutto è aggiornato. Scegli cosa vuoi fare adesso.';
     nextActionButton.textContent = 'Gestisci equipaggio';
     nextActionButton.dataset.skipperView = 'crew';
   }
@@ -713,7 +713,7 @@ function renderSkipperFinanceOverview() {
     ? `${activeProjections.length} ${activeProjections.length === 1 ? 'posto riservato' : 'posti riservati'} · ${formatCurrency(projectedBerthCents / 100)} posti${projectedInsuranceCents ? ` · ${formatCurrency(projectedInsuranceCents / 100)} assicurazione` : ''}${projectedStarterPackCashCents ? ` · ${formatCurrency(projectedStarterPackCashCents / 100)} Starter Pack cash` : ''}${projectedDepositCashCents ? ` · ${formatCurrency(projectedDepositCashCents / 100)} cauzioni cash` : ''}. Non è un incasso.`
     : 'Aggiungi una persona nel Piano equipaggio per stimare gli scenari, senza inviare alcuna richiesta.';
   overview.innerHTML = `
-    <div class="finance-overview-heading"><p class="eyebrow">Cabina di regia economica</p><p>Il preventivo divide solo costi reali tra gli ospiti paganti. Lo Starter Pack e la cauzione restano cash/in loco: nessun margine, nessun incasso nel sito.</p></div>
+    <div class="finance-overview-heading"><p class="eyebrow">I conti della barca</p><p>Il preventivo divide i costi reali tra chi paga. Starter Pack e cauzione restano cash/in loco; il sito non trattiene denaro.</p></div>
     <div class="finance-overview-grid">
       <article class="finance-overview-card"><span>Cassa skipper</span><strong>${escapeHtml(recoveryValue)}</strong><small>${escapeHtml(recoveryDetail)}</small></article>
       <article class="finance-overview-card"><span>Quota cabina calcolata</span><strong>${escapeHtml(cabinValue)}</strong><small>${escapeHtml(cabinDetail)}</small></article>

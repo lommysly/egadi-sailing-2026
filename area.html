@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Area privata skipper ed equipaggi di Egadi Sailing Experience." />
+  <meta name="description" content="Area skipper per organizzare barca, equipaggio e Crew List di Egadi Sailing Experience." />
   <title>Area skipper · Egadi Sailing Experience</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -21,20 +21,20 @@
   <button class="menu-backdrop" type="button" aria-label="Chiudi menu" hidden></button>
   <main id="main-content" class="area-main">
     <section class="area-hero">
-      <p class="eyebrow">Area privata · una barca per skipper</p>
-      <h1>La tua barca.<br /><em>La tua crew.</em></h1>
-      <p>Accesso personale, dati separati per barca e nessun pagamento gestito dal sito. La Crew List resta visibile soltanto allo skipper della barca.</p>
+      <p class="eyebrow">Area skipper · una barca, un equipaggio</p>
+      <h1>La tua barca.<br /><em>Il tuo equipaggio.</em></h1>
+      <p>Qui tieni insieme persone, posti e comunicazioni della tua barca. La Crew List la vedi solo tu; il sito non gestisce pagamenti.</p>
     </section>
     <section id="accesso" class="access-cards access-cards-single">
       <article id="signInCard">
-        <p class="eyebrow">Accesso protetto</p><h2>Entra con Google</h2><p>Lo skipper accede con il proprio account, poi registra e gestisce soltanto la propria barca.</p>
+        <p class="eyebrow">Accesso protetto</p><h2>Entra con Google</h2><p>Accedi con il tuo account: da qui registri e gestisci una sola barca.</p>
         <button id="signInButton" class="button button-primary" type="button">Continua con Google</button>
         <p id="authMessage" class="form-message" role="status" aria-live="polite"></p>
       </article>
       <article id="accountCard" hidden>
         <div class="account-heading"><div><p class="eyebrow">Sessione attiva</p><h2 id="accountName">Skipper</h2></div><button id="signOutButton" class="text-button" type="button">Esci</button></div>
         <p id="accountEmail"></p><p class="account-status" id="accountStatus"></p>
-        <details class="uid-details"><summary>Identificativo tecnico dell'organizzatore</summary><code id="accountUid"></code><p>Serve una sola volta per completare la configurazione iniziale indicata sotto.</p></details>
+        <details class="uid-details"><summary>Identificativo tecnico dell'organizzatore</summary><code id="accountUid"></code><p>Ti serve soltanto se la configurazione iniziale richiede una verifica.</p></details>
       </article>
     </section>
 
@@ -45,14 +45,14 @@
           <label>Nome della barca<input name="name" autocomplete="off" required maxlength="70" placeholder="Es. Isla 40 - nome da confermare" /></label>
           <label>Modello<input name="model" autocomplete="off" required maxlength="100" placeholder="Es. Fountaine Pajot Isla 40" /></label>
           <label>Tipo di imbarcazione<select name="boatType" required><option value="">Seleziona</option><option value="Catamarano">Catamarano</option><option value="Monoscafo">Monoscafo</option><option value="Gommone">Gommone</option><option value="Altro">Altro</option></select></label>
-          <label>Posti totali a bordo · skipper incluso<input name="totalBerths" type="number" required min="2" max="31" inputmode="numeric" placeholder="Es. 10" /><small class="field-hint">Questo è il totale reale delle persone che dormono a bordo, skipper compreso. Il sito riserva automaticamente un posto allo skipper e calcola i posti invitabili e quotabili.</small></label>
+          <label>Posti totali a bordo · skipper incluso<input name="totalBerths" type="number" required min="2" max="31" inputmode="numeric" placeholder="Es. 10" /><small class="field-hint">Indica tutte le persone che dormiranno a bordo, skipper compreso. Da qui il sito calcola i posti da assegnare e le quote.</small></label>
           <label>Porto di partenza<input name="homePort" autocomplete="off" required maxlength="80" value="Marsala" /></label>
           <label>Bandiera<input name="flag" autocomplete="off" required maxlength="60" value="Italiana" /></label>
           <label>Comandante / skipper<input name="skipperName" autocomplete="name" required maxlength="100" /></label>
         </div>
         <fieldset class="boat-accommodation-fieldset">
           <legend>Cabine, posti letto e bagni · privati</legend>
-          <p class="field-hint">La cabina marinaio conta nel totale a bordo: è il posto dello skipper, non è assegnabile né associabile a una quota. Per Karibu, con la configurazione concordata: 4 doppie + 2 posti in dinette + cabina marinaio = 11 persone totali, di cui 10 partecipanti. Bagni, configurazione e quote non compaiono nella flotta pubblica.</p>
+          <p class="field-hint">La cabina marinaio è il posto dello skipper: conta nel totale, ma non si assegna né si quota. Per Karibu: 4 doppie + 2 posti in dinette + cabina marinaio = 11 persone a bordo, 10 partecipanti. Bagni, configurazione e quote restano privati.</p>
           <div class="form-grid">
             <label>Cabine doppie<input name="doubleCabins" type="number" min="0" max="12" value="0" inputmode="numeric" data-berth-layout-input /></label>
             <label>Cabine singole<input name="singleCabins" type="number" min="0" max="12" value="0" inputmode="numeric" data-berth-layout-input /></label>
@@ -63,7 +63,7 @@
           </div>
           <div class="berth-rate-section">
             <p class="berth-rate-heading">Quote per singolo posto letto · facoltative</p>
-            <p class="field-hint">Inserisci una cifra per persona, mai il costo totale della cabina. Sarà proposta nella richiesta WhatsApp e potrai sempre modificarla per la singola persona.</p>
+            <p class="field-hint">Inserisci il prezzo per persona, non quello dell’intera cabina. Sarà una base di partenza e potrai adattarla per ogni partecipante.</p>
             <div class="form-grid">
               <label>Cabina doppia · € per persona<input name="doubleCabinRate" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 250,00" /></label>
               <label>Cabina singola · € per persona<input name="singleCabinRate" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 350,00" /></label>
@@ -77,9 +77,9 @@
         <div class="form-actions"><button id="boatSubmitButton" class="button button-primary" type="submit">Registra la barca</button><button id="cancelBoatEdit" class="text-button" type="button" hidden>Annulla modifica</button><p id="boatFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
       </form>
       <div class="steps-grid">
-        <div><span>1</span><h3>Registra</h3><p>Nome, modello, sistemazioni, posti totali incluso skipper, porto e skipper della barca.</p></div>
-        <div><span>2</span><h3>Organizza</h3><p>La Crew List resta privata allo skipper finché non sarà attivata la scheda personale per ogni partecipante.</p></div>
-        <div><span>3</span><h3>Conferma</h3><p>Controlli dati, cabine e contributi senza fogli condivisi.</p></div>
+        <div><span>1</span><h3>Definisci</h3><p>Inserisci barca, posti, sistemazioni, porto e skipper.</p></div>
+        <div><span>2</span><h3>Prepara</h3><p>Riserva i posti e prepara gli inviti. La Crew List resta privata finché i dati non sono completi.</p></div>
+        <div><span>3</span><h3>Parti ordinato</h3><p>Cabine, dati e contributi restano nello stesso spazio, senza rincorrere fogli o messaggi.</p></div>
       </div>
     </section>
 
@@ -90,13 +90,13 @@
         <article class="dashboard-panel">
           <p class="eyebrow">Crew List</p>
           <h3>Piano equipaggio e inviti</h3>
-          <p class="panel-lead">Prima riserva un posto con dati minimi, ruolo, sistemazione e quota prevista. Solo dopo, quando decidi, generi il link WhatsApp dalla stessa riga. Invito, briefing e Crew List useranno sempre lo stesso posto, senza doppioni.</p>
-          <p class="field-hint">La proiezione è privata: non entra nel PDF charter né nella flotta. Inserisci un contatto solo dopo aver ricevuto consenso. Consulta <a href="privacy.html">Privacy e dati</a>.</p>
+          <p class="panel-lead">Prima tieni da parte un posto con nome, ruolo, sistemazione e quota. Quando sei pronto, mandi l’invito WhatsApp dalla sua stessa scheda: invito, briefing e Crew List restano collegati allo stesso posto.</p>
+          <p class="field-hint">Questa è una bozza privata: non compare né nel PDF per il charter né nella flotta. Aggiungi un contatto solo con il suo consenso. Consulta <a href="privacy.html">Privacy e dati</a>.</p>
           <section class="crew-projection-panel" aria-labelledby="projectionTitle">
             <p class="eyebrow">1 · Piano equipaggio privato</p>
-            <h4 id="projectionTitle">Riserva persona, sistemazione e quota prevista</h4>
-            <p class="panel-lead">Questo è il tuo piano operativo: registra posto, ruolo e costi previsti per la persona. Non invia nulla, non crea una richiesta e non registra un pagamento.</p>
-            <p class="field-hint projection-flow-hint"><strong>Sequenza:</strong> salva la persona → assegna, quando vuoi, la cabina doppia → controlla la quota nella sua card → crea l’invito WhatsApp dalla stessa card. Ogni persona compare una volta sola, con stato e azioni sempre nello stesso punto.</p>
+            <h4 id="projectionTitle">Aggiungi una persona, scegli posto e quota</h4>
+            <p class="panel-lead">È il tuo promemoria operativo: qui decidi posto, ruolo e quota. Non parte nessun messaggio, non si crea una richiesta e non si registra alcun pagamento.</p>
+            <p class="field-hint projection-flow-hint"><strong>Come funziona:</strong> salva la persona, assegna la cabina quando vuoi, controlla la quota nella sua card e manda l’invito WhatsApp da lì. Una persona, una scheda, tutto nello stesso punto.</p>
             <p id="projectionLegacyLinkHint" class="field-hint" role="status" aria-live="polite" hidden></p>
             <form id="projectionForm" class="compact-form">
               <div class="form-grid">
@@ -107,22 +107,22 @@
               <div class="form-grid">
                 <label>Ruolo previsto *<select name="projectionRolePreset" required><option value="crew" selected>Equipaggio</option><option value="co_skipper">Co-skipper</option><option value="hostess">Hostess</option><option value="collaborator">Collaboratore</option><option value="other">Altro ruolo</option></select></label>
                 <label>Sistemazione prevista<select name="berthType"><option value="to_define">Da definire</option><option value="double_cabin">Cabina doppia</option><option value="single_cabin">Cabina singola</option><option value="dinette">Dinette</option><option value="other">Altra sistemazione</option></select></label>
-                <label id="projectionCabinSlotField" hidden>Cabina doppia assegnata<select name="cabinGroupId"><option value="">Da assegnare</option></select><small class="field-hint">Assegna la stessa cabina a due persone: nella card vedrai subito con chi condivide.</small></label>
+                <label id="projectionCabinSlotField" hidden>Cabina doppia assegnata<select name="cabinGroupId"><option value="">Da assegnare</option></select><small class="field-hint">Assegna la stessa cabina a due persone: nella scheda vedrai subito chi la condivide.</small></label>
                 <label>Lingua dell’invito<select name="preferredLocale"><option value="it">Italiano</option><option value="en">English</option></select></label>
               </div>
               <label>Specifica altro ruolo previsto<input name="projectionRoleOther" maxlength="100" placeholder="Solo se è stato selezionato “Altro ruolo”" /></label>
               <label class="consent-field"><input name="contributesToCosts" type="checkbox" checked /> Questa persona partecipa alle quote della barca.</label>
-              <p id="projectionContributionHint" class="field-hint">Equipaggio: quota automatica proposta. Co-skipper, hostess o collaboratore gratuiti possono restare esclusi da quota posto, Starter Pack e assicurazione; la cauzione rimborsabile può restare prevista.</p>
+              <p id="projectionContributionHint" class="field-hint">Per l’equipaggio il sito propone una quota. Co-skipper, hostess o collaboratori gratuiti possono restare fuori da quota posto, Starter Pack e assicurazione; la cauzione rimborsabile può comunque essere prevista.</p>
               <fieldset class="projection-cost-fieldset" aria-describedby="projectionCostHint projectionCostPreview">
-                <legend>Proiezione economica privata · non è una richiesta di pagamento</legend>
-                <p id="projectionCostHint" class="field-hint">Indica la quota prevista per questa persona. Posto/cabina e assicurazione formano la richiesta prevista; Starter Pack e cauzione rimborsabile restano separati, solo contanti in loco.</p>
+                <legend>Conti privati · non è una richiesta di pagamento</legend>
+                <p id="projectionCostHint" class="field-hint">Indica quanto prevedi per questa persona. Posto o cabina e assicurazione formano la richiesta; Starter Pack e cauzione rimborsabile restano separati e si regolano in contanti in loco.</p>
                 <div class="form-grid">
                   <label>Quota posto / cabina prevista · €<input name="berthAmount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 250,00" /></label>
                   <label>Starter Pack previsto · solo contanti, in loco · €<input name="starterPackAmount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 35,00" /></label>
                   <label>Assicurazione cauzione prevista · €<input name="protectionInsuranceAmount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 30,00" /></label>
                   <label>Cauzione rimborsabile · €<input name="refundableDepositAmount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 300,00" /><small class="field-hint">Da portare/regolare in loco: non entra nel totale previsto né in una richiesta WhatsApp.</small></label>
                 </div>
-                <output id="projectionCostPreview" class="projection-cost-preview" aria-live="polite">Compila gli importi per vedere la richiesta prevista; Starter Pack e cauzione restano separati, solo contanti in loco.</output>
+                <output id="projectionCostPreview" class="projection-cost-preview" aria-live="polite">Inserisci gli importi per vedere il riepilogo. Starter Pack e cauzione restano separati e si regolano in contanti in loco.</output>
               </fieldset>
               <label class="consent-field"><input name="contactConsent" type="checkbox" required /> Ho ricevuto il consenso della persona a essere contattata per questo viaggio. *</label>
               <div class="form-actions"><button id="projectionSubmitButton" class="button button-primary" type="submit">Salva proiezione e riserva posto</button><button id="cancelProjectionEdit" class="text-button" type="button" hidden>Annulla modifica</button><p id="projectionFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
@@ -162,8 +162,8 @@
         <div class="board-divider"></div>
         <details class="skipper-cost-panel" id="costPlanPanel">
           <summary><span>Preventivo barca · quote automatiche</span><small>Privato · senza margine</small></summary>
-          <p class="panel-lead">Inserisci qui i totali reali della barca. Il calcolatore divide la barca e i costi di recupero dello skipper solo tra gli ospiti paganti: lo skipper non entra mai nel divisore. Starter Pack e cauzione restano separati e in contanti a bordo.</p>
-          <p class="field-hint">Cabina doppia e singola usano la stessa quota standard. Per la dinette puoi usare il 65% della cabina oppure indicare direttamente un prezzo fisso: il sistema ricava la quota cabina dalla differenza. Il risultato è un preventivo: ogni persona può sempre avere una quota personalizzata nel Piano equipaggio.</p>
+          <p class="panel-lead">Qui fai i conti reali della barca. Il calcolatore ripartisce barca e spese di recupero dello skipper soltanto tra gli ospiti paganti: lo skipper resta fuori dal calcolo. Starter Pack e cauzione si tengono separati e si regolano in contanti a bordo.</p>
+          <p class="field-hint">Cabina doppia e singola partono dalla stessa quota. Per la dinette puoi scegliere il 65% della cabina oppure un prezzo fisso: il sistema ricava la quota cabina dalla differenza. È una stima utile, non un prezzo rigido: nel Piano equipaggio puoi personalizzare ogni quota.</p>
           <form id="costPlanForm" class="compact-form">
             <div class="form-grid">
               <label>Costo charter / barca · €<input name="charterCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 3600,00" /></label>
@@ -195,19 +195,19 @@
 
     <section class="section contribution-note">
       <p class="eyebrow">Contributi tra amici</p>
-      <h2>Il sito non incassa denaro.</h2>
+      <h2>Il sito prepara le richieste.<br />I soldi restano fuori.</h2>
       <ol class="payment-workflow">
-        <li>Configura i metodi che puoi ricevere e prepara una richiesta con importo e causale.</li>
-        <li>Scegli uno o più metodi e apri WhatsApp con il messaggio personale già pronto.</li>
-        <li>La persona effettua il contributo fuori dal sito e avvisa lo skipper.</li>
-        <li>Lo skipper verifica l'accredito reale e solo allora lo segna come verificato.</li>
+        <li>Salva i metodi che preferisci e prepara una richiesta con importo e causale.</li>
+        <li>Scegli come proporli e apri WhatsApp con il messaggio già pronto.</li>
+        <li>La persona versa fuori dal sito e avvisa lo skipper.</li>
+        <li>Lo skipper controlla l’accredito e soltanto allora lo segna come verificato.</li>
       </ol>
-      <p>Lo skipper può offrire PayPal, Satispay, Revolut e bonifico; per il bonifico le coordinate restano una comunicazione privata. Il pagamento è esterno al sito e viene confermato manualmente solo dopo l'accredito reale.</p>
+      <p>Puoi proporre PayPal, Satispay, Revolut o bonifico. Per il bonifico, le coordinate restano private. Il sito non incassa né conferma pagamenti in automatico: la verifica spetta sempre allo skipper.</p>
     </section>
   </main>
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="area.js?v=20260914-roster-cards2"></script>
+  <script type="module" src="area.js?v=20260914-roster-cards3"></script>
 </body>
 </html>
