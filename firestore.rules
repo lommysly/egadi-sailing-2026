@@ -320,10 +320,6 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.fullRulesRead == true));
     }
 
-    function isPaymentManager(boatId) {
-      return isOrganizer() || isSkipper(boatId);
-    }
-
     function hasValidPaymentMethodSelection(methods) {
       return methods is map
         && methods.keys().hasOnly(['paypal', 'satispay', 'revolut', 'bankTransfer'])
@@ -334,9 +330,131 @@ service cloud.firestore {
         && (!methods.keys().hasAll(['bankTransfer']) || methods.bankTransfer == true);
     }
 
+    function isHttpsPaymentLink(value) {
+      return value is string
+        && value.size() >= 9
+        && value.size() <= 500
+        && value.matches('^https://.+$');
+    }
+
+    function isValidRevolutDestination(value) {
+      return isHttpsPaymentLink(value)
+        || (value is string && value.matches('^@[A-Za-z0-9._-]{3,50}$'));
+    }
+
+    function hasValidBankTransferDetails(details) {
+      return details is map
+        && details.keys().hasAll(['iban', 'accountHolder'])
+        && details.keys().hasOnly(['iban', 'accountHolder'])
+        && details.iban is string
+        && details.accountHolder is string
+        && ((details.iban == '' && details.accountHolder == '')
+          || (details.iban.matches('^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$')
+            && details.accountHolder.size() >= 2
+            && details.accountHolder.size() <= 100));
+    }
+
+    function hasValidPaymentDetails(details) {
+      return details is map
+        && details.keys().hasAll(['paypal', 'satispay', 'revolut', 'bankTransfer'])
+        && details.keys().hasOnly(['paypal', 'satispay', 'revolut', 'bankTransfer'])
+        && details.paypal is string
+        && details.satispay is string
+        && details.revolut is string
+        && (details.paypal == '' || isHttpsPaymentLink(details.paypal))
+        && (details.satispay == '' || isHttpsPaymentLink(details.satispay))
+        && (details.revolut == '' || isValidRevolutDestination(details.revolut))
+        && hasValidBankTransferDetails(details.bankTransfer);
+    }
+
+    function hasValidPrivateBoatCapacity() {
+      return !request.resource.data.keys().hasAll(['totalBerths'])
+        || (request.resource.data.totalBerths is int
+          && request.resource.data.totalBerths >= 2
+          && request.resource.data.totalBerths <= 31
+          && request.resource.data.capacity is int
+          && request.resource.data.capacity >= 1
+          && request.resource.data.capacity <= 30
+          && request.resource.data.capacity == request.resource.data.totalBerths - 1);
+    }
+
+    // Il piano quote è volutamente un elenco chiuso: non contiene contatti,
+    // coordinate di pagamento, link o testo libero che possa finire nell'area
+    // equipaggio. Gli importi sono sempre in centesimi per persona.
+    function hasValidContributionItem(item) {
+      return item is map
+        && item.keys().hasAll(['state', 'amountCents'])
+        && item.keys().hasOnly(['state', 'amountCents'])
+        && item.state is string
+        && item.state in ['to_define', 'included', 'extra', 'local', 'not_applicable']
+        && item.amountCents is int
+        && item.amountCents >= 0
+        && item.amountCents <= 1000000
+        // Solo una voce extra o da regolare in loco può avere un importo.
+        && (item.state in ['extra', 'local'] || item.amountCents == 0);
+    }
+
+    function hasValidContributionPlan() {
+      let items = request.resource.data.items;
+      return request.resource.data.keys().hasAll(['items', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['items', 'updatedAt', 'updatedBy'])
+        && items is map
+        && items.keys().hasAll(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'refundable_deposit'])
+        && items.keys().hasOnly(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'refundable_deposit'])
+        && hasValidContributionItem(items.berth)
+        && hasValidContributionItem(items.starter_pack)
+        && hasValidContributionItem(items.linen_towels)
+        && hasValidContributionItem(items.protection_insurance)
+        && hasValidContributionItem(items.provisions)
+        && hasValidContributionItem(items.fuel)
+        && hasValidContributionItem(items.transfer)
+        && hasValidContributionItem(items.refundable_deposit)
+        // Una cauzione rimborsabile non è mai parte silenziosa della quota.
+        && items.refundable_deposit.state != 'included'
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    // La cassa skipper è un prospetto privato di soli importi aggregati.
+    // Non può contenere nominativi, quote individuali, note, istruzioni di
+    // pagamento o una categoria per cene: non è un listino né un incasso.
+    function hasValidSkipperCostPlan() {
+      return request.resource.data.keys().hasAll(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'payingParticipants', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'payingParticipants', 'updatedAt', 'updatedBy'])
+        && request.resource.data.charterCents is int
+        && request.resource.data.charterCents >= 0
+        && request.resource.data.charterCents <= 1000000
+        && request.resource.data.skipperFlightTrainCents is int
+        && request.resource.data.skipperFlightTrainCents >= 0
+        && request.resource.data.skipperFlightTrainCents <= 1000000
+        && request.resource.data.skipperCarCents is int
+        && request.resource.data.skipperCarCents >= 0
+        && request.resource.data.skipperCarCents <= 1000000
+        && request.resource.data.skipperLocalTransferCents is int
+        && request.resource.data.skipperLocalTransferCents >= 0
+        && request.resource.data.skipperLocalTransferCents <= 1000000
+        && request.resource.data.otherRecoverableCents is int
+        && request.resource.data.otherRecoverableCents >= 0
+        && request.resource.data.otherRecoverableCents <= 1000000
+        && request.resource.data.payingParticipants is int
+        && request.resource.data.payingParticipants >= 1
+        && request.resource.data.payingParticipants <= 30
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    // Il piano è consultabile dall'equipaggio soltanto dopo la conferma della
+    // versione corrente delle regole di bordo. La bacheca resta invece
+    // leggibile prima, così la persona può effettivamente accettarla.
+    function hasCurrentParticipantBriefingAcceptance(boatId) {
+      return isBoatParticipant(boatId)
+        && hasCurrentBriefingAcceptance(boatId,
+          get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.inviteId);
+    }
+
     function hasValidCollectionProfile() {
-      return request.resource.data.keys().hasAll(['collectorId', 'collectorName', 'paypalEnabled', 'satispayEnabled', 'revolutEnabled', 'bankTransferEnabled', 'updatedAt', 'updatedBy'])
-        && request.resource.data.keys().hasOnly(['collectorId', 'collectorName', 'paypalEnabled', 'satispayEnabled', 'revolutEnabled', 'bankTransferEnabled', 'updatedAt', 'updatedBy'])
+      return request.resource.data.keys().hasAll(['collectorId', 'collectorName', 'paypalEnabled', 'satispayEnabled', 'revolutEnabled', 'bankTransferEnabled', 'paymentDetails', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['collectorId', 'collectorName', 'paypalEnabled', 'satispayEnabled', 'revolutEnabled', 'bankTransferEnabled', 'paymentDetails', 'updatedAt', 'updatedBy'])
         && request.resource.data.collectorId == request.auth.uid
         && request.resource.data.collectorName is string
         && request.resource.data.collectorName.size() > 0
@@ -349,6 +467,15 @@ service cloud.firestore {
           || request.resource.data.satispayEnabled == true
           || request.resource.data.revolutEnabled == true
           || request.resource.data.bankTransferEnabled == true)
+        // È obbligatorio: un client precedente non può cancellare dettagli già
+        // salvati riscrivendo il vecchio schema del profilo.
+        && hasValidPaymentDetails(request.resource.data.paymentDetails)
+        && (!request.resource.data.paypalEnabled || isHttpsPaymentLink(request.resource.data.paymentDetails.paypal))
+        && (!request.resource.data.satispayEnabled || isHttpsPaymentLink(request.resource.data.paymentDetails.satispay))
+        && (!request.resource.data.revolutEnabled || isValidRevolutDestination(request.resource.data.paymentDetails.revolut))
+        && (!request.resource.data.bankTransferEnabled
+          || (request.resource.data.paymentDetails.bankTransfer.iban != ''
+            && request.resource.data.paymentDetails.bankTransfer.accountHolder != ''))
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
     }
@@ -363,16 +490,31 @@ service cloud.firestore {
 
     function paymentMethodsAllowedByProfile(boatId, methods) {
       let profile = get(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data;
-      return (!methods.keys().hasAll(['paypal']) || profile.paypalEnabled == true)
-        && (!methods.keys().hasAll(['satispay']) || profile.satispayEnabled == true)
-        && (!methods.keys().hasAll(['revolut']) || profile.revolutEnabled == true)
-        && (!methods.keys().hasAll(['bankTransfer']) || profile.bankTransferEnabled == true);
+      return hasValidPaymentDetails(profile.paymentDetails)
+        && (!methods.keys().hasAll(['paypal'])
+          || (profile.paypalEnabled == true && isHttpsPaymentLink(profile.paymentDetails.paypal)))
+        && (!methods.keys().hasAll(['satispay'])
+          || (profile.satispayEnabled == true && isHttpsPaymentLink(profile.paymentDetails.satispay)))
+        && (!methods.keys().hasAll(['revolut'])
+          || (profile.revolutEnabled == true && isValidRevolutDestination(profile.paymentDetails.revolut)))
+        && (!methods.keys().hasAll(['bankTransfer'])
+          || (profile.bankTransferEnabled == true
+            && profile.paymentDetails.bankTransfer.iban != ''
+            && profile.paymentDetails.bankTransfer.accountHolder != ''));
+    }
+
+    // Etichetta tecnica chiusa: serve soltanto a separare i versamenti
+    // verificati che recuperano i costi della barca dalle altre richieste.
+    // Non contiene causali, coordinate o istruzioni di pagamento.
+    function hasValidPaymentAccountingCategory(category) {
+      return category is string
+        && (category == 'cost_recovery' || category == 'other');
     }
 
     function isValidPaymentRequestCreate(boatId) {
       let profile = get(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data;
-      return request.resource.data.keys().hasAll(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
-        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
+      return request.resource.data.keys().hasAll(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
+        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
         && request.resource.data.recipientId is string
         && request.resource.data.recipientId.size() > 0
         && request.resource.data.memberId == request.resource.data.recipientId
@@ -385,6 +527,7 @@ service cloud.firestore {
         && request.resource.data.reason is string
         && request.resource.data.reason.size() > 0
         && request.resource.data.reason.size() <= 160
+        && hasValidPaymentAccountingCategory(request.resource.data.accountingCategory)
         && request.resource.data.isOptional is bool
         && request.resource.data.dueDate is string
         && request.resource.data.dueDate.size() <= 10
@@ -530,14 +673,15 @@ service cloud.firestore {
           && (!exists(/databases/$(database)/documents/boats/$(boatId))
             || get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid)));
       allow list: if false;
-      allow create: if isPrivateAreaOpen() && isGoogleSkipperAccount() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid;
+      allow create: if isPrivateAreaOpen() && isGoogleSkipperAccount() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid && hasValidPrivateBoatCapacity();
       allow update: if isPrivateAreaOpen() && (isOrganizer() || (isSkipper(boatId)
         && request.resource.data.skipperId == resource.data.skipperId
         && request.resource.data.eventId == resource.data.eventId
         // L'ID della vetrina può essere aggiunto alla barca legacy una sola
         // volta, poi resta immutabile per non sostituire una card esistente.
         && (!resource.data.keys().hasAll(['publicFleetId'])
-          || request.resource.data.publicFleetId == resource.data.publicFleetId)));
+          || request.resource.data.publicFleetId == resource.data.publicFleetId)
+        && hasValidPrivateBoatCapacity()));
       allow delete: if isPrivateAreaOpen() && isOrganizer();
 
       match /invites/{inviteId} {
@@ -564,19 +708,54 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
-      // Il profilo conserva soltanto il nome mostrato e i tag dei metodi.
-      // Link, alias, coordinate e credenziali restano fuori da Firestore.
+      // Il profilo è privato allo skipper e conserva istruzioni di incasso
+      // non segrete. Non contiene password, OTP, carte o credenziali provider.
       match /collectionProfile/{profileId} {
-        allow get: if isPrivateAreaOpen() && profileId == 'default' && (isOrganizer() || isSkipper(boatId));
+        allow get: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId);
         allow list: if false;
         allow create, update: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId) && hasValidCollectionProfile();
         allow delete: if false;
       }
 
+      // Riepilogo leggibile dall'equipaggio già confermato. È separato dal
+      // profilo di incasso privato e contiene solo otto voci standardizzate,
+      // stato e importo eventuale: mai link, IBAN o istruzioni di pagamento.
+      match /contributionPlan/{planId} {
+        allow get: if isPrivateAreaOpen()
+          && planId == 'default'
+          && (isOrganizer()
+            || isSkipper(boatId)
+            || hasCurrentParticipantBriefingAcceptance(boatId));
+        allow list: if false;
+        allow create, update: if isPrivateAreaOpen()
+          && planId == 'default'
+          && isSkipper(boatId)
+          && hasValidContributionPlan();
+        allow delete: if false;
+      }
+
+      // Il prospetto interno della cassa skipper non è una comunicazione
+      // all'equipaggio: anche l'organizzatore non lo legge o modifica. Lo
+      // skipper può soltanto usare il documento standard /default.
+      match /costPlan/{planId} {
+        allow get: if isPrivateAreaOpen()
+          && planId == 'default'
+          && isSkipper(boatId);
+        allow list: if false;
+        allow create, update: if isPrivateAreaOpen()
+          && planId == 'default'
+          && isSkipper(boatId)
+          && hasValidSkipperCostPlan();
+        allow delete: if false;
+      }
+
       match /paymentRequests/{requestId} {
-        allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || (resource.data.recipientId is string && isInviteHolder(boatId, resource.data.recipientId)));
+        // Le richieste e la loro categoria contabile alimentano soltanto la
+        // contabilità privata dello skipper: l'organizzatore non le legge né
+        // può alterare il pareggio della Cassa skipper.
+        allow read: if isPrivateAreaOpen() && (isSkipper(boatId) || (resource.data.recipientId is string && isInviteHolder(boatId, resource.data.recipientId)));
         allow create: if isPrivateAreaOpen() && isSkipper(boatId) && collectionProfileExists(boatId) && isValidPaymentRequestCreate(boatId);
-        allow update: if isPrivateAreaOpen() && isPaymentManager(boatId) && (canVerifyPayment() || canCancelPayment());
+        allow update: if isPrivateAreaOpen() && isSkipper(boatId) && (canVerifyPayment() || canCancelPayment());
         allow delete: if false;
       }
 

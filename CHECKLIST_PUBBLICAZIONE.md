@@ -7,7 +7,9 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] Programma pubblico flessibile Marsala, Levanzo, Marettimo e Favignana.
 - [x] Unica pagina pubblica Meteo & Passage Plan, con file dati separato e prompt operativo per aggiornamenti progressivi.
 - [x] Storyboard video in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
-- [x] Richieste di contributo con tag dei metodi e messaggio WhatsApp diretto: nessun checkout, API, creazione o persistenza di link, dato bancario, credenziale o conferma automatica nel sito.
+- [x] Sorgente: richieste di contributo con tag dei metodi e messaggio WhatsApp diretto; nessun checkout, API dei provider o conferma automatica. I dettagli di incasso restano nel solo profilo privato dello skipper e non sono copiati nella richiesta.
+- [ ] Pubblicare e rileggere il piano quote a otto voci: tutte “da definire” per default, stato esplicito per ciascuna voce e nessun link/IBAN/contatto nell'area equipaggio.
+- [ ] Pubblicare e testare la Cassa skipper privata: soli costi aggregati recuperabili e partecipanti paganti, formula esplicita senza skipper nel divisore, nessuna voce cena, nessun profitto, nessun accesso equipaggio/organizzazione e nessun incasso automatico.
 - [x] Crew List A4 orizzontale, da salvare come PDF dallo skipper; il PDF resta disattivato con dati obbligatori mancanti o documento in scadenza prima dell'11 ottobre 2026.
 - [x] Nome e dati della barca modificabili dallo skipper; una sola barca per skipper.
 - [x] Bacheca per barca con regole versionate, orari, comunicazioni e conferma di lettura dell'equipaggio.
@@ -45,14 +47,16 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [ ] Test negativo: numero assente, codice errato, link scaduto, token Google/anonimo e account estraneo non leggono dati.
 - [ ] Test riemissione: il vecchio codice/UID perde accesso; il nuovo link conserva lo stesso `inviteId`, scheda, richieste e PDF.
 - [ ] Test bacheca: pubblicazione skipper, lettura crew, conferma regole e nuova conferma dopo modifica.
-- [ ] Test contributi: profilo incasso, uno o più tag, WhatsApp con dettaglio non persistito, destinatario vede solo le proprie richieste e lo skipper registra “verificato” o “annullata” solo dopo controllo esterno reale. Un click non prova il pagamento.
+- [ ] Test piano quote: skipper salva solo le otto voci fisse; “compreso”, “da definire” e “non previsto” restano senza importo, “a parte” e “in loco” possono avere importo fittizio, e la cauzione rimborsabile non può risultare inclusa. Crew legge il piano solo dopo briefing corrente, senza dati di incasso.
+- [ ] Test Cassa skipper: `costPlan/default` con soli importi fittizi e 1–30 partecipanti paganti; skipper legge/salva/rilegge la propria barca, mentre organizzatore, crew, outsider, `list` e `delete` sono negati. Verificare formula, esclusione skipper dal divisore e che il bilancio usi solo richieste `cost_recovery` verificate manualmente, non cambusa/assicurazione/extra `other` né richieste in attesa.
+- [ ] Test contributi: ogni nuova richiesta usa soltanto `cost_recovery` o `other`; una richiesta legacy senza categoria resta verificabile o annullabile senza poterne riscrivere il contenuto. Verificare inoltre profilo incasso privato con uno o più metodi e relativi dettagli, WhatsApp con solo i dettagli dei metodi selezionati, destinatario vede solo le proprie richieste e soltanto lo skipper registra “verificato” o “annullata” dopo controllo esterno reale; organizzatore e altri skipper sono negati. Un click non prova il pagamento.
 - [ ] Test browser separato su HTTPS con account fittizi approvati e senza documenti reali.
 
 ## Dati reali e privacy
 
-- [ ] Chiudere `privacy.html` e `PRIVACY_DA_COMPLETARE.md`: titolare, contatto, finalità, base giuridica, destinatari, retention, PDF e procedura di cancellazione.
+- [ ] Chiudere `privacy.html` e `PRIVACY_DA_COMPLETARE.md`: titolare, contatto, finalità, base giuridica, destinatari, retention, piano quote, Cassa skipper, PDF e procedura di cancellazione.
 - [ ] Inserire esplicitamente nell'informativa: Firebase Authentication tecnico, impronta del numero, indice di ingresso e assenza di OTP/verifica del possesso del numero.
-- [ ] Definire data e responsabile per cancellare Crew List, inviti, `crewAccess`, `crewLoginIndex`, account Firebase tecnici, PDF locali e messaggi WhatsApp dopo l'evento.
+- [ ] Definire data e responsabile per cancellare Crew List, inviti, `crewAccess`, `crewLoginIndex`, `costPlan/default`, account Firebase tecnici, PDF locali e messaggi WhatsApp dopo l'evento; la Cassa skipper richiede una procedura amministrativa perché l'area skipper non può eliminarla.
 - [ ] Prima di qualunque pulizia, inventariare i documenti di test e confermare il bersaglio esatto: non eliminare per errore barca, skipper, inviti o dati che devono restare.
 - [ ] Confrontare il PDF con il modello effettivamente richiesto da charter / Capitaneria.
 
