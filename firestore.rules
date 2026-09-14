@@ -1308,15 +1308,63 @@ service cloud.firestore {
         && itemId in ['berth_base', 'berth_double_cabin', 'berth_single_cabin', 'berth_dinette', 'berth_other', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'shore_dinner', 'mooring_fee', 'other'];
     }
 
-    function isValidPaymentRequestCreate(boatId) {
-      let profile = get(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data;
+    // I campi di rateizzazione non sostituiscono la causale: separano una
+    // richiesta da un incasso storico e descrivono solo la posizione rispetto
+    // alla quota. L'assenza resta ammessa per record e pagine legacy.
+    function hasValidPaymentAllocation(allocation) {
+      return allocation is map
+        && allocation.keys().hasAll(['berthCents', 'protectionInsuranceCents'])
+        && allocation.keys().hasOnly(['berthCents', 'protectionInsuranceCents'])
+        && allocation.berthCents is int
+        && allocation.berthCents >= 0
+        && allocation.berthCents <= 1000000
+        && allocation.protectionInsuranceCents is int
+        && allocation.protectionInsuranceCents >= 0
+        && allocation.protectionInsuranceCents <= 1000000
+        && allocation.berthCents + allocation.protectionInsuranceCents == request.resource.data.amountCents;
+    }
+
+    function hasValidManualReceiptDate(value) {
+      return value is string
+        && value.size() == 10
+        && value.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
+    }
+
+    function hasValidPaymentInstallmentFields() {
+      let hasEntryType = request.resource.data.keys().hasAll(['entryType']);
+      let hasInstallmentType = request.resource.data.keys().hasAll(['installmentType']);
+      let hasAllocation = request.resource.data.keys().hasAll(['allocation']);
+      let hasReceivedOn = request.resource.data.keys().hasAll(['receivedOn']);
+      return (!hasEntryType && !hasInstallmentType && !hasAllocation && !hasReceivedOn)
+        || (hasEntryType
+          && hasInstallmentType
+          && request.resource.data.entryType is string
+          && request.resource.data.entryType in ['request', 'manual_receipt']
+          && request.resource.data.installmentType is string
+          && request.resource.data.installmentType in ['advance', 'balance', 'full', 'extra']
+          // Le voci extra non si ripartiscono fra posto e assicurazione;
+          // le rate della quota invece devono dichiarare il riparto esatto.
+          && (request.resource.data.installmentType == 'extra'
+            ? !hasAllocation
+            : (hasAllocation && hasValidPaymentAllocation(request.resource.data.allocation)))
+          && (!hasReceivedOn || hasValidManualReceiptDate(request.resource.data.receivedOn)));
+    }
+
+    function hasValidEmptyPaymentMethodSelection(methods) {
+      return methods is map
+        && methods.keys().size() == 0;
+    }
+
+    function hasValidPaymentRequestCore(boatId, canUseProjectionRecipient) {
       return request.resource.data.keys().hasAll(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
-        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'contributionItemId', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
+        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'contributionItemId', 'entryType', 'installmentType', 'allocation', 'receivedOn', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
         && request.resource.data.recipientId is string
         && request.resource.data.recipientId.size() > 0
         && request.resource.data.memberId == request.resource.data.recipientId
         && request.resource.data.payerInviteId == request.resource.data.recipientId
-        && inviteExists(boatId, request.resource.data.recipientId)
+        && (inviteExists(boatId, request.resource.data.recipientId)
+          || (canUseProjectionRecipient
+            && exists(/databases/$(database)/documents/boats/$(boatId)/crewProjections/$(request.resource.data.recipientId))))
         // Compatibilità temporanea per pagine skipper già aperte prima del
         // selettore tecnico: se la chiave è presente deve comunque essere
         // nell'enum chiuso. `refundable_deposit` non è mai ammesso online.
@@ -1334,14 +1382,52 @@ service cloud.firestore {
         && request.resource.data.dueDate is string
         && request.resource.data.dueDate.size() <= 10
         && request.resource.data.collectorId == request.auth.uid
+        && request.resource.data.collectorName is string
+        && request.resource.data.collectorName.size() > 0
+        && request.resource.data.collectorName.size() <= 100
+        && hasValidPaymentInstallmentFields();
+    }
+
+    function isValidPaymentRequestCreate(boatId) {
+      let profile = get(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data;
+      return hasValidPaymentRequestCore(boatId, false)
         && request.resource.data.collectorName == profile.collectorName
         && hasValidPaymentMethodSelection(request.resource.data.paymentMethods)
         && paymentMethodsAllowedByProfile(boatId, request.resource.data.paymentMethods)
+        // Una richiesta ordinaria non può fingersi un incasso già registrato
+        // né attribuirsi una data di ricezione storica.
+        && (!request.resource.data.keys().hasAll(['entryType'])
+          || request.resource.data.entryType == 'request')
+        && !request.resource.data.keys().hasAll(['receivedOn'])
         && request.resource.data.status == 'prepared'
         && request.resource.data.createdAt == request.time
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.verifiedAt == null
         && request.resource.data.verifiedBy == null
+        && request.resource.data.cancelledAt == null
+        && request.resource.data.cancelledBy == null;
+    }
+
+    // Un acconto già ricevuto non è una "richiesta" inviata retroattivamente:
+    // viene registrato dal solo proprietario come incasso verificato. Può
+    // nascere dalla proiezione prima dell'invito, ma senza canali, link,
+    // coordinate o note da mostrare al futuro partecipante.
+    function isValidManualReceiptCreate(boatId) {
+      return hasValidPaymentRequestCore(boatId, true)
+        && request.resource.data.keys().hasAll(['contributionItemId', 'entryType', 'installmentType', 'allocation', 'receivedOn'])
+        && request.resource.data.contributionItemId in ['berth_base', 'berth_double_cabin', 'berth_single_cabin', 'berth_dinette', 'berth_other', 'protection_insurance']
+        && request.resource.data.entryType == 'manual_receipt'
+        && request.resource.data.installmentType == 'advance'
+        && request.resource.data.accountingCategory == 'cost_recovery'
+        && request.resource.data.isOptional == false
+        && request.resource.data.dueDate == ''
+        && request.resource.data.reason == 'Acconto registrato'
+        && hasValidEmptyPaymentMethodSelection(request.resource.data.paymentMethods)
+        && request.resource.data.status == 'verified'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.verifiedAt == request.time
+        && request.resource.data.verifiedBy == request.auth.uid
         && request.resource.data.cancelledAt == null
         && request.resource.data.cancelledBy == null;
     }
@@ -1360,6 +1446,55 @@ service cloud.firestore {
         && request.resource.data.cancelledAt == request.time
         && request.resource.data.cancelledBy == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt', 'cancelledBy']);
+    }
+
+    // Non riscrive mai importo, destinatario o stato: serve solo a classificare
+    // una richiesta storica già verificata senza doverne creare un duplicato.
+    // Non la trasforma in "ricevuta manuale", perché quest'ultima richiede la
+    // data storica obbligatoria e può nascere dalla proiezione prima dell'invito.
+    function canClassifyVerifiedLegacyPaymentInstallment() {
+      return resource.data.status == 'verified'
+        && !resource.data.keys().hasAny(['entryType', 'installmentType', 'allocation', 'receivedOn'])
+        && request.resource.data.keys().hasAll(['entryType', 'installmentType'])
+        && request.resource.data.entryType == 'request'
+        && hasValidPaymentInstallmentFields()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['entryType', 'installmentType', 'allocation']);
+    }
+
+    // Questa lettura è separata dalla normale area skipper per evitare che un
+    // partecipante debba attraversare più catene di `get` annidate. Restano
+    // obbligatori: account password della persona, crewAccess corrente,
+    // invito attivo associato allo stesso ID della richiesta e briefing
+    // accettato nella sua versione pubblicata corrente.
+    function canReadOwnPaymentRequest(boatId) {
+      let access = get(/databases/$(database)/documents/crewAccess/$(request.auth.uid));
+      let inviteId = access.data.inviteId;
+      let invite = get(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId));
+      let board = get(/databases/$(database)/documents/boats/$(boatId)/briefing/board);
+      let acceptance = get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId));
+      return isPasswordCrew()
+        && exists(/databases/$(database)/documents/crewAccess/$(request.auth.uid))
+        && access.data.userId == request.auth.uid
+        && access.data.loginEmail == request.auth.token.email
+        && access.data.boatId == boatId
+        && access.data.inviteId is string
+        && resource.data.recipientId is string
+        && resource.data.recipientId == inviteId
+        && exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId))
+        && invite.data.status == 'active'
+        && invite.data.participantUid == request.auth.uid
+        && exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
+        && board.data.rulesText is string
+        && board.data.rulesText.size() > 0
+        && board.data.rulesVersion is int
+        && exists(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId))
+        && acceptance.data.inviteId == inviteId
+        && acceptance.data.acceptedBy == request.auth.uid
+        && acceptance.data.rulesVersion == board.data.rulesVersion
+        && (!board.data.keys().hasAll(['fullRulesRequired'])
+          || board.data.fullRulesRequired != true
+          || (acceptance.data.keys().hasAll(['fullRulesRead'])
+            && acceptance.data.fullRulesRead == true));
     }
 
     // La vetrina pubblica non riusa mai /boats: quel documento contiene
@@ -1608,11 +1743,24 @@ service cloud.firestore {
         // può alterare il pareggio della Cassa skipper.
         allow read: if isPrivateAreaOpen()
           && (isSkipper(boatId)
-            || (resource.data.recipientId is string
-              && isInviteHolder(boatId, resource.data.recipientId)
-              && hasCurrentParticipantBriefingAcceptance(boatId)));
-        allow create: if isPrivateAreaOpen() && isSkipper(boatId) && collectionProfileExists(boatId) && isValidPaymentRequestCreate(boatId);
-        allow update: if isPrivateAreaOpen() && isSkipper(boatId) && (canVerifyPayment() || canCancelPayment());
+            || canReadOwnPaymentRequest(boatId));
+        // Il profilo di incasso protegge le sole richieste da inviare. Una
+        // ricevuta manuale non propone canali di pagamento e può documentare
+        // un acconto già raccolto prima della configurazione del profilo.
+        allow create: if isPrivateAreaOpen()
+          && isSkipper(boatId)
+          // La diramazione evita di valutare anche il profilo e tutti i suoi
+          // link quando il payload è una ricevuta manuale già verificata.
+          && ((request.resource.data.keys().hasAll(['entryType'])
+              && request.resource.data.entryType == 'manual_receipt')
+            ? isValidManualReceiptCreate(boatId)
+            : (collectionProfileExists(boatId)
+              && isValidPaymentRequestCreate(boatId)));
+        allow update: if isPrivateAreaOpen()
+          && isSkipper(boatId)
+          && (canVerifyPayment()
+            || canCancelPayment()
+            || canClassifyVerifiedLegacyPaymentInstallment());
         allow delete: if false;
       }
 
