@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260913-berth-pricing1';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
@@ -36,6 +36,30 @@ const BERTH_RATE_TYPES = [
   { id: 'dinette', label: 'Posto in dinette', rateKey: 'dinetteCents', defaultReason: 'Quota posto in dinette', count: (totals) => totals.dinetteBerths },
   { id: 'other', label: 'Altra sistemazione', rateKey: 'otherBerthCents', defaultReason: 'Quota altra sistemazione', count: (totals) => totals.otherCrewBerths },
 ];
+// Etichette tecniche chiuse: consentono di mostrare a ciascuno solo le
+// proprie voci, senza dedurle dalla causale libera del messaggio WhatsApp.
+const PAYMENT_CONTRIBUTION_ITEM_LABELS = Object.freeze({
+  berth_base: 'Quota posto consigliata',
+  berth_double_cabin: 'Posto in cabina doppia',
+  berth_single_cabin: 'Posto in cabina singola',
+  berth_dinette: 'Posto in dinette',
+  berth_other: 'Altra sistemazione',
+  starter_pack: 'Starter Pack',
+  linen_towels: 'Lenzuola e asciugamani',
+  protection_insurance: 'Assicurazione cauzione',
+  provisions: 'Cambusa',
+  fuel: 'Gasolio per la navigazione',
+  transfer: 'Transfer da/per il porto',
+  other: 'Altra voce',
+});
+const PAYMENT_CONTRIBUTION_ITEM_IDS = new Set(Object.keys(PAYMENT_CONTRIBUTION_ITEM_LABELS));
+const PROJECTION_BERTH_TYPES = Object.freeze({
+  to_define: 'Da definire',
+  double_cabin: 'Cabina doppia',
+  single_cabin: 'Cabina singola',
+  dinette: 'Dinette',
+  other: 'Altra sistemazione',
+});
 const CONTRIBUTION_ITEM_STATES = new Map([
   ['to_define', 'Da definire'],
   ['included', 'Compreso nella quota'],
@@ -149,6 +173,7 @@ let activeBoat = null;
 let activeMembers = [];
 let activePayments = [];
 let activeInvites = [];
+let activeProjections = [];
 let activePaymentProfile = null;
 let activeContributionPlan = null;
 let activeCostPlan = null;
@@ -162,13 +187,16 @@ let stopPaymentProfileSubscription = null;
 let stopContributionPlanSubscription = null;
 let stopCostPlanSubscription = null;
 let stopInviteSubscription = null;
+let stopProjectionSubscription = null;
 let stopBriefingSubscription = null;
 let stopAnnouncementSubscription = null;
 let stopAcceptanceSubscription = null;
 let creatingBoat = false;
 let editingBoatId = null;
 let editingMemberId = null;
+let editingProjectionId = null;
 const fleetPublicationInProgress = new Set();
+let fleetAvailabilitySyncInProgress = false;
 const SKIPPER_DASHBOARD_HASHES = Object.freeze({
   overview: 'skipper-panorama',
   crew: 'skipper-equipaggio',
@@ -318,10 +346,11 @@ function renderSkipperDashboardOverview() {
   const allocated = allocatedCrewSeatCount();
   const pendingInvites = activeInvites.filter((invite) => invite.status === 'pending').length;
   const completedProfiles = activeMembers.length;
+  const projectedCrew = activeProjections.length;
   setSkipperDashboardMetric(
     'crew',
     capacity ? `${allocated} di ${capacity} posti` : 'Posti da configurare',
-    `${completedProfiles} schede completate · ${pendingInvites} inviti da attivare`,
+    `${completedProfiles} schede completate · ${pendingInvites} link pronti · ${projectedCrew} proiezioni`,
   );
 
   const costPlan = normalizeCostPlan(activeCostPlan);
@@ -355,6 +384,7 @@ function renderSkipperDashboardOverview() {
     `${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} comunicazioni pubblicate`,
   );
 
+  renderSkipperFinanceOverview();
   const nextActionText = document.querySelector('#skipperNextActionText');
   const nextActionButton = document.querySelector('#skipperNextActionButton');
   if (!nextActionText || !nextActionButton) return;
@@ -375,6 +405,90 @@ function renderSkipperDashboardOverview() {
     nextActionButton.textContent = 'Gestisci equipaggio';
     nextActionButton.dataset.skipperView = 'crew';
   }
+}
+
+function contributionConfigSummary(itemId, { deposit = false } = {}) {
+  const item = contributionCatalog().find((candidate) => candidate.id === itemId);
+  if (!activeContributionPlan || !item) {
+    return {
+      value: 'Da configurare',
+      detail: deposit
+        ? 'Indica importo a persona e consegna in loco.'
+        : 'Definisci se la voce è compresa, a parte o in loco.',
+    };
+  }
+  const amount = item.amountCents > 0 ? `${formatCurrency(item.amountCents / 100)} a persona` : 'Importo da definire';
+  if (item.state === 'included') return { value: 'Compreso nella quota', detail: 'Nessuna richiesta separata prevista.' };
+  if (item.state === 'not_applicable') return { value: 'Non previsto', detail: 'Non entra nel riepilogo personale.' };
+  if (item.state === 'extra') {
+    return deposit
+      ? { value: amount, detail: 'Configurazione da correggere: la cauzione va regolata in loco, non richiesta via WhatsApp.' }
+      : { value: amount, detail: 'Voce separata, richiedibile con messaggio personale.' };
+  }
+  if (item.state === 'local') {
+    return {
+      value: amount,
+      detail: deposit
+        ? 'Da portare e regolare in loco; rimborsabile secondo charter e skipper.'
+        : 'Da regolare in loco o da dividere a bordo.',
+    };
+  }
+  return {
+    value: 'Da definire',
+    detail: deposit
+      ? 'Non è inclusa nella quota né nella Cassa skipper.'
+      : 'Non è ancora inclusa né richiesta a parte.',
+  };
+}
+
+function renderSkipperFinanceOverview() {
+  const overview = document.querySelector('#skipperFinanceOverview');
+  if (!overview) return;
+  const plan = normalizeCostPlan(activeCostPlan);
+  const targetCents = activeCostPlan ? costPlanTotalCents(plan) : 0;
+  const verifiedCents = activePayments
+    .filter((payment) => payment.status === 'verified' && paymentCountsTowardCostPlan(payment))
+    .reduce((total, payment) => total + paymentAmountCents(payment), 0);
+  const pendingCents = activePayments
+    .filter((payment) => isPendingPayment(payment) && paymentCountsTowardCostPlan(payment))
+    .reduce((total, payment) => total + paymentAmountCents(payment), 0);
+  const projectedBerthCents = activeProjections
+    .reduce((total, projection) => total + normalizedProjectionAmount(projection.berthCents), 0);
+  const projectedExtrasCents = activeProjections
+    .reduce((total, projection) => total
+      + normalizedProjectionAmount(projection.starterPackCents)
+      + normalizedProjectionAmount(projection.protectionInsuranceCents), 0);
+  const projectedPayableCents = projectedBerthCents + projectedExtrasCents;
+  const baseContribution = costPlanBaseContribution();
+  const starterPack = contributionConfigSummary('starter_pack');
+  const protectionInsurance = contributionConfigSummary('protection_insurance');
+  const refundableDeposit = contributionConfigSummary('refundable_deposit', { deposit: true });
+  const recoveryValue = targetCents ? formatCurrency(targetCents / 100) : 'Da compilare';
+  const recoveryDetail = !targetCents
+    ? 'Solo charter e spese recuperabili dello skipper.'
+    : verifiedCents > targetCents
+      ? `${formatCurrency(verifiedCents / 100)} verificati · ${formatCurrency((verifiedCents - targetCents) / 100)} da riallocare.`
+      : `${formatCurrency(verifiedCents / 100)} verificati · ${formatCurrency((targetCents - verifiedCents) / 100)} ancora da recuperare.${pendingCents ? ` ${formatCurrency(pendingCents / 100)} in attesa di verifica.` : ''}`;
+  const baseValue = baseContribution ? `${formatCurrency(baseContribution.cents / 100)} a persona` : 'Da calcolare';
+  const baseDetail = baseContribution
+    ? `Cassa ÷ ${plan.payingParticipants} ${plan.payingParticipants === 1 ? 'partecipante pagante' : 'partecipanti paganti'}; skipper escluso.`
+    : 'Inserisci i costi e chi li divide per proporre una quota posto.';
+  const projectionValue = activeProjections.length
+    ? `${formatCurrency(projectedPayableCents / 100)} previsti`
+    : 'Nessuna previsione';
+  const projectionDetail = activeProjections.length
+    ? `${activeProjections.length} ${activeProjections.length === 1 ? 'posto riservato' : 'posti riservati'} · ${formatCurrency(projectedBerthCents / 100)} posti${projectedExtrasCents ? ` · ${formatCurrency(projectedExtrasCents / 100)} Starter Pack/assicurazione` : ''}. Non è un incasso.`
+    : 'Aggiungi una persona nel Piano equipaggio per stimare gli scenari, senza inviare alcuna richiesta.';
+  overview.innerHTML = `
+    <div class="finance-overview-heading"><p class="eyebrow">Cabina di regia economica</p><p>La Cassa skipper recupera solo costi reali. Extra e cauzione restano distinti: nessun margine, nessun incasso nel sito.</p></div>
+    <div class="finance-overview-grid">
+      <article class="finance-overview-card"><span>Cassa skipper</span><strong>${escapeHtml(recoveryValue)}</strong><small>${escapeHtml(recoveryDetail)}</small></article>
+      <article class="finance-overview-card"><span>Quota posto consigliata</span><strong>${escapeHtml(baseValue)}</strong><small>${escapeHtml(baseDetail)}</small></article>
+      <article class="finance-overview-card finance-overview-card-projection"><span>Proiezione equipaggio</span><strong>${escapeHtml(projectionValue)}</strong><small>${escapeHtml(projectionDetail)}</small></article>
+      <article class="finance-overview-card finance-overview-card-extras"><span>Extra per persona</span><strong>Starter Pack · ${escapeHtml(starterPack.value)}</strong><small>${escapeHtml(starterPack.detail)}</small><strong>Assicurazione cauzione · ${escapeHtml(protectionInsurance.value)}</strong><small>${escapeHtml(protectionInsurance.detail)}</small></article>
+      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile</span><strong>${escapeHtml(refundableDeposit.value)}</strong><small>${escapeHtml(refundableDeposit.detail)}</small></article>
+    </div>
+  `;
 }
 
 function setupBriefingEditor() {
@@ -581,9 +695,13 @@ function defaultCostPlan() {
   };
 }
 
+function maximumPayingParticipants() {
+  return Math.max(1, effectiveParticipantCapacity(activeBoat) || 30);
+}
+
 function normalizeCostPlan(plan = {}) {
   const defaults = defaultCostPlan();
-  const payingParticipants = asNonNegativeInteger(plan?.payingParticipants, 30);
+  const payingParticipants = asNonNegativeInteger(plan?.payingParticipants, maximumPayingParticipants());
   return {
     charterCents: asNonNegativeInteger(plan?.charterCents, 1_000_000),
     skipperFlightTrainCents: asNonNegativeInteger(plan?.skipperFlightTrainCents, 1_000_000),
@@ -636,7 +754,7 @@ function contributionCatalog(plan = activeContributionPlan) {
 
 function extraContributionTypes(plan = activeContributionPlan) {
   return contributionCatalog(plan)
-    .filter((item) => item.state === 'extra')
+    .filter((item) => item.state === 'extra' && item.id !== 'refundable_deposit')
     .map((item) => ({
       id: `extra:${item.id}`,
       label: item.label,
@@ -850,9 +968,32 @@ async function saveBoatAndPublicFleet(boatId, currentBoat, changes, isNew = fals
 function renderFleetProfileForm() {
   const form = document.querySelector('#fleetProfileForm');
   if (!form || !activeBoat) return;
-  form.elements.availableSeats.value = String(declaredFleetAvailability(activeBoat));
+  form.elements.availableSeats.value = String(Math.max(0, crewSeatLimit() - allocatedCrewSeatCount()));
   form.elements.berthPreference.value = declaredFleetBerthPreference(activeBoat);
   form.elements.showAvailability.checked = isFleetAvailabilityPublic(activeBoat);
+}
+
+async function syncPublicFleetAvailabilityFromCrew() {
+  const boat = activeBoat;
+  if (!boat?.id || !boat.publicFleetId || !auth.currentUser || boat.skipperId !== auth.currentUser.uid
+    || !isFleetAvailabilityPublic(boat) || fleetAvailabilitySyncInProgress) return;
+  const availableSeats = Math.max(0, crewSeatLimit() - allocatedCrewSeatCount());
+  if (declaredFleetAvailability(boat) === availableSeats) return;
+  fleetAvailabilitySyncInProgress = true;
+  try {
+    const nextBoat = await saveBoatAndPublicFleet(boat.id, boat, {
+      fleetAvailableSeats: availableSeats,
+      updatedAt: serverTimestamp(),
+    });
+    if (activeBoat?.id === boat.id) {
+      activeBoat = nextBoat;
+      renderFleetProfileForm();
+    }
+  } catch (error) {
+    console.error('Egadi disponibilità flotta:', error);
+  } finally {
+    fleetAvailabilitySyncInProgress = false;
+  }
 }
 
 function fleetInitializationChanges(boat) {
@@ -900,6 +1041,7 @@ function resetPrivateView() {
   activeMembers = [];
   activePayments = [];
   activeInvites = [];
+  activeProjections = [];
   activePaymentProfile = null;
   activeContributionPlan = null;
   activeCostPlan = null;
@@ -909,7 +1051,9 @@ function resetPrivateView() {
   creatingBoat = false;
   editingBoatId = null;
   editingMemberId = null;
+  editingProjectionId = null;
   fleetPublicationInProgress.clear();
+  fleetAvailabilitySyncInProgress = false;
   stopBoatSubscription?.();
   stopMemberSubscription?.();
   stopPaymentSubscription?.();
@@ -917,6 +1061,7 @@ function resetPrivateView() {
   stopContributionPlanSubscription?.();
   stopCostPlanSubscription?.();
   stopInviteSubscription?.();
+  stopProjectionSubscription?.();
   stopBriefingSubscription?.();
   stopAnnouncementSubscription?.();
   stopAcceptanceSubscription?.();
@@ -927,6 +1072,7 @@ function resetPrivateView() {
   stopContributionPlanSubscription = null;
   stopCostPlanSubscription = null;
   stopInviteSubscription = null;
+  stopProjectionSubscription = null;
   stopBriefingSubscription = null;
   stopAnnouncementSubscription = null;
   stopAcceptanceSubscription = null;
@@ -1149,6 +1295,7 @@ function fillCostPlanForm(plan = activeCostPlan) {
   form.elements.skipperCarCost.value = euroInputValue(normalized.skipperCarCents);
   form.elements.skipperLocalTransferCost.value = euroInputValue(normalized.skipperLocalTransferCents);
   form.elements.otherRecoverableCost.value = euroInputValue(normalized.otherRecoverableCents);
+  form.elements.payingParticipants.max = String(maximumPayingParticipants());
   form.elements.payingParticipants.value = String(normalized.payingParticipants);
 }
 
@@ -1160,7 +1307,7 @@ function readCostPlanForm() {
     skipperCarCents: toEuroCents(form?.elements.skipperCarCost?.value),
     skipperLocalTransferCents: toEuroCents(form?.elements.skipperLocalTransferCost?.value),
     otherRecoverableCents: toEuroCents(form?.elements.otherRecoverableCost?.value),
-    payingParticipants: asNonNegativeInteger(form?.elements.payingParticipants?.value, 30),
+    payingParticipants: asNonNegativeInteger(form?.elements.payingParticipants?.value, maximumPayingParticipants()),
   };
 }
 
@@ -1327,7 +1474,7 @@ function inviteExpiresAt() {
   return Timestamp.fromDate(new Date(Date.now() + INVITE_VALIDITY_DAYS * 24 * 60 * 60 * 1000));
 }
 
-async function createInviteRecord({ displayName, whatsappNumber, preferredLocale = 'it', existingInvite = null }) {
+async function createInviteRecord({ displayName, whatsappNumber, preferredLocale = 'it', inviteId = null, existingInvite = null }) {
   const accessKey = createInviteId();
   const identity = await createCrewInviteIdentity({ phone: whatsappNumber, accessKey });
   if (!existingInvite) {
@@ -1339,7 +1486,7 @@ async function createInviteRecord({ displayName, whatsappNumber, preferredLocale
     }
   }
   return {
-    id: existingInvite?.id || createInviteId(),
+    id: existingInvite?.id || inviteId || createInviteId(),
     boatId: activeBoat.id,
     displayName,
     whatsappNumber: identity.normalizedPhone,
@@ -1352,6 +1499,36 @@ async function createInviteRecord({ displayName, whatsappNumber, preferredLocale
     expiresAt: inviteExpiresAt(),
     preferredLocale: preferredLocale === 'en' ? 'en' : 'it',
   };
+}
+
+async function createInviteFromProjection(projection) {
+  const preferredLocale = projection.preferredLocale === 'en' ? 'en' : 'it';
+  if (preferredLocale === 'en' && !hasOfficialEnglishBriefing()) {
+    const error = new Error('Briefing inglese mancante.');
+    error.code = 'english-briefing-required';
+    throw error;
+  }
+  const invite = await createInviteRecord({
+    displayName: projection.displayName,
+    whatsappNumber: projection.whatsappNumber,
+    preferredLocale,
+    inviteId: projection.id,
+  });
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'boats', activeBoat.id, 'invites', invite.id), {
+    ...invite,
+    createdAt: serverTimestamp(),
+    createdBy: auth.currentUser.uid,
+  });
+  batch.update(doc(db, 'boats', activeBoat.id, 'crewProjections', projection.id), {
+    status: 'invited',
+    inviteId: invite.id,
+    invitedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    updatedBy: auth.currentUser.uid,
+  });
+  await batch.commit();
+  return invite;
 }
 
 async function reissueInvite(invite) {
@@ -1386,13 +1563,13 @@ function renderPaymentRecipientOptions() {
 
 function contributionStateOptions(item) {
   return [...CONTRIBUTION_ITEM_STATES.entries()]
-    .filter(([value]) => item.id !== 'refundable_deposit' || value !== 'included')
+    .filter(([value]) => item.id !== 'refundable_deposit' || ['to_define', 'local', 'not_applicable'].includes(value))
     .map(([value, label]) => `<option value="${value}"${value === item.state ? ' selected' : ''}>${label}</option>`)
     .join('');
 }
 
 function contributionCatalogRow(item) {
-  const stateHint = item.id === 'refundable_deposit' ? '<small>Non può essere inclusa nella quota.</small>' : '';
+  const stateHint = item.id === 'refundable_deposit' ? '<small>È sempre rimborsabile e va portata/regolata in loco: non usa richieste WhatsApp.</small>' : '';
   return `<article class="contribution-catalog-row" data-contribution-id="${escapeHtml(item.id)}"><div class="contribution-catalog-label">${escapeHtml(item.label)}${stateHint}</div><label>Gestione<select data-contribution-state>${contributionStateOptions(item)}</select></label><label>€ a persona · solo a parte / in loco<input data-contribution-amount type="number" min="0" max="10000" step="0.01" inputmode="decimal" value="${euroInputValue(item.amountCents)}" placeholder="Es. 30,00" /></label></article>`;
 }
 
@@ -1436,6 +1613,26 @@ function extraContributionType(typeId) {
 function costPlanContributionType(typeId) {
   const baseContribution = costPlanBaseContribution();
   return baseContribution?.id === typeId ? baseContribution : null;
+}
+
+function contributionItemIdForPaymentSelection(typeId) {
+  const berthItemIds = {
+    double_cabin: 'berth_double_cabin',
+    single_cabin: 'berth_single_cabin',
+    dinette: 'berth_dinette',
+    other: 'berth_other',
+  };
+  if (berthItemIds[typeId]) return berthItemIds[typeId];
+  if (typeId === 'cost:base') return 'berth_base';
+  if (typeof typeId === 'string' && typeId.startsWith('extra:')) {
+    const itemId = typeId.slice('extra:'.length);
+    return PAYMENT_CONTRIBUTION_ITEM_IDS.has(itemId) ? itemId : 'other';
+  }
+  return 'other';
+}
+
+function paymentContributionItemLabel(payment) {
+  return PAYMENT_CONTRIBUTION_ITEM_LABELS[payment?.contributionItemId] || '';
 }
 
 function renderPaymentBerthOptions() {
@@ -1520,12 +1717,74 @@ function normalizeMember(id, member) {
   return { id, ...member, firstName, lastName: lastNameParts.join(' ') };
 }
 
+function projectionBerthLabel(type) {
+  return PROJECTION_BERTH_TYPES[type] || PROJECTION_BERTH_TYPES.to_define;
+}
+
+function normalizedProjectionAmount(value) {
+  return asNonNegativeInteger(value, 1_000_000);
+}
+
+function normalizeProjection(id, projection = {}) {
+  const firstName = String(projection.firstName || '').trim();
+  const lastName = String(projection.lastName || '').trim();
+  const displayName = String(projection.displayName || `${firstName} ${lastName}`).trim();
+  return {
+    id,
+    ...projection,
+    firstName,
+    lastName,
+    displayName,
+    plannedRole: String(projection.plannedRole || DEFAULT_CREW_ROLE).trim() || DEFAULT_CREW_ROLE,
+    berthType: PROJECTION_BERTH_TYPES[projection.berthType] ? projection.berthType : 'to_define',
+    berthCents: normalizedProjectionAmount(projection.berthCents),
+    starterPackCents: normalizedProjectionAmount(projection.starterPackCents),
+    protectionInsuranceCents: normalizedProjectionAmount(projection.protectionInsuranceCents),
+    refundableDepositCents: normalizedProjectionAmount(projection.refundableDepositCents),
+    status: projection.status === 'invited' ? 'invited' : 'projected',
+  };
+}
+
+function projectionPayableCents(projection) {
+  const normalized = normalizeProjection(projection.id, projection);
+  return normalized.berthCents + normalized.starterPackCents + normalized.protectionInsuranceCents;
+}
+
+function projectionQuoteSummary(projection) {
+  const normalized = normalizeProjection(projection.id, projection);
+  const parts = [
+    normalized.berthCents ? `Posto ${formatCurrency(normalized.berthCents / 100)}` : '',
+    normalized.starterPackCents ? `Starter Pack ${formatCurrency(normalized.starterPackCents / 100)}` : '',
+    normalized.protectionInsuranceCents ? `Assicurazione ${formatCurrency(normalized.protectionInsuranceCents / 100)}` : '',
+  ].filter(Boolean);
+  const payableCents = projectionPayableCents(normalized);
+  if (!payableCents) return 'Quota prevista da definire';
+  return `${parts.join(' · ')} · Totale previsto ${formatCurrency(payableCents / 100)}`;
+}
+
+function projectionInvite(projection) {
+  return activeInvites.find((invite) => invite.id === projection.id) || null;
+}
+
+function projectionStatusLabel(projection) {
+  const invite = projectionInvite(projection);
+  if (!invite) return 'Posto riservato · invito da creare';
+  if (invite.status === 'active') {
+    return activeMembers.some((member) => member.id === invite.id)
+      ? 'Accesso attivo · anagrafica completata'
+      : 'Accesso attivo · dati charter da completare';
+  }
+  const expired = invite.expiresAt?.toDate && invite.expiresAt.toDate() < new Date();
+  return expired ? 'Invito scaduto · genera un nuovo link' : 'Link pronto da inviare';
+}
+
 function crewSeatLimit() {
   return effectiveParticipantCapacity(activeBoat);
 }
 
 function allocatedCrewSeatCount() {
-  const seatIds = new Set(activeInvites.filter((invite) => invite.status !== 'revoked').map((invite) => invite.id));
+  const seatIds = new Set(activeProjections.map((projection) => projection.id));
+  activeInvites.filter((invite) => invite.status !== 'revoked' && !seatIds.has(invite.id)).forEach((invite) => seatIds.add(invite.id));
   activeMembers.forEach((member) => seatIds.add(member.id));
   return seatIds.size;
 }
@@ -1548,7 +1807,9 @@ function renderCapacityStatus() {
     return;
   }
   const available = Math.max(0, limit - allocated);
-  status.textContent = 'Posti partecipanti: ' + allocated + ' di ' + limit + ' occupati o riservati. '
+  const projected = activeProjections.length;
+  status.textContent = 'Posti partecipanti: ' + allocated + ' di ' + limit + ' occupati o riservati'
+    + (projected ? ` · ${projected} nella proiezione equipaggio` : '') + '. '
     + (available ? available + ' ancora disponibili.' : 'Nessun posto ancora disponibile.');
 }
 
@@ -1558,6 +1819,15 @@ function resetMemberForm() {
   editingMemberId = null;
   document.querySelector('#memberSubmitButton').textContent = 'Aggiungi persona';
   document.querySelector('#cancelMemberEdit').hidden = true;
+}
+
+function resetProjectionForm() {
+  const form = document.querySelector('#projectionForm');
+  if (!form) return;
+  form.reset();
+  editingProjectionId = null;
+  document.querySelector('#projectionSubmitButton').textContent = 'Riserva posto nella proiezione';
+  document.querySelector('#cancelProjectionEdit').hidden = true;
 }
 
 function setBoatFormDefaults(user) {
@@ -1620,6 +1890,37 @@ function updateCharterReadiness() {
       : 'Crew List completa: il PDF è pronto per il charter.';
 }
 
+function renderProjections() {
+  const list = document.querySelector('#projectionList');
+  if (!list) return;
+  if (!activeProjections.length) {
+    list.innerHTML = '<p class="empty-state">Nessun posto ancora riservato nella proiezione.</p>';
+    renderCapacityStatus();
+    renderSkipperDashboardOverview();
+    void syncPublicFleetAvailabilityFromCrew();
+    return;
+  }
+  list.innerHTML = activeProjections.map((projection) => {
+    const invite = projectionInvite(projection);
+    const quote = projectionQuoteSummary(projection);
+    const deposit = projection.refundableDepositCents > 0
+      ? ` · cauzione rimborsabile ${formatCurrency(projection.refundableDepositCents / 100)} in loco`
+      : ' · cauzione da definire/in loco';
+    const inviteActions = !invite
+      ? `<button class="text-button" type="button" data-send-projection="${escapeHtml(projection.id)}">Crea invito</button>`
+      : invite.status === 'pending' && invite.accessKey
+        ? `<button class="text-button" type="button" data-copy-invite="${escapeHtml(invite.id)}">Copia link</button><button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(invite.id)}">Apri WhatsApp</button>`
+        : '';
+    const draftActions = !invite
+      ? `<button class="text-button" type="button" data-edit-projection="${escapeHtml(projection.id)}">Modifica</button><button class="text-button" type="button" data-release-projection="${escapeHtml(projection.id)}">Libera posto</button>`
+      : '';
+    return `<article class="projection-row"><div><strong>${escapeHtml(projection.displayName)}</strong><span>${escapeHtml(projection.plannedRole)} · ${escapeHtml(projectionBerthLabel(projection.berthType))}</span><span>${escapeHtml(quote + deposit)}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small></div><div class="member-actions">${inviteActions}${draftActions}</div></article>`;
+  }).join('');
+  renderCapacityStatus();
+  renderSkipperDashboardOverview();
+  void syncPublicFleetAvailabilityFromCrew();
+}
+
 function renderMembers() {
   const list = document.querySelector('#memberList');
   if (!activeMembers.length) {
@@ -1628,6 +1929,7 @@ function renderMembers() {
     renderCapacityStatus();
     updateCharterReadiness();
     renderSkipperDashboardOverview();
+    void syncPublicFleetAvailabilityFromCrew();
     return;
   }
   list.innerHTML = activeMembers.map((member) => {
@@ -1643,6 +1945,7 @@ function renderMembers() {
   renderCapacityStatus();
   updateCharterReadiness();
   renderSkipperDashboardOverview();
+  void syncPublicFleetAvailabilityFromCrew();
 }
 
 function renderInvites() {
@@ -1652,6 +1955,7 @@ function renderInvites() {
     renderPaymentRecipientOptions();
     renderCapacityStatus();
     renderSkipperDashboardOverview();
+    void syncPublicFleetAvailabilityFromCrew();
     return;
   }
   list.innerHTML = activeInvites.map((invite) => {
@@ -1669,6 +1973,7 @@ function renderInvites() {
   renderPaymentRecipientOptions();
   renderCapacityStatus();
   renderSkipperDashboardOverview();
+  void syncPublicFleetAvailabilityFromCrew();
 }
 
 function renderPayments(snapshot) {
@@ -1703,7 +2008,11 @@ function renderPayments(snapshot) {
     const accountingTag = paymentCountsTowardCostPlan(payment)
       ? '<span class="payment-accounting-tag">Cassa skipper</span>'
       : '';
-    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}<button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${inviteAction}${statusActions}</div></article>`;
+    const contributionLabel = paymentContributionItemLabel(payment);
+    const contributionTag = contributionLabel
+      ? `<span class="payment-contribution-tag">${escapeHtml(contributionLabel)}</span>`
+      : '';
+    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${contributionTag}${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}<button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${inviteAction}${statusActions}</div></article>`;
   }).join('');
   renderCostPlanSummary();
   renderSkipperDashboardOverview();
@@ -1793,6 +2102,7 @@ function subscribeToBoat(boat) {
   stopContributionPlanSubscription?.();
   stopCostPlanSubscription?.();
   stopInviteSubscription?.();
+  stopProjectionSubscription?.();
   stopBriefingSubscription?.();
   stopAnnouncementSubscription?.();
   stopAcceptanceSubscription?.();
@@ -1816,18 +2126,29 @@ function subscribeToBoat(boat) {
     activeContributionPlan = snapshot.exists() ? snapshot.data() : null;
     renderContributionCatalogForm();
     renderPaymentBerthOptions();
+    renderSkipperDashboardOverview();
   }, () => {
     activeContributionPlan = null;
     renderContributionCatalogForm();
     renderPaymentBerthOptions();
+    renderSkipperDashboardOverview();
     setMessage(document.querySelector('#contributionCatalogMessage'), 'Impossibile leggere la composizione delle quote.', true);
   });
   stopPaymentSubscription = onSnapshot(query(collection(db, 'boats', boat.id, 'paymentRequests'), orderBy('createdAt', 'desc')), renderPayments, () => setMessage(document.querySelector('#paymentFormMessage'), 'Impossibile leggere le richieste.', true));
   stopInviteSubscription = onSnapshot(collection(db, 'boats', boat.id, 'invites'), (snapshot) => {
     activeInvites = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort((first, second) => String(first.displayName || '').localeCompare(String(second.displayName || ''), 'it'));
     renderInvites();
+    renderProjections();
     renderPayments({ empty: activePayments.length === 0, docs: activePayments.map((payment) => ({ id: payment.id, data: () => payment })) });
   }, () => setMessage(document.querySelector('#inviteFormMessage'), 'Impossibile leggere gli inviti personali.', true));
+  stopProjectionSubscription = onSnapshot(collection(db, 'boats', boat.id, 'crewProjections'), (snapshot) => {
+    activeProjections = snapshot.docs
+      .map((item) => normalizeProjection(item.id, item.data()))
+      .sort((first, second) => first.displayName.localeCompare(second.displayName, 'it'));
+    renderProjections();
+    renderCapacityStatus();
+    renderSkipperDashboardOverview();
+  }, () => setMessage(document.querySelector('#projectionFormMessage'), 'Impossibile leggere la proiezione equipaggio.', true));
   stopBriefingSubscription = onSnapshot(doc(db, 'boats', boat.id, 'briefing', 'board'), (snapshot) => {
     activeBriefing = snapshot.exists() ? snapshot.data() : null;
     renderBriefingForm();
@@ -1978,11 +2299,7 @@ document.querySelector('#fleetProfileForm').addEventListener('submit', async (ev
   const form = event.currentTarget;
   const fields = new FormData(form);
   const capacity = Number(activeBoat.capacity);
-  const availableSeats = Number(fields.get('availableSeats'));
-  if (!Number.isInteger(availableSeats) || availableSeats < 0 || availableSeats > capacity) {
-    setMessage(message, `Indica un numero da 0 a ${capacity}.`, true);
-    return;
-  }
+  const availableSeats = Math.max(0, Math.min(capacity, crewSeatLimit() - allocatedCrewSeatCount()));
   const berthPreference = String(fields.get('berthPreference') || 'not_specified');
   if (!FLEET_BERTH_PREFERENCES.has(berthPreference)) {
     setMessage(message, 'Configurazione del posto non valida.', true);
@@ -2011,61 +2328,198 @@ document.querySelector('#fleetProfileForm').addEventListener('submit', async (ev
   }
 });
 
-document.querySelector('#inviteForm').addEventListener('submit', async (event) => {
+function projectionDraftFromFields(fields, id) {
+  const firstName = String(fields.get('firstName') || '').trim();
+  const lastName = String(fields.get('lastName') || '').trim();
+  return {
+    id,
+    firstName,
+    lastName,
+    displayName: `${firstName} ${lastName}`.trim(),
+    whatsappNumber: `+${normalizeWhatsAppNumber(fields.get('whatsappNumber'))}`,
+    plannedRole: roleFromFields(fields, 'projectionRole'),
+    berthType: PROJECTION_BERTH_TYPES[fields.get('berthType')] ? fields.get('berthType') : 'to_define',
+    berthCents: toEuroCents(fields.get('berthAmount')),
+    starterPackCents: toEuroCents(fields.get('starterPackAmount')),
+    protectionInsuranceCents: toEuroCents(fields.get('protectionInsuranceAmount')),
+    refundableDepositCents: toEuroCents(fields.get('refundableDepositAmount')),
+    preferredLocale: fields.get('preferredLocale') === 'en' ? 'en' : 'it',
+    contactConsent: fields.get('contactConsent') === 'on',
+  };
+}
+
+function fillProjectionForm(projection) {
+  const form = document.querySelector('#projectionForm');
+  if (!form) return;
+  form.elements.firstName.value = projection.firstName;
+  form.elements.lastName.value = projection.lastName;
+  form.elements.whatsappNumber.value = projection.whatsappNumber;
+  fillRoleFields(form, 'projectionRole', projection.plannedRole);
+  form.elements.berthType.value = projection.berthType;
+  form.elements.berthAmount.value = euroInputValue(projection.berthCents);
+  form.elements.starterPackAmount.value = euroInputValue(projection.starterPackCents);
+  form.elements.protectionInsuranceAmount.value = euroInputValue(projection.protectionInsuranceCents);
+  form.elements.refundableDepositAmount.value = euroInputValue(projection.refundableDepositCents);
+  form.elements.preferredLocale.value = projection.preferredLocale === 'en' ? 'en' : 'it';
+  form.elements.contactConsent.checked = projection.contactConsent === true;
+}
+
+function applyProjectionBerthPreset() {
+  const form = document.querySelector('#projectionForm');
+  if (!form || !activeBoat) return;
+  const type = berthRateType(form.elements.berthType?.value);
+  if (!type) return;
+  const cents = normalizeBerthRates(activeBoat.berthRates)[type.rateKey];
+  const amount = form.elements.berthAmount;
+  if (cents > 0 && (!amount.value || amount.dataset.autoProjectionRate === 'true')) {
+    amount.value = euroInputValue(cents);
+    amount.dataset.autoProjectionRate = 'true';
+  }
+}
+
+document.querySelector('#projectionForm').addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (blockPrivateAction(document.querySelector('#inviteFormMessage'))) return;
+  const message = document.querySelector('#projectionFormMessage');
+  if (blockPrivateAction(message)) return;
   if (!activeBoat || !auth.currentUser) return;
-  if (needsCapacityAlignment(activeBoat)) {
-    setMessage(document.querySelector('#inviteFormMessage'), capacityAlignmentMessage(activeBoat), true);
+  if (!editingProjectionId && needsCapacityAlignment(activeBoat)) {
+    setMessage(message, capacityAlignmentMessage(activeBoat), true);
     return;
   }
-  if (isCrewCapacityReached()) {
-    setMessage(document.querySelector('#inviteFormMessage'), 'Hai già riservato tutti i posti per partecipanti indicati per questa barca.', true);
+  if (!editingProjectionId && isCrewCapacityReached()) {
+    setMessage(message, 'Hai già riservato tutti i posti per partecipanti indicati per questa barca.', true);
     return;
   }
   const form = event.currentTarget;
   const fields = new FormData(form);
-  const displayName = fields.get('displayName').trim();
-  const preferredLocale = fields.get('preferredLocale') === 'en' ? 'en' : 'it';
   const normalizedNumber = normalizeWhatsAppNumber(fields.get('whatsappNumber'));
   if (!normalizedNumber) {
-    setMessage(document.querySelector('#inviteFormMessage'), 'Inserisci il numero WhatsApp in formato internazionale, ad esempio +39 333 1234567.', true);
+    setMessage(message, 'Inserisci il numero WhatsApp in formato internazionale, ad esempio +39 333 1234567.', true);
     return;
   }
-  if (preferredLocale === 'en' && !hasOfficialEnglishBriefing()) {
-    setMessage(document.querySelector('#inviteFormMessage'), 'Prima di inviare un invito in inglese, pubblica il briefing safety ufficiale in inglese dalla bacheca di bordo.', true);
+  if (fields.get('contactConsent') !== 'on') {
+    setMessage(message, 'Conferma di avere il consenso della persona prima di salvarne il contatto.', true);
     return;
   }
-  const whatsappNumber = `+${normalizedNumber}`;
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
-  const whatsappWindow = window.open('', '_blank');
-  if (whatsappWindow) whatsappWindow.opener = null;
   try {
-    const invite = await createInviteRecord({ displayName, whatsappNumber, preferredLocale });
-    await setDoc(doc(db, 'boats', activeBoat.id, 'invites', invite.id), {
-      ...invite, createdAt: serverTimestamp(), createdBy: auth.currentUser.uid,
-    });
-    form.reset();
-    if (whatsappWindow) {
-      const url = whatsappUrl(invite);
-      if (url) {
-        whatsappWindow.location.replace(url);
-        setMessage(document.querySelector('#inviteFormMessage'), 'Link personale creato: WhatsApp è aperto con il messaggio già pronto.');
-      } else {
-        whatsappWindow.close();
-        setMessage(document.querySelector('#inviteFormMessage'), 'Link creato, ma il numero WhatsApp non è valido. Correggilo prima di inviarlo.', true);
-      }
+    const projectionId = editingProjectionId || createInviteId();
+    const projection = projectionDraftFromFields(fields, projectionId);
+    if (editingProjectionId) {
+      await updateDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), {
+        ...projection,
+        status: 'projected',
+        inviteId: null,
+        invitedAt: null,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser.uid,
+      });
+      setMessage(message, 'Proiezione aggiornata: il posto resta riservato.');
     } else {
-      setMessage(document.querySelector('#inviteFormMessage'), 'Link personale creato: apri WhatsApp dalla scheda dell’invito.');
+      await setDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), {
+        ...projection,
+        status: 'projected',
+        inviteId: null,
+        invitedAt: null,
+        createdAt: serverTimestamp(),
+        createdBy: auth.currentUser.uid,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser.uid,
+      });
+      setMessage(message, 'Posto riservato nella proiezione. Quando vuoi, crea l’invito dalla riga della persona.');
     }
+    resetProjectionForm();
   } catch (error) {
-    whatsappWindow?.close();
-    setMessage(document.querySelector('#inviteFormMessage'), error.code === 'phone-already-assigned'
-      ? 'Questo numero è già associato a una barca dell’evento. Non creare un secondo invito: verifica prima con l’organizzatore.'
-      : 'Non riesco a creare il link personale.', true);
+    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare la proiezione equipaggio.'), true);
   } finally {
     submitButton.disabled = false;
+  }
+});
+
+const projectionForm = document.querySelector('#projectionForm');
+projectionForm.elements.berthType.addEventListener('change', applyProjectionBerthPreset);
+projectionForm.elements.berthAmount.addEventListener('input', () => {
+  delete projectionForm.elements.berthAmount.dataset.autoProjectionRate;
+});
+document.querySelector('#cancelProjectionEdit').addEventListener('click', resetProjectionForm);
+
+document.querySelector('#projectionList').addEventListener('click', async (event) => {
+  const message = document.querySelector('#projectionFormMessage');
+  if (blockPrivateAction(message) || !activeBoat || !auth.currentUser) return;
+  const editButton = event.target.closest('[data-edit-projection]');
+  if (editButton) {
+    const projection = activeProjections.find((candidate) => candidate.id === editButton.dataset.editProjection);
+    if (!projection || projectionInvite(projection)) return;
+    fillProjectionForm(projection);
+    editingProjectionId = projection.id;
+    document.querySelector('#projectionSubmitButton').textContent = 'Salva proiezione';
+    document.querySelector('#cancelProjectionEdit').hidden = false;
+    projectionForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  const releaseButton = event.target.closest('[data-release-projection]');
+  if (releaseButton) {
+    const projection = activeProjections.find((candidate) => candidate.id === releaseButton.dataset.releaseProjection);
+    if (!projection || projectionInvite(projection)) return;
+    if (!window.confirm(`Liberare il posto riservato per ${projection.displayName}? Non è stato creato alcun invito.`)) return;
+    releaseButton.disabled = true;
+    try {
+      await deleteDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projection.id));
+      if (editingProjectionId === projection.id) resetProjectionForm();
+      setMessage(message, 'Posto liberato: torna disponibile per una nuova proiezione.');
+    } catch (error) {
+      releaseButton.disabled = false;
+      setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a liberare questo posto.'), true);
+    }
+    return;
+  }
+  const sendButton = event.target.closest('[data-send-projection]');
+  if (sendButton) {
+    const projection = activeProjections.find((candidate) => candidate.id === sendButton.dataset.sendProjection);
+    if (!projection || projectionInvite(projection)) return;
+    sendButton.disabled = true;
+    const whatsappWindow = window.open('', '_blank');
+    if (whatsappWindow) whatsappWindow.opener = null;
+    try {
+      const invite = await createInviteFromProjection(projection);
+      const url = whatsappUrl(invite);
+      if (whatsappWindow && url) {
+        whatsappWindow.location.replace(url);
+        setMessage(message, `Invito pronto per ${projection.displayName}: WhatsApp è aperto con il messaggio già preparato.`);
+      } else {
+        whatsappWindow?.close();
+        setMessage(message, `Invito pronto per ${projection.displayName}: copia il link dalla lista inviti.`);
+      }
+    } catch (error) {
+      whatsappWindow?.close();
+      sendButton.disabled = false;
+      const fallback = error.code === 'phone-already-assigned'
+        ? 'Questo numero è già associato a una barca dell’evento. Verifica prima con l’organizzatore.'
+        : error.code === 'english-briefing-required'
+          ? 'Prima di creare un invito in inglese, pubblica il briefing safety ufficiale in inglese dalla bacheca di bordo.'
+          : 'Non riesco a creare l’invito personale.';
+      setMessage(message, getFirestoreErrorMessage(error, fallback), true);
+    }
+    return;
+  }
+  const invite = activeInvites.find((candidate) => candidate.id === event.target.closest('[data-copy-invite]')?.dataset.copyInvite
+    || candidate.id === event.target.closest('[data-whatsapp-invite]')?.dataset.whatsappInvite);
+  const copyButton = event.target.closest('[data-copy-invite]');
+  if (copyButton && invite) {
+    try {
+      await navigator.clipboard.writeText(participantUrl(invite));
+      setMessage(message, 'Link personale copiato.');
+    } catch (error) {
+      setMessage(message, 'Non riesco a copiare il link. Verifica i permessi del browser.', true);
+    }
+    return;
+  }
+  const whatsappButton = event.target.closest('[data-whatsapp-invite]');
+  if (whatsappButton && invite) {
+    const url = whatsappUrl(invite);
+    if (url) window.open(url, '_blank', 'noopener');
+    else setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
   }
 });
 
@@ -2346,6 +2800,7 @@ contributionCatalogForm.addEventListener('submit', async (event) => {
     activeContributionPlan = plan;
     renderContributionCatalogForm();
     renderPaymentBerthOptions();
+    renderSkipperDashboardOverview();
     setMessage(message, 'Composizione salvata. L’equipaggio vedrà solo voci, stato e eventuale importo: mai i tuoi dati di incasso.');
   } catch (error) {
     setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare la composizione delle quote.'), true);
@@ -2401,6 +2856,7 @@ paymentForm.addEventListener('submit', async (event) => {
     recipientId,
     memberId: recipientId,
     payerInviteId: recipientId,
+    contributionItemId: contributionItemIdForPaymentSelection(String(fields.get('berthType') || 'custom')),
     amountCents,
     currency: 'EUR',
     reason,

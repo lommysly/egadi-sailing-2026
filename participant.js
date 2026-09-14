@@ -225,7 +225,63 @@ function showInvalid() {
   document.querySelector('#invalidLink').hidden = false;
 }
 
-function showProfile({ invite, member, phone = '' }) {
+function projectionBerthLabel(projection) {
+  const labels = {
+    double_cabin: activeLocale() === 'en' ? 'double cabin' : 'cabina doppia',
+    single_cabin: activeLocale() === 'en' ? 'single cabin' : 'cabina singola',
+    dinette: 'dinette',
+    other: activeLocale() === 'en' ? 'other accommodation' : 'altra sistemazione',
+  };
+  return labels[projection?.berthType] || '';
+}
+
+function renderProjectionHint(projection) {
+  const hint = document.querySelector('#participantProjectionHint');
+  if (!hint) return;
+  const role = String(projection?.plannedRole || '').trim();
+  const berth = projectionBerthLabel(projection);
+  if (!role && !berth) {
+    hint.hidden = true;
+    hint.textContent = '';
+    return;
+  }
+  const details = [
+    role ? (activeLocale() === 'en' ? `role proposed: ${role}` : `ruolo proposto: ${role}`) : '',
+    berth ? (activeLocale() === 'en' ? `accommodation proposed: ${berth}` : `sistemazione prevista: ${berth}`) : '',
+  ].filter(Boolean).join(' · ');
+  hint.textContent = activeLocale() === 'en'
+    ? `Your skipper has prepared this plan for you — ${details}. It is a proposal: verify your personal details before submitting the Crew List.`
+    : `Lo skipper ha preparato questa previsione per te — ${details}. È una proposta: verifica i tuoi dati personali prima di inviare la Crew List.`;
+  hint.hidden = false;
+}
+
+function fillProjectionProfileDefaults(projection) {
+  if (!projection) return;
+  const form = document.querySelector('#participantForm');
+  const fillIfEmpty = (fieldName, value) => {
+    const input = form.elements.namedItem(fieldName);
+    if (input && !input.value && typeof value === 'string' && value.trim()) input.value = value.trim();
+  };
+  fillIfEmpty('firstName', projection.firstName);
+  fillIfEmpty('lastName', projection.lastName);
+  fillIfEmpty('phone', projection.whatsappNumber);
+  if (typeof projection.plannedRole === 'string' && projection.plannedRole.trim()) {
+    fillRoleFields(form, 'role', projection.plannedRole);
+  }
+}
+
+async function readProjectionForInvite(invite) {
+  if (!invite?.boatId || !invite?.id) return null;
+  try {
+    const snapshot = await getDoc(doc(db, 'boats', invite.boatId, 'crewProjections', invite.id));
+    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+  } catch {
+    // Gli inviti precedenti e le Rules non ancora aggiornate restano pienamente utilizzabili.
+    return null;
+  }
+}
+
+function showProfile({ invite, member, projection = null, phone = '' }) {
   activeInvite = invite;
   activeMember = member;
   activatedPhone = phone;
@@ -237,6 +293,8 @@ function showProfile({ invite, member, phone = '' }) {
   document.querySelector('#profileSection').hidden = false;
   document.querySelector('#participantTitle').textContent = invite.displayName || translate('crew.flow.titleFallback', 'Dati per la Crew List');
   if (member) fillProfile(member);
+  else fillProjectionProfileDefaults(projection);
+  renderProjectionHint(projection);
   if (phone && !document.querySelector('#participantForm [name="phone"]').value) {
     document.querySelector('#participantForm [name="phone"]').value = phone;
   }
@@ -254,12 +312,15 @@ function fillProfile(member) {
 }
 
 async function openProfile({ invite, phone = '', redirectWhenCompleted = true }) {
-  const member = await getDoc(doc(db, 'boats', invite.boatId, 'members', invite.id));
+  const [member, projection] = await Promise.all([
+    getDoc(doc(db, 'boats', invite.boatId, 'members', invite.id)),
+    readProjectionForInvite(invite),
+  ]);
   if (member.exists() && redirectWhenCompleted) {
     window.location.replace(personalAreaUrl());
     return;
   }
-  showProfile({ invite, member: member.exists() ? member.data() : null, phone });
+  showProfile({ invite, member: member.exists() ? member.data() : null, projection, phone });
 }
 
 function renderPreRegistrationGate() {
@@ -504,10 +565,12 @@ if (isEditMode) {
     onReady: async ({ invite }) => {
       let member;
       let briefingAccepted = false;
+      let projection = null;
       try {
-        [member, briefingAccepted] = await Promise.all([
+        [member, briefingAccepted, projection] = await Promise.all([
           getDoc(doc(db, 'boats', invite.boatId, 'members', invite.id)),
           hasCurrentBriefingAcceptance(invite),
+          readProjectionForInvite(invite),
         ]);
       } catch {
         openPreRegistrationBriefing({ invite, phone: '' });
@@ -517,7 +580,7 @@ if (isEditMode) {
         openPreRegistrationBriefing({ invite, phone: '' });
         return;
       }
-      showProfile({ invite, member: member.data() });
+      showProfile({ invite, member: member.data(), projection });
     },
   });
 } else {
