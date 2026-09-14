@@ -56,8 +56,7 @@ function hasPublishedBriefing() {
 }
 
 function briefingTitle() {
-  if (activeLocale() === 'en' && hasOfficialEnglishBriefing()) return activeBriefing.rulesTitleEn.trim();
-  return activeBriefing?.rulesTitle || translate('crew.briefing.fullRules', 'Regolamento completo');
+  return translate('crew.briefing.fullRules', 'Regolamento di bordo');
 }
 
 function briefingRequiresFullRulesRead() {
@@ -70,12 +69,134 @@ function briefingSummary() {
     : activeBriefing?.rulesSummary;
   return typeof summary === 'string' && summary.trim()
     ? summary.trim()
-    : translate('crew.briefing.summaryFallback', 'Leggi integralmente il regolamento completo: questa sintesi non sostituisce il testo.');
+    : translate('crew.briefing.summaryFallback', 'La sintesi ti orienta: leggi tutto il regolamento di bordo prima di confermare.');
 }
 
 function briefingRulesText() {
   if (activeLocale() === 'en' && hasOfficialEnglishBriefing()) return activeBriefing.rulesTextEn;
   return activeBriefing?.rulesText || '';
+}
+
+function compactRulesLine(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function isRulesSectionHeading(line, index, lines) {
+  const compact = compactRulesLine(line);
+  if (!compact || compact.length > 140 || /^[•\-–—*]\s+/.test(compact)) return false;
+  if (/^(?:#{1,6}\s+|\d{1,2}[.)]\s+|[ivxlcdm]{1,7}[.)]\s+)/i.test(compact)) return true;
+  if (/[A-ZÀ-ÖØ-Þ]/.test(compact) && compact.length <= 110 && compact === compact.toUpperCase()) return true;
+  if (/^(?:premessa|introduzione|introduction|overview|notice|avvertenza|avvertenze)$/i.test(compact)) return true;
+  const previousBlank = index === 0 || !compactRulesLine(lines[index - 1]);
+  const nextLine = lines.slice(index + 1).map(compactRulesLine).find(Boolean);
+  return previousBlank
+    && Boolean(nextLine)
+    && compact.length <= 96
+    && !/[.!?;:]$/.test(compact)
+    && nextLine.length >= compact.length;
+}
+
+function splitRulesIntoSections(value) {
+  const lines = String(value || '').replace(/\r\n?/g, '\n').split('\n');
+  const sections = [];
+  let current = null;
+  let paragraphLines = [];
+  const flushParagraph = () => {
+    const paragraph = paragraphLines.map((line) => line.trim()).filter(Boolean).join('\n');
+    paragraphLines = [];
+    if (!paragraph) return;
+    if (!current) current = { heading: '', paragraphs: [] };
+    current.paragraphs.push(paragraph);
+  };
+  const flushSection = () => {
+    flushParagraph();
+    if (current?.heading || current?.paragraphs.length) sections.push(current);
+    current = null;
+  };
+
+  lines.forEach((line, index) => {
+    if (!compactRulesLine(line)) {
+      flushParagraph();
+      return;
+    }
+    if (isRulesSectionHeading(line, index, lines)) {
+      flushSection();
+      current = { heading: compactRulesLine(line), paragraphs: [] };
+      return;
+    }
+    paragraphLines.push(line);
+  });
+  flushSection();
+  return sections;
+}
+
+function rulesSectionCategory(section) {
+  const heading = String(section.heading || '').toLowerCase();
+  const fullText = `${heading} ${section.paragraphs.join(' ')}`.toLowerCase();
+  const environment = /ambient|rifiut|fumo|mozzicon|mare|marin[oa]|environment|waste|smok/;
+  const route = /skipper|naviga|rotta|rada|porto|tender|uscit|orari|route|navigation|anchorage|harbou?r|timings|schedule/;
+  const life = /vita comune|rispetto|cabine|cambusa|cucina|salute|comportamento|preparazione|personale|spesa|costi|life on board|respect|cabins|galley|health|behavio[u]?r|preparation|cost/;
+  const safety = /sicurezz|emergen|giubbot|life ?line|zattera|estintor|cadut|boma|dotazion|gas|safety|emergen|lifejacket|liferaft|extinguisher|overboard|equipment/;
+  if (environment.test(heading)) return 'environment';
+  if (route.test(heading)) return 'route';
+  if (life.test(heading)) return 'life';
+  if (safety.test(heading)) return 'safety';
+  if (environment.test(fullText)) return 'environment';
+  if (route.test(fullText)) return 'route';
+  if (safety.test(fullText)) return 'safety';
+  return 'life';
+}
+
+function rulesSectionLabel(category) {
+  const labels = activeLocale() === 'en'
+    ? { route: 'Route & navigation', safety: 'Safety', life: 'Life on board', environment: 'Sea & environment' }
+    : { route: 'Rotta e navigazione', safety: 'Sicurezza', life: 'Vita a bordo', environment: 'Mare e ambiente' };
+  return labels[category] || labels.life;
+}
+
+function renderRulesSections(selector, value) {
+  const target = document.querySelector(selector);
+  if (!target) return;
+  const sections = splitRulesIntoSections(value);
+  const fragment = document.createDocumentFragment();
+  sections.forEach((section, index) => {
+    const isDocumentTitle = index === 0
+      && section.paragraphs.length === 0
+      && /regolamento|board rules/i.test(section.heading);
+    const category = isDocumentTitle ? 'route' : rulesSectionCategory(section);
+    const card = document.createElement('section');
+    card.className = `rules-section-card rules-section-card--${category}${isDocumentTitle ? ' rules-section-card--document' : ''}`;
+    const icon = document.createElement('span');
+    icon.className = 'rules-section-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const content = document.createElement('div');
+    content.className = 'rules-section-content';
+    const label = document.createElement('p');
+    label.className = 'rules-section-kicker';
+    label.textContent = rulesSectionLabel(category);
+    if (!isDocumentTitle) content.append(label);
+    if (section.heading) {
+      const heading = document.createElement('h4');
+      heading.className = 'rules-section-heading';
+      heading.id = `${target.id}-section-${index}`;
+      heading.textContent = section.heading;
+      card.setAttribute('aria-labelledby', heading.id);
+      content.append(heading);
+    } else {
+      card.setAttribute('aria-label', rulesSectionLabel(category));
+    }
+    const copy = document.createElement('div');
+    copy.className = 'rules-section-copy';
+    section.paragraphs.forEach((paragraph) => {
+      const item = document.createElement('p');
+      item.textContent = paragraph;
+      copy.append(item);
+    });
+    content.append(copy);
+    card.append(icon, content);
+    fragment.append(card);
+  });
+  target.replaceChildren(fragment);
 }
 
 function currentBriefingVersion() {
@@ -127,7 +248,7 @@ function markPreRegistrationRulesRead() {
   if (gate.dataset.fullRulesRead === 'true') return;
   gate.dataset.fullRulesRead = 'true';
   scrollRegion.classList.add('is-complete');
-  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.fullRulesSeen', 'Regolamento completo visualizzato. Ora puoi confermare la lettura.');
+  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.fullRulesSeen', 'Regolamento di bordo visualizzato. Ora puoi confermare la lettura.');
   updatePreRegistrationAcceptState();
   if (document.activeElement === scrollRegion) acknowledgement.focus();
 }
@@ -360,7 +481,7 @@ function renderPreRegistrationGate() {
   if (gate.dataset.rulesContext !== rulesContext) {
     document.querySelector('#preRegistrationRulesTitle').textContent = briefingTitle();
     document.querySelector('#preRegistrationRulesSummary').textContent = briefingSummary();
-    document.querySelector('#preRegistrationRulesText').textContent = briefingRulesText();
+    renderRulesSections('#preRegistrationRulesText', briefingRulesText());
     gate.dataset.rulesContext = rulesContext;
     gate.dataset.rulesVersion = version;
     resetPreRegistrationRulesRead();
@@ -380,7 +501,7 @@ function renderPreRegistrationGate() {
     return;
   }
 
-  status.textContent = translate('crew.flow.readThenComplete', `Leggi la sintesi e l’intero regolamento, poi accetta la versione ${version}: solo dopo potrai inserire i dati nella Crew List.`, { version });
+  status.textContent = translate('crew.flow.readThenComplete', 'Leggi la sintesi e il regolamento di bordo completo. Poi potrai inserire i dati nella Crew List.');
   updatePreRegistrationAcceptState();
 }
 
@@ -531,7 +652,7 @@ document.querySelector('#preRegistrationBriefingStatus').setAttribute('aria-live
 document.querySelector('#preRegistrationAcceptButton').addEventListener('click', async () => {
   if (!hasPublishedBriefing() || !activeInvite || !auth.currentUser) return;
   if (!document.querySelector('#preRegistrationAcknowledgement').checked) {
-    setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.confirmReadFirst', 'Scorri il regolamento completo e conferma di averlo letto prima di proseguire.'), true);
+    setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.confirmReadFirst', 'Scorri il regolamento di bordo fino alla fine e conferma di averlo letto prima di proseguire.'), true);
     return;
   }
   if (document.querySelector('#preRegistrationBriefing').dataset.fullRulesRead !== 'true') return;

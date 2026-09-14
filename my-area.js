@@ -50,12 +50,14 @@ const CONTRIBUTION_ITEM_STATES = new Map([
 ]);
 const CONTRIBUTION_ITEMS = [
   { id: 'berth', label: localized('Quota posto in barca', 'Berth contribution') },
-  { id: 'starter_pack', label: localized('Starter Pack · lenzuola/asciugamani, SUP e fuoribordo · solo contanti a bordo', 'Starter Pack · bed linen/towels, SUP and outboard · cash on board only') },
+  { id: 'starter_pack', label: localized('Starter Pack · servizi per la barca', 'Starter Pack · boat services') },
   { id: 'linen_towels', label: localized('Lenzuola e asciugamani · inclusi nello Starter Pack', 'Bed linen and towels · included in the Starter Pack') },
   { id: 'protection_insurance', label: localized('Assicurazione cauzione', 'Deposit insurance') },
   { id: 'provisions', label: localized('Cambusa', 'Provisions') },
   { id: 'fuel', label: localized('Gasolio per la navigazione', 'Fuel for navigation') },
   { id: 'transfer', label: localized('Transfer da/per il porto', 'Transfer to/from the port') },
+  { id: 'shore_dinner', label: localized('Cena a terra programmata', 'Planned dinner ashore') },
+  { id: 'mooring_fee', label: localized('Porto / ormeggio programmato', 'Planned port / mooring') },
   { id: 'refundable_deposit', label: localized('Cauzione rimborsabile', 'Refundable deposit') },
 ];
 const PERSONAL_PAYMENT_GROUPS = Object.freeze({
@@ -487,6 +489,13 @@ function projectionAmountCents(fieldName) {
   return Number.isInteger(amountCents) && amountCents > 0 ? amountCents : 0;
 }
 
+function projectionHasFrozenPricing() {
+  return activeProjection?.status === 'invited'
+    && (Boolean(activeProjection?.pricingSnapshotAt)
+      || activeProjection?.pricingMode === 'dashboard'
+      || activeProjection?.pricingMode === 'custom');
+}
+
 function projectionPayableCents() {
   return ['berthCents', 'protectionInsuranceCents']
     .reduce((total, fieldName) => total + projectionAmountCents(fieldName), 0);
@@ -510,7 +519,13 @@ function projectedContributionSummary(fieldName) {
     };
   }
   const amountCents = projectionAmountCents(fieldName);
-  if (!amountCents) return null;
+  if (!amountCents && !projectionHasFrozenPricing()) return null;
+  if (!amountCents) {
+    return {
+      value: localized('Non previsto nella quota fissata', 'Not included in the agreed contribution'),
+      detail: localized('Lo skipper non ha indicato un importo per questa voce nel tuo accordo personale.', 'The skipper has not set an amount for this item in your personal agreement.'),
+    };
+  }
   return {
     value: `${formatCurrency(amountCents / 100)} ${localized('previsti', 'planned')}`,
     detail: localized('Quota prevista dallo skipper; non è ancora una richiesta di pagamento.', 'Planned by the skipper; this is not a payment request yet.'),
@@ -519,10 +534,21 @@ function projectedContributionSummary(fieldName) {
 
 function projectedRefundableDepositSummary() {
   const amountCents = projectionAmountCents('refundableDepositCents');
-  if (!amountCents) return contributionPlanFallback('refundable_deposit', { deposit: true });
+  if (!amountCents && !projectionHasFrozenPricing()) return contributionPlanFallback('refundable_deposit', { deposit: true });
+  if (!amountCents) {
+    return {
+      value: localized('Non prevista per il tuo posto', 'Not included for your berth'),
+      detail: localized('Nella quota fissata dal tuo skipper non è prevista una cauzione rimborsabile per te.', 'Your skipper’s agreed contribution does not include a refundable deposit for you.'),
+    };
+  }
+  const plannedItem = contributionPlanItems().find((item) => item.id === 'refundable_deposit');
+  const description = String(plannedItem?.description || '').trim();
   return {
     value: `${formatCurrency(amountCents / 100)} ${localized('all’imbarco', 'at boarding')}`,
-    detail: localized('Cauzione rimborsabile: da portare e regolare all’imbarco, separata dalle richieste di pagamento.', 'Refundable deposit: bring and settle it at boarding, separate from payment requests.'),
+    detail: localized(
+      `${description || 'Cauzione rimborsabile'} Da portare e regolare all’imbarco, separata dalle richieste di pagamento.`,
+      `${description || 'Refundable deposit.'} Bring and settle it at boarding, separate from payment requests.`,
+    ),
   };
 }
 
@@ -535,16 +561,32 @@ function starterPackCashSummary() {
   }
   const projectedCents = projectionAmountCents('starterPackCents');
   const plannedItem = contributionPlanItems().find((item) => item.id === 'starter_pack');
-  const amountCents = projectedCents || contributionAmountCents(plannedItem);
+  // Le card storiche potevano usare "included" per il Pack senza salvarne
+  // la quota individuale. Non facciamolo sembrare già pagato: il modello
+  // attuale lo regola comunque cash a bordo.
+  const legacyIncludedInCharter = plannedItem?.state === 'included' && !projectedCents;
+  const amountCents = projectionHasFrozenPricing()
+    ? projectedCents
+    : projectedCents || contributionAmountCents(plannedItem);
   const value = amountCents
     ? `${formatCurrency(amountCents / 100)} ${localized('in contanti a bordo', 'cash on board')}`
-    : localized('Da definire · contanti a bordo', 'To be confirmed · cash on board');
+    : legacyIncludedInCharter
+      ? localized('Quota da definire · contanti a bordo', 'Amount to be confirmed · cash on board')
+    : projectionHasFrozenPricing()
+      ? localized('Non previsto nella quota fissata', 'Not included in the agreed contribution')
+      : localized('Da definire · contanti a bordo', 'To be confirmed · cash on board');
+  const description = String(plannedItem?.description || '').trim();
   return {
     value,
-    detail: localized(
-      'Lo Starter Pack riunisce i servizi scelti per la barca, per esempio lenzuola, asciugamani, SUP e fuoribordo. Per questa barca si paga solo in contanti a bordo: non entra nelle richieste online e non usa link di pagamento.',
-      'The Starter Pack brings together services chosen for the boat, for example bed linen, towels, a SUP and an outboard. For this boat it is settled in cash on board only: it is not included in online requests and does not use payment links.',
-    ),
+    detail: legacyIncludedInCharter
+      ? localized(
+        `${description || 'Lo Starter Pack riunisce i servizi scelti per la barca.'} È già parte del costo charter, ma la quota individuale non è ancora stata indicata: chiedi allo skipper. Quando sarà definita, si regola in contanti a bordo e non con una richiesta online.`,
+        `${description || 'The Starter Pack brings together the services selected for the boat.'} It is already part of the charter cost, but the individual amount has not yet been set: ask your skipper. Once confirmed, it is settled in cash on board, not through an online request.`,
+      )
+      : localized(
+        `${description || 'Lo Starter Pack riunisce i servizi scelti per la barca.'} Per questa barca si paga solo in contanti a bordo: non entra nelle richieste online e non usa link di pagamento.`,
+        `${description || 'The Starter Pack brings together the services selected for the boat.'} For this boat it is settled in cash on board only: it is not included in online requests and does not use payment links.`,
+      ),
   };
 }
 
@@ -573,8 +615,10 @@ function contributionPlanFallback(itemId, { deposit = false } = {}) {
     };
   }
   const amount = item.amountCents > 0 ? `${formatCurrency(item.amountCents / 100)} ${localized('a persona', 'per person')}` : localized('Importo da definire', 'Amount to be confirmed');
+  const description = String(item.description || '').trim();
+  const descriptionPrefix = description ? `${description} ` : '';
   if (item.state === 'included') {
-    return { value: localized('Compreso nella quota', 'Included in the contribution'), detail: localized('Nessuna richiesta separata prevista.', 'No separate request is expected.') };
+    return { value: localized('Compreso nella quota', 'Included in the contribution'), detail: `${descriptionPrefix}${localized('Nessuna richiesta separata prevista.', 'No separate request is expected.')}` };
   }
   if (item.state === 'not_applicable') {
     return { value: localized('Non previsto', 'Not included'), detail: localized('Non è previsto per questa barca.', 'This is not planned for this boat.') };
@@ -582,14 +626,14 @@ function contributionPlanFallback(itemId, { deposit = false } = {}) {
   if (item.state === 'extra') {
     return deposit
       ? { value: amount, detail: localized('Da correggere: una cauzione rimborsabile si regola all’imbarco.', 'To be corrected: a refundable deposit is settled at boarding.') }
-      : { value: amount, detail: localized('Richiesta personale non ancora preparata.', 'A personal request has not been prepared yet.') };
+      : { value: amount, detail: `${descriptionPrefix}${localized('Richiesta personale non ancora preparata.', 'A personal request has not been prepared yet.')}` };
   }
   if (item.state === 'local') {
     return {
       value: amount,
       detail: deposit
         ? localized('Da portare e regolare all’imbarco; non è sommata alle richieste online.', 'Bring and settle it at boarding; it is not added to online requests.')
-        : localized('Da regolare separatamente o da dividere a bordo.', 'To be settled separately or shared on board.'),
+        : `${descriptionPrefix}${localized('Da regolare separatamente o da dividere a bordo.', 'To be settled separately or shared on board.')}`,
     };
   }
   return {
@@ -608,7 +652,10 @@ function personalContributionSummary(groupId, planItemId, projectionField) {
       detail: localized('Lo skipper ti ha escluso dalle quote automatiche della barca.', 'The skipper has excluded you from the boat’s automatic contributions.'),
     };
   }
-  if (!totals.payments.length) return projectedContributionSummary(projectionField) || contributionPlanFallback(planItemId);
+  if (!totals.payments.length) {
+    const projectionSummary = projectedContributionSummary(projectionField);
+    return projectionSummary || contributionPlanFallback(planItemId);
+  }
   if (totals.pendingCents && totals.verifiedCents) {
     return {
       value: `${formatCurrency(totals.pendingCents / 100)} ${localized('da regolare', 'to settle')}`,
@@ -666,7 +713,6 @@ function renderParticipantFinanceSummary() {
     .reduce((total, payment) => total + paymentAmountCents(payment), 0);
   const unclassifiedPayments = activeCrewPayments.filter((payment) => payment.status !== 'cancelled' && !payment.contributionItemId).length;
   const acceptedAt = formatDateTime(activeRuleAcceptance?.acceptedAt);
-  const rulesTitle = briefingTitle();
   const paymentStatus = pendingCents
     ? `${formatCurrency(pendingCents / 100)} ${localized('da regolare', 'to settle')}`
     : verifiedCents
@@ -682,7 +728,7 @@ function renderParticipantFinanceSummary() {
   summary.innerHTML = `
     <p class="eyebrow">${escapeHtml(localized('Il tuo riepilogo dei costi', 'Your cost summary'))}</p>
     <h4>${escapeHtml(localized('Cosa pagare e cosa portare a bordo', 'What to pay and what to bring on board'))}</h4>
-    <p>${escapeHtml(localized('Qui vedi solo i tuoi importi. Lo Starter Pack e la cauzione rimborsabile si regolano in contanti a bordo; le richieste personali arrivano invece dallo skipper e vengono verificate manualmente.', 'Here you only see your own amounts. The Starter Pack and refundable deposit are settled in cash on board; personal requests come from the skipper and are checked manually.'))}</p>
+    <p>${escapeHtml(localized('Qui vedi solo i tuoi importi. Lo Starter Pack può essere già compreso nel charter oppure esterno: in entrambi i casi la sua quota resta distinta dall’importo del tuo posto/cabina e, quando prevista, si regola in contanti a bordo. La cauzione rimborsabile resta separata. Le richieste personali arrivano invece dallo skipper e vengono verificate manualmente.', 'Here you only see your own amounts. The Starter Pack may already be included in the charter or be external: in both cases its share remains separate from your berth/cabin amount and, whenever planned, is settled in cash on board. The refundable deposit remains separate. Personal requests come from the skipper and are checked manually.'))}</p>
     <div class="participant-finance-grid">
       ${participantProjectionRows()}
       ${participantFinanceRow(localized('Posto / cabina', 'Berth / cabin'), berth)}
@@ -691,7 +737,7 @@ function renderParticipantFinanceSummary() {
       ${participantFinanceRow(localized('Cauzione rimborsabile', 'Refundable deposit'), refundableDeposit, 'participant-finance-row-deposit')}
       ${participantFinanceRow(localized('Richieste personali', 'My personal requests'), { value: paymentStatus, detail: paymentDetail })}
     </div>
-    <div class="participant-finance-acceptance"><strong>${escapeHtml(localized('Regole di bordo accettate', 'Board rules accepted'))}</strong>${escapeHtml(rulesTitle)} · ${escapeHtml(localized('versione', 'version'))} ${currentBriefingVersion()}${acceptedAt ? ` · ${escapeHtml(acceptedAt)}` : ''}. <a href="#crew-bacheca">${escapeHtml(localized('Rileggi briefing e bacheca', 'Read the briefing and updates again'))}</a></div>
+    <div class="participant-finance-acceptance"><strong>${escapeHtml(localized('Regole di bordo accettate', 'Board rules accepted'))}</strong>${acceptedAt ? ` · ${escapeHtml(acceptedAt)}` : ''}. <a href="#crew-bacheca">${escapeHtml(localized('Rileggi il regolamento e la bacheca', 'Read the rules and updates again'))}</a></div>
   `;
 }
 
@@ -796,7 +842,7 @@ function contributionPlanItems(plan = activeContributionPlan) {
   return CONTRIBUTION_ITEMS.map((item) => {
     const source = sourceItems[item.id] || {};
     const state = item.id === 'starter_pack'
-      ? 'local'
+      ? (CONTRIBUTION_ITEM_STATES.has(source.state) ? source.state : 'local')
       : item.id === 'linen_towels'
         ? 'included'
       : CONTRIBUTION_ITEM_STATES.has(source.state) ? source.state : 'to_define';
@@ -804,16 +850,18 @@ function contributionPlanItems(plan = activeContributionPlan) {
       ...item,
       state,
       amountCents: item.id === 'linen_towels' ? 0 : contributionAmountCents(source),
+      description: String(source.description || '').trim().slice(0, 320),
     };
   });
 }
 
 function contributionItemMarkup(item) {
   const amount = item.amountCents > 0 ? ` · ${formatCurrency(item.amountCents / 100)} ${translate('crew.flow.perPerson', 'a persona')}` : '';
-  const stateLabel = item.id === 'starter_pack'
+  const stateLabel = item.id === 'starter_pack' && item.state === 'local'
     ? localized('Solo contanti a bordo', 'Cash on board only')
     : CONTRIBUTION_ITEM_STATES.get(item.state);
-  return `<div><span>${escapeHtml(stateLabel)}</span><strong>${escapeHtml(item.label)}${escapeHtml(amount)}</strong></div>`;
+  const description = item.description ? `<small>${escapeHtml(item.description)}</small>` : '';
+  return `<div><span>${escapeHtml(stateLabel)}</span><strong>${escapeHtml(item.label)}${escapeHtml(amount)}</strong>${description}</div>`;
 }
 
 function contributionNotApplicableContainer(plan) {
@@ -884,8 +932,7 @@ function hasPublishedBriefing() {
 }
 
 function briefingTitle() {
-  if (activeLocale() === 'en' && hasOfficialEnglishBriefing()) return activeBriefing.rulesTitleEn.trim();
-  return activeBriefing?.rulesTitle || translate('crew.briefing.fullRules', 'Regolamento completo');
+  return translate('crew.briefing.fullRules', 'Regolamento di bordo');
 }
 
 function briefingRequiresFullRulesRead() {
@@ -898,12 +945,134 @@ function briefingSummary() {
     : activeBriefing?.rulesSummary;
   return typeof summary === 'string' && summary.trim()
     ? summary.trim()
-    : translate('crew.briefing.summaryFallback', 'Leggi integralmente il regolamento completo: questa sintesi non sostituisce il testo.');
+    : translate('crew.briefing.summaryFallback', 'La sintesi ti orienta: leggi tutto il regolamento di bordo prima di confermare.');
 }
 
 function briefingRulesText() {
   if (activeLocale() === 'en' && hasOfficialEnglishBriefing()) return activeBriefing.rulesTextEn;
   return activeBriefing?.rulesText || '';
+}
+
+function compactRulesLine(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function isRulesSectionHeading(line, index, lines) {
+  const compact = compactRulesLine(line);
+  if (!compact || compact.length > 140 || /^[•\-–—*]\s+/.test(compact)) return false;
+  if (/^(?:#{1,6}\s+|\d{1,2}[.)]\s+|[ivxlcdm]{1,7}[.)]\s+)/i.test(compact)) return true;
+  if (/[A-ZÀ-ÖØ-Þ]/.test(compact) && compact.length <= 110 && compact === compact.toUpperCase()) return true;
+  if (/^(?:premessa|introduzione|introduction|overview|notice|avvertenza|avvertenze)$/i.test(compact)) return true;
+  const previousBlank = index === 0 || !compactRulesLine(lines[index - 1]);
+  const nextLine = lines.slice(index + 1).map(compactRulesLine).find(Boolean);
+  return previousBlank
+    && Boolean(nextLine)
+    && compact.length <= 96
+    && !/[.!?;:]$/.test(compact)
+    && nextLine.length >= compact.length;
+}
+
+function splitRulesIntoSections(value) {
+  const lines = String(value || '').replace(/\r\n?/g, '\n').split('\n');
+  const sections = [];
+  let current = null;
+  let paragraphLines = [];
+  const flushParagraph = () => {
+    const paragraph = paragraphLines.map((line) => line.trim()).filter(Boolean).join('\n');
+    paragraphLines = [];
+    if (!paragraph) return;
+    if (!current) current = { heading: '', paragraphs: [] };
+    current.paragraphs.push(paragraph);
+  };
+  const flushSection = () => {
+    flushParagraph();
+    if (current?.heading || current?.paragraphs.length) sections.push(current);
+    current = null;
+  };
+
+  lines.forEach((line, index) => {
+    if (!compactRulesLine(line)) {
+      flushParagraph();
+      return;
+    }
+    if (isRulesSectionHeading(line, index, lines)) {
+      flushSection();
+      current = { heading: compactRulesLine(line), paragraphs: [] };
+      return;
+    }
+    paragraphLines.push(line);
+  });
+  flushSection();
+  return sections;
+}
+
+function rulesSectionCategory(section) {
+  const heading = String(section.heading || '').toLowerCase();
+  const fullText = `${heading} ${section.paragraphs.join(' ')}`.toLowerCase();
+  const environment = /ambient|rifiut|fumo|mozzicon|mare|marin[oa]|environment|waste|smok/;
+  const route = /skipper|naviga|rotta|rada|porto|tender|uscit|orari|route|navigation|anchorage|harbou?r|timings|schedule/;
+  const life = /vita comune|rispetto|cabine|cambusa|cucina|salute|comportamento|preparazione|personale|spesa|costi|life on board|respect|cabins|galley|health|behavio[u]?r|preparation|cost/;
+  const safety = /sicurezz|emergen|giubbot|life ?line|zattera|estintor|cadut|boma|dotazion|gas|safety|emergen|lifejacket|liferaft|extinguisher|overboard|equipment/;
+  if (environment.test(heading)) return 'environment';
+  if (route.test(heading)) return 'route';
+  if (life.test(heading)) return 'life';
+  if (safety.test(heading)) return 'safety';
+  if (environment.test(fullText)) return 'environment';
+  if (route.test(fullText)) return 'route';
+  if (safety.test(fullText)) return 'safety';
+  return 'life';
+}
+
+function rulesSectionLabel(category) {
+  const labels = activeLocale() === 'en'
+    ? { route: 'Route & navigation', safety: 'Safety', life: 'Life on board', environment: 'Sea & environment' }
+    : { route: 'Rotta e navigazione', safety: 'Sicurezza', life: 'Vita a bordo', environment: 'Mare e ambiente' };
+  return labels[category] || labels.life;
+}
+
+function renderRulesSections(selector, value) {
+  const target = document.querySelector(selector);
+  if (!target) return;
+  const sections = splitRulesIntoSections(value);
+  const fragment = document.createDocumentFragment();
+  sections.forEach((section, index) => {
+    const isDocumentTitle = index === 0
+      && section.paragraphs.length === 0
+      && /regolamento|board rules/i.test(section.heading);
+    const category = isDocumentTitle ? 'route' : rulesSectionCategory(section);
+    const card = document.createElement('section');
+    card.className = `rules-section-card rules-section-card--${category}${isDocumentTitle ? ' rules-section-card--document' : ''}`;
+    const icon = document.createElement('span');
+    icon.className = 'rules-section-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const content = document.createElement('div');
+    content.className = 'rules-section-content';
+    const label = document.createElement('p');
+    label.className = 'rules-section-kicker';
+    label.textContent = rulesSectionLabel(category);
+    if (!isDocumentTitle) content.append(label);
+    if (section.heading) {
+      const heading = document.createElement('h4');
+      heading.className = 'rules-section-heading';
+      heading.id = `${target.id}-section-${index}`;
+      heading.textContent = section.heading;
+      card.setAttribute('aria-labelledby', heading.id);
+      content.append(heading);
+    } else {
+      card.setAttribute('aria-label', rulesSectionLabel(category));
+    }
+    const copy = document.createElement('div');
+    copy.className = 'rules-section-copy';
+    section.paragraphs.forEach((paragraph) => {
+      const item = document.createElement('p');
+      item.textContent = paragraph;
+      copy.append(item);
+    });
+    content.append(copy);
+    card.append(icon, content);
+    fragment.append(card);
+  });
+  target.replaceChildren(fragment);
 }
 
 function currentBriefingVersion() {
@@ -955,7 +1124,7 @@ function markBoardingRulesRead() {
   if (gate.dataset.fullRulesRead === 'true') return;
   gate.dataset.fullRulesRead = 'true';
   scrollRegion.classList.add('is-complete');
-  document.querySelector('#boardingFullRulesHint').textContent = translate('crew.flow.fullRulesSeen', 'Regolamento completo visualizzato. Ora puoi confermare la lettura.');
+  document.querySelector('#boardingFullRulesHint').textContent = translate('crew.flow.fullRulesSeen', 'Regolamento di bordo visualizzato. Ora puoi confermare la lettura.');
   updateBoardingAcceptState();
   if (document.activeElement === scrollRegion) acknowledgement.focus();
 }
@@ -1058,9 +1227,9 @@ function renderDashboardBriefing() {
   empty.hidden = true;
   briefing.hidden = false;
   renderSchedule('#participantSchedule');
-  document.querySelector('#participantRulesTitle').textContent = briefingTitle();
+  document.querySelector('#participantRulesTitle').textContent = translate('crew.briefing.fullText', 'Testo completo');
   document.querySelector('#participantRulesSummary').textContent = briefingSummary();
-  document.querySelector('#participantRulesText').textContent = briefingRulesText();
+  renderRulesSections('#participantRulesText', briefingRulesText());
   const acceptedAt = formatDateTime(activeRuleAcceptance?.acceptedAt);
   const acceptedAtSuffix = acceptedAt
     ? translate('crew.flow.briefingAcceptedAtSuffix', ' il {date}', { date: acceptedAt })
@@ -1068,8 +1237,7 @@ function renderDashboardBriefing() {
   const originalNotice = activeLocale() === 'en' && !hasOfficialEnglishBriefing()
     ? translate('crew.flow.italianOriginalNotice', ' Italian original supplied by the skipper; an official English version has not yet been published.')
     : '';
-  document.querySelector('#participantRulesStatus').textContent = `${translate('crew.flow.briefingAcceptedStatus', 'Briefing di sicurezza versione {version} accettato{acceptedAt}.', {
-    version: currentBriefingVersion(),
+  document.querySelector('#participantRulesStatus').textContent = `${translate('crew.flow.briefingAcceptedStatus', 'Regolamento di bordo accettato{acceptedAt}.', {
     acceptedAt: acceptedAtSuffix,
   })}${originalNotice}`;
   renderParticipantFinanceSummary();
@@ -1125,7 +1293,7 @@ function renderBoardingGate() {
   if (gate.dataset.rulesContext !== rulesContext) {
     document.querySelector('#boardingRulesTitle').textContent = briefingTitle();
     document.querySelector('#boardingRulesSummary').textContent = briefingSummary();
-    document.querySelector('#boardingRulesText').textContent = briefingRulesText();
+    renderRulesSections('#boardingRulesText', briefingRulesText());
     gate.dataset.rulesContext = rulesContext;
     gate.dataset.rulesVersion = version;
     resetBoardingRulesRead();
@@ -1147,7 +1315,7 @@ function renderBoardingGate() {
   gate.hidden = false;
   waiting.hidden = true;
   briefing.hidden = false;
-  status.textContent = translate('crew.flow.readThenEnter', `Leggi la sintesi e l’intero regolamento, poi accetta la versione ${version} per entrare nella tua area di bordo.`, { version });
+  status.textContent = translate('crew.flow.readThenEnter', 'Leggi la sintesi e il regolamento di bordo completo. Poi potrai entrare nella tua area.');
   updateBoardingAcceptState();
 }
 
@@ -1196,7 +1364,7 @@ document.querySelector('#boardingGateStatus').setAttribute('aria-live', 'polite'
 document.querySelector('#acceptRulesButton').addEventListener('click', async () => {
   if (!canAcceptCurrentLocaleBriefing() || !activeInvite || !auth.currentUser) return;
   if (!document.querySelector('#rulesAcknowledgement').checked) {
-    setMessage(document.querySelector('#participantRulesMessage'), translate('crew.flow.confirmReadFirst', 'Scorri il regolamento completo e conferma di averlo letto prima di proseguire.'), true);
+    setMessage(document.querySelector('#participantRulesMessage'), translate('crew.flow.confirmReadFirst', 'Scorri il regolamento di bordo fino alla fine e conferma di averlo letto prima di proseguire.'), true);
     return;
   }
   if (document.querySelector('#boardingRulesGate').dataset.fullRulesRead !== 'true') return;

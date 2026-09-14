@@ -228,7 +228,7 @@ service cloud.firestore {
           && isConfiguredDoubleCabinGroup(boatId, request.resource.data.cabinGroupId));
     }
 
-    function hasValidCrewProjectionPayload(projectionId) {
+    function hasValidCrewProjectionPayloadV2(projectionId) {
       return request.resource.data.keys().hasAll(['contributesToCosts'])
         && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
         && hasValidCrewProjectionPayloadCore(projectionId)
@@ -245,11 +245,46 @@ service cloud.firestore {
             && request.resource.data.protectionInsuranceCents == 0));
     }
 
+    // V3 dichiara se gli importi seguono la Dashboard economica oppure sono
+    // un'eccezione esplicita. `pricingSnapshotAt`, quando presente, attesta
+    // che l'invito ha già fissato gli importi; resta opzionale per permettere
+    // la lettura e la manutenzione delle schede V3 già esistenti.
+    function hasValidCrewProjectionPayloadV3(projectionId) {
+      return request.resource.data.keys().hasAll(['contributesToCosts', 'pricingMode'])
+        && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && hasValidCrewProjectionPayloadCore(projectionId)
+        && request.resource.data.contributesToCosts is bool
+        && request.resource.data.pricingMode is string
+        && request.resource.data.pricingMode in ['dashboard', 'custom']
+        && (!request.resource.data.keys().hasAny(['pricingSnapshotAt'])
+          || request.resource.data.pricingSnapshotAt is timestamp)
+        && (!request.resource.data.keys().hasAny(['cabinGroupId'])
+          || (request.resource.data.cabinGroupId is string
+            && (request.resource.data.cabinGroupId == ''
+              || request.resource.data.cabinGroupId.matches('^double-[1-9][0-9]*$'))
+            && (request.resource.data.berthType == 'double_cabin'
+              || request.resource.data.cabinGroupId == '')))
+        && (request.resource.data.contributesToCosts == true
+          || (request.resource.data.berthCents == 0
+            && request.resource.data.starterPackCents == 0
+            && request.resource.data.protectionInsuranceCents == 0));
+    }
+
+    function hasValidCrewProjectionPayload(projectionId) {
+      return hasValidCrewProjectionPayloadV2(projectionId)
+        || hasValidCrewProjectionPayloadV3(projectionId);
+    }
+
     // Ogni impronta V2/V3, anche incompleta, blocca un set legacy che potrebbe
     // cancellare il flag e quindi alterare il significato delle quote automatiche.
     function isCrewProjectionV2(data) {
       return data is map
         && data.keys().hasAny(['contributesToCosts']);
+    }
+
+    function isCrewProjectionV3(data) {
+      return data is map
+        && data.keys().hasAny(['pricingMode']);
     }
 
     function isValidCrewProjectionCreate(boatId, projectionId) {
@@ -269,6 +304,8 @@ service cloud.firestore {
           && hasCrewProjectionCabinGroupWithinBoat(boatId))
           || (!isCrewProjectionV2(resource.data)
             && hasValidLegacyCrewProjectionPayload(projectionId)))
+        && (!isCrewProjectionV3(resource.data)
+          || hasValidCrewProjectionPayloadV3(projectionId))
         && resource.data.status == 'projected'
         && resource.data.inviteId == null
         && resource.data.invitedAt == null
@@ -277,17 +314,15 @@ service cloud.firestore {
         && request.resource.data.invitedAt == null
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'updatedAt', 'updatedBy']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'pricingMode', 'updatedAt', 'updatedBy']);
     }
 
-    // Dopo l'invito lo skipper può ancora aggiornare piano, quota e cabina,
-    // ma non può trasformare il link personale in un'altra identità.
-    function isValidCrewProjectionInvitedPlanUpdate(boatId, projectionId) {
-      return ((hasValidCrewProjectionPayload(projectionId)
-          && hasCrewProjectionCabinGroupWithinBoat(boatId))
-          || (!isCrewProjectionV2(resource.data)
-            && hasValidLegacyCrewProjectionPayload(projectionId)))
-        && resource.data.id == projectionId
+    // Dopo l'invito l'identità e i prezzi concordati sono indipendenti dal
+    // piano operativo. Il prezzo può cambiare solo in un percorso esplicito
+    // che registra una nuova fotografia server-side; cambiare cabina o ruolo
+    // non può quindi alterare per sbaglio l'accordo con la persona.
+    function hasStableCrewProjectionInvitation(projectionId) {
+      return resource.data.id == projectionId
         && resource.data.status == 'invited'
         && resource.data.inviteId == projectionId
         && resource.data.invitedAt is timestamp
@@ -302,8 +337,82 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.updatedAt == request.time
-        && request.resource.data.updatedBy == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contactConsent', 'contributesToCosts', 'updatedAt', 'updatedBy']);
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    function hasFrozenCrewProjectionPricing() {
+      return resource.data.keys().hasAll(['pricingSnapshotAt'])
+        && resource.data.pricingSnapshotAt is timestamp;
+    }
+
+    function hasValidInvitedCrewProjectionV3(boatId, projectionId) {
+      return hasValidCrewProjectionPayloadV3(projectionId)
+        && hasCrewProjectionCabinGroupWithinBoat(boatId)
+        && hasStableCrewProjectionInvitation(projectionId);
+    }
+
+    // Piano ordinario: ruolo, sistemazione e cabina possono evolvere, mentre
+    // importi, modalità di prezzo e partecipazione ai costi restano fissi.
+    function isValidCrewProjectionInvitedPlanUpdate(boatId, projectionId) {
+      return hasValidInvitedCrewProjectionV3(boatId, projectionId)
+        && isCrewProjectionV3(resource.data)
+        && hasFrozenCrewProjectionPricing()
+        && request.resource.data.pricingSnapshotAt == resource.data.pricingSnapshotAt
+        && request.resource.data.pricingMode == resource.data.pricingMode
+        && request.resource.data.contributesToCosts == resource.data.contributesToCosts
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plannedRole', 'berthType', 'cabinGroupId', 'contactConsent', 'updatedAt', 'updatedBy']);
+    }
+
+    // Le card V1/V2 o V3 senza marcatore vengono allineate una volta senza
+    // cambiare nessun importo. È una migrazione compatibile, non un refresh
+    // della dashboard o una nuova richiesta di denaro.
+    function isValidCrewProjectionInvitedSnapshotMigration(boatId, projectionId) {
+      return hasValidInvitedCrewProjectionV3(boatId, projectionId)
+        && !hasFrozenCrewProjectionPricing()
+        && request.resource.data.pricingSnapshotAt == request.time
+        && request.resource.data.berthCents == resource.data.berthCents
+        && request.resource.data.starterPackCents == resource.data.starterPackCents
+        && request.resource.data.protectionInsuranceCents == resource.data.protectionInsuranceCents
+        && request.resource.data.refundableDepositCents == resource.data.refundableDepositCents
+        && (!resource.data.keys().hasAny(['contributesToCosts'])
+          ? request.resource.data.contributesToCosts == true
+          : request.resource.data.contributesToCosts == resource.data.contributesToCosts)
+        && (!resource.data.keys().hasAny(['pricingMode'])
+          ? request.resource.data.pricingMode == 'custom'
+          : request.resource.data.pricingMode == resource.data.pricingMode)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plannedRole', 'berthType', 'cabinGroupId', 'contactConsent', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'updatedAt', 'updatedBy']);
+    }
+
+    // Il pulsante ⟳ applica la dashboard corrente solo alle card che la seguono
+    // già. Può anche essere il primo marcatore per una card V3 storica; non
+    // permette di modificare ruolo, posto o partecipazione ai costi.
+    function isValidCrewProjectionInvitedDashboardPricingRefresh(boatId, projectionId) {
+      return hasValidInvitedCrewProjectionV3(boatId, projectionId)
+        && isCrewProjectionV3(resource.data)
+        && resource.data.pricingMode == 'dashboard'
+        && request.resource.data.pricingMode == 'dashboard'
+        && request.resource.data.contributesToCosts == resource.data.contributesToCosts
+        && request.resource.data.pricingSnapshotAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'pricingSnapshotAt', 'updatedAt', 'updatedBy']);
+    }
+
+    // L'icona € apre una revisione dichiarata della quota: resta separata
+    // dalla modifica del posto e converte l'accordo in eccezione personale.
+    function isValidCrewProjectionInvitedCustomPricingUpdate(boatId, projectionId) {
+      return hasValidInvitedCrewProjectionV3(boatId, projectionId)
+        && request.resource.data.pricingMode == 'custom'
+        && (!resource.data.keys().hasAny(['contributesToCosts'])
+          ? request.resource.data.contributesToCosts == true
+          : request.resource.data.contributesToCosts == resource.data.contributesToCosts)
+        && request.resource.data.pricingSnapshotAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'updatedAt', 'updatedBy']);
+    }
+
+    function isValidCrewProjectionInvitedUpdate(boatId, projectionId) {
+      return isValidCrewProjectionInvitedPlanUpdate(boatId, projectionId)
+        || isValidCrewProjectionInvitedSnapshotMigration(boatId, projectionId)
+        || isValidCrewProjectionInvitedDashboardPricingRefresh(boatId, projectionId)
+        || isValidCrewProjectionInvitedCustomPricingUpdate(boatId, projectionId);
     }
 
     // Il collegamento diventa reale solo nel batch che crea l'invito con lo
@@ -320,9 +429,8 @@ service cloud.firestore {
     }
 
     function isValidCrewProjectionInviteTransition(boatId, projectionId) {
-      return (hasValidLegacyCrewProjectionPayload(projectionId)
-          || (hasValidCrewProjectionPayload(projectionId)
-            && hasCrewProjectionCabinGroupWithinBoat(boatId)))
+      return hasValidCrewProjectionPayloadV3(projectionId)
+        && hasCrewProjectionCabinGroupWithinBoat(boatId)
         && resource.data.id == projectionId
         && resource.data.status == 'projected'
         && resource.data.inviteId == null
@@ -334,7 +442,14 @@ service cloud.firestore {
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'inviteId', 'invitedAt', 'updatedAt', 'updatedBy'])
+        && request.resource.data.pricingSnapshotAt == request.time
+        && (!resource.data.keys().hasAny(['contributesToCosts'])
+          ? request.resource.data.contributesToCosts == true
+          : request.resource.data.contributesToCosts == resource.data.contributesToCosts)
+        && (!resource.data.keys().hasAny(['pricingMode'])
+          ? request.resource.data.pricingMode == 'custom'
+          : request.resource.data.pricingMode == resource.data.pricingMode)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'inviteId', 'invitedAt', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'updatedAt', 'updatedBy'])
         && hasMatchingCrewProjectionInviteAfter(boatId, projectionId);
     }
 
@@ -648,9 +763,9 @@ service cloud.firestore {
     }
 
     // Il piano quote è volutamente un elenco chiuso: non contiene contatti,
-    // coordinate di pagamento, link o testo libero che possa finire nell'area
-    // equipaggio. Gli importi sono sempre in centesimi per persona.
-    function hasValidContributionItem(item) {
+    // coordinate di pagamento o link che possano finire nell'area equipaggio.
+    // Gli importi sono sempre in centesimi per persona.
+    function hasValidContributionItemV1(item) {
       return item is map
         && item.keys().hasAll(['state', 'amountCents'])
         && item.keys().hasOnly(['state', 'amountCents'])
@@ -663,21 +778,21 @@ service cloud.firestore {
         && (item.state in ['extra', 'local'] || item.amountCents == 0);
     }
 
-    function hasValidContributionPlan() {
+    function hasValidContributionPlanV1() {
       let items = request.resource.data.items;
       return request.resource.data.keys().hasAll(['items', 'updatedAt', 'updatedBy'])
         && request.resource.data.keys().hasOnly(['items', 'updatedAt', 'updatedBy'])
         && items is map
         && items.keys().hasAll(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'refundable_deposit'])
         && items.keys().hasOnly(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'refundable_deposit'])
-        && hasValidContributionItem(items.berth)
-        && hasValidContributionItem(items.starter_pack)
-        && hasValidContributionItem(items.linen_towels)
-        && hasValidContributionItem(items.protection_insurance)
-        && hasValidContributionItem(items.provisions)
-        && hasValidContributionItem(items.fuel)
-        && hasValidContributionItem(items.transfer)
-        && hasValidContributionItem(items.refundable_deposit)
+        && hasValidContributionItemV1(items.berth)
+        && hasValidContributionItemV1(items.starter_pack)
+        && hasValidContributionItemV1(items.linen_towels)
+        && hasValidContributionItemV1(items.protection_insurance)
+        && hasValidContributionItemV1(items.provisions)
+        && hasValidContributionItemV1(items.fuel)
+        && hasValidContributionItemV1(items.transfer)
+        && hasValidContributionItemV1(items.refundable_deposit)
         // Lo Starter Pack di questo viaggio è sempre cash/in loco e include
         // già lenzuola e asciugamani: nessun doppio addebito o link esterno.
         && items.starter_pack.state == 'local'
@@ -687,6 +802,105 @@ service cloud.firestore {
         && items.refundable_deposit.state == 'local'
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    // Descrizioni visibili all'equipaggio: servono a spiegare una voce, mai
+    // a ripetere un canale d'incasso. Blocchiamo URL, e-mail, IBAN e i nomi
+    // dei metodi di pagamento anche con maiuscole/minuscole miste.
+    function hasSafeCrewFacingDescription(value) {
+      return value is string
+        && value.size() > 0
+        && value.size() <= 320
+        && !(value.matches('.*[Hh][Tt][Tt][Pp][Ss]?://.*'))
+        && !(value.matches('.*[Ww][Ww][Ww][.].*'))
+        && !(value.matches('.*@[A-Za-z0-9._-]+[.][A-Za-z]{2,}.*'))
+        && !(value.matches('.*[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}.*'))
+        && !(value.matches('.*([Pp][Aa][Yy][Pp][Aa][Ll]|[Ss][Aa][Tt][Ii][Ss][Pp][Aa][Yy]|[Rr][Ee][Vv][Oo][Ll][Uu][Tt]|[Ii][Bb][Aa][Nn]|[Bb][Oo][Nn][Ii][Ff][Ii][Cc][Oo]|[Cc][Aa][Uu][Ss][Aa][Ll][Ee]).*'));
+    }
+
+    // V2 aggiunge un dettaglio breve e controllato per ciascuna voce e due
+    // voci operative (cena a terra e porto/ormeggio). Il testo è pensato per
+    // l'equipaggio dopo il briefing, non può contenere canali d'incasso.
+    function hasValidContributionItemV2(item) {
+      return item is map
+        && item.keys().hasAll(['state', 'amountCents', 'description'])
+        && item.keys().hasOnly(['state', 'amountCents', 'description'])
+        && item.state is string
+        && item.state in ['to_define', 'included', 'extra', 'local', 'not_applicable']
+        && item.amountCents is int
+        && item.amountCents >= 0
+        && item.amountCents <= 1000000
+        && hasSafeCrewFacingDescription(item.description)
+        && (item.state in ['extra', 'local'] || item.amountCents == 0);
+    }
+
+    function hasValidContributionPlanV2() {
+      let items = request.resource.data.items;
+      return request.resource.data.keys().hasAll(['items', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['items', 'updatedAt', 'updatedBy'])
+        && items is map
+        && items.keys().hasAll(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'shore_dinner', 'mooring_fee', 'refundable_deposit'])
+        && items.keys().hasOnly(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'shore_dinner', 'mooring_fee', 'refundable_deposit'])
+        && hasValidContributionItemV2(items.berth)
+        && hasValidContributionItemV2(items.starter_pack)
+        && hasValidContributionItemV2(items.linen_towels)
+        && hasValidContributionItemV2(items.protection_insurance)
+        && hasValidContributionItemV2(items.provisions)
+        && hasValidContributionItemV2(items.fuel)
+        && hasValidContributionItemV2(items.transfer)
+        && hasValidContributionItemV2(items.shore_dinner)
+        && hasValidContributionItemV2(items.mooring_fee)
+        && hasValidContributionItemV2(items.refundable_deposit)
+        && items.starter_pack.state == 'local'
+        && items.linen_towels.state == 'included'
+        && items.refundable_deposit.state == 'local'
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    function isContributionPlanV2(data) {
+      return data is map
+        && data.keys().hasAll(['items'])
+        && data.items is map
+        && data.items.keys().hasAny(['shore_dinner', 'mooring_fee']);
+    }
+
+    // V3 dichiara il trattamento mostrato all'equipaggio. La provenienza del
+    // Pack (dentro o fuori charter) vive nel costPlan V6: la dashboard attuale
+    // salva sempre la quota cash_on_board, senza confondere i due concetti.
+    function hasValidContributionPlanV3() {
+      let items = request.resource.data.items;
+      return request.resource.data.keys().hasAll(['items', 'starterPackSettlementMode', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['items', 'starterPackSettlementMode', 'updatedAt', 'updatedBy'])
+        && items is map
+        && items.keys().hasAll(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'shore_dinner', 'mooring_fee', 'refundable_deposit'])
+        && items.keys().hasOnly(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'shore_dinner', 'mooring_fee', 'refundable_deposit'])
+        && hasValidContributionItemV2(items.berth)
+        && hasValidContributionItemV2(items.starter_pack)
+        && hasValidContributionItemV2(items.linen_towels)
+        && hasValidContributionItemV2(items.protection_insurance)
+        && hasValidContributionItemV2(items.provisions)
+        && hasValidContributionItemV2(items.fuel)
+        && hasValidContributionItemV2(items.transfer)
+        && hasValidContributionItemV2(items.shore_dinner)
+        && hasValidContributionItemV2(items.mooring_fee)
+        && hasValidContributionItemV2(items.refundable_deposit)
+        && request.resource.data.starterPackSettlementMode is string
+        && request.resource.data.starterPackSettlementMode in ['included_in_charter', 'cash_on_board']
+        && ((request.resource.data.starterPackSettlementMode == 'included_in_charter'
+            && items.starter_pack.state == 'included'
+            && items.starter_pack.amountCents == 0)
+          || (request.resource.data.starterPackSettlementMode == 'cash_on_board'
+            && items.starter_pack.state == 'local'))
+        && items.linen_towels.state == 'included'
+        && items.refundable_deposit.state == 'local'
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    function isContributionPlanV3(data) {
+      return data is map
+        && data.keys().hasAny(['starterPackSettlementMode']);
     }
 
     // Il preventivo barca è un prospetto privato di soli importi aggregati.
@@ -783,13 +997,97 @@ service cloud.firestore {
 
     // La cauzione può essere portata anche da co-skipper o hostess: il suo
     // divisore resta quindi indipendente da chi contribuisce ai costi barca.
-    function hasValidSkipperCostPlanV4() {
+    function hasValidSkipperCostPlanV4Core() {
       return request.resource.data.keys().hasAll(['depositParticipants'])
-        && request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'protectionInsuranceTotalCents', 'refundableDepositTotalCents', 'payingParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'dinetteRateMode', 'dinetteFixedCents', 'depositParticipants', 'updatedAt', 'updatedBy'])
         && hasValidSkipperCostPlanV3Core()
         && request.resource.data.depositParticipants is int
         && request.resource.data.depositParticipants >= 1
         && request.resource.data.depositParticipants <= 30;
+    }
+
+    function hasValidSkipperCostPlanV4() {
+      return request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'protectionInsuranceTotalCents', 'refundableDepositTotalCents', 'payingParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'dinetteRateMode', 'dinetteFixedCents', 'depositParticipants', 'updatedAt', 'updatedBy'])
+        && hasValidSkipperCostPlanV4Core();
+    }
+
+    // V5 conserva il prospetto aggregato, ma aggiunge tre descrizioni brevi
+    // da copiare nel piano quote sanificato visibile all'equipaggio dopo il
+    // briefing. Non ammette canali di incasso o istruzioni di pagamento.
+    function hasValidSkipperCostPlanV5Core() {
+      return request.resource.data.keys().hasAll(['starterPackDescription', 'protectionInsuranceDescription', 'refundableDepositDescription'])
+        && hasValidSkipperCostPlanV4Core()
+        && hasSafeCrewFacingDescription(request.resource.data.starterPackDescription)
+        && hasSafeCrewFacingDescription(request.resource.data.protectionInsuranceDescription)
+        && hasSafeCrewFacingDescription(request.resource.data.refundableDepositDescription);
+    }
+
+    function hasValidSkipperCostPlanV5() {
+      return request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'protectionInsuranceTotalCents', 'refundableDepositTotalCents', 'payingParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'dinetteRateMode', 'dinetteFixedCents', 'depositParticipants', 'starterPackDescription', 'protectionInsuranceDescription', 'refundableDepositDescription', 'updatedAt', 'updatedBy'])
+        && hasValidSkipperCostPlanV5Core();
+    }
+
+    // V6 rende esplicito il significato delle due voci variabili. I campi
+    // "totale" non vengono mai riutilizzati come quota individuale: evita
+    // che una pagina vecchia divida due volte un importo fisso per persona.
+    function hasValidSkipperCostPlanV6() {
+      return request.resource.data.keys().hasAll(['starterPackRateMode', 'starterPackFixedPerPersonCents', 'starterPackIncludedInCharter', 'protectionInsuranceRateMode', 'protectionInsuranceFixedPerPersonCents'])
+        && request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'starterPackRateMode', 'starterPackFixedPerPersonCents', 'starterPackIncludedInCharter', 'protectionInsuranceTotalCents', 'protectionInsuranceRateMode', 'protectionInsuranceFixedPerPersonCents', 'refundableDepositTotalCents', 'payingParticipants', 'depositParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'dinetteRateMode', 'dinetteFixedCents', 'starterPackDescription', 'protectionInsuranceDescription', 'refundableDepositDescription', 'updatedAt', 'updatedBy'])
+        && request.resource.data.starterPackRateMode is string
+        && request.resource.data.starterPackRateMode in ['total_divided', 'fixed_per_person']
+        && request.resource.data.starterPackFixedPerPersonCents is int
+        && request.resource.data.starterPackFixedPerPersonCents >= 0
+        && request.resource.data.starterPackFixedPerPersonCents <= 1000000
+        && request.resource.data.starterPackIncludedInCharter is bool
+        && request.resource.data.protectionInsuranceRateMode is string
+        && request.resource.data.protectionInsuranceRateMode in ['total_divided', 'fixed_per_person']
+        && request.resource.data.protectionInsuranceFixedPerPersonCents is int
+        && request.resource.data.protectionInsuranceFixedPerPersonCents >= 0
+        && request.resource.data.protectionInsuranceFixedPerPersonCents <= 1000000
+        && request.resource.data.dinetteRateMode is string
+        && request.resource.data.dinetteRateMode in ['percentage', 'fixed']
+        && request.resource.data.dinetteFixedCents is int
+        && request.resource.data.dinetteFixedCents >= 0
+        && request.resource.data.dinetteFixedCents <= 1000000
+        && request.resource.data.depositParticipants is int
+        && request.resource.data.depositParticipants >= 1
+        && request.resource.data.depositParticipants <= 30
+        && hasSafeCrewFacingDescription(request.resource.data.starterPackDescription)
+        && hasSafeCrewFacingDescription(request.resource.data.protectionInsuranceDescription)
+        && hasSafeCrewFacingDescription(request.resource.data.refundableDepositDescription)
+        && ((request.resource.data.starterPackRateMode == 'total_divided'
+            && request.resource.data.starterPackFixedPerPersonCents == 0)
+          || (request.resource.data.starterPackRateMode == 'fixed_per_person'
+            && request.resource.data.starterPackTotalCents == 0
+            && request.resource.data.starterPackFixedPerPersonCents >= 1))
+        && (request.resource.data.starterPackIncludedInCharter == false
+          || (request.resource.data.starterPackRateMode == 'total_divided'
+            && request.resource.data.starterPackTotalCents <= request.resource.data.charterCents)
+          || (request.resource.data.starterPackRateMode == 'fixed_per_person'
+            && request.resource.data.starterPackFixedPerPersonCents * request.resource.data.payingParticipants <= request.resource.data.charterCents))
+        // Con il Pack già dentro il charter la dinette fissa deve lasciare
+        // coperta anche la sola quota cabina: è lo stesso limite della UI.
+        && ((request.resource.data.dinetteRateMode == 'percentage'
+            && request.resource.data.dinetteFixedCents == 0)
+          || (request.resource.data.dinetteRateMode == 'fixed'
+            && request.resource.data.dinetteFixedCents >= 1
+            && request.resource.data.dinettePayingParticipants >= 1
+            && request.resource.data.dinettePayingParticipants < request.resource.data.payingParticipants
+            && request.resource.data.dinettePayingParticipants * request.resource.data.dinetteFixedCents
+              < (skipperCostPlanRecoverableCents()
+                - (request.resource.data.starterPackIncludedInCharter
+                  ? (request.resource.data.starterPackRateMode == 'fixed_per_person'
+                    ? request.resource.data.starterPackFixedPerPersonCents * request.resource.data.payingParticipants
+                    : request.resource.data.starterPackTotalCents)
+                  : 0))))
+        && ((request.resource.data.protectionInsuranceRateMode == 'total_divided'
+            && request.resource.data.protectionInsuranceFixedPerPersonCents == 0)
+          || (request.resource.data.protectionInsuranceRateMode == 'fixed_per_person'
+            && request.resource.data.protectionInsuranceTotalCents == 0
+            && request.resource.data.protectionInsuranceFixedPerPersonCents >= 1))
+        // V6 usa il core V2 per i totali e i contatori condivisi. Evitiamo di
+        // attraversare anche i vecchi controlli V3/V4/V5: la condizione
+        // fixed sopra è più restrittiva perché considera il Pack scorporato.
+        && hasValidSkipperCostPlanV2Core();
     }
 
     // Il rilevamento usa qualsiasi marcatore: anche un documento migrato a
@@ -808,6 +1106,16 @@ service cloud.firestore {
     function isSkipperCostPlanV4(data) {
       return data is map
         && data.keys().hasAny(['depositParticipants']);
+    }
+
+    function isSkipperCostPlanV5(data) {
+      return data is map
+        && data.keys().hasAny(['starterPackDescription', 'protectionInsuranceDescription', 'refundableDepositDescription']);
+    }
+
+    function isSkipperCostPlanV6(data) {
+      return data is map
+        && data.keys().hasAny(['starterPackRateMode', 'starterPackFixedPerPersonCents', 'starterPackIncludedInCharter', 'protectionInsuranceRateMode', 'protectionInsuranceFixedPerPersonCents']);
     }
 
     // Piano quote, richieste personali e bacheca restano consultabili soltanto
@@ -884,7 +1192,7 @@ service cloud.firestore {
     // o interpretare la causale libera del messaggio.
     function hasValidPaymentContributionItemId(itemId) {
       return itemId is string
-        && itemId in ['berth_base', 'berth_double_cabin', 'berth_single_cabin', 'berth_dinette', 'berth_other', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'other'];
+        && itemId in ['berth_base', 'berth_double_cabin', 'berth_single_cabin', 'berth_dinette', 'berth_other', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'shore_dinner', 'mooring_fee', 'other'];
     }
 
     function isValidPaymentRequestCreate(boatId) {
@@ -1090,7 +1398,7 @@ service cloud.firestore {
           && isValidCrewProjectionDraftUpdate(boatId, projectionId);
         allow update: if isPrivateAreaOpen()
           && (isOrganizer() || isSkipper(boatId))
-          && isValidCrewProjectionInvitedPlanUpdate(boatId, projectionId);
+          && isValidCrewProjectionInvitedUpdate(boatId, projectionId);
         allow update: if isPrivateAreaOpen()
           && (isOrganizer() || isSkipper(boatId))
           && isValidCrewProjectionInviteTransition(boatId, projectionId);
@@ -1127,7 +1435,7 @@ service cloud.firestore {
       }
 
       // Riepilogo leggibile dall'equipaggio già confermato. È separato dal
-      // profilo di incasso privato e contiene solo otto voci standardizzate,
+      // profilo di incasso privato e contiene solo dieci voci standardizzate,
       // stato e importo eventuale: mai link, IBAN o istruzioni di pagamento.
       match /contributionPlan/{planId} {
         allow get: if isPrivateAreaOpen()
@@ -1136,10 +1444,19 @@ service cloud.firestore {
             || isSkipper(boatId)
             || hasCurrentParticipantBriefingAcceptance(boatId));
         allow list: if false;
-        allow create, update: if isPrivateAreaOpen()
+        allow create: if isPrivateAreaOpen()
           && planId == 'default'
           && isSkipper(boatId)
-          && hasValidContributionPlan();
+          && hasValidContributionPlanV3();
+        allow update: if isPrivateAreaOpen()
+          && planId == 'default'
+          && isSkipper(boatId)
+          && (hasValidContributionPlanV3()
+            || (!isContributionPlanV3(resource.data)
+              && hasValidContributionPlanV2())
+            || (!isContributionPlanV3(resource.data)
+              && !isContributionPlanV2(resource.data)
+              && hasValidContributionPlanV1()));
         allow delete: if false;
       }
 
@@ -1154,23 +1471,14 @@ service cloud.firestore {
         allow create: if isPrivateAreaOpen()
           && planId == 'default'
           && isSkipper(boatId)
-          && (hasValidLegacySkipperCostPlan()
-            || hasValidSkipperCostPlanV2()
-            || hasValidSkipperCostPlanV3()
-            || hasValidSkipperCostPlanV4());
+          && hasValidSkipperCostPlanV6();
+        // V6 è il formato canonico. Un piano storico può passare a V6 con un
+        // solo salvataggio completo dalla pagina aggiornata; una pagina cache
+        // non può invece cancellare campi nuovi riscrivendo V1–V5.
         allow update: if isPrivateAreaOpen()
           && planId == 'default'
           && isSkipper(boatId)
-          && (hasValidSkipperCostPlanV4()
-            || (!isSkipperCostPlanV4(resource.data)
-              && hasValidSkipperCostPlanV3())
-            || (!isSkipperCostPlanV3(resource.data)
-              && !isSkipperCostPlanV4(resource.data)
-              && hasValidSkipperCostPlanV2())
-            || (!isSkipperCostPlanV2(resource.data)
-              && !isSkipperCostPlanV3(resource.data)
-              && !isSkipperCostPlanV4(resource.data)
-              && hasValidLegacySkipperCostPlan()));
+          && hasValidSkipperCostPlanV6();
         allow delete: if false;
       }
 
