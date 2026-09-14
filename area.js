@@ -69,14 +69,17 @@ const CONTRIBUTION_ITEM_STATES = new Map([
 ]);
 const DEFAULT_CONTRIBUTION_ITEMS = [
   { id: 'berth', label: 'Quota posto in barca' },
-  { id: 'starter_pack', label: 'Starter Pack · pulizie finali, fuoribordo e tender' },
-  { id: 'linen_towels', label: 'Lenzuola e asciugamani' },
+  { id: 'starter_pack', label: 'Starter Pack · lenzuola/asciugamani, SUP e fuoribordo · solo contanti in loco' },
+  { id: 'linen_towels', label: 'Lenzuola e asciugamani · inclusi nello Starter Pack' },
   { id: 'protection_insurance', label: 'Assicurazione cauzione' },
   { id: 'provisions', label: 'Cambusa' },
   { id: 'fuel', label: 'Gasolio per la navigazione' },
   { id: 'transfer', label: 'Transfer da/per il porto' },
   { id: 'refundable_deposit', label: 'Cauzione rimborsabile' },
 ];
+const AUTOMATIC_COST_PLAN_ITEM_IDS = new Set(['starter_pack', 'linen_towels', 'protection_insurance', 'refundable_deposit']);
+const DINETTE_RATE_MODES = new Set(['percentage', 'fixed']);
+const FREE_SUPPORT_ROLES = new Set(['co_skipper', 'hostess', 'collaborator']);
 const DEFAULT_RULES_SUMMARY = [
   '1. Seguo sempre le decisioni dello skipper su sicurezza, manovre, meteo, rotta, rada e porto.',
   '2. Partecipo al briefing pratico e uso le dotazioni di sicurezza quando richiesto.',
@@ -195,6 +198,7 @@ let creatingBoat = false;
 let editingBoatId = null;
 let editingMemberId = null;
 let editingProjectionId = null;
+let linkingLegacyInviteId = null;
 const fleetPublicationInProgress = new Set();
 let fleetAvailabilitySyncInProgress = false;
 const SKIPPER_DASHBOARD_HASHES = Object.freeze({
@@ -347,7 +351,7 @@ function setupSkipperFinanceDashboard() {
     financeDashboardCard({
       view: SKIPPER_FINANCE_VIEWS.setup,
       title: 'Imposta',
-      detail: 'Metodi d’incasso, Cassa skipper e composizione delle quote.',
+      detail: 'Metodi d’incasso, preventivo barca e composizione delle quote.',
       icon: 'setup',
     }),
     financeDashboardCard({
@@ -644,7 +648,8 @@ function renderSkipperFinanceOverview() {
   const overview = document.querySelector('#skipperFinanceOverview');
   if (!overview) return;
   const plan = normalizeCostPlan(activeCostPlan);
-  const targetCents = activeCostPlan ? costPlanTotalCents(plan) : 0;
+  const model = activeCostPlan ? costPlanQuoteModel(plan) : null;
+  const targetCents = model?.recoveryCents || 0;
   const verifiedCents = activePayments
     .filter((payment) => payment.status === 'verified' && paymentCountsTowardCostPlan(payment))
     .reduce((total, payment) => total + paymentAmountCents(payment), 0);
@@ -653,39 +658,69 @@ function renderSkipperFinanceOverview() {
     .reduce((total, payment) => total + paymentAmountCents(payment), 0);
   const projectedBerthCents = activeProjections
     .reduce((total, projection) => total + normalizedProjectionAmount(projection.berthCents), 0);
-  const projectedExtrasCents = activeProjections
-    .reduce((total, projection) => total
-      + normalizedProjectionAmount(projection.starterPackCents)
-      + normalizedProjectionAmount(projection.protectionInsuranceCents), 0);
-  const projectedPayableCents = projectedBerthCents + projectedExtrasCents;
-  const baseContribution = costPlanBaseContribution();
-  const starterPack = contributionConfigSummary('starter_pack');
-  const protectionInsurance = contributionConfigSummary('protection_insurance');
-  const refundableDeposit = contributionConfigSummary('refundable_deposit', { deposit: true });
+  const projectedInsuranceCents = activeProjections
+    .reduce((total, projection) => total + normalizedProjectionAmount(projection.protectionInsuranceCents), 0);
+  const projectedStarterPackCashCents = activeProjections
+    .reduce((total, projection) => total + normalizedProjectionAmount(projection.starterPackCents), 0);
+  const projectedDepositCashCents = activeProjections
+    .reduce((total, projection) => total + normalizedProjectionAmount(projection.refundableDepositCents), 0);
+  const projectedPayableCents = projectedBerthCents + projectedInsuranceCents;
   const recoveryValue = targetCents ? formatCurrency(targetCents / 100) : 'Da compilare';
   const recoveryDetail = !targetCents
     ? 'Solo charter e spese recuperabili dello skipper.'
     : verifiedCents > targetCents
       ? `${formatCurrency(verifiedCents / 100)} verificati · ${formatCurrency((verifiedCents - targetCents) / 100)} da riallocare.`
       : `${formatCurrency(verifiedCents / 100)} verificati · ${formatCurrency((targetCents - verifiedCents) / 100)} ancora da recuperare.${pendingCents ? ` ${formatCurrency(pendingCents / 100)} in attesa di verifica.` : ''}`;
-  const baseValue = baseContribution ? `${formatCurrency(baseContribution.cents / 100)} a persona` : 'Da calcolare';
-  const baseDetail = baseContribution
-    ? `Cassa ÷ ${plan.payingParticipants} ${plan.payingParticipants === 1 ? 'partecipante pagante' : 'partecipanti paganti'}; skipper escluso.`
-    : 'Inserisci i costi e chi li divide per proporre una quota posto.';
+  const fixedDinetteMessage = fixedDinetteConfigurationMessage(model);
+  const cabinValue = fixedDinetteMessage
+    ? 'Da correggere'
+    : model?.standardBerthCents ? `${formatCurrency(model.standardBerthCents / 100)} a persona` : 'Da calcolare';
+  const cabinDetail = fixedDinetteMessage
+    ? fixedDinetteMessage
+    : model?.standardBerthCents
+      ? model.dinetteRateMode === 'fixed'
+        ? `${model.standardPayingParticipants} quote cabina ricavate dal residuo · skipper escluso.`
+        : `${model.standardPayingParticipants} quote cabina + ${model.dinettePayingParticipants} dinette al ${model.dinetteWeightPercent}% · skipper escluso.`
+      : 'Inserisci i costi della barca e gli ospiti paganti per proporre la quota cabina.';
+  const dinetteValue = fixedDinetteMessage
+    ? 'Da correggere'
+    : model?.dinettePayingParticipants && model?.dinetteBerthCents
+      ? `${formatCurrency(model.dinetteBerthCents / 100)} a persona`
+      : 'Non prevista';
+  const dinetteDetail = fixedDinetteMessage
+    ? fixedDinetteMessage
+    : model?.dinettePayingParticipants
+      ? model.dinetteRateMode === 'fixed'
+        ? `Prezzo fisso · ${model.dinettePayingParticipants} ${model.dinettePayingParticipants === 1 ? 'posto' : 'posti'} nel preventivo.`
+        : `${model.dinetteWeightPercent}% della quota cabina · ${model.dinettePayingParticipants} ${model.dinettePayingParticipants === 1 ? 'posto' : 'posti'} nel preventivo.`
+      : 'La dinette non entra in questo preventivo.';
+  const starterValue = model?.starterPackTotalCents
+    ? `${formatCurrency(model.starterPackPerPersonCents / 100)} a persona`
+    : 'Da definire';
+  const insuranceValue = model?.protectionInsuranceTotalCents
+    ? `${formatCurrency(model.protectionInsurancePerPersonCents / 100)} a persona`
+    : 'Da definire';
+  const depositValue = model?.refundableDepositTotalCents
+    ? `${formatCurrency(model.refundableDepositPerPersonCents / 100)} a persona`
+    : 'Da definire';
+  const depositDetail = model?.refundableDepositTotalCents
+    ? `Divisa tra ${model.depositParticipants} ${model.depositParticipants === 1 ? 'persona' : 'persone'}; separata, da portare in contanti e restituita secondo charter e skipper.`
+    : 'Separata, da portare in contanti e restituita secondo charter e skipper.';
   const projectionValue = activeProjections.length
     ? `${formatCurrency(projectedPayableCents / 100)} previsti`
     : 'Nessuna previsione';
   const projectionDetail = activeProjections.length
-    ? `${activeProjections.length} ${activeProjections.length === 1 ? 'posto riservato' : 'posti riservati'} · ${formatCurrency(projectedBerthCents / 100)} posti${projectedExtrasCents ? ` · ${formatCurrency(projectedExtrasCents / 100)} Starter Pack/assicurazione` : ''}. Non è un incasso.`
+    ? `${activeProjections.length} ${activeProjections.length === 1 ? 'posto riservato' : 'posti riservati'} · ${formatCurrency(projectedBerthCents / 100)} posti${projectedInsuranceCents ? ` · ${formatCurrency(projectedInsuranceCents / 100)} assicurazione` : ''}${projectedStarterPackCashCents ? ` · ${formatCurrency(projectedStarterPackCashCents / 100)} Starter Pack cash` : ''}${projectedDepositCashCents ? ` · ${formatCurrency(projectedDepositCashCents / 100)} cauzioni cash` : ''}. Non è un incasso.`
     : 'Aggiungi una persona nel Piano equipaggio per stimare gli scenari, senza inviare alcuna richiesta.';
   overview.innerHTML = `
-    <div class="finance-overview-heading"><p class="eyebrow">Cabina di regia economica</p><p>La Cassa skipper recupera solo costi reali. Extra e cauzione restano distinti: nessun margine, nessun incasso nel sito.</p></div>
+    <div class="finance-overview-heading"><p class="eyebrow">Cabina di regia economica</p><p>Il preventivo divide solo costi reali tra gli ospiti paganti. Lo Starter Pack e la cauzione restano cash/in loco: nessun margine, nessun incasso nel sito.</p></div>
     <div class="finance-overview-grid">
       <article class="finance-overview-card"><span>Cassa skipper</span><strong>${escapeHtml(recoveryValue)}</strong><small>${escapeHtml(recoveryDetail)}</small></article>
-      <article class="finance-overview-card"><span>Quota posto consigliata</span><strong>${escapeHtml(baseValue)}</strong><small>${escapeHtml(baseDetail)}</small></article>
+      <article class="finance-overview-card"><span>Quota cabina calcolata</span><strong>${escapeHtml(cabinValue)}</strong><small>${escapeHtml(cabinDetail)}</small></article>
+      <article class="finance-overview-card"><span>Quota dinette calcolata</span><strong>${escapeHtml(dinetteValue)}</strong><small>${escapeHtml(dinetteDetail)}</small></article>
       <article class="finance-overview-card finance-overview-card-projection"><span>Proiezione equipaggio</span><strong>${escapeHtml(projectionValue)}</strong><small>${escapeHtml(projectionDetail)}</small></article>
-      <article class="finance-overview-card finance-overview-card-extras"><span>Extra per persona</span><strong>Starter Pack · ${escapeHtml(starterPack.value)}</strong><small>${escapeHtml(starterPack.detail)}</small><strong>Assicurazione cauzione · ${escapeHtml(protectionInsurance.value)}</strong><small>${escapeHtml(protectionInsurance.detail)}</small></article>
-      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile</span><strong>${escapeHtml(refundableDeposit.value)}</strong><small>${escapeHtml(refundableDeposit.detail)}</small></article>
+      <article class="finance-overview-card finance-overview-card-extras"><span>Starter Pack · cash in loco</span><strong>${escapeHtml(starterValue)}</strong><small>Lenzuola e asciugamani, SUP e fuoribordo. Non appare nelle richieste WhatsApp.</small><strong>Assicurazione cauzione · ${escapeHtml(insuranceValue)}</strong><small>Separata dalla quota cabina; puoi richiederla con i metodi scelti.</small></article>
+      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile · cash in loco</span><strong>${escapeHtml(depositValue)}</strong><small>${escapeHtml(depositDetail)}</small></article>
     </div>
   `;
 }
@@ -884,13 +919,22 @@ function normalizeBerthRates(rates = {}) {
 }
 
 function defaultCostPlan() {
+  const payingParticipants = Math.max(1, effectiveParticipantCapacity(activeBoat) || 1);
   return {
     charterCents: 0,
     skipperFlightTrainCents: 0,
     skipperCarCents: 0,
     skipperLocalTransferCents: 0,
     otherRecoverableCents: 0,
-    payingParticipants: Math.max(1, effectiveParticipantCapacity(activeBoat) || 1),
+    starterPackTotalCents: 0,
+    protectionInsuranceTotalCents: 0,
+    refundableDepositTotalCents: 0,
+    payingParticipants,
+    depositParticipants: payingParticipants,
+    dinettePayingParticipants: maximumDinettePayingParticipants(payingParticipants),
+    dinetteRateMode: 'percentage',
+    dinetteWeightPercent: 65,
+    dinetteFixedCents: 0,
   };
 }
 
@@ -898,16 +942,52 @@ function maximumPayingParticipants() {
   return Math.max(1, effectiveParticipantCapacity(activeBoat) || 30);
 }
 
+function maximumDepositParticipants() {
+  return maximumPayingParticipants();
+}
+
+function maximumDinettePayingParticipants(payingParticipants = maximumPayingParticipants()) {
+  const dinetteBerths = berthLayoutTotals(activeBoat?.berthLayout).dinetteBerths;
+  return Math.min(dinetteBerths, asNonNegativeInteger(payingParticipants, maximumPayingParticipants()));
+}
+
+function normalizeDinetteWeightPercent(value) {
+  const numericValue = Number(value);
+  return Number.isInteger(numericValue) && numericValue >= 1 && numericValue <= 100 ? numericValue : 65;
+}
+
+function normalizeDinetteRateMode(value) {
+  return DINETTE_RATE_MODES.has(value) ? value : 'percentage';
+}
+
 function normalizeCostPlan(plan = {}) {
   const defaults = defaultCostPlan();
   const payingParticipants = asNonNegativeInteger(plan?.payingParticipants, maximumPayingParticipants());
+  const normalizedPayingParticipants = payingParticipants || defaults.payingParticipants;
+  const rawDepositParticipants = Number(plan?.depositParticipants);
+  const depositParticipants = Number.isInteger(rawDepositParticipants) && rawDepositParticipants >= 1
+    ? asNonNegativeInteger(rawDepositParticipants, maximumDepositParticipants())
+    : normalizedPayingParticipants;
+  const maxDinetteParticipants = maximumDinettePayingParticipants(normalizedPayingParticipants);
+  const rawDinetteParticipants = Number(plan?.dinettePayingParticipants);
+  const dinettePayingParticipants = Number.isInteger(rawDinetteParticipants) && rawDinetteParticipants >= 0
+    ? asNonNegativeInteger(rawDinetteParticipants, maxDinetteParticipants)
+    : Math.min(defaults.dinettePayingParticipants, maxDinetteParticipants);
   return {
     charterCents: asNonNegativeInteger(plan?.charterCents, 1_000_000),
     skipperFlightTrainCents: asNonNegativeInteger(plan?.skipperFlightTrainCents, 1_000_000),
     skipperCarCents: asNonNegativeInteger(plan?.skipperCarCents, 1_000_000),
     skipperLocalTransferCents: asNonNegativeInteger(plan?.skipperLocalTransferCents, 1_000_000),
     otherRecoverableCents: asNonNegativeInteger(plan?.otherRecoverableCents, 1_000_000),
-    payingParticipants: payingParticipants || defaults.payingParticipants,
+    starterPackTotalCents: asNonNegativeInteger(plan?.starterPackTotalCents, 1_000_000),
+    protectionInsuranceTotalCents: asNonNegativeInteger(plan?.protectionInsuranceTotalCents, 1_000_000),
+    refundableDepositTotalCents: asNonNegativeInteger(plan?.refundableDepositTotalCents, 1_000_000),
+    payingParticipants: normalizedPayingParticipants,
+    depositParticipants: depositParticipants || normalizedPayingParticipants,
+    dinettePayingParticipants,
+    dinetteRateMode: normalizeDinetteRateMode(plan?.dinetteRateMode),
+    dinetteWeightPercent: normalizeDinetteWeightPercent(plan?.dinetteWeightPercent),
+    dinetteFixedCents: asNonNegativeInteger(plan?.dinetteFixedCents, 1_000_000),
   };
 }
 
@@ -920,16 +1000,118 @@ function costPlanTotalCents(plan = activeCostPlan) {
     + normalized.otherRecoverableCents;
 }
 
-function costPlanBaseContribution(plan = activeCostPlan) {
+function costPlanQuoteModel(plan = activeCostPlan) {
   if (!plan) return null;
   const normalized = normalizeCostPlan(plan);
-  const totalCents = costPlanTotalCents(normalized);
-  if (!totalCents || !normalized.payingParticipants) return null;
+  const standardPayingParticipants = Math.max(0, normalized.payingParticipants - normalized.dinettePayingParticipants);
+  const dinetteWeight = normalized.dinetteWeightPercent / 100;
+  const recoveryCents = costPlanTotalCents(normalized);
+  const usesFixedDinetteRate = normalized.dinetteRateMode === 'fixed';
+  const fixedDinetteTotalCents = normalized.dinetteFixedCents * normalized.dinettePayingParticipants;
+  const fixedDinetteError = usesFixedDinetteRate && (
+    normalized.dinettePayingParticipants < 1
+    || standardPayingParticipants < 1
+    || normalized.dinetteFixedCents < 1
+    || fixedDinetteTotalCents >= recoveryCents
+  );
+  const weightedUnits = standardPayingParticipants + (normalized.dinettePayingParticipants * dinetteWeight);
+  const standardBerthCents = recoveryCents > 0 && !fixedDinetteError
+    ? usesFixedDinetteRate
+      ? Math.round((recoveryCents - fixedDinetteTotalCents) / standardPayingParticipants)
+      : weightedUnits > 0
+        ? Math.round(recoveryCents / weightedUnits)
+        : 0
+    : 0;
+  const dinetteBerthCents = !fixedDinetteError
+    ? usesFixedDinetteRate
+      ? normalized.dinetteFixedCents
+      : standardBerthCents > 0
+        ? Math.round(standardBerthCents * dinetteWeight)
+        : 0
+    : 0;
+  const allocatedRecoveryCents = (standardBerthCents * standardPayingParticipants)
+    + (dinetteBerthCents * normalized.dinettePayingParticipants);
+  const divideEvenly = (totalCents, participants = normalized.payingParticipants) => totalCents > 0 && participants > 0
+    ? Math.round(totalCents / participants)
+    : 0;
+  return {
+    ...normalized,
+    recoveryCents,
+    standardPayingParticipants,
+    weightedUnits,
+    fixedDinetteTotalCents,
+    fixedDinetteError,
+    standardBerthCents,
+    dinetteBerthCents,
+    allocatedRecoveryCents,
+    roundingDeltaCents: allocatedRecoveryCents - recoveryCents,
+    starterPackPerPersonCents: divideEvenly(normalized.starterPackTotalCents),
+    protectionInsurancePerPersonCents: divideEvenly(normalized.protectionInsuranceTotalCents),
+    refundableDepositPerPersonCents: divideEvenly(normalized.refundableDepositTotalCents, normalized.depositParticipants),
+  };
+}
+
+function fixedDinetteConfigurationMessage(model) {
+  if (!model?.fixedDinetteError) return '';
+  if (model.dinettePayingParticipants < 1) return 'Per usare un prezzo fisso, indica almeno un posto dinette pagante.';
+  if (model.standardPayingParticipants < 1) return 'Con il prezzo fisso serve almeno un ospite in cabina: altrimenti non c’è una quota cabina da ricavare.';
+  if (model.dinetteFixedCents < 1) return 'Inserisci un prezzo fisso della dinette maggiore di zero.';
+  return 'Il totale delle dinette lascerebbe la cabina gratuita: riduci il prezzo dinette oppure aumenta i costi della barca.';
+}
+
+function costPlanBaseContribution(plan = activeCostPlan) {
+  const model = costPlanQuoteModel(plan);
+  if (!model || !model.standardBerthCents) return null;
   return {
     id: 'cost:base',
-    label: 'Quota base calcolata · recupero costi',
-    cents: Math.round(totalCents / normalized.payingParticipants),
-    defaultReason: 'Quota base · recupero costi barca e skipper',
+    label: 'Quota cabina calcolata · recupero costi',
+    cents: model.standardBerthCents,
+    defaultReason: 'Quota cabina · recupero costi barca e skipper',
+    accountingCategory: 'cost_recovery',
+  };
+}
+
+function costPlanContributionTypes(plan = activeCostPlan) {
+  const model = costPlanQuoteModel(plan);
+  if (!model) return [];
+  const types = [];
+  const standard = costPlanBaseContribution(model);
+  if (standard) types.push(standard);
+  if (model.dinettePayingParticipants > 0 && model.dinetteBerthCents > 0) {
+    types.push({
+      id: 'cost:dinette',
+      label: model.dinetteRateMode === 'fixed'
+        ? 'Quota dinette calcolata · prezzo fisso'
+        : `Quota dinette calcolata · ${model.dinetteWeightPercent}% cabina`,
+      cents: model.dinetteBerthCents,
+      defaultReason: 'Quota posto in dinette · recupero costi barca e skipper',
+      accountingCategory: 'cost_recovery',
+    });
+  }
+  if (model.protectionInsurancePerPersonCents > 0) {
+    types.push({
+      id: 'cost:protection_insurance',
+      label: 'Assicurazione cauzione calcolata',
+      cents: model.protectionInsurancePerPersonCents,
+      defaultReason: 'Assicurazione cauzione',
+      accountingCategory: 'other',
+    });
+  }
+  return types;
+}
+
+function costPlanProjectionPreset(berthType, plan = activeCostPlan) {
+  const model = costPlanQuoteModel(plan);
+  if (!model) return null;
+  const berthCents = berthType === 'dinette'
+    ? model.dinetteBerthCents
+    : (berthType === 'double_cabin' || berthType === 'single_cabin' ? model.standardBerthCents : 0);
+  if (!berthCents && !model.starterPackPerPersonCents && !model.protectionInsurancePerPersonCents && !model.refundableDepositPerPersonCents) return null;
+  return {
+    berthCents,
+    starterPackCents: model.starterPackPerPersonCents,
+    protectionInsuranceCents: model.protectionInsurancePerPersonCents,
+    refundableDepositCents: model.refundableDepositPerPersonCents,
   };
 }
 
@@ -937,7 +1119,13 @@ function normalizeContributionPlan(plan = {}) {
   const sourceItems = plan?.items && typeof plan.items === 'object' ? plan.items : {};
   const items = Object.fromEntries(DEFAULT_CONTRIBUTION_ITEMS.map((item) => {
     const source = sourceItems[item.id] || {};
-    const state = CONTRIBUTION_ITEM_STATES.has(source.state) ? source.state : 'to_define';
+    const forcedStates = {
+      starter_pack: 'local',
+      linen_towels: 'included',
+      refundable_deposit: 'local',
+    };
+    const state = forcedStates[item.id]
+      || (CONTRIBUTION_ITEM_STATES.has(source.state) ? source.state : 'to_define');
     const amountCents = state === 'extra' || state === 'local'
       ? asNonNegativeInteger(source.amountCents, 1_000_000)
       : 0;
@@ -948,12 +1136,26 @@ function normalizeContributionPlan(plan = {}) {
 
 function contributionCatalog(plan = activeContributionPlan) {
   const normalized = normalizeContributionPlan(plan);
-  return DEFAULT_CONTRIBUTION_ITEMS.map((item) => ({ ...item, ...normalized.items[item.id] }));
+  const model = costPlanQuoteModel();
+  return DEFAULT_CONTRIBUTION_ITEMS.map((item) => {
+    const value = { ...item, ...normalized.items[item.id] };
+    if (item.id === 'starter_pack') {
+      return { ...value, state: 'local', amountCents: model ? model.starterPackPerPersonCents : value.amountCents };
+    }
+    if (item.id === 'linen_towels') return { ...value, state: 'included', amountCents: 0 };
+    if (item.id === 'protection_insurance') {
+      return model ? { ...value, state: 'extra', amountCents: model.protectionInsurancePerPersonCents } : value;
+    }
+    if (item.id === 'refundable_deposit') {
+      return { ...value, state: 'local', amountCents: model ? model.refundableDepositPerPersonCents : value.amountCents };
+    }
+    return value;
+  });
 }
 
 function extraContributionTypes(plan = activeContributionPlan) {
   return contributionCatalog(plan)
-    .filter((item) => item.state === 'extra' && item.id !== 'refundable_deposit')
+    .filter((item) => item.state === 'extra' && !AUTOMATIC_COST_PLAN_ITEM_IDS.has(item.id))
     .map((item) => ({
       id: `extra:${item.id}`,
       label: item.label,
@@ -1251,6 +1453,7 @@ function resetPrivateView() {
   editingBoatId = null;
   editingMemberId = null;
   editingProjectionId = null;
+  linkingLegacyInviteId = null;
   fleetPublicationInProgress.clear();
   fleetAvailabilitySyncInProgress = false;
   stopBoatSubscription?.();
@@ -1494,19 +1697,96 @@ function fillCostPlanForm(plan = activeCostPlan) {
   form.elements.skipperCarCost.value = euroInputValue(normalized.skipperCarCents);
   form.elements.skipperLocalTransferCost.value = euroInputValue(normalized.skipperLocalTransferCents);
   form.elements.otherRecoverableCost.value = euroInputValue(normalized.otherRecoverableCents);
+  form.elements.starterPackTotal.value = euroInputValue(normalized.starterPackTotalCents);
+  form.elements.protectionInsuranceTotal.value = euroInputValue(normalized.protectionInsuranceTotalCents);
+  form.elements.refundableDepositTotal.value = euroInputValue(normalized.refundableDepositTotalCents);
   form.elements.payingParticipants.max = String(maximumPayingParticipants());
   form.elements.payingParticipants.value = String(normalized.payingParticipants);
+  form.elements.depositParticipants.max = String(maximumDepositParticipants());
+  form.elements.depositParticipants.value = String(normalized.depositParticipants);
+  const maxDinetteParticipants = maximumDinettePayingParticipants(normalized.payingParticipants);
+  form.elements.dinettePayingParticipants.max = String(maxDinetteParticipants);
+  form.elements.dinettePayingParticipants.value = String(normalized.dinettePayingParticipants);
+  form.elements.dinetteRateMode.value = normalized.dinetteRateMode;
+  form.elements.dinetteRatePercent.value = String(normalized.dinetteWeightPercent);
+  form.elements.dinetteFixedPrice.value = euroInputValue(normalized.dinetteFixedCents);
+  syncCostPlanDinetteFieldAvailability();
+  syncCostPlanDepositParticipantAvailability();
+}
+
+function syncCostPlanDinettePricingMode() {
+  const form = document.querySelector('#costPlanForm');
+  if (!form) return;
+  const hasDinette = maximumDinettePayingParticipants(
+    asNonNegativeInteger(form.elements.payingParticipants?.value, maximumPayingParticipants()) || maximumPayingParticipants(),
+  ) > 0;
+  const fixedRate = normalizeDinetteRateMode(form.elements.dinetteRateMode?.value) === 'fixed';
+  form.querySelectorAll('[data-dinette-rate-percent]').forEach((field) => {
+    field.hidden = !hasDinette || fixedRate;
+  });
+  form.querySelectorAll('[data-dinette-rate-fixed]').forEach((field) => {
+    field.hidden = !hasDinette || !fixedRate;
+  });
+}
+
+function syncCostPlanDinetteFieldAvailability() {
+  const form = document.querySelector('#costPlanForm');
+  if (!form) return;
+  const payingParticipants = asNonNegativeInteger(form.elements.payingParticipants?.value, maximumPayingParticipants());
+  const maxDinetteParticipants = maximumDinettePayingParticipants(payingParticipants || maximumPayingParticipants());
+  const dinetteInput = form.elements.dinettePayingParticipants;
+  dinetteInput.max = String(maxDinetteParticipants);
+  if (asNonNegativeInteger(dinetteInput.value, maximumPayingParticipants()) > maxDinetteParticipants) {
+    dinetteInput.value = String(maxDinetteParticipants);
+  }
+  if (maxDinetteParticipants === 0) {
+    dinetteInput.value = '0';
+    form.elements.dinetteRateMode.value = 'percentage';
+    form.elements.dinetteFixedPrice.value = '';
+  }
+  form.querySelectorAll('[data-dinette-calculator]').forEach((field) => {
+    field.hidden = maxDinetteParticipants === 0;
+  });
+  syncCostPlanDinettePricingMode();
+}
+
+function syncCostPlanDepositParticipantAvailability() {
+  const form = document.querySelector('#costPlanForm');
+  if (!form) return;
+  const input = form.elements.depositParticipants;
+  if (!input) return;
+  const maximum = maximumDepositParticipants();
+  input.max = String(maximum);
+  const value = asNonNegativeInteger(input.value, maximum);
+  if (value < 1 || value > maximum) {
+    const payingParticipants = asNonNegativeInteger(form.elements.payingParticipants?.value, maximumPayingParticipants());
+    input.value = String(Math.max(1, Math.min(maximum, payingParticipants || 1)));
+  }
 }
 
 function readCostPlanForm() {
   const form = document.querySelector('#costPlanForm');
+  const dinetteRateMode = normalizeDinetteRateMode(form?.elements.dinetteRateMode?.value);
   return {
     charterCents: toEuroCents(form?.elements.charterCost?.value),
     skipperFlightTrainCents: toEuroCents(form?.elements.skipperFlightTrainCost?.value),
     skipperCarCents: toEuroCents(form?.elements.skipperCarCost?.value),
     skipperLocalTransferCents: toEuroCents(form?.elements.skipperLocalTransferCost?.value),
     otherRecoverableCents: toEuroCents(form?.elements.otherRecoverableCost?.value),
+    starterPackTotalCents: toEuroCents(form?.elements.starterPackTotal?.value),
+    protectionInsuranceTotalCents: toEuroCents(form?.elements.protectionInsuranceTotal?.value),
+    refundableDepositTotalCents: toEuroCents(form?.elements.refundableDepositTotal?.value),
     payingParticipants: asNonNegativeInteger(form?.elements.payingParticipants?.value, maximumPayingParticipants()),
+    depositParticipants: asNonNegativeInteger(form?.elements.depositParticipants?.value, maximumDepositParticipants()),
+    dinettePayingParticipants: asNonNegativeInteger(
+      form?.elements.dinettePayingParticipants?.value,
+      maximumDinettePayingParticipants(asNonNegativeInteger(form?.elements.payingParticipants?.value, maximumPayingParticipants())),
+    ),
+    dinetteRateMode,
+    dinetteWeightPercent: normalizeDinetteWeightPercent(form?.elements.dinetteRatePercent?.value),
+    dinetteFixedCents: dinetteRateMode === 'fixed'
+      ? toEuroCents(form?.elements.dinetteFixedPrice?.value)
+      : 0,
   };
 }
 
@@ -1514,7 +1794,8 @@ function renderCostPlanSummary() {
   const summary = document.querySelector('#costPlanSummary');
   if (!summary) return;
   const plan = normalizeCostPlan(readCostPlanForm());
-  const totalCents = costPlanTotalCents(plan);
+  const model = costPlanQuoteModel(plan);
+  const totalCents = model.recoveryCents;
   const verifiedCents = activePayments
     .filter((payment) => payment.status === 'verified' && paymentCountsTowardCostPlan(payment))
     .reduce((total, payment) => total + paymentAmountCents(payment), 0);
@@ -1527,25 +1808,74 @@ function renderCostPlanSummary() {
   const legacyNote = legacyVerifiedCount
     ? ` ${legacyVerifiedCount} ${legacyVerifiedCount === 1 ? 'accredito verificato precedente non è classificato' : 'accrediti verificati precedenti non sono classificati'} e resta fuori dal bilancio.`
     : '';
-  if (!totalCents) {
-    summary.textContent = `Inserisci i costi che vuoi recuperare. Lo skipper è escluso; al momento il divisore proposto è ${plan.payingParticipants} ${plan.payingParticipants === 1 ? 'partecipante' : 'partecipanti'}. Contributi Cassa skipper verificati: ${formatCurrency(verifiedCents / 100)}${pendingCents ? ` · ancora da verificare: ${formatCurrency(pendingCents / 100)}` : ''}.${legacyNote}`;
+  const hasAnyTotal = totalCents > 0
+    || model.starterPackTotalCents > 0
+    || model.protectionInsuranceTotalCents > 0
+    || model.refundableDepositTotalCents > 0
+    || model.dinetteFixedCents > 0;
+  if (!hasAnyTotal) {
+    summary.textContent = `Inserisci i totali della barca. Lo skipper è escluso; al momento il divisore proposto è ${model.payingParticipants} ${model.payingParticipants === 1 ? 'ospite pagante' : 'ospiti paganti'}. La dinette, se presente, usa ${model.dinetteWeightPercent}% della quota cabina. Contributi Cassa skipper verificati: ${formatCurrency(verifiedCents / 100)}${pendingCents ? ` · ancora da verificare: ${formatCurrency(pendingCents / 100)}` : ''}.${legacyNote}`;
     return;
   }
-  const baseCents = Math.round(totalCents / plan.payingParticipants);
   const balanceCents = verifiedCents - totalCents;
   const balance = balanceCents === 0
     ? 'Pareggio raggiunto con gli accrediti verificati.'
     : balanceCents > 0
       ? `Avanzo da riallocare: ${formatCurrency(balanceCents / 100)}. Non è un guadagno automatico.`
       : `Da recuperare: ${formatCurrency(Math.abs(balanceCents / 100))}.`;
-  summary.textContent = `Totale costi recuperabili: ${formatCurrency(totalCents / 100)} ÷ ${plan.payingParticipants} ${plan.payingParticipants === 1 ? 'partecipante' : 'partecipanti'} = quota base indicativa ${formatCurrency(baseCents / 100)} a persona. Contributi Cassa skipper verificati: ${formatCurrency(verifiedCents / 100)}${pendingCents ? ` · ancora da verificare: ${formatCurrency(pendingCents / 100)}` : ''}. Bilancio: ${balance} Le richieste per cambusa, assicurazione o altri extra restano fuori; seleziona “Conta nella Cassa skipper” soltanto per i contributi che devono recuperare questi costi.${legacyNote}`;
+  const fixedDinetteMessage = fixedDinetteConfigurationMessage(model);
+  if (fixedDinetteMessage) {
+    summary.textContent = `${fixedDinetteMessage} Nessuna quota automatica viene proposta finché il preventivo non torna coerente.`;
+    return;
+  }
+  const berthFormula = model.dinettePayingParticipants > 0
+    ? model.dinetteRateMode === 'fixed'
+      ? `${model.standardPayingParticipants} quote cabina ricavate dal residuo dopo ${model.dinettePayingParticipants} dinette a ${formatCurrency(model.dinetteFixedCents / 100)}`
+      : `${model.standardPayingParticipants} quote cabina + ${model.dinettePayingParticipants} dinette al ${model.dinetteWeightPercent}% = ${model.weightedUnits.toFixed(2).replace('.', ',')} quote equivalenti`
+    : `${model.standardPayingParticipants} quote cabina`;
+  const berthSummary = totalCents > 0
+    ? `Cassa da recuperare: ${formatCurrency(totalCents / 100)} su ${berthFormula}. Quota cabina standard: ${formatCurrency(model.standardBerthCents / 100)}; quota dinette: ${model.dinettePayingParticipants > 0 ? formatCurrency(model.dinetteBerthCents / 100) : 'non prevista'}.`
+    : 'Nessun costo barca o skipper da recuperare nel preventivo.';
+  const insuranceSummary = model.protectionInsuranceTotalCents > 0
+    ? ` Assicurazione: ${formatCurrency(model.protectionInsurancePerPersonCents / 100)} per ospite, separata e richiedibile.`
+    : ' Assicurazione: da definire.';
+  const starterSummary = model.starterPackTotalCents > 0
+    ? ` Starter Pack: ${formatCurrency(model.starterPackPerPersonCents / 100)} per ospite, solo contanti in loco.`
+    : ' Starter Pack: da definire, solo contanti in loco.';
+  const depositSummary = model.refundableDepositTotalCents > 0
+    ? ` Cauzione rimborsabile: ${formatCurrency(model.refundableDepositPerPersonCents / 100)} per ${model.depositParticipants} ${model.depositParticipants === 1 ? 'persona' : 'persone'}, solo contanti in loco.`
+    : ' Cauzione rimborsabile: da definire, separata e in loco.';
+  const roundedRecoveryNote = model.roundingDeltaCents
+    ? ` Arrotondamento tecnico delle quote: ${model.roundingDeltaCents > 0 ? '+' : ''}${formatCurrency(model.roundingDeltaCents / 100)} da riallocare.`
+    : '';
+  const projectedDinetteCount = activeProjections
+    .filter((projection) => projection.contributesToCosts !== false && projection.berthType === 'dinette')
+    .length;
+  const projectedPayingCount = activeProjections
+    .filter((projection) => projection.contributesToCosts !== false)
+    .length;
+  const projectedDepositCount = activeProjections
+    .filter((projection) => normalizedProjectionAmount(projection.refundableDepositCents) > 0)
+    .length;
+  const contributorProjectionNote = activeProjections.length && projectedPayingCount !== model.payingParticipants
+    ? ` Nota: il preventivo divide per ${model.payingParticipants} ospiti paganti; il Piano equipaggio ne registra finora ${projectedPayingCount}. Aggiorna il divisore quando la composizione è definita.`
+    : '';
+  const dinetteProjectionNote = activeProjections.length && projectedDinetteCount !== model.dinettePayingParticipants
+    ? ` Attenzione: nel preventivo risultano ${model.dinettePayingParticipants} ${model.dinettePayingParticipants === 1 ? 'dinette pagante' : 'dinette paganti'}, mentre il Piano equipaggio ne assegna ${projectedDinetteCount}; aggiorna il preventivo quando la composizione è definita.`
+    : '';
+  const depositProjectionNote = activeProjections.length && projectedDepositCount !== model.depositParticipants
+    ? ` Nota: la cauzione è divisa per ${model.depositParticipants} ${model.depositParticipants === 1 ? 'persona' : 'persone'}, mentre il Piano equipaggio ne registra finora ${projectedDepositCount} con cauzione prevista; aggiorna il numero quando la composizione è definita.`
+    : '';
+  summary.textContent = `${berthSummary}${insuranceSummary}${starterSummary}${depositSummary} Contributi Cassa skipper verificati: ${formatCurrency(verifiedCents / 100)}${pendingCents ? ` · ${formatCurrency(pendingCents / 100)} in attesa di verifica` : ''}. Bilancio Cassa skipper: ${balance}${roundedRecoveryNote}${contributorProjectionNote}${dinetteProjectionNote}${depositProjectionNote}${legacyNote}`;
 }
 
 function renderCostPlan(plan) {
   activeCostPlan = plan ? normalizeCostPlan(plan) : null;
   fillCostPlanForm(activeCostPlan);
   renderCostPlanSummary();
+  renderContributionCatalogForm();
   renderPaymentBerthOptions();
+  applyProjectionBerthPreset();
   renderSkipperDashboardOverview();
 }
 
@@ -1761,18 +2091,31 @@ function renderPaymentRecipientOptions() {
 }
 
 function contributionStateOptions(item) {
+  if (item.id === 'starter_pack') return '<option value="local" selected>Solo contanti, in loco</option>';
+  if (item.id === 'linen_towels') return '<option value="included" selected>Compreso nello Starter Pack</option>';
+  if (item.id === 'refundable_deposit') return '<option value="local" selected>Solo contanti, in loco</option>';
   return [...CONTRIBUTION_ITEM_STATES.entries()]
-    .filter(([value]) => item.id !== 'refundable_deposit' || ['to_define', 'local', 'not_applicable'].includes(value))
     .map(([value, label]) => `<option value="${value}"${value === item.state ? ' selected' : ''}>${label}</option>`)
     .join('');
 }
 
 function contributionCatalogRow(item) {
-  const stateHint = item.id === 'refundable_deposit' ? '<small>È sempre rimborsabile e va portata/regolata in loco: non usa richieste WhatsApp.</small>' : '';
-  return `<article class="contribution-catalog-row" data-contribution-id="${escapeHtml(item.id)}"><div class="contribution-catalog-label">${escapeHtml(item.label)}${stateHint}</div><label>Gestione<select data-contribution-state>${contributionStateOptions(item)}</select></label><label>€ a persona · solo a parte / in loco<input data-contribution-amount type="number" min="0" max="10000" step="0.01" inputmode="decimal" value="${euroInputValue(item.amountCents)}" placeholder="Es. 30,00" /></label></article>`;
+  const automatic = AUTOMATIC_COST_PLAN_ITEM_IDS.has(item.id);
+  const stateHint = item.id === 'starter_pack'
+    ? '<small>Gestito dal Preventivo barca: lenzuola e asciugamani, SUP e fuoribordo. Solo contanti, in loco; non crea richieste WhatsApp.</small>'
+    : item.id === 'linen_towels'
+      ? '<small>Già incluso nello Starter Pack: non va richiesto una seconda volta.</small>'
+      : item.id === 'protection_insurance'
+        ? '<small>La quota per persona arriva dal totale assicurazione nel Preventivo barca; può essere richiesta separatamente.</small>'
+        : item.id === 'refundable_deposit'
+          ? '<small>Gestita dal Preventivo barca: sempre rimborsabile, solo contanti in loco e mai in una richiesta WhatsApp.</small>'
+          : '';
+  const amountLabel = automatic ? '€ a persona · calcolato' : '€ a persona · solo a parte / in loco';
+  return `<article class="contribution-catalog-row" data-contribution-id="${escapeHtml(item.id)}"><div class="contribution-catalog-label">${escapeHtml(item.label)}${stateHint}</div><label>Gestione<select data-contribution-state${automatic ? ' disabled' : ''}>${contributionStateOptions(item)}</select></label><label>${amountLabel}<input data-contribution-amount type="number" min="0" max="10000" step="0.01" inputmode="decimal" value="${euroInputValue(item.amountCents)}" placeholder="Es. 30,00"${automatic ? ' disabled' : ''} /></label></article>`;
 }
 
 function syncContributionCatalogRow(row) {
+  if (AUTOMATIC_COST_PLAN_ITEM_IDS.has(row?.dataset.contributionId)) return;
   const state = row?.querySelector('[data-contribution-state]')?.value;
   const amount = row?.querySelector('[data-contribution-amount]');
   if (!amount) return;
@@ -1810,8 +2153,7 @@ function extraContributionType(typeId) {
 }
 
 function costPlanContributionType(typeId) {
-  const baseContribution = costPlanBaseContribution();
-  return baseContribution?.id === typeId ? baseContribution : null;
+  return costPlanContributionTypes().find((type) => type.id === typeId) || null;
 }
 
 function contributionItemIdForPaymentSelection(typeId) {
@@ -1823,9 +2165,11 @@ function contributionItemIdForPaymentSelection(typeId) {
   };
   if (berthItemIds[typeId]) return berthItemIds[typeId];
   if (typeId === 'cost:base') return 'berth_base';
+  if (typeId === 'cost:dinette') return 'berth_dinette';
+  if (typeId === 'cost:protection_insurance') return 'protection_insurance';
   if (typeof typeId === 'string' && typeId.startsWith('extra:')) {
     const itemId = typeId.slice('extra:'.length);
-    return PAYMENT_CONTRIBUTION_ITEM_IDS.has(itemId) ? itemId : 'other';
+    return PAYMENT_CONTRIBUTION_ITEM_IDS.has(itemId) && !AUTOMATIC_COST_PLAN_ITEM_IDS.has(itemId) ? itemId : 'other';
   }
   return 'other';
 }
@@ -1852,13 +2196,13 @@ function renderPaymentBerthOptions() {
     const priceLabel = type.cents > 0 ? `${formatCurrency(type.cents / 100)} a persona` : 'importo da indicare';
     return `<option value="${escapeHtml(type.id)}">${escapeHtml(type.label)} · ${priceLabel}</option>`;
   }).join('');
-  const costBase = costPlanBaseContribution();
-  const costBaseOption = costBase
-    ? `<optgroup label="Quota base dalla Cassa skipper"><option value="${costBase.id}">${escapeHtml(costBase.label)} · ${formatCurrency(costBase.cents / 100)} a persona</option></optgroup>`
+  const calculatedOptions = costPlanContributionTypes();
+  const calculatedOption = calculatedOptions.length
+    ? `<optgroup label="Preventivo automatico dalla Dashboard">${calculatedOptions.map((type) => `<option value="${escapeHtml(type.id)}">${escapeHtml(type.label)} · ${formatCurrency(type.cents / 100)} a persona</option>`).join('')}</optgroup>`
     : '';
   select.innerHTML = '<option value="custom">Importo libero / altra voce</option>'
-    + costBaseOption
-    + (berthOptions ? `<optgroup label="Posti letto">${berthOptions}</optgroup>` : '')
+    + calculatedOption
+    + (berthOptions ? `<optgroup label="Listino barca manuale">${berthOptions}</optgroup>` : '')
     + (extraOptions ? `<optgroup label="Voci da richiedere a parte">${extraOptions}</optgroup>` : '');
   select.value = (berthRateType(selectedType) || extraContributionType(selectedType) || costPlanContributionType(selectedType)) && [...select.options].some((option) => option.value === selectedType)
     ? selectedType
@@ -1902,8 +2246,9 @@ function applyPaymentBerthPreset() {
   }
   const accountingCategory = form.elements.accountingCategory;
   if (costPlanType && accountingCategory) {
-    accountingCategory.checked = true;
-    accountingCategory.dataset.autoCostRecovery = 'true';
+    const shouldRecoverCosts = costPlanType.accountingCategory === 'cost_recovery';
+    accountingCategory.checked = shouldRecoverCosts;
+    accountingCategory.dataset.autoCostRecovery = shouldRecoverCosts ? 'true' : 'false';
   } else if (accountingCategory?.dataset.autoCostRecovery === 'true') {
     accountingCategory.checked = false;
     delete accountingCategory.dataset.autoCostRecovery;
@@ -1924,10 +2269,15 @@ function normalizedProjectionAmount(value) {
   return asNonNegativeInteger(value, 1_000_000);
 }
 
+function projectionContributesToCosts(projection) {
+  return projection?.contributesToCosts !== false;
+}
+
 function normalizeProjection(id, projection = {}) {
   const firstName = String(projection.firstName || '').trim();
   const lastName = String(projection.lastName || '').trim();
   const displayName = String(projection.displayName || `${firstName} ${lastName}`).trim();
+  const contributesToCosts = projectionContributesToCosts(projection);
   return {
     id,
     ...projection,
@@ -1936,9 +2286,12 @@ function normalizeProjection(id, projection = {}) {
     displayName,
     plannedRole: String(projection.plannedRole || DEFAULT_CREW_ROLE).trim() || DEFAULT_CREW_ROLE,
     berthType: PROJECTION_BERTH_TYPES[projection.berthType] ? projection.berthType : 'to_define',
-    berthCents: normalizedProjectionAmount(projection.berthCents),
-    starterPackCents: normalizedProjectionAmount(projection.starterPackCents),
-    protectionInsuranceCents: normalizedProjectionAmount(projection.protectionInsuranceCents),
+    contributesToCosts,
+    berthCents: contributesToCosts ? normalizedProjectionAmount(projection.berthCents) : 0,
+    starterPackCents: contributesToCosts ? normalizedProjectionAmount(projection.starterPackCents) : 0,
+    protectionInsuranceCents: contributesToCosts ? normalizedProjectionAmount(projection.protectionInsuranceCents) : 0,
+    // La cauzione è rimborsabile e separata: un ruolo gratuito può doverla
+    // comunque portare, anche quando non partecipa alle quote della barca.
     refundableDepositCents: normalizedProjectionAmount(projection.refundableDepositCents),
     status: projection.status === 'invited' ? 'invited' : 'projected',
   };
@@ -1946,14 +2299,13 @@ function normalizeProjection(id, projection = {}) {
 
 function projectionPayableCents(projection) {
   const normalized = normalizeProjection(projection.id, projection);
-  return normalized.berthCents + normalized.starterPackCents + normalized.protectionInsuranceCents;
+  return normalized.berthCents + normalized.protectionInsuranceCents;
 }
 
 function projectionCostBreakdown(projection) {
   const normalized = normalizeProjection(projection.id, projection);
   const items = [
     { label: 'Posto/cabina', cents: normalized.berthCents },
-    { label: 'Starter Pack', cents: normalized.starterPackCents },
     { label: 'Assicurazione cauzione', cents: normalized.protectionInsuranceCents },
   ];
   const payableCents = items.reduce((total, item) => total + item.cents, 0);
@@ -1962,6 +2314,7 @@ function projectionCostBreakdown(projection) {
     items,
     payableCents,
     hasPayableEstimate: items.some((item) => item.cents > 0),
+    starterPackCents: normalized.starterPackCents,
     refundableDepositCents: normalized.refundableDepositCents,
   };
 }
@@ -1972,17 +2325,43 @@ function projectionAmountOrPending(cents) {
 
 function projectionQuoteSummary(projection) {
   const summary = projectionCostBreakdown(projection);
+  if (!summary.normalized.contributesToCosts) {
+    const deposit = summary.refundableDepositCents > 0
+      ? ` Cauzione rimborsabile ${formatCurrency(summary.refundableDepositCents / 100)} separata, in loco.`
+      : ' Cauzione rimborsabile da definire, separata e in loco.';
+    return `Esente da quota posto, Starter Pack e assicurazione.${deposit}`;
+  }
   const parts = summary.items
     .map((item) => `${item.label} ${projectionAmountOrPending(item.cents)}`)
     .join(' · ');
   const total = summary.hasPayableEstimate
     ? formatCurrency(summary.payableCents / 100)
     : 'da definire';
-  return `${parts} · Totale previsto ${total}`;
+  const starter = summary.starterPackCents > 0
+    ? ` · Starter Pack ${formatCurrency(summary.starterPackCents / 100)} cash in loco`
+    : ' · Starter Pack cash in loco da definire';
+  return `${parts} · Totale richiesta prevista ${total}${starter}`;
+}
+
+function projectionMatchesInvite(projection, inviteId) {
+  return projection?.status === 'invited'
+    && projection.id === inviteId
+    && projection.inviteId === inviteId;
+}
+
+function isLegacyInviteLinkable(invite) {
+  if (!invite?.createdAt?.toDate) return false;
+  if (invite.status === 'active') return true;
+  return invite.status === 'pending'
+    && Boolean(invite.expiresAt?.toDate)
+    && invite.expiresAt.toDate() > new Date()
+    && typeof invite.accessKey === 'string'
+    && invite.accessKey.length === 48;
 }
 
 function projectionInvite(projection) {
-  return activeInvites.find((invite) => invite.id === projection.id) || null;
+  if (!projectionMatchesInvite(projection, projection?.id)) return null;
+  return activeInvites.find((invite) => invite.id === projection.inviteId) || null;
 }
 
 function projectionStatusLabel(projection) {
@@ -2040,11 +2419,13 @@ function renderProjectionSummary() {
     return;
   }
   const payableCents = activeProjections.reduce((total, projection) => total + projectionPayableCents(projection), 0);
+  const starterPackCashCents = activeProjections
+    .reduce((total, projection) => total + projectionCostBreakdown(projection).starterPackCents, 0);
   const refundableDepositCents = activeProjections
     .reduce((total, projection) => total + projectionCostBreakdown(projection).refundableDepositCents, 0);
   const invitationReady = activeProjections.filter((projection) => !projectionInvite(projection)).length;
   const invited = activeProjections.length - invitationReady;
-  const historicalInvites = activeInvites.filter((invite) => invite.status !== 'revoked' && !activeProjections.some((projection) => projection.id === invite.id)).length;
+  const historicalInvites = activeInvites.filter((invite) => invite.status !== 'revoked' && !activeProjections.some((projection) => projectionInvite(projection)?.id === invite.id)).length;
   const title = document.createElement('strong');
   title.className = 'projection-summary-title';
   title.textContent = payableCents > 0
@@ -2055,9 +2436,13 @@ function renderProjectionSummary() {
   detail.textContent = `${activeProjections.length} ${activeProjections.length === 1 ? 'posto riservato' : 'posti riservati'} · ${invitationReady} ${invitationReady === 1 ? 'invito da creare' : 'inviti da creare'}${invited ? ` · ${invited} ${invited === 1 ? 'link già creato' : 'link già creati'}` : ''}${historicalInvites ? ` · ${historicalInvites} ${historicalInvites === 1 ? 'invito già creato fuori dal piano' : 'inviti già creati fuori dal piano'}` : ''}.`;
   const note = document.createElement('small');
   note.className = 'projection-summary-note';
-  note.textContent = refundableDepositCents > 0
-    ? `Cauzioni rimborsabili previste: ${formatCurrency(refundableDepositCents / 100)}, separate e da regolare in loco.`
-    : 'Le cauzioni rimborsabili restano separate e da regolare in loco.';
+  const starterPackNote = starterPackCashCents > 0
+    ? `Starter Pack previsti: ${formatCurrency(starterPackCashCents / 100)}, solo contanti in loco.`
+    : 'Starter Pack solo contanti in loco.';
+  const depositNote = refundableDepositCents > 0
+    ? ` Cauzioni rimborsabili previste: ${formatCurrency(refundableDepositCents / 100)}, separate e in loco.`
+    : ' Le cauzioni rimborsabili restano separate e da regolare in loco.';
+  note.textContent = starterPackNote + depositNote;
   summary.replaceChildren(title, detail, note);
 }
 
@@ -2075,23 +2460,34 @@ function renderProjectionCostPreview() {
   const form = document.querySelector('#projectionForm');
   const preview = document.querySelector('#projectionCostPreview');
   if (!form || !preview) return;
-  const items = [
+  if (form.elements.contributesToCosts?.checked !== true) {
+    const deposit = projectionPreviewItem(form, 'refundableDepositAmount', 'Cauzione rimborsabile');
+    const depositText = deposit.defined
+      ? ` Cauzione rimborsabile: ${formatCurrency(deposit.cents / 100)}, separata e in loco.`
+      : ' Cauzione rimborsabile: da definire, separata e in loco.';
+    preview.textContent = `Persona esente da quota posto, Starter Pack e assicurazione.${depositText} Non crea una richiesta o un pagamento.`;
+    return;
+  }
+  const payableItems = [
     projectionPreviewItem(form, 'berthAmount', 'Posto/cabina'),
-    projectionPreviewItem(form, 'starterPackAmount', 'Starter Pack'),
     projectionPreviewItem(form, 'protectionInsuranceAmount', 'Assicurazione'),
   ];
+  const starterPack = projectionPreviewItem(form, 'starterPackAmount', 'Starter Pack');
   const deposit = projectionPreviewItem(form, 'refundableDepositAmount', 'Cauzione rimborsabile');
-  const payableCents = items.reduce((total, item) => total + item.cents, 0);
-  const missing = items.filter((item) => !item.defined).map((item) => item.label);
-  const details = items.map((item) => `${item.label}: ${item.defined ? formatCurrency(item.cents / 100) : 'da definire'}`).join(' · ');
+  const payableCents = payableItems.reduce((total, item) => total + item.cents, 0);
+  const missing = payableItems.filter((item) => !item.defined).map((item) => item.label);
+  const details = payableItems.map((item) => `${item.label}: ${item.defined ? formatCurrency(item.cents / 100) : 'da definire'}`).join(' · ');
   const total = missing.length
-    ? `Totale previsto finora: ${formatCurrency(payableCents / 100)}`
-    : `Totale previsto da regolare: ${formatCurrency(payableCents / 100)}`;
+    ? `Richiesta prevista finora: ${formatCurrency(payableCents / 100)}`
+    : `Richiesta prevista: ${formatCurrency(payableCents / 100)}`;
   const missingText = missing.length ? ` · Da definire: ${missing.join(', ')}.` : '.';
   const depositText = deposit.defined
     ? ` Cauzione rimborsabile: ${formatCurrency(deposit.cents / 100)}, separata e in loco.`
     : ' Cauzione rimborsabile: da definire, separata e in loco.';
-  preview.textContent = `${total} (${details})${missingText}${depositText} Non crea una richiesta o un pagamento.`;
+  const starterPackText = starterPack.defined
+    ? ` Starter Pack: ${formatCurrency(starterPack.cents / 100)}, solo contanti in loco.`
+    : ' Starter Pack: da definire, solo contanti in loco.';
+  preview.textContent = `${total} (${details})${missingText}${starterPackText}${depositText} Non crea una richiesta o un pagamento.`;
 }
 
 function resetMemberForm() {
@@ -2105,10 +2501,20 @@ function resetMemberForm() {
 function resetProjectionForm() {
   const form = document.querySelector('#projectionForm');
   if (!form) return;
+  form.elements.preferredLocale.disabled = false;
   form.reset();
+  delete form.elements.contributesToCosts.dataset.userChoice;
+  syncProjectionCostParticipation();
   editingProjectionId = null;
+  linkingLegacyInviteId = null;
   document.querySelector('#projectionSubmitButton').textContent = 'Salva proiezione e riserva posto';
   document.querySelector('#cancelProjectionEdit').hidden = true;
+  document.querySelector('#cancelProjectionEdit').textContent = 'Annulla modifica';
+  const legacyLinkHint = document.querySelector('#projectionLegacyLinkHint');
+  if (legacyLinkHint) {
+    legacyLinkHint.hidden = true;
+    legacyLinkHint.textContent = '';
+  }
   renderProjectionCostPreview();
 }
 
@@ -2187,9 +2593,17 @@ function renderProjections() {
     const invite = projectionInvite(projection);
     const cost = projectionCostBreakdown(projection);
     const quote = projectionQuoteSummary(projection);
-    const total = cost.hasPayableEstimate
+    const isExemptFromCosts = projection.contributesToCosts === false;
+    const total = isExemptFromCosts
+      ? 'Esente'
+      : cost.hasPayableEstimate
       ? formatCurrency(cost.payableCents / 100)
       : 'Da definire';
+    const starterPack = isExemptFromCosts
+      ? 'Non previsto per il ruolo gratuito'
+      : cost.starterPackCents > 0
+      ? `${formatCurrency(cost.starterPackCents / 100)} · solo contanti in loco`
+      : 'Da definire · solo contanti in loco';
     const deposit = cost.refundableDepositCents > 0
       ? `${formatCurrency(cost.refundableDepositCents / 100)} · separata, in loco`
       : 'Da definire · separata, in loco';
@@ -2201,7 +2615,7 @@ function renderProjections() {
     const draftActions = !invite
       ? `<button class="projection-action" type="button" data-edit-projection="${escapeHtml(projection.id)}" aria-label="Modifica la proiezione di ${escapeHtml(projection.displayName)}"><span class="projection-action-icon" aria-hidden="true">✎</span><span>Modifica</span></button><button class="projection-action projection-action-release" type="button" data-release-projection="${escapeHtml(projection.id)}" aria-label="Libera il posto riservato per ${escapeHtml(projection.displayName)}"><span class="projection-action-icon" aria-hidden="true">×</span><span>Libera posto</span></button>`
       : '';
-    return `<article class="projection-row"><div class="projection-row-person"><strong>${escapeHtml(projection.displayName)}</strong><span class="projection-row-assignment"><b>Ruolo previsto:</b> ${escapeHtml(projection.plannedRole)} · <b>Sistemazione:</b> ${escapeHtml(projectionBerthLabel(projection.berthType))}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small></div><div class="projection-row-cost"><span class="projection-row-cost-label">Quota prevista · non è una richiesta</span><strong>${escapeHtml(total)}</strong><span class="projection-row-cost-breakdown">${escapeHtml(quote)}</span><span class="projection-row-deposit"><b>Cauzione rimborsabile:</b> ${escapeHtml(deposit)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(projection.displayName)}">${inviteActions}${draftActions}</div></article>`;
+    return `<article class="projection-row"><div class="projection-row-person"><strong>${escapeHtml(projection.displayName)}</strong><span class="projection-row-assignment"><b>Ruolo previsto:</b> ${escapeHtml(projection.plannedRole)} · <b>Sistemazione:</b> ${escapeHtml(projectionBerthLabel(projection.berthType))}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small></div><div class="projection-row-cost"><span class="projection-row-cost-label">Richiesta prevista · non è un pagamento</span><strong>${escapeHtml(total)}</strong><span class="projection-row-cost-breakdown">${escapeHtml(quote)}</span><span class="projection-row-deposit"><b>Starter Pack:</b> ${escapeHtml(starterPack)}</span><span class="projection-row-deposit"><b>Cauzione rimborsabile:</b> ${escapeHtml(deposit)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(projection.displayName)}">${inviteActions}${draftActions}</div></article>`;
   }).join('');
   renderCapacityStatus();
   renderSkipperDashboardOverview();
@@ -2247,7 +2661,7 @@ function renderInvites() {
   }
   list.innerHTML = activeInvites.map((invite) => {
     const profileCompleted = activeMembers.some((member) => member.id === invite.id);
-    const linkedProjection = activeProjections.find((projection) => projection.id === invite.id) || null;
+    const linkedProjection = activeProjections.find((projection) => projectionMatchesInvite(projection, invite.id)) || null;
     const expired = invite.expiresAt?.toDate && invite.expiresAt.toDate() < new Date();
     const status = invite.status === 'active'
       ? (profileCompleted ? 'Accesso attivo · anagrafica completata' : 'Accesso attivo · dati da completare')
@@ -2255,11 +2669,16 @@ function renderInvites() {
     const invitationLanguage = inviteLocale(invite) === 'en' ? 'English' : 'Italiano';
     const planStatus = linkedProjection
       ? 'Collegato al Piano equipaggio: stesso posto, ruolo, sistemazione e quota prevista.'
-      : 'Invito creato prima del Piano equipaggio: posto già conteggiato, quota prevista non ancora associata.';
+      : isLegacyInviteLinkable(invite)
+        ? 'Invito creato prima del Piano equipaggio: posto già conteggiato, quota prevista non ancora associata.'
+        : 'Invito storico non collegabile al Piano: il suo accesso non viene modificato.';
     const sendActions = invite.status === 'pending' && !expired && invite.accessKey
       ? `<button class="text-button" type="button" data-copy-invite="${escapeHtml(invite.id)}">Copia link</button><button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(invite.id)}">Apri WhatsApp</button>`
       : '';
-    return `<article class="invite-row"><div><strong>${escapeHtml(invite.displayName)}</strong><span>${escapeHtml(status)} · ${escapeHtml(invite.whatsappNumber)} · ${invitationLanguage}</span><small class="invite-plan-status">${escapeHtml(planStatus)}</small></div><div class="payment-action">${sendActions}<button class="text-button" type="button" data-reissue-invite="${escapeHtml(invite.id)}">Revoca e genera nuovo link</button></div></article>`;
+    const legacyPlanAction = !linkedProjection && isLegacyInviteLinkable(invite)
+      ? `<button class="text-button" type="button" data-link-legacy-invite="${escapeHtml(invite.id)}" aria-label="Aggiungi ${escapeHtml(invite.displayName)} al Piano equipaggio senza modificare l’invito">Aggiungi al Piano</button>`
+      : '';
+    return `<article class="invite-row"><div><strong>${escapeHtml(invite.displayName)}</strong><span>${escapeHtml(status)} · ${escapeHtml(invite.whatsappNumber)} · ${invitationLanguage}</span><small class="invite-plan-status">${escapeHtml(planStatus)}</small></div><div class="payment-action">${legacyPlanAction}${sendActions}<button class="text-button" type="button" data-reissue-invite="${escapeHtml(invite.id)}">Revoca e genera nuovo link</button></div></article>`;
   }).join('');
   renderPaymentRecipientOptions();
   renderCapacityStatus();
@@ -2635,8 +3054,48 @@ function projectionDraftFromFields(fields, id) {
     protectionInsuranceCents: toEuroCents(fields.get('protectionInsuranceAmount')),
     refundableDepositCents: toEuroCents(fields.get('refundableDepositAmount')),
     preferredLocale: fields.get('preferredLocale') === 'en' ? 'en' : 'it',
+    contributesToCosts: fields.get('contributesToCosts') === 'on',
     contactConsent: fields.get('contactConsent') === 'on',
   };
+}
+
+function legacyProjectionDraftFromInvite(invite) {
+  const [firstName = '', ...lastNameParts] = String(invite.displayName || '').trim().split(/\s+/);
+  return {
+    firstName,
+    lastName: lastNameParts.join(' '),
+    whatsappNumber: String(invite.whatsappNumber || ''),
+    plannedRole: DEFAULT_CREW_ROLE,
+    berthType: 'to_define',
+    berthCents: 0,
+    starterPackCents: 0,
+    protectionInsuranceCents: 0,
+    refundableDepositCents: 0,
+    preferredLocale: inviteLocale(invite),
+    contributesToCosts: true,
+    contactConsent: false,
+  };
+}
+
+function prepareLegacyInviteProjection(invite) {
+  const form = document.querySelector('#projectionForm');
+  if (!form) return;
+  resetProjectionForm();
+  linkingLegacyInviteId = invite.id;
+  fillProjectionForm(legacyProjectionDraftFromInvite(invite));
+  form.elements.preferredLocale.disabled = true;
+  const legacyLinkHint = document.querySelector('#projectionLegacyLinkHint');
+  if (legacyLinkHint) {
+    legacyLinkHint.hidden = false;
+    legacyLinkHint.textContent = `Stai aggiungendo ${invite.displayName} al Piano equipaggio. Completa ruolo, sistemazione e quota, poi salva: il link personale esistente non verrà creato, revocato o modificato.`;
+  }
+  document.querySelector('#projectionSubmitButton').textContent = 'Salva nel Piano senza creare un nuovo invito';
+  const cancelButton = document.querySelector('#cancelProjectionEdit');
+  cancelButton.textContent = 'Annulla collegamento';
+  cancelButton.hidden = false;
+  setMessage(document.querySelector('#projectionFormMessage'), 'Controlla che nome e WhatsApp coincidano con l’invito esistente, quindi salva il posto e la quota prevista.');
+  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  form.elements.berthType.focus();
 }
 
 function fillProjectionForm(projection) {
@@ -2652,8 +3111,62 @@ function fillProjectionForm(projection) {
   form.elements.protectionInsuranceAmount.value = euroInputValue(projection.protectionInsuranceCents);
   form.elements.refundableDepositAmount.value = euroInputValue(projection.refundableDepositCents);
   form.elements.preferredLocale.value = projection.preferredLocale === 'en' ? 'en' : 'it';
+  form.elements.contributesToCosts.checked = projection.contributesToCosts !== false;
+  form.elements.contributesToCosts.dataset.userChoice = 'true';
   form.elements.contactConsent.checked = projection.contactConsent === true;
+  syncProjectionCostParticipation();
   renderProjectionCostPreview();
+}
+
+function applyProjectionCalculatedAmount(input, cents, dataKey) {
+  if (!input) return;
+  if (cents > 0 && (!input.value || input.dataset[dataKey] === 'true')) {
+    input.value = euroInputValue(cents);
+    input.dataset[dataKey] = 'true';
+  } else if (cents === 0 && input.dataset[dataKey] === 'true') {
+    input.value = '';
+    delete input.dataset[dataKey];
+  }
+}
+
+function syncProjectionCostParticipation() {
+  const form = document.querySelector('#projectionForm');
+  if (!form) return;
+  const contributesToCosts = form.elements.contributesToCosts?.checked === true;
+  const contributionHint = document.querySelector('#projectionContributionHint');
+  const automaticFields = [
+    ['berthAmount', 'autoProjectionRate'],
+    ['starterPackAmount', 'autoStarterPackRate'],
+    ['protectionInsuranceAmount', 'autoProtectionInsuranceRate'],
+  ];
+  automaticFields.forEach(([fieldName, dataKey]) => {
+    const input = form.elements[fieldName];
+    if (!input) return;
+    input.disabled = !contributesToCosts;
+    if (!contributesToCosts) {
+      input.value = '';
+      delete input.dataset[dataKey];
+    }
+  });
+  const depositInput = form.elements.refundableDepositAmount;
+  if (depositInput) depositInput.disabled = false;
+  if (contributionHint) {
+    contributionHint.textContent = contributesToCosts
+      ? 'Questa persona partecipa alle quote: il preventivo può proporre importi modificabili.'
+      : 'Questa persona è esente da quota posto, Starter Pack e assicurazione. La cauzione rimborsabile resta separata e può essere prevista.';
+  }
+  renderProjectionCostPreview();
+}
+
+function syncProjectionRoleContributionDefault() {
+  const form = document.querySelector('#projectionForm');
+  if (!form) return;
+  const checkbox = form.elements.contributesToCosts;
+  if (!checkbox.dataset.userChoice) {
+    checkbox.checked = !FREE_SUPPORT_ROLES.has(form.elements.projectionRolePreset?.value);
+  }
+  syncProjectionCostParticipation();
+  applyProjectionBerthPreset();
 }
 
 function applyProjectionBerthPreset() {
@@ -2662,16 +3175,28 @@ function applyProjectionBerthPreset() {
     renderProjectionCostPreview();
     return;
   }
+  if (form.elements.contributesToCosts?.checked !== true) {
+    const model = costPlanQuoteModel();
+    applyProjectionCalculatedAmount(
+      form.elements.refundableDepositAmount,
+      model?.refundableDepositPerPersonCents || 0,
+      'autoRefundableDepositRate',
+    );
+    syncProjectionCostParticipation();
+    return;
+  }
   const type = berthRateType(form.elements.berthType?.value);
   if (!type) {
     renderProjectionCostPreview();
     return;
   }
-  const cents = normalizeBerthRates(activeBoat.berthRates)[type.rateKey];
-  const amount = form.elements.berthAmount;
-  if (cents > 0 && (!amount.value || amount.dataset.autoProjectionRate === 'true')) {
-    amount.value = euroInputValue(cents);
-    amount.dataset.autoProjectionRate = 'true';
+  const calculated = costPlanProjectionPreset(type.id);
+  const cents = calculated?.berthCents || normalizeBerthRates(activeBoat.berthRates)[type.rateKey];
+  applyProjectionCalculatedAmount(form.elements.berthAmount, cents, 'autoProjectionRate');
+  if (calculated) {
+    applyProjectionCalculatedAmount(form.elements.starterPackAmount, calculated.starterPackCents, 'autoStarterPackRate');
+    applyProjectionCalculatedAmount(form.elements.protectionInsuranceAmount, calculated.protectionInsuranceCents, 'autoProtectionInsuranceRate');
+    applyProjectionCalculatedAmount(form.elements.refundableDepositAmount, calculated.refundableDepositCents, 'autoRefundableDepositRate');
   }
   renderProjectionCostPreview();
 }
@@ -2681,16 +3206,28 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
   const message = document.querySelector('#projectionFormMessage');
   if (blockPrivateAction(message)) return;
   if (!activeBoat || !auth.currentUser) return;
-  if (!editingProjectionId && needsCapacityAlignment(activeBoat)) {
+  const form = event.currentTarget;
+  const fields = new FormData(form);
+  const legacyLinkRequested = Boolean(linkingLegacyInviteId);
+  const legacyInvite = legacyLinkRequested
+    ? activeInvites.find((candidate) => candidate.id === linkingLegacyInviteId)
+    : null;
+  if (legacyLinkRequested && (!legacyInvite || !isLegacyInviteLinkable(legacyInvite) || !legacyInvite.createdAt?.toDate)) {
+    setMessage(message, 'Questo invito storico non è più compatibile con il Piano equipaggio. Il suo accesso non è stato modificato.', true);
+    return;
+  }
+  if (legacyInvite && activeProjections.some((projection) => projectionMatchesInvite(projection, legacyInvite.id))) {
+    setMessage(message, 'Questo invito è già collegato al Piano equipaggio.', true);
+    return;
+  }
+  if (!editingProjectionId && !legacyInvite && needsCapacityAlignment(activeBoat)) {
     setMessage(message, capacityAlignmentMessage(activeBoat), true);
     return;
   }
-  if (!editingProjectionId && isCrewCapacityReached()) {
+  if (!editingProjectionId && !legacyInvite && isCrewCapacityReached()) {
     setMessage(message, 'Hai già riservato tutti i posti per partecipanti indicati per questa barca.', true);
     return;
   }
-  const form = event.currentTarget;
-  const fields = new FormData(form);
   const normalizedNumber = normalizeWhatsAppNumber(fields.get('whatsappNumber'));
   if (!normalizedNumber) {
     setMessage(message, 'Inserisci il numero WhatsApp in formato internazionale, ad esempio +39 333 1234567.', true);
@@ -2700,11 +3237,18 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
     setMessage(message, 'Conferma di avere il consenso della persona prima di salvarne il contatto.', true);
     return;
   }
+  const projectionId = editingProjectionId || legacyInvite?.id || createInviteId();
+  const projection = projectionDraftFromFields(fields, projectionId);
+  if (legacyInvite) {
+    projection.preferredLocale = inviteLocale(legacyInvite);
+    if (projection.displayName !== legacyInvite.displayName || projection.whatsappNumber !== legacyInvite.whatsappNumber) {
+      setMessage(message, 'Per riusare questo invito, nome e WhatsApp devono coincidere esattamente con quelli già presenti. Nessun accesso è stato modificato.', true);
+      return;
+    }
+  }
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
   try {
-    const projectionId = editingProjectionId || createInviteId();
-    const projection = projectionDraftFromFields(fields, projectionId);
     if (editingProjectionId) {
       await updateDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), {
         ...projection,
@@ -2715,6 +3259,18 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
         updatedBy: auth.currentUser.uid,
       });
       setMessage(message, 'Proiezione aggiornata: posto, ruolo, sistemazione e quota prevista restano associati alla stessa persona.');
+    } else if (legacyInvite) {
+      await setDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), {
+        ...projection,
+        status: 'invited',
+        inviteId: legacyInvite.id,
+        invitedAt: legacyInvite.createdAt,
+        createdAt: serverTimestamp(),
+        createdBy: auth.currentUser.uid,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser.uid,
+      });
+      setMessage(message, `Piano equipaggio salvato per ${legacyInvite.displayName}: usa lo stesso ID dell’invito esistente, che non è stato creato, revocato o modificato.`);
     } else {
       await setDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), {
         ...projection,
@@ -2738,14 +3294,30 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
 
 const projectionForm = document.querySelector('#projectionForm');
 projectionForm.elements.berthType.addEventListener('change', applyProjectionBerthPreset);
+projectionForm.elements.projectionRolePreset.addEventListener('change', syncProjectionRoleContributionDefault);
+projectionForm.elements.contributesToCosts.addEventListener('change', () => {
+  projectionForm.elements.contributesToCosts.dataset.userChoice = 'true';
+  syncProjectionCostParticipation();
+  applyProjectionBerthPreset();
+});
 projectionForm.elements.berthAmount.addEventListener('input', () => {
   delete projectionForm.elements.berthAmount.dataset.autoProjectionRate;
+});
+const projectionAutomaticRateKeys = {
+  starterPackAmount: 'autoStarterPackRate',
+  protectionInsuranceAmount: 'autoProtectionInsuranceRate',
+  refundableDepositAmount: 'autoRefundableDepositRate',
+};
+Object.entries(projectionAutomaticRateKeys).forEach(([fieldName, dataKey]) => {
+  projectionForm.elements[fieldName].addEventListener('input', () => {
+    delete projectionForm.elements[fieldName].dataset[dataKey];
+  });
 });
 ['berthAmount', 'starterPackAmount', 'protectionInsuranceAmount', 'refundableDepositAmount'].forEach((fieldName) => {
   projectionForm.elements[fieldName].addEventListener('input', renderProjectionCostPreview);
   projectionForm.elements[fieldName].addEventListener('change', renderProjectionCostPreview);
 });
-renderProjectionCostPreview();
+syncProjectionCostParticipation();
 document.querySelector('#cancelProjectionEdit').addEventListener('click', resetProjectionForm);
 
 document.querySelector('#projectionList').addEventListener('click', async (event) => {
@@ -3049,7 +3621,16 @@ paymentProfileForm.addEventListener('submit', async (event) => {
 });
 
 const costPlanForm = document.querySelector('#costPlanForm');
-costPlanForm.addEventListener('input', renderCostPlanSummary);
+function handleCostPlanFormChange(event) {
+  if (event.target?.name === 'payingParticipants') {
+    syncCostPlanDinetteFieldAvailability();
+    syncCostPlanDepositParticipantAvailability();
+  }
+  if (event.target?.name === 'dinetteRateMode') syncCostPlanDinettePricingMode();
+  renderCostPlanSummary();
+}
+costPlanForm.addEventListener('input', handleCostPlanFormChange);
+costPlanForm.addEventListener('change', handleCostPlanFormChange);
 costPlanForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const message = document.querySelector('#costPlanMessage');
@@ -3060,9 +3641,19 @@ costPlanForm.addEventListener('submit', async (event) => {
     setMessage(message, 'Indica almeno un partecipante che divide i costi: lo skipper è già escluso.', true);
     return;
   }
+  if (plan.depositParticipants < 1) {
+    setMessage(message, 'Indica almeno una persona che porta la cauzione rimborsabile.', true);
+    return;
+  }
+  const model = costPlanQuoteModel(plan);
+  const fixedDinetteMessage = fixedDinetteConfigurationMessage(model);
+  if (fixedDinetteMessage) {
+    setMessage(message, fixedDinetteMessage, true);
+    return;
+  }
   const submitButton = costPlanForm.querySelector('button[type="submit"]');
   submitButton.disabled = true;
-  setMessage(message, 'Salvo la cassa skipper…');
+  setMessage(message, 'Salvo il preventivo barca…');
   try {
     await setDoc(doc(db, 'boats', activeBoat.id, 'costPlan', COST_PLAN_ID), {
       ...plan,
@@ -3070,11 +3661,10 @@ costPlanForm.addEventListener('submit', async (event) => {
       updatedBy: auth.currentUser.uid,
     });
     activeCostPlan = normalizeCostPlan(plan);
-    renderCostPlanSummary();
-    renderPaymentBerthOptions();
-    setMessage(message, 'Cassa skipper salvata. La quota base è solo una proposta: puoi sempre differenziare le richieste per persona o cabina.');
+    renderCostPlan(activeCostPlan);
+    setMessage(message, 'Preventivo salvato: le quote vengono proposte solo per nuove proiezioni o campi ancora automatici. Le quote già salvate restano da verificare e possono essere personalizzate.');
   } catch (error) {
-    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare la cassa skipper.'), true);
+    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare il preventivo barca.'), true);
   } finally {
     submitButton.disabled = false;
   }
@@ -3285,6 +3875,17 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
 
 document.querySelector('#inviteList').addEventListener('click', async (event) => {
   if (blockPrivateAction(document.querySelector('#inviteFormMessage'))) return;
+  const legacyLinkButton = event.target.closest('[data-link-legacy-invite]');
+  if (legacyLinkButton) {
+    const invite = activeInvites.find((candidate) => candidate.id === legacyLinkButton.dataset.linkLegacyInvite);
+    if (!invite || !activeBoat || !auth.currentUser || !isLegacyInviteLinkable(invite)) return;
+    if (activeProjections.some((projection) => projectionMatchesInvite(projection, invite.id))) {
+      setMessage(document.querySelector('#inviteFormMessage'), 'Questo invito è già collegato al Piano equipaggio.', true);
+      return;
+    }
+    prepareLegacyInviteProjection(invite);
+    return;
+  }
   const reissueButton = event.target.closest('[data-reissue-invite]');
   if (reissueButton) {
     const invite = activeInvites.find((candidate) => candidate.id === reissueButton.dataset.reissueInvite);

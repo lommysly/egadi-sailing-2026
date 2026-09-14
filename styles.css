@@ -158,12 +158,12 @@ body.menu-open { overflow:hidden; }
 .projection-row-cost > strong { color:#063644; font:600 1.3rem/1 "Fraunces",serif; }
 .projection-row-cost-breakdown { margin:0 !important; color:#416b6d !important; font-size:.75rem; line-height:1.42; }
 .projection-row-deposit { margin:4px 0 0 !important; padding-top:8px; border-top:1px solid rgba(17,45,56,.12); color:#986914 !important; font-size:.74rem; line-height:1.4; }
-.projection-actions { grid-area:actions; display:flex; flex-wrap:wrap; gap:8px; padding-top:2px; }
-.projection-action { display:inline-flex; align-items:center; gap:7px; min-height:39px; padding:8px 12px; border:1px solid rgba(8,123,138,.24); border-radius:999px; background:white; color:#16494f; cursor:pointer; font:700 .73rem "DM Sans",sans-serif; transition:transform .18s ease,background .18s ease,border-color .18s ease; }
+.projection-actions { grid-area:actions; display:flex; flex-wrap:wrap; gap:7px; padding-top:2px; }
+.projection-action { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:6px 10px; border:1px solid rgba(8,123,138,.24); border-radius:999px; background:white; color:#16494f; cursor:pointer; font:700 .69rem "DM Sans",sans-serif; transition:transform .18s ease,background .18s ease,border-color .18s ease; }
 .projection-action:hover { transform:translateY(-1px); border-color:#087b8a; background:#eafbfa; }
 .projection-action:focus-visible { outline:3px solid rgba(8,123,138,.28); outline-offset:2px; }
 .projection-action:disabled { cursor:wait; opacity:.6; transform:none; }
-.projection-action-icon { display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:#e0f4f1; color:#087b8a; font:700 .95rem/1 "DM Sans",sans-serif; }
+.projection-action-icon { display:grid; place-items:center; width:17px; height:17px; border-radius:50%; background:#e0f4f1; color:#087b8a; font:700 .8rem/1 "DM Sans",sans-serif; }
 .projection-action-primary { border-color:#087b8a; background:#087b8a; color:white; }
 .projection-action-primary:hover { background:#063644; border-color:#063644; }
 .projection-action-primary .projection-action-icon { background:rgba(255,255,255,.18); color:white; }
@@ -340,7 +340,7 @@ body.menu-open { overflow:hidden; }
 @media (max-width:800px) { .passage-status,.passage-data-grid,.passage-stop-grid,.passage-mooring-guide { grid-template-columns:1fr; }.passage-day-heading { display:grid; gap:0; }.passage-day-card,.passage-introduction,.passage-safety,.passage-mooring-guide { padding:24px; } }
 @media (max-width:800px) { .form-grid,.dashboard-grid,.schedule-list { grid-template-columns:1fr; }.dashboard-heading { display:grid; align-items:start; }.dashboard-actions { justify-content:start; }.form-actions { display:grid; align-items:start; }.form-actions .form-message { margin:0; }.dashboard-overview-heading { grid-template-columns:1fr; gap:14px; }.dashboard-hub { grid-template-columns:repeat(2,minmax(0,1fr)); }.dashboard-hub-card { min-height:160px; padding:15px; }.dashboard-next-step { display:grid; align-items:start; }.dashboard-next-step .button { width:100%; }.dashboard-view-navigation { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }.dashboard-view-navigation button { flex:0 0 auto; } }
 @media (max-width:800px) { .contribution-catalog-row { grid-template-columns:1fr; }.finance-overview-heading { grid-template-columns:1fr; }.finance-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.finance-dashboard-hub { grid-template-columns:1fr; }.finance-dashboard-panel { padding:22px; }.crew-activity-timeline-heading { display:grid; align-items:start; gap:6px; }.projection-row { grid-template-columns:1fr; grid-template-areas:"person" "cost" "actions"; gap:12px; }.projection-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }.projection-action { justify-content:center; width:100%; } }
-@media (max-width:430px) { .finance-overview-grid,.participant-finance-grid,.projection-actions { grid-template-columns:1fr; }.projection-action { min-height:44px; } }
+@media (max-width:430px) { .finance-overview-grid,.participant-finance-grid,.projection-actions { grid-template-columns:1fr; }.projection-action { min-height:40px; } }
 @media (max-width:800px) { .charter-export { display:grid; align-items:start; } }
 
 /* Arrivi e partenze: la pagina pubblica spiega il flusso, senza raccogliere dati o contatti. */

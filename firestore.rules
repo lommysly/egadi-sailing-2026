@@ -144,9 +144,8 @@ service cloud.firestore {
     // La proiezione è il posto riservato dal solo skipper prima che esista un
     // invito. Non è una Crew List, non è pubblica e non contiene istruzioni
     // di pagamento: gli importi servono esclusivamente al preventivo privato.
-    function hasValidCrewProjectionPayload(projectionId) {
+    function hasValidCrewProjectionPayloadCore(projectionId) {
       return request.resource.data.keys().hasAll(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
-        && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
         && projectionId.matches('^[a-f0-9]{48}$')
         && request.resource.data.id == projectionId
         && request.resource.data.firstName is string
@@ -184,8 +183,35 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid;
     }
 
-    function isValidCrewProjectionCreate(projectionId) {
-      return hasValidCrewProjectionPayload(projectionId)
+    // Compatibilità per le pagine già aperte prima del flag di partecipazione
+    // ai costi. Il nuovo payload usa sempre lo schema V2 qui sotto.
+    function hasValidLegacyCrewProjectionPayload(projectionId) {
+      return request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && hasValidCrewProjectionPayloadCore(projectionId);
+    }
+
+    function hasValidCrewProjectionPayload(projectionId) {
+      return request.resource.data.keys().hasAll(['contributesToCosts'])
+        && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && hasValidCrewProjectionPayloadCore(projectionId)
+        && request.resource.data.contributesToCosts is bool
+        && (request.resource.data.contributesToCosts == true
+          || (request.resource.data.berthCents == 0
+            && request.resource.data.starterPackCents == 0
+            && request.resource.data.protectionInsuranceCents == 0));
+    }
+
+    // Ogni impronta V2, anche incompleta, blocca un set legacy che potrebbe
+    // cancellare il flag e quindi alterare il significato delle quote automatiche.
+    function isCrewProjectionV2(data) {
+      return data is map
+        && data.keys().hasAny(['contributesToCosts']);
+    }
+
+    function isValidCrewProjectionCreate(boatId, projectionId) {
+      return !exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId))
+        && (hasValidLegacyCrewProjectionPayload(projectionId)
+          || hasValidCrewProjectionPayload(projectionId))
         && request.resource.data.status == 'projected'
         && request.resource.data.inviteId == null
         && request.resource.data.invitedAt == null
@@ -194,7 +220,9 @@ service cloud.firestore {
     }
 
     function isValidCrewProjectionDraftUpdate(projectionId) {
-      return hasValidCrewProjectionPayload(projectionId)
+      return (hasValidCrewProjectionPayload(projectionId)
+          || (!isCrewProjectionV2(resource.data)
+            && hasValidLegacyCrewProjectionPayload(projectionId)))
         && resource.data.status == 'projected'
         && resource.data.inviteId == null
         && resource.data.invitedAt == null
@@ -203,7 +231,7 @@ service cloud.firestore {
         && request.resource.data.invitedAt == null
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'updatedAt', 'updatedBy']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'updatedAt', 'updatedBy']);
     }
 
     // Il collegamento diventa reale solo nel batch che crea l'invito con lo
@@ -220,7 +248,9 @@ service cloud.firestore {
     }
 
     function isValidCrewProjectionInviteTransition(boatId, projectionId) {
-      return resource.data.id == projectionId
+      return (hasValidLegacyCrewProjectionPayload(projectionId)
+          || hasValidCrewProjectionPayload(projectionId))
+        && resource.data.id == projectionId
         && resource.data.status == 'projected'
         && resource.data.inviteId == null
         && resource.data.invitedAt == null
@@ -233,6 +263,36 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'inviteId', 'invitedAt', 'updatedAt', 'updatedBy'])
         && hasMatchingCrewProjectionInviteAfter(boatId, projectionId);
+    }
+
+    // Un invito creato prima del Piano può essere collegato soltanto creando
+    // una proiezione con il suo stesso ID. L'invito viene solo letto: non
+    // viene riemesso, aggiornato o sostituito dal collegamento.
+    function hasMatchingExistingCrewProjectionInvite(boatId, projectionId) {
+      let invite = get(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId));
+      return exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId))
+        && invite.data.id == projectionId
+        && invite.data.boatId == boatId
+        && invite.data.displayName == request.resource.data.displayName
+        && invite.data.whatsappNumber == request.resource.data.whatsappNumber
+        && invite.data.createdAt is timestamp
+        && request.resource.data.invitedAt == invite.data.createdAt
+        && (invite.data.status == 'active'
+          || (invite.data.status == 'pending'
+            && invite.data.expiresAt is timestamp
+            && invite.data.expiresAt > request.time
+            && invite.data.accessKey is string
+            && invite.data.accessKey.size() == 48));
+    }
+
+    function isValidCrewProjectionLegacyInviteCreate(boatId, projectionId) {
+      return (hasValidLegacyCrewProjectionPayload(projectionId)
+          || hasValidCrewProjectionPayload(projectionId))
+        && request.resource.data.status == 'invited'
+        && request.resource.data.inviteId == projectionId
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid
+        && hasMatchingExistingCrewProjectionInvite(boatId, projectionId);
     }
 
     function canClaimInvite(boatId, inviteId) {
@@ -542,19 +602,22 @@ service cloud.firestore {
         && hasValidContributionItem(items.fuel)
         && hasValidContributionItem(items.transfer)
         && hasValidContributionItem(items.refundable_deposit)
+        // Lo Starter Pack di questo viaggio è sempre cash/in loco e include
+        // già lenzuola e asciugamani: nessun doppio addebito o link esterno.
+        && items.starter_pack.state == 'local'
+        && items.linen_towels.state == 'included'
         // Una cauzione rimborsabile non è mai parte silenziosa della quota,
         // né una richiesta a distanza: si porta e si regola in loco.
-        && items.refundable_deposit.state in ['to_define', 'local', 'not_applicable']
+        && items.refundable_deposit.state == 'local'
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
     }
 
-    // La cassa skipper è un prospetto privato di soli importi aggregati.
+    // Il preventivo barca è un prospetto privato di soli importi aggregati.
     // Non può contenere nominativi, quote individuali, note, istruzioni di
     // pagamento o una categoria per cene: non è un listino né un incasso.
-    function hasValidSkipperCostPlan() {
+    function hasValidSkipperCostPlanCore() {
       return request.resource.data.keys().hasAll(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'payingParticipants', 'updatedAt', 'updatedBy'])
-        && request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'payingParticipants', 'updatedAt', 'updatedBy'])
         && request.resource.data.charterCents is int
         && request.resource.data.charterCents >= 0
         && request.resource.data.charterCents <= 1000000
@@ -575,6 +638,100 @@ service cloud.firestore {
         && request.resource.data.payingParticipants <= 30
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    // Compatibilità transitoria per i prospetti salvati prima del calcolatore.
+    // Un documento già v2, v3 o v4 non può tornare a questo schema: una pagina
+    // cache vecchia non deve poter cancellare i nuovi dati al salvataggio.
+    function hasValidLegacySkipperCostPlan() {
+      return request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'payingParticipants', 'updatedAt', 'updatedBy'])
+        && hasValidSkipperCostPlanCore();
+    }
+
+    function hasValidSkipperCostPlanV2Core() {
+      return request.resource.data.keys().hasAll(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'protectionInsuranceTotalCents', 'refundableDepositTotalCents', 'payingParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'updatedAt', 'updatedBy'])
+        && request.resource.data.starterPackTotalCents is int
+        && request.resource.data.starterPackTotalCents >= 0
+        && request.resource.data.starterPackTotalCents <= 1000000
+        && request.resource.data.protectionInsuranceTotalCents is int
+        && request.resource.data.protectionInsuranceTotalCents >= 0
+        && request.resource.data.protectionInsuranceTotalCents <= 1000000
+        && request.resource.data.refundableDepositTotalCents is int
+        && request.resource.data.refundableDepositTotalCents >= 0
+        && request.resource.data.refundableDepositTotalCents <= 1000000
+        && request.resource.data.dinettePayingParticipants is int
+        && request.resource.data.dinettePayingParticipants >= 0
+        && request.resource.data.dinettePayingParticipants <= request.resource.data.payingParticipants
+        && request.resource.data.dinetteWeightPercent is int
+        && request.resource.data.dinetteWeightPercent >= 1
+        && request.resource.data.dinetteWeightPercent <= 100
+        && hasValidSkipperCostPlanCore();
+    }
+
+    function hasValidSkipperCostPlanV2() {
+      return request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'protectionInsuranceTotalCents', 'refundableDepositTotalCents', 'payingParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'updatedAt', 'updatedBy'])
+        && hasValidSkipperCostPlanV2Core();
+    }
+
+    function skipperCostPlanRecoverableCents() {
+      return request.resource.data.charterCents
+        + request.resource.data.skipperFlightTrainCents
+        + request.resource.data.skipperCarCents
+        + request.resource.data.skipperLocalTransferCents
+        + request.resource.data.otherRecoverableCents;
+    }
+
+    // V3 conserva la percentuale per il round-trip del calcolatore. In
+    // modalità fixed, dinetteFixedCents è la quota per ogni posto dinette.
+    function hasValidSkipperCostPlanV3Core() {
+      return request.resource.data.keys().hasAll(['dinetteRateMode', 'dinetteFixedCents'])
+        && hasValidSkipperCostPlanV2Core()
+        && request.resource.data.dinetteRateMode is string
+        && request.resource.data.dinetteRateMode in ['percentage', 'fixed']
+        && request.resource.data.dinetteFixedCents is int
+        && request.resource.data.dinetteFixedCents >= 0
+        && request.resource.data.dinetteFixedCents <= 1000000
+        && ((request.resource.data.dinetteRateMode == 'percentage'
+            && request.resource.data.dinetteFixedCents == 0)
+          || (request.resource.data.dinetteRateMode == 'fixed'
+            && request.resource.data.dinetteFixedCents >= 1
+            && request.resource.data.dinettePayingParticipants >= 1
+            && request.resource.data.dinettePayingParticipants < request.resource.data.payingParticipants
+            && request.resource.data.dinettePayingParticipants * request.resource.data.dinetteFixedCents < skipperCostPlanRecoverableCents()));
+    }
+
+    function hasValidSkipperCostPlanV3() {
+      return request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'protectionInsuranceTotalCents', 'refundableDepositTotalCents', 'payingParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'dinetteRateMode', 'dinetteFixedCents', 'updatedAt', 'updatedBy'])
+        && hasValidSkipperCostPlanV3Core();
+    }
+
+    // La cauzione può essere portata anche da co-skipper o hostess: il suo
+    // divisore resta quindi indipendente da chi contribuisce ai costi barca.
+    function hasValidSkipperCostPlanV4() {
+      return request.resource.data.keys().hasAll(['depositParticipants'])
+        && request.resource.data.keys().hasOnly(['charterCents', 'skipperFlightTrainCents', 'skipperCarCents', 'skipperLocalTransferCents', 'otherRecoverableCents', 'starterPackTotalCents', 'protectionInsuranceTotalCents', 'refundableDepositTotalCents', 'payingParticipants', 'dinettePayingParticipants', 'dinetteWeightPercent', 'dinetteRateMode', 'dinetteFixedCents', 'depositParticipants', 'updatedAt', 'updatedBy'])
+        && hasValidSkipperCostPlanV3Core()
+        && request.resource.data.depositParticipants is int
+        && request.resource.data.depositParticipants >= 1
+        && request.resource.data.depositParticipants <= 30;
+    }
+
+    // Il rilevamento usa qualsiasi marcatore: anche un documento migrato a
+    // metà resta bloccato dal downgrade e può essere soltanto riparato con il
+    // payload completo della sua versione o di una successiva.
+    function isSkipperCostPlanV2(data) {
+      return data is map
+        && data.keys().hasAny(['starterPackTotalCents', 'protectionInsuranceTotalCents', 'refundableDepositTotalCents', 'dinettePayingParticipants', 'dinetteWeightPercent']);
+    }
+
+    function isSkipperCostPlanV3(data) {
+      return data is map
+        && data.keys().hasAny(['dinetteRateMode', 'dinetteFixedCents']);
+    }
+
+    function isSkipperCostPlanV4(data) {
+      return data is map
+        && data.keys().hasAny(['depositParticipants']);
     }
 
     // Piano quote, richieste personali e bacheca restano consultabili soltanto
@@ -647,11 +804,11 @@ service cloud.firestore {
     }
 
     // Identificatore chiuso della voce richiesta. Permette al destinatario di
-    // distinguere la propria quota, Starter Pack e assicurazione senza usare
+    // distinguere la propria quota e assicurazione senza usare
     // o interpretare la causale libera del messaggio.
     function hasValidPaymentContributionItemId(itemId) {
       return itemId is string
-        && itemId in ['berth_base', 'berth_double_cabin', 'berth_single_cabin', 'berth_dinette', 'berth_other', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'other'];
+        && itemId in ['berth_base', 'berth_double_cabin', 'berth_single_cabin', 'berth_dinette', 'berth_other', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'other'];
     }
 
     function isValidPaymentRequestCreate(boatId) {
@@ -850,8 +1007,8 @@ service cloud.firestore {
           && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, projectionId));
         allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
         allow create: if isPrivateAreaOpen()
-          && (isOrganizer() || isSkipper(boatId))
-          && isValidCrewProjectionCreate(projectionId);
+          && (((isOrganizer() || isSkipper(boatId)) && isValidCrewProjectionCreate(boatId, projectionId))
+            || (isSkipper(boatId) && isValidCrewProjectionLegacyInviteCreate(boatId, projectionId)));
         allow update: if isPrivateAreaOpen()
           && (isOrganizer() || isSkipper(boatId))
           && isValidCrewProjectionDraftUpdate(projectionId);
@@ -915,10 +1072,26 @@ service cloud.firestore {
           && planId == 'default'
           && isSkipper(boatId);
         allow list: if false;
-        allow create, update: if isPrivateAreaOpen()
+        allow create: if isPrivateAreaOpen()
           && planId == 'default'
           && isSkipper(boatId)
-          && hasValidSkipperCostPlan();
+          && (hasValidLegacySkipperCostPlan()
+            || hasValidSkipperCostPlanV2()
+            || hasValidSkipperCostPlanV3()
+            || hasValidSkipperCostPlanV4());
+        allow update: if isPrivateAreaOpen()
+          && planId == 'default'
+          && isSkipper(boatId)
+          && (hasValidSkipperCostPlanV4()
+            || (!isSkipperCostPlanV4(resource.data)
+              && hasValidSkipperCostPlanV3())
+            || (!isSkipperCostPlanV3(resource.data)
+              && !isSkipperCostPlanV4(resource.data)
+              && hasValidSkipperCostPlanV2())
+            || (!isSkipperCostPlanV2(resource.data)
+              && !isSkipperCostPlanV3(resource.data)
+              && !isSkipperCostPlanV4(resource.data)
+              && hasValidLegacySkipperCostPlan()));
         allow delete: if false;
       }
 
