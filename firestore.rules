@@ -482,9 +482,10 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid;
     }
 
-    // Il piano è consultabile dall'equipaggio soltanto dopo la conferma della
-    // versione corrente delle regole di bordo. La bacheca resta invece
-    // leggibile prima, così la persona può effettivamente accettarla.
+    // Piano quote, richieste personali e bacheca restano consultabili soltanto
+    // dopo la conferma della versione corrente delle regole di bordo. Il
+    // briefing rimane un percorso separato e leggibile prima, così la persona
+    // può effettivamente leggerlo e accettarlo.
     function hasCurrentParticipantBriefingAcceptance(boatId) {
       return isBoatParticipant(boatId)
         && hasCurrentBriefingAcceptance(boatId,
@@ -792,7 +793,11 @@ service cloud.firestore {
         // Le richieste e la loro categoria contabile alimentano soltanto la
         // contabilità privata dello skipper: l'organizzatore non le legge né
         // può alterare il pareggio della Cassa skipper.
-        allow read: if isPrivateAreaOpen() && (isSkipper(boatId) || (resource.data.recipientId is string && isInviteHolder(boatId, resource.data.recipientId)));
+        allow read: if isPrivateAreaOpen()
+          && (isSkipper(boatId)
+            || (resource.data.recipientId is string
+              && isInviteHolder(boatId, resource.data.recipientId)
+              && hasCurrentParticipantBriefingAcceptance(boatId)));
         allow create: if isPrivateAreaOpen() && isSkipper(boatId) && collectionProfileExists(boatId) && isValidPaymentRequestCreate(boatId);
         allow update: if isPrivateAreaOpen() && isSkipper(boatId) && (canVerifyPayment() || canCancelPayment());
         allow delete: if false;
@@ -806,7 +811,8 @@ service cloud.firestore {
       }
 
       match /announcements/{announcementId} {
-        allow read: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isBoatParticipant(boatId));
+        allow read: if isPrivateAreaOpen()
+          && (isOrganizer() || isSkipper(boatId) || hasCurrentParticipantBriefingAcceptance(boatId));
         allow create, update, delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
       }
 
