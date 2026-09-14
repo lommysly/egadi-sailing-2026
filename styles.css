@@ -7,7 +7,7 @@ a { color:inherit; }
 :where(a,button,input,select,textarea,summary):focus-visible { outline:3px solid #e6ac34; outline-offset:4px; }
 .skip-link { position:absolute; z-index:140; left:18px; top:-64px; padding:12px 16px; border-radius:0 0 10px 10px; background:var(--ink); color:white; font-weight:700; text-decoration:none; transition:top .18s ease; }
 .skip-link:focus { top:0; }
-.site-header { min-height:86px; padding:18px clamp(22px,5vw,72px); display:flex; align-items:center; justify-content:space-between; background:var(--paper); position:relative; z-index:120; }
+.site-header { min-height:86px; padding:18px clamp(22px,5vw,72px); display:flex; align-items:center; justify-content:space-between; background:var(--paper); position:sticky; top:0; z-index:120; box-shadow:0 1px 0 rgba(1,31,43,.09),0 8px 24px rgba(1,31,43,.06); }
 .brand { display:inline-flex; gap:10px; align-items:center; color:var(--ink); text-decoration:none; font-size:.75rem; line-height:1.08; letter-spacing:.06em; text-transform:uppercase; font-weight:700; }
 .brand-mark { width:32px; height:32px; display:grid; place-items:center; border-radius:50%; background:var(--sun); color:white; font-family:"Fraunces", serif; font-size:1.25rem; text-transform:none; }
 .site-nav { display:flex; gap:clamp(18px,3vw,44px); align-items:center; margin-left:auto; font-size:.86rem; font-weight:700; }
@@ -113,9 +113,15 @@ body.menu-open { overflow:hidden; }
 .payment-method-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .payment-method-tag { display:inline-block !important; margin:0 !important; padding:4px 7px; border-radius:999px; background:#d8f4f1; color:#087b8a !important; font:700 .62rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
 .payment-accounting-tag { display:inline-block !important; width:fit-content; margin-top:8px !important; padding:4px 7px; border:1px solid rgba(8,123,138,.24); border-radius:999px; background:#eaf8f6; color:#087b8a !important; font:700 .62rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
+.payment-contribution-tag { display:inline-block !important; width:fit-content; margin-top:8px !important; padding:4px 7px; border:1px solid rgba(17,45,56,.16); border-radius:999px; background:#f3f6f5; color:#416b6d !important; font:700 .62rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
 .payment-detail-note { font-size:.76rem; line-height:1.4; }
 .invite-panel { margin-top:28px; padding:22px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .invite-panel h4 { margin:0 0 10px; font:600 1.45rem "Fraunces",serif; letter-spacing:-.03em; }
+.crew-projection-panel { margin-top:22px; padding:20px; border:1px solid rgba(8,123,138,.22); border-radius:14px; background:linear-gradient(140deg,#eafbfa 0%,#f8fffe 100%); }
+.crew-projection-panel h4 { margin:0 0 9px; font:600 1.4rem "Fraunces",serif; letter-spacing:-.03em; }
+.crew-projection-panel .eyebrow { margin-bottom:7px; }
+.projection-cost-fieldset { margin:0; padding:14px; border:1px solid rgba(8,123,138,.18); border-radius:10px; }
+.projection-cost-fieldset legend { padding:0 6px; color:#416b6d; font:700 .68rem "DM Mono",monospace; letter-spacing:.04em; text-transform:uppercase; }
 .manual-entry { margin:18px 0 0; padding:13px 0 0; border-top:1px solid var(--line); }
 .manual-entry summary { cursor:pointer; color:rgba(17,45,56,.7); font:500 .76rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
 .manual-entry[open] summary { margin-bottom:15px; color:var(--ink); }
@@ -126,14 +132,15 @@ body.menu-open { overflow:hidden; }
 .charter-export .eyebrow { margin-bottom:7px; }
 .charter-export .panel-lead { margin:0; }
 .charter-export .button:disabled { cursor:not-allowed; opacity:.45; transform:none; }
-.member-list,.payment-list,.invite-list { display:grid; gap:10px; margin-top:24px; }
+.member-list,.payment-list,.invite-list,.projection-list { display:grid; gap:10px; margin-top:24px; }
 .profile-summary dl { display:grid; gap:11px; margin:0 0 22px; }
 .profile-summary div { display:grid; gap:2px; padding-bottom:10px; border-bottom:1px solid var(--line); }
 .profile-summary dt { color:rgba(17,45,56,.62); font:500 .68rem "DM Mono",monospace; letter-spacing:.04em; text-transform:uppercase; }
 .profile-summary dd { margin:0; line-height:1.4; }
-.member-row,.payment-row,.invite-row { display:flex; justify-content:space-between; gap:16px; padding:13px 0; border-top:1px solid var(--line); font-size:.84rem; }
-.member-row strong,.payment-row strong,.invite-row strong { display:block; }
-.member-row span,.payment-row span,.invite-row span { display:block; margin-top:3px; color:rgba(17,45,56,.7); }
+.member-row,.payment-row,.invite-row,.projection-row { display:flex; justify-content:space-between; gap:16px; padding:13px 0; border-top:1px solid var(--line); font-size:.84rem; }
+.member-row strong,.payment-row strong,.invite-row strong,.projection-row strong { display:block; }
+.member-row span,.payment-row span,.invite-row span,.projection-row span { display:block; margin-top:3px; color:rgba(17,45,56,.7); }
+.projection-row small { display:block; margin-top:7px; color:#087b8a; font:700 .67rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
 .member-row > span,.payment-status { text-align:right; white-space:nowrap; }
 .payment-status { color:#416b6d !important; font-weight:700; }
 .payment-action { display:grid; justify-items:end; gap:7px; }
@@ -147,6 +154,33 @@ body.menu-open { overflow:hidden; }
 .contribution-catalog-panel summary small,.skipper-cost-panel summary small { color:#417174; font:500 .72rem "DM Mono",monospace; text-transform:uppercase; letter-spacing:.05em; }
 .contribution-catalog-panel .panel-lead,.skipper-cost-panel .panel-lead { margin-top:16px; }
 .skipper-cost-summary { margin:14px 0 0; padding:13px; border-radius:9px; background:#e0f4f1; color:#16494f; font-size:.86rem; line-height:1.5; }
+.skipper-finance-overview { margin:0 0 24px; padding:18px; border:1px solid rgba(8,123,138,.22); border-radius:14px; background:linear-gradient(140deg,#eafbfa 0%,#f7fffe 100%); }
+.finance-overview-heading { display:grid; grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr); gap:16px; align-items:end; margin-bottom:14px; }
+.finance-overview-heading .eyebrow { margin:0; }
+.finance-overview-heading > p:last-child { margin:0; color:#416b6d; font-size:.82rem; line-height:1.45; }
+.finance-overview-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+.finance-overview-card { display:grid; align-content:start; gap:7px; min-width:0; padding:14px; border:1px solid rgba(8,123,138,.16); border-radius:11px; background:white; }
+.finance-overview-card > span { color:#087b8a; font:700 .64rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; }
+.finance-overview-card > strong { color:#0a3d49; font:600 1.05rem/1.1 "Fraunces",serif; overflow-wrap:anywhere; }
+.finance-overview-card > small { color:#416b6d; font-size:.73rem; line-height:1.4; }
+.finance-overview-card-extras strong + small { margin-bottom:5px; }
+.finance-overview-card-projection { border-color:rgba(50,122,184,.22); background:#f4fbff; }
+.finance-overview-card-projection > span { color:#176c99; }
+.finance-overview-card-deposit { border-color:rgba(175,122,34,.24); background:#fff9e8; }
+.finance-overview-card-deposit > span { color:#986914; }
+.participant-finance-summary { margin:0 0 22px; padding:18px; border:1px solid rgba(8,123,138,.22); border-radius:14px; background:#f7fffe; }
+.participant-finance-summary h4 { margin:0 0 7px; }
+.participant-finance-summary > p { margin:0 0 14px; color:#416b6d; font-size:.83rem; line-height:1.45; }
+.participant-finance-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.participant-finance-row { display:grid; align-content:start; gap:5px; min-width:0; padding:13px; border:1px solid rgba(8,123,138,.15); border-radius:10px; background:white; }
+.participant-finance-row > span { color:#087b8a; font:700 .64rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; }
+.participant-finance-row > strong { color:#0a3d49; font:600 1rem/1.15 "Fraunces",serif; overflow-wrap:anywhere; }
+.participant-finance-row > small { color:#416b6d; font-size:.74rem; line-height:1.4; }
+.participant-finance-row-deposit { border-color:rgba(175,122,34,.24); background:#fff9e8; }
+.participant-finance-row-deposit > span { color:#986914; }
+.participant-finance-acceptance { margin-top:12px; padding:12px 13px; border-radius:10px; background:#e0f4f1; color:#16494f; font-size:.8rem; line-height:1.45; }
+.participant-finance-acceptance strong { display:block; margin-bottom:3px; }
+.participant-finance-acceptance a { color:#075d69; font-weight:700; text-decoration-thickness:1px; text-underline-offset:3px; }
 .contribution-catalog-rows { display:grid; gap:10px; }
 .contribution-catalog-row { display:grid; grid-template-columns:minmax(160px,1.35fr) minmax(160px,1fr) minmax(150px,.8fr); gap:10px; align-items:end; padding:12px; border:1px solid rgba(17,45,56,.14); border-radius:10px; background:white; }
 .contribution-catalog-label { display:grid; gap:5px; font-weight:700; font-size:.85rem; }
@@ -240,7 +274,8 @@ body.menu-open { overflow:hidden; }
 .passage-safety p { max-width:780px; line-height:1.6; }
 @media (max-width:800px) { .passage-status,.passage-data-grid,.passage-stop-grid,.passage-mooring-guide { grid-template-columns:1fr; }.passage-day-heading { display:grid; gap:0; }.passage-day-card,.passage-introduction,.passage-safety,.passage-mooring-guide { padding:24px; } }
 @media (max-width:800px) { .form-grid,.dashboard-grid,.schedule-list { grid-template-columns:1fr; }.dashboard-heading { display:grid; align-items:start; }.dashboard-actions { justify-content:start; }.form-actions { display:grid; align-items:start; }.form-actions .form-message { margin:0; }.dashboard-overview-heading { grid-template-columns:1fr; gap:14px; }.dashboard-hub { grid-template-columns:repeat(2,minmax(0,1fr)); }.dashboard-hub-card { min-height:160px; padding:15px; }.dashboard-next-step { display:grid; align-items:start; }.dashboard-next-step .button { width:100%; }.dashboard-view-navigation { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }.dashboard-view-navigation button { flex:0 0 auto; } }
-@media (max-width:800px) { .contribution-catalog-row { grid-template-columns:1fr; } }
+@media (max-width:800px) { .contribution-catalog-row { grid-template-columns:1fr; }.finance-overview-heading { grid-template-columns:1fr; }.finance-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:430px) { .finance-overview-grid,.participant-finance-grid { grid-template-columns:1fr; } }
 @media (max-width:800px) { .charter-export { display:grid; align-items:start; } }
 
 /* Arrivi e partenze: la pagina pubblica spiega il flusso, senza raccogliere dati o contatti. */

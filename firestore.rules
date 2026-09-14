@@ -141,6 +141,100 @@ service cloud.firestore {
         && request.resource.data.createdBy == request.auth.uid;
     }
 
+    // La proiezione è il posto riservato dal solo skipper prima che esista un
+    // invito. Non è una Crew List, non è pubblica e non contiene istruzioni
+    // di pagamento: gli importi servono esclusivamente al preventivo privato.
+    function hasValidCrewProjectionPayload(projectionId) {
+      return request.resource.data.keys().hasAll(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && projectionId.matches('^[a-f0-9]{48}$')
+        && request.resource.data.id == projectionId
+        && request.resource.data.firstName is string
+        && request.resource.data.firstName.size() > 0
+        && request.resource.data.firstName.size() <= 80
+        && request.resource.data.lastName is string
+        && request.resource.data.lastName.size() > 0
+        && request.resource.data.lastName.size() <= 80
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName == request.resource.data.firstName + ' ' + request.resource.data.lastName
+        && request.resource.data.whatsappNumber is string
+        && request.resource.data.whatsappNumber.size() >= 8
+        && request.resource.data.whatsappNumber.size() <= 30
+        && request.resource.data.plannedRole is string
+        && request.resource.data.plannedRole.size() > 0
+        && request.resource.data.plannedRole.size() <= 100
+        && request.resource.data.berthType in ['to_define', 'double_cabin', 'single_cabin', 'dinette', 'other']
+        && request.resource.data.berthCents is int
+        && request.resource.data.berthCents >= 0
+        && request.resource.data.berthCents <= 1000000
+        && request.resource.data.starterPackCents is int
+        && request.resource.data.starterPackCents >= 0
+        && request.resource.data.starterPackCents <= 1000000
+        && request.resource.data.protectionInsuranceCents is int
+        && request.resource.data.protectionInsuranceCents >= 0
+        && request.resource.data.protectionInsuranceCents <= 1000000
+        && request.resource.data.refundableDepositCents is int
+        && request.resource.data.refundableDepositCents >= 0
+        && request.resource.data.refundableDepositCents <= 1000000
+        && request.resource.data.preferredLocale in ['it', 'en']
+        && request.resource.data.contactConsent == true
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.createdBy is string
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    function isValidCrewProjectionCreate(projectionId) {
+      return hasValidCrewProjectionPayload(projectionId)
+        && request.resource.data.status == 'projected'
+        && request.resource.data.inviteId == null
+        && request.resource.data.invitedAt == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+    }
+
+    function isValidCrewProjectionDraftUpdate(projectionId) {
+      return hasValidCrewProjectionPayload(projectionId)
+        && resource.data.status == 'projected'
+        && resource.data.inviteId == null
+        && resource.data.invitedAt == null
+        && request.resource.data.status == 'projected'
+        && request.resource.data.inviteId == null
+        && request.resource.data.invitedAt == null
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'updatedAt', 'updatedBy']);
+    }
+
+    // Il collegamento diventa reale solo nel batch che crea l'invito con lo
+    // stesso ID. `!exists` impedisce di agganciare una proiezione a un invito
+    // già esistente o a un record appartenente a un altro flusso.
+    function hasMatchingCrewProjectionInviteAfter(boatId, projectionId) {
+      return !exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId))
+        && existsAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId))
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data.id == projectionId
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data.boatId == boatId
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data.status == 'pending'
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data.displayName == request.resource.data.displayName
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data.whatsappNumber == request.resource.data.whatsappNumber;
+    }
+
+    function isValidCrewProjectionInviteTransition(boatId, projectionId) {
+      return resource.data.id == projectionId
+        && resource.data.status == 'projected'
+        && resource.data.inviteId == null
+        && resource.data.invitedAt == null
+        && request.resource.data.status == 'invited'
+        && request.resource.data.inviteId == projectionId
+        && request.resource.data.invitedAt == request.time
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'inviteId', 'invitedAt', 'updatedAt', 'updatedBy'])
+        && hasMatchingCrewProjectionInviteAfter(boatId, projectionId);
+    }
+
     function canClaimInvite(boatId, inviteId) {
       return isPasswordCrew()
         && resource.data.id == inviteId
@@ -448,8 +542,9 @@ service cloud.firestore {
         && hasValidContributionItem(items.fuel)
         && hasValidContributionItem(items.transfer)
         && hasValidContributionItem(items.refundable_deposit)
-        // Una cauzione rimborsabile non è mai parte silenziosa della quota.
-        && items.refundable_deposit.state != 'included'
+        // Una cauzione rimborsabile non è mai parte silenziosa della quota,
+        // né una richiesta a distanza: si porta e si regola in loco.
+        && items.refundable_deposit.state in ['to_define', 'local', 'not_applicable']
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
     }
@@ -551,15 +646,28 @@ service cloud.firestore {
         && (category == 'cost_recovery' || category == 'other');
     }
 
+    // Identificatore chiuso della voce richiesta. Permette al destinatario di
+    // distinguere la propria quota, Starter Pack e assicurazione senza usare
+    // o interpretare la causale libera del messaggio.
+    function hasValidPaymentContributionItemId(itemId) {
+      return itemId is string
+        && itemId in ['berth_base', 'berth_double_cabin', 'berth_single_cabin', 'berth_dinette', 'berth_other', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'other'];
+    }
+
     function isValidPaymentRequestCreate(boatId) {
       let profile = get(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data;
       return request.resource.data.keys().hasAll(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
-        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
+        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'contributionItemId', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
         && request.resource.data.recipientId is string
         && request.resource.data.recipientId.size() > 0
         && request.resource.data.memberId == request.resource.data.recipientId
         && request.resource.data.payerInviteId == request.resource.data.recipientId
         && inviteExists(boatId, request.resource.data.recipientId)
+        // Compatibilità temporanea per pagine skipper già aperte prima del
+        // selettore tecnico: se la chiave è presente deve comunque essere
+        // nell'enum chiuso. `refundable_deposit` non è mai ammesso online.
+        && (!request.resource.data.keys().hasAll(['contributionItemId'])
+          || hasValidPaymentContributionItemId(request.resource.data.contributionItemId))
         && request.resource.data.amountCents is int
         && request.resource.data.amountCents >= 1
         && request.resource.data.amountCents <= 1000000
@@ -732,6 +840,31 @@ service cloud.firestore {
         allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
         allow update: if isPrivateAreaOpen() && (canClaimInvite(boatId, inviteId)
           || ((isOrganizer() || isSkipper(boatId)) && canReissueInvite(boatId, inviteId)));
+      }
+
+      // Posto e preventivo restano privati finché lo skipper non invia il
+      // link personale. L'equipaggio attivo può leggere soltanto il proprio
+      // documento puntuale: mai la lista, mai le proiezioni altrui.
+      match /crewProjections/{projectionId} {
+        allow get: if isPrivateAreaOpen()
+          && (isOrganizer() || isSkipper(boatId) || isInviteHolder(boatId, projectionId));
+        allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+        allow create: if isPrivateAreaOpen()
+          && (isOrganizer() || isSkipper(boatId))
+          && isValidCrewProjectionCreate(projectionId);
+        allow update: if isPrivateAreaOpen()
+          && (isOrganizer() || isSkipper(boatId))
+          && isValidCrewProjectionDraftUpdate(projectionId);
+        allow update: if isPrivateAreaOpen()
+          && (isOrganizer() || isSkipper(boatId))
+          && isValidCrewProjectionInviteTransition(boatId, projectionId);
+        // Si libera solo una bozza senza accesso. Dopo l'invito il record
+        // resta la traccia privata che collega lo stesso posto alla Crew List.
+        allow delete: if isPrivateAreaOpen()
+          && (isOrganizer() || isSkipper(boatId))
+          && resource.data.status == 'projected'
+          && resource.data.inviteId == null
+          && resource.data.invitedAt == null;
       }
 
       match /members/{memberId} {
