@@ -35,8 +35,12 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/events/egadi-2026).data.publicFleetEnabled == true;
     }
 
+    // Google resta obbligatorio per registrare una nuova barca. Per una barca
+    // già esistente l'autorizzazione deriva invece dall'UID Firebase scritto
+    // nella barca: è stabile anche se il titolare ha collegato un secondo
+    // metodo di accesso, mentre un equipaggio non può mai assumere quell'UID.
     function isSkipper(boatId) {
-      return isGoogleSkipperAccount()
+      return signedIn()
         && exists(/databases/$(database)/documents/boats/$(boatId))
         && get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid;
     }
@@ -819,6 +823,16 @@ service cloud.firestore {
         && !(value.matches('.*([Pp][Aa][Yy][Pp][Aa][Ll]|[Ss][Aa][Tt][Ii][Ss][Pp][Aa][Yy]|[Rr][Ee][Vv][Oo][Ll][Uu][Tt]|[Ii][Bb][Aa][Nn]|[Bb][Oo][Nn][Ii][Ff][Ii][Cc][Oo]|[Cc][Aa][Uu][Ss][Aa][Ll][Ee]).*'));
     }
 
+    // Il preventivo barca resta leggibile soltanto allo skipper. Le note
+    // storiche non vengono più propagate nel riepilogo equipaggio, quindi
+    // qui basta mantenere un testo breve e non un secondo filtro pubblico
+    // ad alta complessità che può bloccare il salvataggio del preventivo.
+    function hasValidPrivateCostPlanNote(value) {
+      return value is string
+        && value.size() > 0
+        && value.size() <= 320;
+    }
+
     // V2 aggiunge un dettaglio breve e controllato per ciascuna voce e due
     // voci operative (cena a terra e porto/ormeggio). Il testo è pensato per
     // l'equipaggio dopo il briefing, non può contenere canali d'incasso.
@@ -1051,9 +1065,9 @@ service cloud.firestore {
         && request.resource.data.depositParticipants is int
         && request.resource.data.depositParticipants >= 1
         && request.resource.data.depositParticipants <= 30
-        && hasSafeCrewFacingDescription(request.resource.data.starterPackDescription)
-        && hasSafeCrewFacingDescription(request.resource.data.protectionInsuranceDescription)
-        && hasSafeCrewFacingDescription(request.resource.data.refundableDepositDescription)
+        && hasValidPrivateCostPlanNote(request.resource.data.starterPackDescription)
+        && hasValidPrivateCostPlanNote(request.resource.data.protectionInsuranceDescription)
+        && hasValidPrivateCostPlanNote(request.resource.data.refundableDepositDescription)
         && ((request.resource.data.starterPackRateMode == 'total_divided'
             && request.resource.data.starterPackFixedPerPersonCents == 0)
           || (request.resource.data.starterPackRateMode == 'fixed_per_person'
