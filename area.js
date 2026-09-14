@@ -4970,33 +4970,17 @@ costPlanForm.addEventListener('submit', async (event) => {
   try {
     const boatId = activeBoat.id;
     const skipperId = auth.currentUser.uid;
-    const contributionPlan = await runTransaction(db, async (transaction) => {
-      const contributionPlanRef = doc(db, 'boats', boatId, 'contributionPlan', 'default');
-      const latestContributionPlan = await transaction.get(contributionPlanRef);
-      const synchronizedContributionPlan = contributionPlanForCostPlan(
-        plan,
-        latestContributionPlan.exists() ? latestContributionPlan.data() : null,
-      );
+    await runTransaction(db, async (transaction) => {
       transaction.set(doc(db, 'boats', boatId, 'costPlan', COST_PLAN_ID), {
         ...plan,
         updatedAt: serverTimestamp(),
         updatedBy: skipperId,
       });
-      // Conserviamo gli extra appena riletti dal server: la dashboard aggiorna
-      // soltanto le voci automatiche, senza cancellare cena, ormeggio o note
-      // salvati da un’altra scheda.
-      transaction.set(contributionPlanRef, {
-        ...synchronizedContributionPlan,
-        updatedAt: serverTimestamp(),
-        updatedBy: skipperId,
-      });
-      return synchronizedContributionPlan;
     });
     activeCostPlan = normalizeCostPlan(plan);
-    activeContributionPlan = contributionPlan;
     renderCostPlan(activeCostPlan);
     renderProjections();
-    setMessage(message, 'Dashboard salvata: le schede senza invito sono state aggiornate con le quote automatiche. Inviti già creati, schede storiche ed eccezioni restano fissati.');
+    setMessage(message, 'Dashboard salvata: le schede senza invito sono state aggiornate con le quote automatiche. Inviti già creati, schede storiche ed eccezioni restano fissati. Il riepilogo delle voci già visibile all’equipaggio non viene riscritto da questo salvataggio.');
   } catch (error) {
     setMessage(message, getCostPlanSaveErrorMessage(error), true);
   } finally {

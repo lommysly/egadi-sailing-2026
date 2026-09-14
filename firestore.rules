@@ -1129,6 +1129,15 @@ service cloud.firestore {
         && data.keys().hasAny(['berthRoundingMode', 'berthRoundingIncrementCents', 'manualStandardBerthCents']);
     }
 
+    // La scelta del validatore con ternario evita di valutare V6 e V7 nello
+    // stesso accesso. Le Rules hanno un budget massimo di espressioni anche
+    // per una singola transazione con documenti diversi.
+    function hasValidSkipperCostPlanV6OrV7() {
+      return isSkipperCostPlanV7(request.resource.data)
+        ? hasValidSkipperCostPlanV7()
+        : hasValidSkipperCostPlanV6();
+    }
+
     // Il rilevamento usa qualsiasi marcatore: anche un documento migrato a
     // metà resta bloccato dal downgrade e può essere soltanto riparato con il
     // payload completo della sua versione o di una successiva.
@@ -1510,15 +1519,16 @@ service cloud.firestore {
         allow create: if isPrivateAreaOpen()
           && planId == 'default'
           && isSkipper(boatId)
-          && (hasValidSkipperCostPlanV7() || hasValidSkipperCostPlanV6());
+          && hasValidSkipperCostPlanV6OrV7();
         // V7 è il formato canonico. La compatibilità V6 è soltanto una
         // passerella di rilascio: resta disponibile finché il piano è V6,
         // poi il primo salvataggio V7 blocca per sempre il downgrade cache.
         allow update: if isPrivateAreaOpen()
           && planId == 'default'
           && isSkipper(boatId)
-          && (hasValidSkipperCostPlanV7()
-            || (!isSkipperCostPlanV7(resource.data)
+          && (isSkipperCostPlanV7(request.resource.data)
+            ? hasValidSkipperCostPlanV7()
+            : (!isSkipperCostPlanV7(resource.data)
               && hasValidSkipperCostPlanV6()));
         allow delete: if false;
       }
