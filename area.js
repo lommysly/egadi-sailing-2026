@@ -3906,6 +3906,10 @@ function resetProjectionForm() {
   document.querySelector('#projectionSubmitButton').textContent = 'Salva la scheda e riserva il posto';
   document.querySelector('#cancelProjectionEdit').hidden = true;
   document.querySelector('#cancelProjectionEdit').textContent = 'Annulla modifica';
+  const title = document.querySelector('#projectionTitle');
+  if (title) title.textContent = 'Nuovo partecipante';
+  const newProjectionButton = document.querySelector('#newProjectionButton');
+  if (newProjectionButton) newProjectionButton.hidden = true;
   const legacyLinkHint = document.querySelector('#projectionLegacyLinkHint');
   if (legacyLinkHint) {
     legacyLinkHint.hidden = true;
@@ -3913,6 +3917,64 @@ function resetProjectionForm() {
   }
   syncProjectionCabinGroupField();
   renderProjectionCostPreview();
+}
+
+function retainSavedProjectionLocally(projection) {
+  const saved = normalizeProjection(projection.id, projection);
+  activeProjections = [
+    ...activeProjections.filter((candidate) => candidate.id !== saved.id),
+    saved,
+  ].sort((first, second) => first.displayName.localeCompare(second.displayName, 'it'));
+  return saved;
+}
+
+function showSavedProjectionForm(projection, message) {
+  const form = document.querySelector('#projectionForm');
+  if (!form) return;
+  const saved = normalizeProjection(projection.id, projection);
+  const invite = projectionInvite(saved);
+  editingProjectionId = saved.id;
+  editingInvitedPricing = false;
+  linkingLegacyInviteId = null;
+  form.elements.preferredLocale.disabled = false;
+  setProjectionIdentityFieldsLocked(false);
+  fillProjectionForm(saved);
+  setProjectionIdentityFieldsLocked(Boolean(invite));
+  form.elements.preferredLocale.disabled = Boolean(invite);
+  document.querySelector('#projectionSubmitButton').textContent = 'Salva la scheda';
+  document.querySelector('#cancelProjectionEdit').hidden = true;
+  document.querySelector('#cancelProjectionEdit').textContent = 'Annulla modifica';
+  const title = document.querySelector('#projectionTitle');
+  if (title) title.textContent = `Scheda di ${saved.displayName}`;
+  const newProjectionButton = document.querySelector('#newProjectionButton');
+  if (newProjectionButton) newProjectionButton.hidden = false;
+  setMessage(document.querySelector('#projectionFormMessage'), message);
+}
+
+function startNewProjection() {
+  const message = document.querySelector('#projectionFormMessage');
+  if (needsCapacityAlignment(activeBoat)) {
+    setMessage(message, capacityAlignmentMessage(activeBoat), true);
+    return;
+  }
+  if (isCrewCapacityReached()) {
+    setMessage(message, 'Hai già riservato tutti i posti per partecipanti indicati per questa barca.', true);
+    return;
+  }
+  const current = editingProjection();
+  if (current && !window.confirm(`Vuoi preparare una nuova scheda? Le modifiche non salvate a ${current.displayName} non verranno conservate.`)) return;
+  resetProjectionForm();
+  setMessage(message, 'Nuova scheda partecipante: compila solo il nominativo che vuoi aggiungere.');
+  document.querySelector('#projectionForm').elements.firstName.focus({ preventScroll: true });
+}
+
+function cancelProjectionEdit() {
+  const current = editingProjection();
+  if (current && !linkingLegacyInviteId) {
+    showSavedProjectionForm(current, `Modifiche non salvate annullate. Stai guardando la scheda di ${current.displayName}.`);
+    return;
+  }
+  resetProjectionForm();
 }
 
 function setBoatFormDefaults(user) {
@@ -4582,6 +4644,8 @@ function prepareLegacyInviteProjection(invite) {
   const form = document.querySelector('#projectionForm');
   if (!form) return;
   resetProjectionForm();
+  const title = document.querySelector('#projectionTitle');
+  if (title) title.textContent = `Completa la scheda di ${invite.displayName}`;
   linkingLegacyInviteId = invite.id;
   fillProjectionForm(legacyProjectionDraftFromInvite(invite));
   form.elements.preferredLocale.disabled = true;
@@ -4808,8 +4872,11 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
         updatedAt: serverTimestamp(),
         updatedBy: auth.currentUser.uid,
       });
-      setMessage(message, `Quota aggiornata per ${editingProjection.displayName}. La card e la sua area personale mostrano ora lo stesso accordo; nessuna richiesta di pagamento è stata creata.`);
-      resetProjectionForm();
+      const savedProjection = retainSavedProjectionLocally({
+        ...editingProjection,
+        ...pricing,
+      });
+      showSavedProjectionForm(savedProjection, `Quota aggiornata per ${editingProjection.displayName}. La card e la sua area personale mostrano ora lo stesso accordo; nessuna richiesta di pagamento è stata creata. Per aggiungere un’altra persona scegli “Nuovo partecipante”.`);
     } catch (error) {
       setMessage(message, getFirestoreErrorMessage(error, 'Non riesco ad aggiornare la quota concordata.'), true);
     } finally {
@@ -4845,8 +4912,10 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
   }
   submitButton.disabled = true;
   try {
+    let savedProjection;
+    let savedMessage;
     if (editingProjectionId) {
-      await updateDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), {
+      const update = {
         ...projection,
         status: editingProjection.status,
         inviteId: editingProjection.inviteId || null,
@@ -4859,12 +4928,14 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
           : {}),
         updatedAt: serverTimestamp(),
         updatedBy: auth.currentUser.uid,
-      });
-      setMessage(message, existingInvite
+      };
+      await updateDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), update);
+      savedProjection = retainSavedProjectionLocally({ ...editingProjection, ...update });
+      savedMessage = existingInvite
         ? 'Scheda aggiornata: il link personale e lo stato di accesso restano invariati.'
-        : 'Scheda aggiornata: posto, ruolo, sistemazione e importo previsto restano associati alla stessa persona.');
+        : 'Scheda aggiornata: posto, ruolo, sistemazione e importo previsto restano associati alla stessa persona.';
     } else if (legacyInvite) {
-      await setDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), {
+      const created = {
         ...projection,
         status: 'invited',
         inviteId: legacyInvite.id,
@@ -4874,10 +4945,12 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
         createdBy: auth.currentUser.uid,
         updatedAt: serverTimestamp(),
         updatedBy: auth.currentUser.uid,
-      });
-      setMessage(message, `Scheda equipaggio salvata per ${legacyInvite.displayName}: usa lo stesso ID dell’invito esistente, che non è stato creato, revocato o modificato.`);
+      };
+      await setDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), created);
+      savedProjection = retainSavedProjectionLocally(created);
+      savedMessage = `Scheda equipaggio salvata per ${legacyInvite.displayName}: usa lo stesso ID dell’invito esistente, che non è stato creato, revocato o modificato.`;
     } else {
-      await setDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), {
+      const created = {
         ...projection,
         status: 'projected',
         inviteId: null,
@@ -4886,10 +4959,12 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
         createdBy: auth.currentUser.uid,
         updatedAt: serverTimestamp(),
         updatedBy: auth.currentUser.uid,
-      });
-      setMessage(message, 'Scheda salvata: controlla il riepilogo accanto alla persona e, quando vuoi, crea l’invito WhatsApp dalla stessa riga.');
+      };
+      await setDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), created);
+      savedProjection = retainSavedProjectionLocally(created);
+      savedMessage = 'Scheda salvata: controlla il riepilogo accanto alla persona e, quando vuoi, crea l’invito WhatsApp dalla stessa riga.';
     }
-    resetProjectionForm();
+    showSavedProjectionForm(savedProjection, `${savedMessage} Per aggiungere un’altra persona scegli “Nuovo partecipante”.`);
   } catch (error) {
     setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare la scheda dell’equipaggio.'), true);
   } finally {
@@ -4929,7 +5004,8 @@ Object.entries(projectionAutomaticRateKeys).forEach(([fieldName, dataKey]) => {
 });
 syncProjectionCostParticipation();
 syncProjectionCabinGroupField();
-document.querySelector('#cancelProjectionEdit').addEventListener('click', resetProjectionForm);
+document.querySelector('#newProjectionButton').addEventListener('click', startNewProjection);
+document.querySelector('#cancelProjectionEdit').addEventListener('click', cancelProjectionEdit);
 
 document.querySelector('#projectionList').addEventListener('click', async (event) => {
   const message = document.querySelector('#projectionFormMessage');
@@ -4963,14 +5039,18 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     if (!projection) return;
     const invite = projectionInvite(projection);
     editingInvitedPricing = false;
+    projectionForm.elements.preferredLocale.disabled = false;
+    setProjectionIdentityFieldsLocked(false);
     fillProjectionForm(projection);
     editingProjectionId = projection.id;
     setProjectionIdentityFieldsLocked(Boolean(invite));
-    if (invite) projectionForm.elements.preferredLocale.disabled = true;
+    projectionForm.elements.preferredLocale.disabled = Boolean(invite);
     syncProjectionCabinGroupField();
     syncProjectionCostParticipation();
     document.querySelector('#projectionSubmitButton').textContent = 'Salva la scheda';
     document.querySelector('#cancelProjectionEdit').hidden = false;
+    document.querySelector('#newProjectionButton').hidden = true;
+    document.querySelector('#projectionTitle').textContent = `Modifica la scheda di ${projection.displayName}`;
     setMessage(message, invite
       ? 'Puoi aggiornare ruolo, sistemazione, cabina e importi. Nome, WhatsApp, lingua e link personale restano invariati.'
       : 'Modifica posto, ruolo, sistemazione, cabina e importo previsto, poi salva.');
@@ -4994,6 +5074,8 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     syncProjectionCostParticipation();
     document.querySelector('#projectionSubmitButton').textContent = 'Aggiorna quota concordata';
     document.querySelector('#cancelProjectionEdit').hidden = false;
+    document.querySelector('#newProjectionButton').hidden = true;
+    document.querySelector('#projectionTitle').textContent = `Quota concordata di ${projection.displayName}`;
     setMessage(message, `Stai rivedendo solo la quota di ${projection.displayName}. I nuovi importi restano fissi e non generano un pagamento: salvali soltanto dopo esserti accordato con la persona.`);
     projectionForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
     projectionForm.elements.berthAmount.focus();
