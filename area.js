@@ -211,8 +211,15 @@ const SKIPPER_DASHBOARD_LABELS = Object.freeze({
   boat: 'Barca e flotta',
   board: 'Briefing e bacheca',
 });
+const SKIPPER_FINANCE_VIEWS = Object.freeze({
+  overview: 'overview',
+  setup: 'setup',
+  request: 'request',
+  review: 'review',
+});
 let skipperDashboardView = 'overview';
 let skipperDashboardInitialized = false;
+let skipperFinanceDashboardInitialized = false;
 
 function setMessage(element, message, isError = false) {
   element.textContent = message;
@@ -231,8 +238,198 @@ function skipperDashboardIcon(kind) {
     money: '<rect x="3.5" y="5.25" width="17" height="13.5" rx="2"/><path d="M3.5 9.5h17M15.5 14.25h2.25"/>',
     boat: '<path d="M3 14.5h18l-2.25 4.25H5.25L3 14.5Z"/><path d="M12 3.5v11M12 4l5.25 7H12M11.75 6.25 7 11h4.75"/>',
     board: '<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4.5"/>',
+    setup: '<path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/><circle cx="12" cy="12" r="4.5"/>',
+    request: '<path d="m4 4 16 8-16 8 3-8-3-8Z"/><path d="M7 12h9"/>',
+    review: '<path d="M4 19.5V11M10 19.5V4.5M16 19.5V8M22 19.5H2"/>',
   };
   return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths[kind] || paths.board}</svg>`;
+}
+
+function financeDashboardCard({ view, title, detail, icon }) {
+  const button = document.createElement('button');
+  button.className = 'dashboard-hub-card finance-dashboard-card';
+  button.type = 'button';
+  button.dataset.financeView = view;
+  button.setAttribute('aria-controls', `skipperFinancePanel-${view}`);
+
+  const iconTarget = document.createElement('span');
+  iconTarget.className = 'dashboard-hub-icon';
+  iconTarget.innerHTML = skipperDashboardIcon(icon);
+  const label = document.createElement('span');
+  label.className = 'dashboard-hub-label';
+  label.textContent = title;
+  const description = document.createElement('small');
+  description.textContent = detail;
+  button.append(iconTarget, label, description);
+  return button;
+}
+
+function financeDashboardBackButton() {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'text-button finance-dashboard-back';
+  button.dataset.financeView = SKIPPER_FINANCE_VIEWS.overview;
+  button.textContent = '← Quote e conti';
+  return button;
+}
+
+function createFinanceDashboardPanel({ view, eyebrow, title, lead }) {
+  const panel = document.createElement('section');
+  panel.id = `skipperFinancePanel-${view}`;
+  panel.className = 'finance-dashboard-panel';
+  panel.dataset.financePanel = view;
+  panel.hidden = true;
+
+  const heading = document.createElement('div');
+  heading.className = 'finance-dashboard-panel-heading';
+  heading.append(financeDashboardBackButton());
+  const eyebrowTarget = document.createElement('p');
+  eyebrowTarget.className = 'eyebrow';
+  eyebrowTarget.textContent = eyebrow;
+  const titleTarget = document.createElement('h4');
+  titleTarget.tabIndex = -1;
+  titleTarget.textContent = title;
+  const leadTarget = document.createElement('p');
+  leadTarget.className = 'panel-lead';
+  leadTarget.textContent = lead;
+  heading.append(eyebrowTarget, titleTarget, leadTarget);
+
+  const content = document.createElement('div');
+  content.className = 'finance-dashboard-panel-content';
+  panel.append(heading, content);
+  return { panel, content, titleTarget };
+}
+
+function setupSkipperFinanceDashboard() {
+  if (skipperFinanceDashboardInitialized) return;
+  const moneyPanel = document.querySelector('#paymentProfileForm')?.closest('.dashboard-panel');
+  const financeOverview = document.querySelector('#skipperFinanceOverview');
+  const paymentProfileForm = document.querySelector('#paymentProfileForm');
+  const costPlanPanel = document.querySelector('#costPlanPanel');
+  const contributionCatalogPanel = document.querySelector('#contributionCatalogPanel');
+  const paymentForm = document.querySelector('#paymentForm');
+  const paymentList = document.querySelector('#paymentList');
+  if (!moneyPanel || !financeOverview || !paymentProfileForm || !costPlanPanel || !contributionCatalogPanel || !paymentForm || !paymentList) return;
+
+  const initialChildren = Array.from(moneyPanel.children);
+  const overviewIndex = initialChildren.indexOf(financeOverview);
+  const catalogIndex = initialChildren.indexOf(contributionCatalogPanel);
+  const paymentFormIndex = initialChildren.indexOf(paymentForm);
+  const profileIntro = initialChildren.slice(0, overviewIndex);
+  const requestIntro = initialChildren.slice(catalogIndex + 1, paymentFormIndex);
+
+  const financeDashboard = document.createElement('section');
+  financeDashboard.id = 'skipperFinanceDashboard';
+  financeDashboard.className = 'skipper-finance-dashboard-shell';
+  financeDashboard.setAttribute('aria-label', 'Quote e conti');
+
+  const overviewPanel = document.createElement('section');
+  overviewPanel.id = 'skipperFinancePanel-overview';
+  overviewPanel.className = 'finance-dashboard-panel finance-dashboard-hub-panel';
+  overviewPanel.dataset.financePanel = SKIPPER_FINANCE_VIEWS.overview;
+
+  const overviewHeading = document.createElement('div');
+  overviewHeading.className = 'finance-dashboard-panel-heading';
+  const overviewEyebrow = document.createElement('p');
+  overviewEyebrow.className = 'eyebrow';
+  overviewEyebrow.textContent = 'Area economica privata';
+  const overviewTitle = document.createElement('h4');
+  overviewTitle.textContent = 'Quote e conti, senza confondere i passaggi.';
+  const overviewLead = document.createElement('p');
+  overviewLead.className = 'panel-lead';
+  overviewLead.textContent = 'Prima imposti il quadro, poi prepari una richiesta personale e infine controlli quanto è stato verificato. Il sito non incassa denaro.';
+  overviewHeading.append(overviewEyebrow, overviewTitle, overviewLead);
+
+  const hub = document.createElement('div');
+  hub.className = 'dashboard-hub finance-dashboard-hub';
+  hub.setAttribute('aria-label', 'Azioni quote e conti');
+  hub.append(
+    financeDashboardCard({
+      view: SKIPPER_FINANCE_VIEWS.setup,
+      title: 'Imposta',
+      detail: 'Metodi d’incasso, Cassa skipper e composizione delle quote.',
+      icon: 'setup',
+    }),
+    financeDashboardCard({
+      view: SKIPPER_FINANCE_VIEWS.request,
+      title: 'Richiedi',
+      detail: 'Prepara una richiesta personale e apri WhatsApp.',
+      icon: 'request',
+    }),
+    financeDashboardCard({
+      view: SKIPPER_FINANCE_VIEWS.review,
+      title: 'Controlla',
+      detail: 'Riepilogo, richieste emesse e accrediti verificati.',
+      icon: 'review',
+    }),
+  );
+  overviewPanel.append(overviewHeading, hub);
+
+  const setupPanel = createFinanceDashboardPanel({
+    view: SKIPPER_FINANCE_VIEWS.setup,
+    eyebrow: '1 · Imposta',
+    title: 'Prepara il quadro economico',
+    lead: 'Queste informazioni restano nella tua area skipper: l’equipaggio non vede i metodi di incasso né la tua Cassa skipper.',
+  });
+  const requestPanel = createFinanceDashboardPanel({
+    view: SKIPPER_FINANCE_VIEWS.request,
+    eyebrow: '2 · Richiedi',
+    title: 'Crea una richiesta personale',
+    lead: 'Scegli persona, importo, causale e metodi; poi WhatsApp si apre con il messaggio già pronto. Il pagamento avviene sempre fuori dal sito.',
+  });
+  const reviewPanel = createFinanceDashboardPanel({
+    view: SKIPPER_FINANCE_VIEWS.review,
+    eyebrow: '3 · Controlla',
+    title: 'Segui richieste e accrediti',
+    lead: 'Riepiloga la Cassa skipper, ricontrolla le richieste inviate e conferma un accredito solo dopo averlo verificato davvero.',
+  });
+
+  const profileLead = profileIntro.find((element) => element.classList.contains('panel-lead'));
+  const requestLead = requestIntro.find((element) => element.classList.contains('panel-lead'));
+  profileIntro.filter((element) => element !== profileLead).forEach((element) => element.remove());
+  requestIntro.filter((element) => element !== requestLead).forEach((element) => element.remove());
+  if (profileLead) setupPanel.content.append(profileLead);
+  setupPanel.content.append(paymentProfileForm, costPlanPanel, contributionCatalogPanel);
+  if (requestLead) requestPanel.content.append(requestLead);
+  requestPanel.content.append(paymentForm);
+  reviewPanel.content.append(financeOverview, paymentList);
+  Array.from(moneyPanel.children)
+    .filter((element) => element.classList.contains('board-divider'))
+    .forEach((element) => element.remove());
+
+  financeDashboard.append(overviewPanel, setupPanel.panel, requestPanel.panel, reviewPanel.panel);
+  moneyPanel.append(financeDashboard);
+
+  financeDashboard.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-finance-view]');
+    if (!button || !financeDashboard.contains(button)) return;
+    const nextView = button.dataset.financeView;
+    if (!SKIPPER_FINANCE_VIEWS[nextView]) return;
+    setSkipperFinanceDashboardView(nextView, { focus: nextView !== SKIPPER_FINANCE_VIEWS.overview });
+  });
+
+  skipperFinanceDashboardInitialized = true;
+  setSkipperFinanceDashboardView(SKIPPER_FINANCE_VIEWS.overview);
+}
+
+function setSkipperFinanceDashboardView(nextView, { focus = false } = {}) {
+  if (!skipperFinanceDashboardInitialized) return;
+  const view = SKIPPER_FINANCE_VIEWS[nextView] ? nextView : SKIPPER_FINANCE_VIEWS.overview;
+  const financeDashboard = document.querySelector('#skipperFinanceDashboard');
+  if (!financeDashboard) return;
+  financeDashboard.querySelectorAll('[data-finance-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.financePanel !== view;
+  });
+  financeDashboard.querySelectorAll('[data-finance-view]').forEach((button) => {
+    if (button.dataset.financeView === view && view !== SKIPPER_FINANCE_VIEWS.overview) {
+      button.setAttribute('aria-current', 'step');
+    } else {
+      button.removeAttribute('aria-current');
+    }
+  });
+  if (focus && view !== SKIPPER_FINANCE_VIEWS.overview) {
+    financeDashboard.querySelector(`[data-finance-panel="${view}"] h4`)?.focus();
+  }
 }
 
 function setupSkipperDashboard() {
@@ -291,6 +488,7 @@ function setupSkipperDashboard() {
     .join('');
 
   grid.before(overview, navigation);
+  setupSkipperFinanceDashboard();
   dashboard.addEventListener('click', (event) => {
     const button = event.target.closest('[data-skipper-view]');
     if (!button || !dashboard.contains(button)) return;
@@ -331,6 +529,7 @@ function setSkipperDashboardView(nextView) {
     const current = button.dataset.skipperView === view;
     button.toggleAttribute('aria-current', current);
   });
+  if (view === 'money') setSkipperFinanceDashboardView(SKIPPER_FINANCE_VIEWS.overview);
 }
 
 function setSkipperDashboardMetric(name, value, detail) {
