@@ -104,9 +104,9 @@
           <p class="field-hint">Questa fase è un elenco privato di lavoro: non compare nella flotta né nel PDF. La Crew List è l’elenco anagrafico finale da inviare al charter. Aggiungi un contatto solo con il suo consenso. Consulta <a href="privacy.html">Privacy e dati</a>.</p>
           <section class="crew-projection-panel" aria-labelledby="projectionTitle">
             <p class="eyebrow">1 · Elenco provvisorio dell’equipaggio</p>
-            <h4 id="projectionTitle">Aggiungi una persona e assegnale posto</h4>
+            <h4 id="projectionTitle">Nuovo partecipante</h4>
             <p class="panel-lead">Questa è una scheda organizzativa: scegli persona, ruolo e sistemazione. Il sito prende gli importi dalla Dashboard economica; se non è ancora compilata, usa il listino base della barca. Non parte nessun messaggio e non viene registrato alcun pagamento.</p>
-            <p class="field-hint projection-flow-hint"><strong>Come funziona:</strong> salva la persona, assegna la cabina quando vuoi, controlla il riepilogo nella sua card e manda l’invito WhatsApp da lì. Una persona, una scheda, tutto nello stesso punto.</p>
+            <p class="field-hint projection-flow-hint"><strong>Come funziona:</strong> dopo il salvataggio resti sulla stessa persona per controllare o correggere posto, cabina e importi. Per aggiungere un altro nominativo scegli esplicitamente “Nuovo partecipante”.</p>
             <p id="projectionLegacyLinkHint" class="field-hint" role="status" aria-live="polite" hidden></p>
             <form id="projectionForm" class="compact-form">
               <div class="form-grid">
@@ -140,7 +140,7 @@
                 </details>
               </fieldset>
               <label class="consent-field"><input name="contactConsent" type="checkbox" required /> Ho ricevuto il consenso della persona a essere contattata per questo viaggio. *</label>
-              <div class="form-actions"><button id="projectionSubmitButton" class="button button-primary" type="submit">Salva la scheda e riserva il posto</button><button id="cancelProjectionEdit" class="text-button" type="button" hidden>Annulla modifica</button><p id="projectionFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
+              <div class="form-actions"><button id="projectionSubmitButton" class="button button-primary" type="submit">Salva la scheda e riserva il posto</button><button id="newProjectionButton" class="button button-ghost" type="button" hidden>Nuovo partecipante</button><button id="cancelProjectionEdit" class="text-button" type="button" hidden>Annulla modifica</button><p id="projectionFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
             </form>
             <section id="projectionSummary" class="projection-summary" aria-live="polite"></section>
             <div id="projectionList" class="projection-list" aria-live="polite"></div>
@@ -287,6 +287,6 @@
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="area.js?v=20260914-installments-v5"></script>
+  <script type="module" src="area.js?v=20260914-roster-save-v1"></script>
 </body>
 </html>
