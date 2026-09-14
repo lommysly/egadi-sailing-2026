@@ -118,7 +118,7 @@ service cloud.firestore {
 
     function isValidNewInvite(boatId, inviteId) {
       return request.resource.data.keys().hasAll(['id', 'boatId', 'displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'createdAt', 'createdBy'])
-        && request.resource.data.keys().hasOnly(['id', 'boatId', 'displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasOnly(['id', 'boatId', 'displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'preferredLocale', 'createdAt', 'createdBy'])
         && request.resource.data.id == inviteId
         && request.resource.data.boatId == boatId
         && request.resource.data.displayName is string
@@ -133,6 +133,10 @@ service cloud.firestore {
         && request.resource.data.accessVersion == 1
         && request.resource.data.expiresAt is timestamp
         && request.resource.data.expiresAt > request.time
+        // Facoltativo soltanto per compatibilita con gli inviti creati prima
+        // del selettore lingua; i nuovi client inviano sempre it oppure en.
+        && (!request.resource.data.keys().hasAll(['preferredLocale'])
+          || request.resource.data.preferredLocale in ['it', 'en'])
         && request.resource.data.createdAt == request.time
         && request.resource.data.createdBy == request.auth.uid;
     }
@@ -172,9 +176,11 @@ service cloud.firestore {
             && request.resource.data.accessVersion == 1))
         && request.resource.data.expiresAt is timestamp
         && request.resource.data.expiresAt > request.time
+        && (!request.resource.data.keys().hasAll(['preferredLocale'])
+          || request.resource.data.preferredLocale in ['it', 'en'])
         && request.resource.data.reissuedAt == request.time
         && request.resource.data.reissuedBy == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'activatedAt', 'reissuedAt', 'reissuedBy']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'preferredLocale', 'activatedAt', 'reissuedAt', 'reissuedBy']);
     }
 
     function isCurrentCrewAccess(userId) {
@@ -228,11 +234,14 @@ service cloud.firestore {
     function isValidRuleAcceptance(boatId, inviteId) {
       return isInviteHolder(boatId, inviteId)
         && hasPublishedBriefing(boatId)
-        && request.resource.data.keys().hasOnly(['inviteId', 'acceptedBy', 'rulesVersion', 'fullRulesRead', 'acceptedAt'])
+        && request.resource.data.keys().hasOnly(['inviteId', 'acceptedBy', 'rulesVersion', 'fullRulesRead', 'acceptedLocale', 'acceptedAt'])
         && request.resource.data.inviteId == inviteId
         && request.resource.data.acceptedBy == request.auth.uid
         && request.resource.data.rulesVersion is int
         && (!request.resource.data.keys().hasAll(['fullRulesRead']) || request.resource.data.fullRulesRead == true)
+        && (!request.resource.data.keys().hasAll(['acceptedLocale'])
+          || request.resource.data.acceptedLocale == 'it'
+          || (request.resource.data.acceptedLocale == 'en' && hasOfficialEnglishBriefing(boatId)))
         && (!briefingRequiresFullRulesRead(boatId)
           || (request.resource.data.keys().hasAll(['fullRulesRead']) && request.resource.data.fullRulesRead == true))
         && request.resource.data.acceptedAt == request.time
@@ -248,13 +257,27 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion is int;
     }
 
+    // La versione inglese è un contenuto ufficiale parallelo, non una
+    // traduzione automatica. È richiesta solo per un'accettazione in inglese.
+    function hasOfficialEnglishBriefing(boatId) {
+      let board = get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data;
+      return board.keys().hasAll(['rulesTitleEn', 'rulesSummaryEn', 'rulesTextEn', 'scheduleNoteEn'])
+        && board.rulesTitleEn is string
+        && board.rulesTitleEn.size() > 0
+        && board.rulesSummaryEn is string
+        && board.rulesSummaryEn.size() > 0
+        && board.rulesTextEn is string
+        && board.rulesTextEn.size() > 0
+        && board.scheduleNoteEn is string;
+    }
+
     // Lo skipper resta proprietario del contenuto, ma non può modificare il
     // briefing già accettato senza produrre una nuova versione. I documenti
     // legacy sono ammessi soltanto in lettura: il primo salvataggio li porta
     // nel formato completo e rende obbligatoria la rilettura.
     function hasValidBoardBriefingPayload() {
       return request.resource.data.keys().hasAll(['rulesTitle', 'rulesSummary', 'rulesText', 'fullRulesRequired', 'rulesVersion', 'meetingPoint', 'boardingAt', 'departureAt', 'returnAt', 'scheduleNote', 'updatedAt', 'updatedBy'])
-        && request.resource.data.keys().hasOnly(['rulesTitle', 'rulesSummary', 'rulesText', 'fullRulesRequired', 'rulesVersion', 'meetingPoint', 'boardingAt', 'departureAt', 'returnAt', 'scheduleNote', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['rulesTitle', 'rulesSummary', 'rulesText', 'rulesTitleEn', 'rulesSummaryEn', 'rulesTextEn', 'fullRulesRequired', 'rulesVersion', 'meetingPoint', 'boardingAt', 'departureAt', 'returnAt', 'scheduleNote', 'scheduleNoteEn', 'updatedAt', 'updatedBy'])
         && request.resource.data.rulesTitle is string
         && request.resource.data.rulesTitle.size() > 0
         && request.resource.data.rulesTitle.size() <= 120
@@ -277,12 +300,28 @@ service cloud.firestore {
         && request.resource.data.returnAt.size() <= 40
         && request.resource.data.scheduleNote is string
         && request.resource.data.scheduleNote.size() <= 400
+        && (!request.resource.data.keys().hasAll(['rulesTitleEn', 'rulesSummaryEn', 'rulesTextEn', 'scheduleNoteEn'])
+          || (request.resource.data.rulesTitleEn is string
+            && request.resource.data.rulesTitleEn.size() <= 120
+            && request.resource.data.rulesSummaryEn is string
+            && request.resource.data.rulesSummaryEn.size() <= 1800
+            && request.resource.data.rulesTextEn is string
+            && request.resource.data.rulesTextEn.size() <= 9000
+            && request.resource.data.scheduleNoteEn is string
+            && request.resource.data.scheduleNoteEn.size() <= 400
+            && ((request.resource.data.rulesTitleEn.size() == 0
+                && request.resource.data.rulesSummaryEn.size() == 0
+                && request.resource.data.rulesTextEn.size() == 0
+                && request.resource.data.scheduleNoteEn.size() == 0)
+              || (request.resource.data.rulesTitleEn.size() > 0
+                && request.resource.data.rulesSummaryEn.size() > 0
+                && request.resource.data.rulesTextEn.size() > 0))))
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
     }
 
     function boardContentHasChanged() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['rulesTitle', 'rulesSummary', 'rulesText', 'fullRulesRequired', 'meetingPoint', 'boardingAt', 'departureAt', 'returnAt', 'scheduleNote']);
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['rulesTitle', 'rulesSummary', 'rulesText', 'rulesTitleEn', 'rulesSummaryEn', 'rulesTextEn', 'fullRulesRequired', 'meetingPoint', 'boardingAt', 'departureAt', 'returnAt', 'scheduleNote', 'scheduleNoteEn']);
     }
 
     function hasValidBoardVersionUpdate() {

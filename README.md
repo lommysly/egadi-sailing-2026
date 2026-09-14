@@ -5,6 +5,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 ## Stato reale
 
 - Il sito pubblico è raggiungibile su `https://egadi.thatsablast.it/`.
+- Il sito usa un solo sorgente bilingue IT / EN: il selettore conserva lingua, query e hash. L'inglese è copy editoriale scritto e revisionato nel progetto, non un widget Google Translate o una traduzione al volo.
 - L'area privata è attiva su HTTPS per autorizzazione esplicita del titolare: skipper con Google, equipaggio solo tramite invito WhatsApp personale e codice di sei cifre.
 - `PRIVATE_AREA_ENABLED` nel sorgente e `events/egadi-2026.privateAreaEnabled` in Firestore sono entrambi `true`. Per una chiusura di emergenza basta riportare uno dei due a `false`; per coerenza operativa vanno riportati entrambi a `false`.
 - Google ed Email/Password sono attivi; email-link e SMS non sono usati. Il dominio `egadi.thatsablast.it` è autorizzato in Firebase Authentication.
@@ -12,7 +13,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 ## Pagine e materiali
 
 - `index.html`: presentazione pubblica della flotta e del viaggio.
-- `passage-plan.html`: unica pagina pubblica per meteo e Passage Plan, alimentata da `passage-plan-data.js`.
+- `passage-plan.html`: unica pagina pubblica per meteo e Passage Plan, alimentata da `passage-plan-data.js` e dalla sua edizione inglese editoriale `passage-plan-data-en.js`.
 - `arrivi-partenze.html`: sezione pubblica che spiega le quattro tratte, la finestra di match ±2 ore e la visibilità controllata dei contatti; non raccoglie dati in pagina.
 - `film.html` e `VIDEO_STORYBOARD.md`: storyboard del film; nessun filmato di terzi viene incorporato senza licenza.
 - `area.html`: area skipper con Google Sign-In, una barca per skipper, Crew List, PDF, bacheca, inviti WhatsApp, profilo privato di incasso, piano quote a otto voci e richieste di contributo con messaggio WhatsApp diretto.
@@ -25,15 +26,21 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 
 ## Accesso dell'equipaggio: flusso concordato
 
-1. Lo skipper crea un invito con nome e numero WhatsApp internazionale.
-2. Il sito genera un link personale casuale, valido 14 giorni. Lo skipper lo invia direttamente su WhatsApp.
+1. Lo skipper crea un invito con nome, numero WhatsApp internazionale e lingua preferita della persona (italiano o inglese).
+2. Il sito genera un link personale casuale, valido 14 giorni. Lo skipper lo invia direttamente su WhatsApp: messaggio, Privacy e primo accesso usano la lingua selezionata.
 3. Al primo accesso la persona apre quel link, conferma il numero WhatsApp e sceglie il proprio codice personale di **esattamente 6 cifre**. Non è il PIN di sblocco del telefono.
-4. Prima della Crew List la persona legge una sintesi, scorre il regolamento completo della propria barca e conferma esplicitamente la versione pubblicata dallo skipper. La sintesi non sostituisce il testo integrale né il briefing pratico a bordo.
+4. Prima della Crew List la persona legge una sintesi, scorre il regolamento completo della propria barca e conferma esplicitamente la versione pubblicata dallo skipper. La sintesi non sostituisce il testo integrale né il briefing pratico a bordo. In inglese la conferma è possibile soltanto quando lo skipper ha pubblicato anche la versione inglese ufficiale completa.
 5. Il codice viene verificato da Firebase Authentication e non viene salvato nella Crew List, in Firestore o nel browser.
 6. Dopo aver completato la scheda, la persona torna quando vuole da `crew.html`: inserisce numero + codice e viene portata soltanto nella barca e nell'area dello skipper associati. Per il weekend un numero WhatsApp può avere una sola barca attiva.
 7. Se dimentica il codice o perde il link, lo skipper usa **Revoca e genera nuovo link**. L'invito conserva lo stesso identificativo, quindi anagrafica, richieste e associazione al PDF restano nella stessa posizione; il precedente accesso smette di funzionare.
 
 Il link WhatsApp è un codice di attivazione, non un accesso permanente. Se viene inoltrato e usato **prima** della persona destinataria, chi lo possiede può attivarlo: un link diretto non può dimostrare l'identità del destinatario senza OTP o verifica esterna. Per questo scade, non va inoltrato e lo skipper può revocarlo.
+
+### Lingua e contenuti ufficiali
+
+Le pagine pubbliche, la navigazione e il percorso equipaggio hanno una traduzione inglese editoriale, non Google Translate. La lingua scelta dallo skipper nell’invito (`preferredLocale`) è privata e serve solo a comporre il messaggio WhatsApp e il primo link nella lingua della persona. Il sito non traduce automaticamente nomi, anagrafica, contatti, richieste di contributo, causali, annunci dello skipper, istruzioni di pagamento o note operative libere: una traduzione automatica potrebbe alterarne il significato o divulgare dati non necessari. Le richieste WhatsApp usano invece un testo guida italiano o inglese; una causale scritta liberamente dallo skipper resta nella sua lingua originale.
+
+Il briefing safety segue una regola più rigorosa: italiano e inglese sono due versioni ufficiali parallele. Lo skipper completa e verifica titolo, sintesi e regolamento inglesi prima della pubblicazione; un contenuto inglese parziale viene rifiutato. Ogni modifica italiana o inglese aumenta `rulesVersion`, richiede una nuova accettazione e registra `acceptedLocale`. Il browser non usa Google Translate per questo testo.
 
 La pagina di attivazione imposta inoltre `Referrer-Policy: no-referrer`, così il codice presente nel link non viene passato come referrer a font, script o altre risorse esterne caricate dalla pagina.
 
@@ -75,7 +82,7 @@ boats/{skipperUid}
     role, email, phone, displayName, updatedAt
   invites/{inviteId}
     displayName, whatsappNumber, phoneFingerprint, loginEmail, accessKey
-    participantUid, status, accessVersion, expiresAt, createdAt
+    participantUid, status, accessVersion, expiresAt, preferredLocale, createdAt
   collectionProfile/default
     collectorId, collectorName, paypalEnabled, satispayEnabled
     revolutEnabled, bankTransferEnabled, paymentDetails (privati), updatedAt, updatedBy
@@ -93,12 +100,13 @@ boats/{skipperUid}
     verifiedAt, verifiedBy, cancelledAt, cancelledBy
   briefing/board
     rulesTitle, rulesSummary, rulesText, fullRulesRequired, rulesVersion
-    meetingPoint, boardingAt, departureAt, returnAt, scheduleNote
+    rulesTitleEn, rulesSummaryEn, rulesTextEn (tutti completi oppure tutti vuoti)
+    meetingPoint, boardingAt, departureAt, returnAt, scheduleNote, scheduleNoteEn
   announcements/{announcementId}
   ruleAcceptances/{inviteId}
-    inviteId, acceptedBy, rulesVersion, fullRulesRead, acceptedAt
+    inviteId, acceptedBy, rulesVersion, fullRulesRead, acceptedLocale, acceptedAt
     history/{rulesVersion}-{participantUid}
-      inviteId, acceptedBy, rulesVersion, fullRulesRead, acceptedAt
+      inviteId, acceptedBy, rulesVersion, fullRulesRead, acceptedLocale, acceptedAt
 
 crewAccess/{participantUid}
   boatId, inviteId, userId, loginEmail, updatedAt
@@ -125,7 +133,7 @@ Ogni skipper gestisce una sola barca: per le nuove registrazioni l'ID della barc
 
 ## Bacheca e contributi
 
-Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Il regolamento è composto da una sintesi iniziale e dal testo completo: la sintesi orienta ma non sostituisce mai il testo integrale. Ogni persona vede soltanto la bacheca della propria barca. Per i briefing pubblicati con `fullRulesRequired: true`, l'interfaccia sblocca la conferma solo dopo lo scorrimento del testo completo e Firestore richiede la dichiarazione `fullRulesRead: true` prima della Crew List o dell'aggiornamento della propria scheda. Quando cambia il regolamento, aumenta la versione e la persona deve confermare di nuovo la lettura della nuova versione.
+Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Il regolamento è composto da una sintesi iniziale e dal testo completo: la sintesi orienta ma non sostituisce mai il testo integrale. Ogni persona vede soltanto la bacheca della propria barca. Per i briefing pubblicati con `fullRulesRequired: true`, l'interfaccia sblocca la conferma solo dopo lo scorrimento del testo completo e Firestore richiede la dichiarazione `fullRulesRead: true` prima della Crew List o dell'aggiornamento della propria scheda. Quando cambia il regolamento, in italiano o nell'eventuale edizione inglese ufficiale, aumenta la versione e la persona deve confermare di nuovo la lettura della nuova versione.
 
 Lo scorrimento e la conferma registrano una dichiarazione di lettura della versione, non possono dimostrare materialmente che ogni parola sia stata compresa. Indicazioni operative reali della singola barca, del charter, delle dotazioni e di eventuali cauzioni devono essere verificate dallo skipper e pubblicate solo quando confermate.
 

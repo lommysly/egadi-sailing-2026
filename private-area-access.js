@@ -5,6 +5,11 @@
  */
 export const PRIVATE_AREA_ENABLED = true;
 
+function translate(key, fallback) {
+  const translated = window.EgadiI18n?.t?.(key);
+  return translated && translated !== key ? translated : fallback;
+}
+
 function hasSecureTransport() {
   const hostname = window.location.hostname;
   const isLocalPreview = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
@@ -17,7 +22,7 @@ export function canUsePrivateArea() {
 
 export function privateAreaBlockMessage() {
   if (!hasSecureTransport()) {
-    return 'L’area privata è temporaneamente chiusa: per proteggere i dati personali serve prima un collegamento HTTPS valido. Non inserire dati qui.';
+    return translate('crew.errors.httpsRequired', 'L’area privata è temporaneamente chiusa: per proteggere i dati personali serve prima un collegamento HTTPS valido. Non inserire dati qui.');
   }
-  return 'L’area privata è in preparazione: l’informativa privacy definitiva deve essere completata prima di raccogliere dati personali.';
+  return translate('crew.errors.privateAreaUnavailable', 'L’area privata è in preparazione: l’informativa privacy definitiva deve essere completata prima di raccogliere dati personali.');
 }

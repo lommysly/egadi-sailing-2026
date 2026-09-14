@@ -4,14 +4,68 @@ import { firebaseConfig } from './firebase-config.js';
 
 const EVENT_ID = 'egadi-2026';
 const MAX_PUBLIC_TEXT_LENGTH = 100;
-const BERTH_PREFERENCE_LABELS = {
-  not_specified: 'Nessuna indicazione',
-  cabin_female: 'Posto in cabina femminile',
-  cabin_male: 'Posto in cabina maschile',
-  cabin_mixed: 'Posto in cabina mista',
-  dinette: 'Posto in dinette',
-  other: 'Altra sistemazione',
+const locale = window.EgadiI18n?.getLocale?.() === 'en' ? 'en' : 'it';
+const COPY = {
+  it: {
+    berthPreferences: {
+      not_specified: 'Nessuna indicazione',
+      cabin_female: 'Posto in cabina femminile',
+      cabin_male: 'Posto in cabina maschile',
+      cabin_mixed: 'Posto in cabina mista',
+      dinette: 'Posto in dinette',
+      other: 'Altra sistemazione',
+    },
+    boats: 'Barche',
+    participantBerths: 'Posti partecipanti',
+    declaredAvailableBerths: 'Posti liberi dichiarati',
+    publishedAvailability: 'Disponibilità pubblicate',
+    boat: 'barca',
+    boatsPublished: 'barche pubblicate',
+    berth: 'posto',
+    berths: 'posti',
+    availableBerths: 'Posti liberi dichiarati',
+    noAvailableBerths: 'Nessun posto libero dichiarato',
+    berthPreference: 'Preferenza posto',
+    updated: 'Aggiornata',
+    boatInFlotilla: 'Barca della flottiglia',
+    skipper: 'Skipper',
+    updating: 'In aggiornamento',
+    forming: 'La flottiglia si sta formando. Le barche compariranno qui appena gli skipper registreranno la propria barca.',
+    nonePublished: 'Nessuna barca pubblicata per ora.',
+    unavailable: 'La flottiglia non è disponibile in questo momento. Riprova più tardi.',
+    updateUnavailable: 'Impossibile aggiornare la flottiglia al momento.',
+  },
+  en: {
+    berthPreferences: {
+      not_specified: 'No preference stated',
+      cabin_female: 'Berth in a women’s cabin',
+      cabin_male: 'Berth in a men’s cabin',
+      cabin_mixed: 'Berth in a mixed cabin',
+      dinette: 'Dinette berth',
+      other: 'Other accommodation',
+    },
+    boats: 'Boats',
+    participantBerths: 'Participant berths',
+    declaredAvailableBerths: 'Available berths declared',
+    publishedAvailability: 'Availability published',
+    boat: 'boat',
+    boatsPublished: 'boats published',
+    berth: 'berth',
+    berths: 'berths',
+    availableBerths: 'Available berths declared',
+    noAvailableBerths: 'No available berths declared',
+    berthPreference: 'Berth preference',
+    updated: 'Updated',
+    boatInFlotilla: 'Flotilla boat',
+    skipper: 'Skipper',
+    updating: 'Being updated',
+    forming: 'The flotilla is taking shape. Boats will appear here as soon as their skippers register them.',
+    nonePublished: 'No boats have been published yet.',
+    unavailable: 'The flotilla is unavailable at the moment. Please try again later.',
+    updateUnavailable: 'The flotilla cannot be refreshed at the moment.',
+  },
 };
+const copy = COPY[locale];
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -47,7 +101,7 @@ function publicRecord(data) {
     capacity: nonNegativeInteger(data?.capacity),
     showAvailability,
     availableSeats,
-    berthPreference: BERTH_PREFERENCE_LABELS[berthPreference] || '',
+    berthPreference: copy.berthPreferences[berthPreference] || '',
     updatedAt: data?.updatedAt,
   };
 }
@@ -60,7 +114,7 @@ function updatedAtTime(value) {
 function formatUpdatedAt(value) {
   const date = value?.toDate ? value.toDate() : null;
   if (!date || Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium' }).format(date);
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'it-IT', { dateStyle: 'medium' }).format(date);
 }
 
 function setStatus(message, isError = false) {
@@ -78,10 +132,10 @@ function renderSummary(fleet) {
   const declaredAvailability = boatsWithAvailability.reduce((total, boat) => total + boat.availableSeats, 0);
 
   fleetSummary.innerHTML = [
-    `<div><span>Barche</span><strong>${escapeHtml(String(fleet.length))}</strong></div>`,
-    `<div><span>Posti partecipanti</span><strong>${declaredCapacity ? escapeHtml(String(declaredCapacity)) : '—'}</strong></div>`,
-    `<div><span>Posti liberi dichiarati</span><strong>${boatsWithAvailability.length ? escapeHtml(String(declaredAvailability)) : '—'}</strong></div>`,
-    `<div><span>Disponibilità pubblicate</span><strong>${escapeHtml(plural(boatsWithAvailability.length, 'barca', 'barche'))}</strong></div>`,
+    `<div><span>${escapeHtml(copy.boats)}</span><strong>${escapeHtml(String(fleet.length))}</strong></div>`,
+    `<div><span>${escapeHtml(copy.participantBerths)}</span><strong>${declaredCapacity ? escapeHtml(String(declaredCapacity)) : '—'}</strong></div>`,
+    `<div><span>${escapeHtml(copy.declaredAvailableBerths)}</span><strong>${boatsWithAvailability.length ? escapeHtml(String(declaredAvailability)) : '—'}</strong></div>`,
+    `<div><span>${escapeHtml(copy.publishedAvailability)}</span><strong>${escapeHtml(plural(boatsWithAvailability.length, copy.boat, locale === 'en' ? 'boats' : 'barche'))}</strong></div>`,
   ].join('');
   fleetSummary.hidden = false;
 }
@@ -94,23 +148,23 @@ function detailsRow(label, value) {
 function renderCard(boat) {
   const boatDetails = [boat.boatType, boat.model].filter(Boolean).join(' · ');
   const availabilityDetails = boat.showAvailability && boat.availableSeats !== null
-    ? detailsRow('Posti liberi dichiarati', boat.availableSeats === 0 ? 'Nessun posto libero dichiarato' : plural(boat.availableSeats, 'posto', 'posti'))
+    ? detailsRow(copy.availableBerths, boat.availableSeats === 0 ? copy.noAvailableBerths : plural(boat.availableSeats, copy.berth, copy.berths))
     : '';
   const preferenceDetails = boat.showAvailability && boat.berthPreference
-    ? detailsRow('Preferenza posto', boat.berthPreference)
+    ? detailsRow(copy.berthPreference, boat.berthPreference)
     : '';
   const updatedAt = formatUpdatedAt(boat.updatedAt);
 
   return `<article class="dashboard-panel">
-    <p class="eyebrow">${escapeHtml(boat.boatType || 'Barca della flotta')}</p>
+    <p class="eyebrow">${escapeHtml(boat.boatType || copy.boatInFlotilla)}</p>
     <h3>${escapeHtml(boat.name)}</h3>
     ${boatDetails ? `<p class="panel-lead">${escapeHtml(boatDetails)}</p>` : ''}
     <dl class="profile-summary">
-      ${detailsRow('Skipper', boat.skipperName || 'In aggiornamento')}
-      ${boat.capacity !== null ? detailsRow('Posti partecipanti', plural(boat.capacity, 'posto', 'posti')) : ''}
+      ${detailsRow(copy.skipper, boat.skipperName || copy.updating)}
+      ${boat.capacity !== null ? detailsRow(copy.participantBerths, plural(boat.capacity, copy.berth, copy.berths)) : ''}
       ${availabilityDetails}
       ${preferenceDetails}
-      ${updatedAt ? detailsRow('Aggiornata', updatedAt) : ''}
+      ${updatedAt ? detailsRow(copy.updated, updatedAt) : ''}
     </dl>
   </article>`;
 }
@@ -118,14 +172,16 @@ function renderCard(boat) {
 function renderFleet(fleet) {
   if (!fleet.length) {
     fleetSummary.hidden = true;
-    fleetList.innerHTML = '<p class="empty-state">La flotta si sta formando. Le barche compariranno qui appena gli skipper registreranno la propria barca.</p>';
-    setStatus('Nessuna barca pubblicata per ora.');
+    fleetList.innerHTML = `<p class="empty-state">${escapeHtml(copy.forming)}</p>`;
+    setStatus(copy.nonePublished);
     return;
   }
 
   renderSummary(fleet);
   fleetList.innerHTML = fleet.map(renderCard).join('');
-  setStatus(`${plural(fleet.length, 'barca pubblicata', 'barche pubblicate')} nella flotta.`);
+  setStatus(locale === 'en'
+    ? `${plural(fleet.length, 'boat published', copy.boatsPublished)} in the flotilla.`
+    : `${plural(fleet.length, 'barca pubblicata', copy.boatsPublished)} nella flottiglia.`);
 }
 
 async function loadFleet() {
@@ -134,12 +190,12 @@ async function loadFleet() {
     const fleet = snapshot.docs
       .map((item) => publicRecord(item.data()))
       .filter(Boolean)
-      .sort((first, second) => updatedAtTime(second.updatedAt) - updatedAtTime(first.updatedAt) || first.name.localeCompare(second.name, 'it'));
+      .sort((first, second) => updatedAtTime(second.updatedAt) - updatedAtTime(first.updatedAt) || first.name.localeCompare(second.name, locale));
     renderFleet(fleet);
   } catch {
     fleetSummary.hidden = true;
-    fleetList.innerHTML = '<p class="empty-state">La flotta non è disponibile in questo momento. Riprova più tardi.</p>';
-    setStatus('Impossibile aggiornare la flotta al momento.', true);
+    fleetList.innerHTML = `<p class="empty-state">${escapeHtml(copy.unavailable)}</p>`;
+    setStatus(copy.updateUnavailable, true);
   }
 }
 

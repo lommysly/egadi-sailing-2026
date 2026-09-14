@@ -1,7 +1,11 @@
-import { crewAccessErrorMessage, personalAreaUrl, signInCrew, startCrewAreaSession } from './crew-session.js?v=20260911-live';
+import { crewAccessErrorMessage, personalAreaUrl, signInCrew, startCrewAreaSession } from './crew-session.js?v=20260914-en2';
 
 const form = document.querySelector('#crewLoginForm');
 const message = document.querySelector('#crewLoginMessage');
+const translate = (key, fallback) => {
+  const translated = window.EgadiI18n?.t?.(key);
+  return translated && translated !== key ? translated : fallback;
+};
 
 function setMessage(text, isError = false) {
   message.textContent = text;
@@ -28,7 +32,7 @@ form.addEventListener('submit', async (event) => {
   const fields = new FormData(form);
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
-  setMessage('Verifico il tuo accesso personale…');
+  setMessage(translate('crew.login.checking', 'Verifico il tuo accesso personale…'));
   try {
     await signInCrew({ phone: fields.get('phone').trim(), pin: fields.get('pin').trim() });
     window.location.replace(personalAreaUrl());

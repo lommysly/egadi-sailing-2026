@@ -4,8 +4,8 @@ import { addDoc, collection, doc, getDoc, getFirestore, onSnapshot, orderBy, que
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260913-berth-pricing1';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
-import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260911-live';
-import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260911-role1';
+import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260914-en2';
+import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260914-en2';
 
 const eventId = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
@@ -99,6 +99,52 @@ const DEFAULT_FULL_RULES = [
   '10. Cambusa, costi e condizioni specifiche',
   'Cambusa, extra, eventuali quote, cauzioni e condizioni del charter non sono stabiliti da questo regolamento generale: vengono comunicati separatamente dallo skipper della singola barca prima di qualsiasi richiesta. La conferma online attesta la lettura integrale di questo testo; non sostituisce il briefing pratico obbligatorio a bordo.',
 ].join('\n');
+const DEFAULT_RULES_SUMMARY_EN = [
+  '1. I always follow the skipper’s decisions on safety, manoeuvres, weather, route, anchorage and harbour.',
+  '2. I take part in the practical briefing and use safety equipment whenever requested.',
+  '3. While under way, I move carefully: one hand for myself and one for the boat.',
+  '4. In an emergency, I alert the skipper immediately and follow instructions without improvising.',
+  '5. I do not use gas, the tender, VHF, windlass, engine or other equipment without permission.',
+  '6. I use water, power, heads, galley and waste facilities with care; I respect cabins, shared spaces, quiet hours and timings.',
+  '7. No drugs; alcohol responsibly; smoking only in areas specified by the skipper.',
+  '8. I let the crew know if I leave the boat, keep my belongings secure and contribute to life on board.',
+].join('\n');
+const DEFAULT_FULL_RULES_EN = [
+  'BOARD RULES · EGADI SAILING EXPERIENCE 2026',
+  '',
+  'Introduction',
+  'These rules apply to life on board the boat named in the invitation. Weather, route, anchorage, harbour and programme may change: safety always takes priority over the programme. The skipper confirms the specific arrangements for the boat, charter and harbour.',
+  '',
+  '1. Skipper and navigation decisions',
+  'The skipper is responsible for decisions about safety, manoeuvres, navigation, anchorage and harbour. If you are unsure, ask before acting. Do not take any initiative that could put people, the boat or the environment at risk.',
+  '',
+  '2. Safety and moving around on board',
+  'While under way, keep one hand for yourself and one for the boat. Walk slowly, do not run barefoot, and wear suitable footwear when asked. Watch out for the boom, loaded lines, winches, cleats, hatches, ladders, wet decks and moving objects. Luggage and personal belongings must be kept tidy and secured.',
+  '',
+  '3. Practical briefing and emergencies',
+  'Take part in the practical briefing on board covering lifejackets, lifelines, liferaft, extinguishers, VHF, gas, man overboard procedures and the boat’s actual equipment. Wear a lifejacket when asked. If someone goes overboard, raise the alarm immediately, keep pointing to the person without losing sight of them, and follow the skipper’s instructions.',
+  '',
+  '4. Equipment, resources and heads',
+  'Do not use gas, the tender, VHF, windlass, engine or other equipment without permission and instruction. Do not leave chargers unattended or charging overnight unless the skipper says otherwise. Water and electricity are limited resources: use showers, taps and devices carefully. Only biological waste goes into the heads—never paper, wipes, sanitary products or other objects.',
+  '',
+  '5. Health and responsible behaviour',
+  'Do nothing that could endanger yourself or others. Drugs are not allowed. Alcohol must be consumed responsibly, especially before or during manoeuvres, tender trips and sailing. Tell the skipper privately about allergies, intolerances, dietary needs or anything relevant to safety. Bring any personal medication according to your doctor’s or pharmacist’s advice.',
+  '',
+  '6. Respect and shared life',
+  'Respect cabins and personal space: do not enter without permission. Keep shared spaces clean and tidy, respect quiet time and other people’s rest, and use headphones or a considerate volume. Provisions, cooking, tidying and cleaning are shared fairly: the person cooking should not be left to handle everything else alone.',
+  '',
+  '7. Smoking, waste and the marine environment',
+  'Smoke only in the areas specified by the skipper and charter company, never below deck. Use an ashtray and never throw cigarette ends or waste into the sea. Respect neighbouring boats at anchor, the harbour and marine protected areas.',
+  '',
+  '8. Tender, trips ashore and timings',
+  'Use the tender only with permission and after receiving instructions. Always tell someone if you leave the boat, especially in the evening or at night. Respect the announced times for boarding, departures, returns and meet-ups. Any watch system or night sailing only applies if the skipper expressly announces it.',
+  '',
+  '9. Personal preparation',
+  'Bring a valid document, a soft bag rather than a rigid suitcase, layers for wind and evenings, sunscreen, a hat, light-soled non-marking shoes and a small dry bag for trips ashore. Instructions for the specific boat take priority over this general list.',
+  '',
+  '10. Provisions, costs and boat-specific arrangements',
+  'Provisions, extras, any contributions, deposits and charter conditions are not set by these general rules. They are communicated separately by the skipper of each boat before any request is made. Online acceptance confirms that you have read this text in full; it does not replace the compulsory practical briefing on board.',
+].join('\n');
 let activeBoat = null;
 let activeMembers = [];
 let activePayments = [];
@@ -132,7 +178,7 @@ function setupBriefingEditor() {
   const form = document.querySelector('#briefingForm');
   const fullRules = form?.elements.rulesText;
   const fullRulesLabel = fullRules?.closest('label');
-  if (!form || !fullRules || !fullRulesLabel || form.elements.rulesSummary) return;
+  if (!form || !fullRules || !fullRulesLabel || form.elements.rulesSummary || form.elements.rulesTextEn) return;
 
   const labelText = Array.from(fullRulesLabel.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
   if (labelText) labelText.textContent = 'Regolamento completo obbligatorio';
@@ -155,6 +201,56 @@ function setupBriefingEditor() {
   hint.textContent = 'Questa sintesi orienta l’equipaggio, ma non sostituisce il regolamento completo sottostante.';
   summaryLabel.append('Sintesi da conoscere prima dell’accettazione', summary, hint);
   fullRulesLabel.before(summaryLabel);
+
+  const englishDetails = document.createElement('details');
+  englishDetails.className = 'briefing-translation-editor';
+  const englishSummary = document.createElement('summary');
+  englishSummary.textContent = 'Versione inglese ufficiale · necessaria per l’equipaggio non italofono';
+  const englishLead = document.createElement('p');
+  englishLead.className = 'panel-lead';
+  englishLead.textContent = 'Questa è la versione che verrà letta e accettata in inglese. Verifica ogni modifica prima di pubblicarla: non viene generata o tradotta automaticamente dal sito.';
+  const englishFields = document.createElement('div');
+  englishFields.className = 'compact-form';
+
+  const englishTitleLabel = document.createElement('label');
+  const englishTitle = document.createElement('input');
+  englishTitle.name = 'rulesTitleEn';
+  englishTitle.maxLength = 120;
+  englishTitle.value = 'Safety Briefing & Board Rules · Egadi 2026';
+  englishTitle.defaultValue = englishTitle.value;
+  englishTitleLabel.append('Official English briefing title', englishTitle);
+
+  const englishSummaryLabel = document.createElement('label');
+  const englishSummaryText = document.createElement('textarea');
+  englishSummaryText.name = 'rulesSummaryEn';
+  englishSummaryText.maxLength = 1800;
+  englishSummaryText.rows = 9;
+  englishSummaryText.value = DEFAULT_RULES_SUMMARY_EN;
+  englishSummaryText.defaultValue = DEFAULT_RULES_SUMMARY_EN;
+  englishSummaryLabel.append('English summary before acceptance', englishSummaryText);
+
+  const englishRulesLabel = document.createElement('label');
+  const englishRulesText = document.createElement('textarea');
+  englishRulesText.name = 'rulesTextEn';
+  englishRulesText.maxLength = 9000;
+  englishRulesText.rows = 22;
+  englishRulesText.value = DEFAULT_FULL_RULES_EN;
+  englishRulesText.defaultValue = DEFAULT_FULL_RULES_EN;
+  const englishHint = document.createElement('small');
+  englishHint.className = 'field-hint';
+  englishHint.textContent = 'Use clear, approved English for the actual boat, charter and skipper arrangements. Do not leave an English crew member with an automatic or incomplete translation.';
+  englishRulesLabel.append('Full official English rules', englishRulesText, englishHint);
+
+  const englishScheduleNoteLabel = document.createElement('label');
+  const englishScheduleNote = document.createElement('input');
+  englishScheduleNote.name = 'scheduleNoteEn';
+  englishScheduleNote.maxLength = 400;
+  englishScheduleNote.placeholder = 'E.g. provisions already on board; route adapted to the weather';
+  englishScheduleNoteLabel.append('Operational note in English · optional', englishScheduleNote);
+
+  englishFields.append(englishTitleLabel, englishSummaryLabel, englishRulesLabel, englishScheduleNoteLabel);
+  englishDetails.append(englishSummary, englishLead, englishFields);
+  fullRulesLabel.after(englishDetails);
 }
 
 function getAuthErrorMessage(error) {
@@ -659,8 +755,8 @@ function recipientName(recipientId) {
   return activeInvites.find((candidate) => candidate.id === recipientId)?.displayName || 'Persona della crew';
 }
 
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(amount || 0);
+function formatCurrency(amount, locale = 'it') {
+  return new Intl.NumberFormat(locale === 'en' ? 'en-GB' : 'it-IT', { style: 'currency', currency: 'EUR' }).format(amount || 0);
 }
 
 function defaultPaymentProfile() {
@@ -900,8 +996,8 @@ function renderCostPlan(plan) {
   renderPaymentBerthOptions();
 }
 
-function formatDate(value) {
-  return new Intl.DateTimeFormat('it-IT').format(new Date(`${value}T00:00:00`));
+function formatDate(value, locale = 'it') {
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'it-IT').format(new Date(`${value}T00:00:00`));
 }
 
 function formatDateTime(value) {
@@ -921,12 +1017,23 @@ function toDateTimeLocal(value) {
 
 const INVITE_VALIDITY_DAYS = 14;
 
+function inviteLocale(invite) {
+  return invite?.preferredLocale === 'en' ? 'en' : 'it';
+}
+
+function participantPrivacyUrl(invite) {
+  const url = new URL('privacy.html', window.location.href);
+  url.searchParams.set('lang', inviteLocale(invite));
+  return url.toString();
+}
+
 function participantUrl(invite) {
   if (!invite?.accessKey) return '';
   const url = new URL('participant.html', window.location.href);
   url.searchParams.set('invite', invite.id);
   url.searchParams.set('boat', activeBoat.id);
   url.searchParams.set('key', invite.accessKey);
+  url.searchParams.set('lang', inviteLocale(invite));
   return url.toString();
 }
 
@@ -939,24 +1046,33 @@ function whatsappUrl(invite) {
   const number = normalizeWhatsAppNumber(invite.whatsappNumber);
   const personalUrl = participantUrl(invite);
   if (!number || !personalUrl) return '';
-  const message = `Ciao ${invite.displayName}, ecco il tuo invito personale di prova per l’area Egadi. Apri il link, conferma il numero WhatsApp e scegli un codice personale di 6 cifre: ${personalUrl}\n\nPrima di attivarlo puoi leggere Privacy e dati: ${new URL('privacy.html', window.location.href).toString()}\n\nL’area è in test: fino alla pubblicazione dell’informativa finale inserisci esclusivamente dati fittizi.`;
+  const privacyUrl = participantPrivacyUrl(invite);
+  const message = inviteLocale(invite) === 'en'
+    ? `Hi ${invite.displayName}, here is your personal test invitation to the Egadi private area. Open the link, confirm your WhatsApp number and choose a six-digit personal code: ${personalUrl}\n\nBefore activating access, please read Privacy & data: ${privacyUrl}\n\nThe private area is still being tested. Until the final privacy notice is published, please use fictitious data only.`
+    : `Ciao ${invite.displayName}, ecco il tuo invito personale di prova per l’area Egadi. Apri il link, conferma il numero WhatsApp e scegli un codice personale di 6 cifre: ${personalUrl}\n\nPrima di attivarlo puoi leggere Privacy e dati: ${privacyUrl}\n\nL’area è in test: fino alla pubblicazione dell’informativa finale inserisci esclusivamente dati fittizi.`;
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
 
+function inviteForRecipient(recipientId) {
+  return activeInvites.find((candidate) => candidate.id === recipientId) || null;
+}
+
 function paymentRecipientWhatsappNumber(recipientId) {
-  const invite = activeInvites.find((candidate) => candidate.id === recipientId);
+  const invite = inviteForRecipient(recipientId);
   if (invite?.whatsappNumber) return normalizeWhatsAppNumber(invite.whatsappNumber);
   const member = activeMembers.find((candidate) => candidate.id === recipientId);
   return normalizeWhatsAppNumber(member?.phone || '');
 }
 
-function selectedPaymentProfileDetails(payment, profile = activePaymentProfile) {
+function selectedPaymentProfileDetails(payment, profile = activePaymentProfile, locale = 'it') {
   const details = normalizePaymentDetails(profile?.paymentDetails);
   return paymentMethodsFor(payment)
     .map((method) => {
       if (!isValidPaymentDetail(method, details)) return '';
       if (method.id === 'bankTransfer') {
-        return `${method.label}:\nIntestatario: ${details.bankTransfer.accountHolder}\nIBAN: ${details.bankTransfer.iban}`;
+        const bankTransferLabel = locale === 'en' ? 'Bank transfer' : method.label;
+        const accountHolderLabel = locale === 'en' ? 'Account holder' : 'Intestatario';
+        return `${bankTransferLabel}:\n${accountHolderLabel}: ${details.bankTransfer.accountHolder}\nIBAN: ${details.bankTransfer.iban}`;
       }
       return `${method.label}: ${details[method.id]}`;
     })
@@ -965,21 +1081,26 @@ function selectedPaymentProfileDetails(payment, profile = activePaymentProfile) 
 
 function paymentWhatsappMessage(payment, { messageDetails = '', profile = activePaymentProfile } = {}) {
   const recipientId = payment.recipientId || payment.memberId || payment.payerInviteId;
-  const amount = formatCurrency(paymentAmount(payment));
-  const reason = payment.reason || 'il contributo del weekend';
-  const dueDate = payment.dueDate ? `\nSe possibile entro il ${formatDate(payment.dueDate)}.` : '';
-  const methods = paymentMethodsFor(payment).map((method) => method.label);
+  const locale = inviteLocale(inviteForRecipient(recipientId));
+  const amount = formatCurrency(paymentAmount(payment), locale);
+  const reason = payment.reason || (locale === 'en' ? 'your weekend contribution' : 'il contributo del weekend');
+  const dueDate = payment.dueDate
+    ? (locale === 'en' ? `\nIf possible, please complete it by ${formatDate(payment.dueDate, locale)}.` : `\nSe possibile entro il ${formatDate(payment.dueDate, locale)}.`)
+    : '';
+  const methods = paymentMethodsFor(payment).map((method) => locale === 'en' && method.id === 'bankTransfer' ? 'Bank transfer' : method.label);
   const methodText = methods.length
-    ? `\n\nPuoi scegliere il metodo che preferisci: ${methods.join(', ')}.`
-    : '\n\nScrivimi qui e scegliamo insieme il metodo più comodo.';
+    ? (locale === 'en' ? `\n\nYou can choose whichever method suits you: ${methods.join(', ')}.` : `\n\nPuoi scegliere il metodo che preferisci: ${methods.join(', ')}.`)
+    : (locale === 'en' ? '\n\nMessage me here and we can choose the most convenient method together.' : '\n\nScrivimi qui e scegliamo insieme il metodo più comodo.');
   const details = [
-    ...selectedPaymentProfileDetails(payment, profile),
+    ...selectedPaymentProfileDetails(payment, profile, locale),
     String(messageDetails || '').trim(),
   ].filter(Boolean);
   const detailsText = details.length
-    ? `\n\nDettagli per il pagamento:\n${details.join('\n\n')}`
-    : '\n\nPer i dettagli del metodo scelto, rispondimi qui su WhatsApp.';
-  return `Ciao ${recipientName(recipientId)} 🌊\n\nPer ${reason}, il contributo è di ${amount}.${dueDate}${methodText}${detailsText}\n\nIl sito non riceve denaro: dopo il contributo avvisami qui, così controllo l’accredito reale. Grazie! ⛵`;
+    ? (locale === 'en' ? `\n\nPayment details:\n${details.join('\n\n')}` : `\n\nDettagli per il pagamento:\n${details.join('\n\n')}`)
+    : (locale === 'en' ? '\n\nFor details of the method you choose, reply to me here on WhatsApp.' : '\n\nPer i dettagli del metodo scelto, rispondimi qui su WhatsApp.');
+  return locale === 'en'
+    ? `Hi ${recipientName(recipientId)} 🌊\n\nFor ${reason}, the contribution is ${amount}.${dueDate}${methodText}${detailsText}\n\nThe website does not receive payments. Once you have paid, please message me here so I can check the actual transfer. Thank you! ⛵`
+    : `Ciao ${recipientName(recipientId)} 🌊\n\nPer ${reason}, il contributo è di ${amount}.${dueDate}${methodText}${detailsText}\n\nIl sito non riceve denaro: dopo il contributo avvisami qui, così controllo l’accredito reale. Grazie! ⛵`;
 }
 
 function paymentWhatsappUrl(payment, options = {}) {
@@ -999,7 +1120,7 @@ function inviteExpiresAt() {
   return Timestamp.fromDate(new Date(Date.now() + INVITE_VALIDITY_DAYS * 24 * 60 * 60 * 1000));
 }
 
-async function createInviteRecord({ displayName, whatsappNumber, existingInvite = null }) {
+async function createInviteRecord({ displayName, whatsappNumber, preferredLocale = 'it', existingInvite = null }) {
   const accessKey = createInviteId();
   const identity = await createCrewInviteIdentity({ phone: whatsappNumber, accessKey });
   if (!existingInvite) {
@@ -1022,6 +1143,7 @@ async function createInviteRecord({ displayName, whatsappNumber, existingInvite 
     status: 'pending',
     accessVersion: Number(existingInvite?.accessVersion || 0) + 1,
     expiresAt: inviteExpiresAt(),
+    preferredLocale: preferredLocale === 'en' ? 'en' : 'it',
   };
 }
 
@@ -1029,6 +1151,7 @@ async function reissueInvite(invite) {
   const renewedInvite = await createInviteRecord({
     displayName: invite.displayName,
     whatsappNumber: invite.whatsappNumber,
+    preferredLocale: inviteLocale(invite),
     existingInvite: invite,
   });
   await updateDoc(doc(db, 'boats', activeBoat.id, 'invites', invite.id), {
@@ -1327,10 +1450,11 @@ function renderInvites() {
     const status = invite.status === 'active'
       ? (profileCompleted ? 'Accesso attivo · anagrafica completata' : 'Accesso attivo · dati da completare')
       : (expired ? 'Invito scaduto' : 'Pronto da inviare · valido 14 giorni');
+    const invitationLanguage = inviteLocale(invite) === 'en' ? 'English' : 'Italiano';
     const sendActions = invite.status === 'pending' && !expired && invite.accessKey
       ? `<button class="text-button" type="button" data-copy-invite="${escapeHtml(invite.id)}">Copia link</button><button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(invite.id)}">Apri WhatsApp</button>`
       : '';
-    return `<article class="invite-row"><div><strong>${escapeHtml(invite.displayName)}</strong><span>${escapeHtml(status)} · ${escapeHtml(invite.whatsappNumber)}</span></div><div class="payment-action">${sendActions}<button class="text-button" type="button" data-reissue-invite="${escapeHtml(invite.id)}">Revoca e genera nuovo link</button></div></article>`;
+    return `<article class="invite-row"><div><strong>${escapeHtml(invite.displayName)}</strong><span>${escapeHtml(status)} · ${escapeHtml(invite.whatsappNumber)} · ${invitationLanguage}</span></div><div class="payment-action">${sendActions}<button class="text-button" type="button" data-reissue-invite="${escapeHtml(invite.id)}">Revoca e genera nuovo link</button></div></article>`;
   }).join('');
   renderPaymentRecipientOptions();
   renderCapacityStatus();
@@ -1386,6 +1510,13 @@ function renderBriefingForm() {
   form.dataset.loadedVersion = String(activeBriefing.rulesVersion || 1);
 }
 
+function hasOfficialEnglishBriefing() {
+  return Boolean(typeof activeBriefing?.rulesTitleEn === 'string' && activeBriefing.rulesTitleEn.trim()
+    && typeof activeBriefing?.rulesSummaryEn === 'string' && activeBriefing.rulesSummaryEn.trim()
+    && typeof activeBriefing?.rulesTextEn === 'string' && activeBriefing.rulesTextEn.trim()
+    && typeof activeBriefing?.scheduleNoteEn === 'string');
+}
+
 function renderBriefingStatus() {
   const status = document.querySelector('#briefingStatus');
   if (!activeBriefing?.rulesText) {
@@ -1395,7 +1526,8 @@ function renderBriefingStatus() {
   const version = activeBriefing.rulesVersion || 1;
   const accepted = activeAcceptances.filter((item) => item.rulesVersion === version
     && (activeBriefing.fullRulesRequired !== true || item.fullRulesRead === true)).length;
-  status.textContent = `Briefing safety versione ${version} pubblicato. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} completato l’accettazione.`;
+  const hasOfficialEnglish = hasOfficialEnglishBriefing();
+  status.textContent = `Briefing safety versione ${version} pubblicato. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} completato l’accettazione.${hasOfficialEnglish ? ' Versione inglese ufficiale disponibile.' : ' Versione inglese ufficiale non ancora pubblicata.'}`;
 }
 
 function renderAnnouncements(snapshot) {
@@ -1674,9 +1806,14 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
   const form = event.currentTarget;
   const fields = new FormData(form);
   const displayName = fields.get('displayName').trim();
+  const preferredLocale = fields.get('preferredLocale') === 'en' ? 'en' : 'it';
   const normalizedNumber = normalizeWhatsAppNumber(fields.get('whatsappNumber'));
   if (!normalizedNumber) {
     setMessage(document.querySelector('#inviteFormMessage'), 'Inserisci il numero WhatsApp in formato internazionale, ad esempio +39 333 1234567.', true);
+    return;
+  }
+  if (preferredLocale === 'en' && !hasOfficialEnglishBriefing()) {
+    setMessage(document.querySelector('#inviteFormMessage'), 'Prima di inviare un invito in inglese, pubblica il briefing safety ufficiale in inglese dalla bacheca di bordo.', true);
     return;
   }
   const whatsappNumber = `+${normalizedNumber}`;
@@ -1685,7 +1822,7 @@ document.querySelector('#inviteForm').addEventListener('submit', async (event) =
   const whatsappWindow = window.open('', '_blank');
   if (whatsappWindow) whatsappWindow.opener = null;
   try {
-    const invite = await createInviteRecord({ displayName, whatsappNumber });
+    const invite = await createInviteRecord({ displayName, whatsappNumber, preferredLocale });
     await setDoc(doc(db, 'boats', activeBoat.id, 'invites', invite.id), {
       ...invite, createdAt: serverTimestamp(), createdBy: auth.currentUser.uid,
     });
@@ -1804,16 +1941,30 @@ document.querySelector('#briefingForm').addEventListener('submit', async (event)
   const rulesTitle = fields.get('rulesTitle').trim();
   const rulesSummary = fields.get('rulesSummary').trim();
   const rulesText = fields.get('rulesText').trim();
+  const rulesTitleEn = fields.get('rulesTitleEn').trim();
+  const rulesSummaryEn = fields.get('rulesSummaryEn').trim();
+  const rulesTextEn = fields.get('rulesTextEn').trim();
+  const scheduleNoteEn = fields.get('scheduleNoteEn').trim();
+  const englishFieldsHaveContent = [rulesTitleEn, rulesSummaryEn, rulesTextEn, scheduleNoteEn].some(Boolean);
+  const englishCoreIsComplete = rulesTitleEn && rulesSummaryEn && rulesTextEn;
+  if (englishFieldsHaveContent && !englishCoreIsComplete) {
+    setMessage(document.querySelector('#briefingFormMessage'), 'Completa titolo, sintesi e regolamento inglese oppure lascia vuota l’intera sezione inglese. Non pubblicare una traduzione parziale.', true);
+    return;
+  }
   const briefingData = {
     rulesTitle,
     rulesSummary,
     rulesText,
+    rulesTitleEn,
+    rulesSummaryEn,
+    rulesTextEn,
     fullRulesRequired: true,
     meetingPoint: fields.get('meetingPoint').trim(),
     boardingAt: fields.get('boardingAt'),
     departureAt: fields.get('departureAt'),
     returnAt: fields.get('returnAt'),
     scheduleNote: fields.get('scheduleNote').trim(),
+    scheduleNoteEn,
   };
   const briefingChanged = !activeBriefing || Object.entries(briefingData).some(([field, value]) => {
     const previous = field.endsWith('At') ? toDateTimeLocal(activeBriefing[field]) : String(activeBriefing[field] || '');
