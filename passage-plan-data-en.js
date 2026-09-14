@@ -21,20 +21,20 @@
     nextUpdateAt: '28 September 2026 · ten-day outlook',
     dataMode: 'planning',
     summary: 'This first overview helps the flotilla plan around a flexible itinerary, available daylight and possible coves to enjoy. It does not contain a wind, sea-state or current forecast; that will be published only in the useful window, with sources and issue time.',
-    sourceNote: 'Astronomical check: 11 September 2026, 01:56 CEST, Europe/Rome time zone. The coves are possible scenarios, not allocated places: every evening the skipper chooses a marina berth, authorised mooring field or permitted anchorage only after checking weather, sea state, seabed, marine protected-area zoning, notices and availability.',
+    sourceNote: 'Astronomical check: 11 September 2026, 01:56 CEST, Europe/Rome time zone. The coves are possible scenarios, not allocated places: every evening the skipper chooses a marina berth, authorised mooring field or permitted anchorage only after checking weather, waves, depth, the Egadi Marine Protected Area rules, local notices and availability.',
     sources: [
       { label: 'Astronomical source', url: 'https://aa.usno.navy.mil/data/api', scope: 'sunrise, sunset and moon', checkedAt: '11 September 2026 · 01:56 CEST' },
-      { label: 'Egadi MPA · zoning', url: 'https://www.ampisoleegadi.it/index.php/zonazione/', scope: 'areas and rules to verify', checkedAt: '11 September 2026' },
+      { label: 'Egadi Marine Protected Area · map and rules', url: 'https://www.ampisoleegadi.it/index.php/zonazione/', scope: 'areas and rules to verify', checkedAt: '11 September 2026' },
       { label: 'Egadi MPA · mooring fields', url: 'https://www.ampisoleegadi.it/index.php/campi-boe/', scope: 'seasonal fields and permits', checkedAt: '11 September 2026' },
     ],
-    stopsNote: 'For October 2026, MPA rules, any permits, seasonal installation of mooring fields and current notices must be checked in the operational briefing: a beautiful cove is not automatically a suitable place to spend the night at anchor.',
+    stopsNote: 'Before departure, the Marine Protected Area rules, any permits, the seasonal presence of mooring fields and local notices will be checked. A beautiful cove is not automatically a permitted or suitable place to spend the night at anchor.',
     mooringGuide: {
       title: 'At anchor, in port or on a mooring?',
       introduction: 'The cards below help you picture the places; they are not anchoring instructions. The same cove may be perfect for a swim and unsuitable for an overnight stay. Each boat receives its skipper’s decision for the day.',
       checks: [
-        { title: '1 · Check the rules first', text: 'The skipper checks MPA zoning, notices, permits and the seasonal status of any mooring field. A buoy seen online is not the same as a buoy that is authorised and available.' },
-        { title: '2 · Then read the sea as it is', text: 'Wind direction and strength, sea state, period, seabed, manoeuvring room and crew comfort decide whether to stop, change side or continue.' },
-        { title: '3 · A Plan B is part of the plan', text: 'If the anchorage or mooring field is unsuitable, the alternative is a marina berth or another sheltered option. Safety and a punctual return matter more than a chosen cove.' },
+        { title: '1 · Check the rules first', text: 'The skipper checks whether the Marine Protected Area allows the stop, whether permits are needed and whether the mooring field is active and available. A buoy seen online is not necessarily usable.' },
+        { title: '2 · Then read the sea as it is', text: 'Wind, waves, depth, room to manoeuvre and crew comfort decide whether to stop, change side of the island or continue.' },
+        { title: '3 · A Plan B is part of the plan', text: 'If the anchorage or mooring field is unsuitable, the alternative is a marina berth or another place sheltered from wind and waves. Safety and a punctual return matter more than a chosen cove.' },
       ],
     },
     days: [
@@ -42,16 +42,16 @@
         date: 'Thursday 8 October',
         route: 'Marsala → Levanzo',
         plan: 'Departure at 15:00, with provisions already on board. We will look for the light of sunset and, if conditions allow, a calm night near Levanzo.',
-        overnight: 'At anchor near Levanzo only if permitted, sheltered and comfortable; otherwise a marina berth or another sheltered option chosen by the skipper.',
+        overnight: 'At anchor near Levanzo only if permitted and well sheltered from wind and waves; otherwise a marina berth or another shelter chosen by the skipper.',
         overnightType: 'Anchorage to be checked',
         overnightStatus: 'Not confirmed',
-        alternative: 'Alternative shelter or a change of route will be decided by the skippers.',
+        alternative: 'Another shelter or a change of route will be decided by the skippers.',
         stops: [
           {
             moment: 'Sunset · possible anchorage',
             title: 'Cala Tramontana or Cala del Genovese',
             description: 'Possible west and north-west settings for evening light, without assigning a cove to the flotilla in advance.',
-            check: 'To be validated: shelter, seabed, MPA zoning, notices, permits and traffic.',
+            check: 'To be checked: shelter from the wind, depth, Marine Protected Area rules, any permits and traffic at sea.',
           },
           {
             moment: 'Sunrise · alternative shelter',
@@ -82,7 +82,7 @@
             moment: 'Sunrise / swim · daytime stop',
             title: 'Cala Fredda or Cala Minnola',
             description: 'A second Levanzo cove, chosen after waking for light, sea state and crew comfort before the crossing.',
-            check: 'Daytime stop only, and only where current rules permit it and the seabed has been checked.',
+            check: 'Daytime stop only, and only where current rules permit it and the depth and seabed have been checked.',
           },
           {
             moment: 'Marettimo · evening arrival',
@@ -127,7 +127,7 @@
         air: seasonalOnly,
         water: localCheck,
         currents: currentsLater,
-        decision: 'Moorings, harbour and the coastal approach remain subject to notices, availability and real conditions.',
+        decision: 'The mooring field, harbour and route close to the coast depend on local rules, availability and real conditions.',
         sun: 'Sunrise 07:15 · sunset 18:42 · civil twilight until 19:08.',
         moon: 'New moon · moonrise 06:58 · moonset 18:20.',
       },
@@ -143,8 +143,8 @@
           {
             moment: 'Sunrise / swim · east coast',
             title: 'Cala Azzurra or Cala Rossa',
-            description: 'Possible morning-sun settings, chosen only if sea state, seabed and crowding make the stop simple and safe.',
-            check: 'These are possible daytime stops: they do not include an overnight stay and do not replace the MPA check.',
+            description: 'Possible morning-sun settings, chosen only if sea conditions, water depth and crowding make the stop simple and safe.',
+            check: 'These are possible daytime stops: they do not include an overnight stay and still require the Marine Protected Area rules to be checked.',
           },
           {
             moment: 'Plan B · west coast',

@@ -45,12 +45,12 @@ const CONTRIBUTION_ITEM_STATES = new Map([
   ['to_define', localized('Da confermare con lo skipper', 'To be confirmed with the skipper')],
   ['included', localized('Compreso nella quota', 'Included in the contribution')],
   ['extra', localized('Da richiedere a parte', 'To be requested separately')],
-  ['local', localized('Da regolare in loco / da dividere', 'To be settled locally / shared')],
+  ['local', localized('Da regolare separatamente / da dividere', 'To be settled separately / shared')],
   ['not_applicable', localized('Non previsto', 'Not included')],
 ]);
 const CONTRIBUTION_ITEMS = [
   { id: 'berth', label: localized('Quota posto in barca', 'Berth contribution') },
-  { id: 'starter_pack', label: localized('Starter Pack · lenzuola/asciugamani, SUP e fuoribordo · solo contanti in loco', 'Starter Pack · bed linen/towels, SUP and outboard · cash on board only') },
+  { id: 'starter_pack', label: localized('Starter Pack · lenzuola/asciugamani, SUP e fuoribordo · solo contanti a bordo', 'Starter Pack · bed linen/towels, SUP and outboard · cash on board only') },
   { id: 'linen_towels', label: localized('Lenzuola e asciugamani · inclusi nello Starter Pack', 'Bed linen and towels · included in the Starter Pack') },
   { id: 'protection_insurance', label: localized('Assicurazione cauzione', 'Deposit insurance') },
   { id: 'provisions', label: localized('Cambusa', 'Provisions') },
@@ -87,19 +87,19 @@ function crewDashboardIcon(kind) {
 function crewDashboardCopy() {
   if (activeLocale() === 'en') {
     return {
-      eyebrow: 'Your onboard area',
-      title: 'Everything for your boat,<br /><em>in one place.</em>',
-      description: 'Your details, skipper updates and personal requests are kept here for you.',
-      activity: 'My activity',
-      activityDetail: 'Your completed personal steps.',
+      eyebrow: 'Your crew area',
+      title: 'Before departure,<br /><em>here is what to check.</em>',
+      description: 'Your charter details, safety briefing, skipper updates and payment requests — only information for you.',
+      activity: 'Your progress',
+      activityDetail: 'What you have already completed.',
       activityTimelineEyebrow: 'Your trip status',
       activityTimelineTitle: 'What you have already done',
-      board: 'My boat',
-      boardDetail: 'Safety briefing and skipper updates.',
-      money: 'My contributions',
-      moneyDetail: 'Only requests addressed to you.',
-      profile: 'My details',
-      profileDetail: 'Your submitted charter details.',
+      board: 'Rules and updates',
+      boardDetail: 'Safety briefing, timings and skipper messages.',
+      money: 'Costs and requests',
+      moneyDetail: 'Only costs and requests that concern you.',
+      profile: 'Charter details',
+      profileDetail: 'Personal details requested before boarding.',
       nextStep: 'Next step',
       nextButton: 'Open',
       noPayments: 'No requests at the moment',
@@ -107,49 +107,49 @@ function crewDashboardCopy() {
       paymentsVerified: '{count} confirmed contribution{suffix}',
       briefingReady: 'Safety briefing accepted',
       briefingWaiting: 'Safety briefing to be accepted',
-      profileReady: 'Details submitted',
+      profileReady: 'Details saved',
       profileWaiting: 'Details to complete',
       announcements: '{count} skipper update{suffix}',
       activityProgress: '{count} completed step{suffix}',
-      allReady: 'Everything is in place for now. Come back when the skipper posts an update or a request.',
-      pendingAction: 'There is a payment request to sort out. The skipper’s instructions are here.',
+      allReady: 'You have completed everything for now. Come back when the skipper posts an update or a new request.',
+      pendingAction: 'A payment request is waiting. The amount and the skipper’s instructions are here.',
       boardAction: 'Before departure, take a look at the skipper’s latest updates.',
       profileAction: 'Complete the details needed for the charter.',
-      openBoard: 'Open boat area',
+      openBoard: 'Open rules and updates',
       openPayments: 'Open requests',
       openProfile: 'Open my details',
     };
   }
   return {
-    eyebrow: 'La tua area di bordo',
-    title: 'Tutto per la tua barca,<br /><em>in un unico posto.</em>',
-    description: 'Qui trovi i tuoi dati, gli avvisi dello skipper e le richieste che ti riguardano.',
-    activity: 'La mia attività',
-    activityDetail: 'I passaggi personali già completati.',
+    eyebrow: 'La tua area equipaggio',
+    title: 'Prima di partire,<br /><em>ecco cosa controllare.</em>',
+    description: 'Dati per il charter, briefing di sicurezza, messaggi dello skipper e richieste di pagamento: qui trovi solo ciò che riguarda te.',
+    activity: 'Il tuo percorso',
+    activityDetail: 'Quello che hai già completato.',
     activityTimelineEyebrow: 'Stato del viaggio',
     activityTimelineTitle: 'Quello che hai già fatto',
-    board: 'La mia barca',
-    boardDetail: 'Briefing safety e aggiornamenti dello skipper.',
-    money: 'Le mie quote',
-    moneyDetail: 'Solo le richieste indirizzate a te.',
-    profile: 'I miei dati',
-    profileDetail: 'Anagrafica inviata per il charter.',
+    board: 'Regole e avvisi',
+    boardDetail: 'Briefing di sicurezza, orari e messaggi dello skipper.',
+    money: 'Costi e richieste',
+    moneyDetail: 'Solo costi e richieste che riguardano te.',
+    profile: 'Dati per il charter',
+    profileDetail: 'Dati personali richiesti prima dell’imbarco.',
     nextStep: 'Prossimo passo',
     nextButton: 'Apri',
     noPayments: 'Nessuna richiesta al momento',
     paymentsPending: '{count} richiest{suffix} da regolare',
     paymentsVerified: '{count} contribut{suffix} confermat{suffixVerified}',
-    briefingReady: 'Briefing safety accettato',
-    briefingWaiting: 'Briefing safety da accettare',
-    profileReady: 'Dati inviati',
+    briefingReady: 'Briefing di sicurezza accettato',
+    briefingWaiting: 'Briefing di sicurezza da accettare',
+    profileReady: 'Dati salvati',
     profileWaiting: 'Dati da completare',
     announcements: '{count} comunicazion{suffix} dello skipper',
     activityProgress: '{count} passagg{suffix} completat{suffixCompleted}',
-    allReady: 'Per ora è tutto a posto. Torna qui quando lo skipper pubblica un avviso o una richiesta.',
-    pendingAction: 'C’è una richiesta da sistemare. Qui trovi importo e indicazioni dello skipper.',
+    allReady: 'Per ora hai completato tutto. Torna qui quando lo skipper pubblica un avviso o una nuova richiesta.',
+    pendingAction: 'C’è una richiesta da pagare. Qui trovi importo e indicazioni dello skipper.',
     boardAction: 'Prima di partire, dai un’occhiata agli ultimi messaggi dello skipper.',
     profileAction: 'Completa i dati richiesti per il charter.',
-    openBoard: 'Apri la barca',
+    openBoard: 'Apri regole e avvisi',
     openPayments: 'Apri richieste',
     openProfile: 'Apri i miei dati',
   };
@@ -318,12 +318,12 @@ function renderCrewActivityTimeline({ profileReady, briefingReady, pendingPaymen
       detail: profileReady
         ? profileUpdatedAt
           ? localized(`Dati aggiornati il ${profileUpdatedAt}.`, `Details updated on ${profileUpdatedAt}.`)
-          : localized('Dati inviati per il charter.', 'Details submitted for the charter.')
+          : localized('Dati salvati nell’elenco dello skipper per il charter.', 'Details saved in the skipper’s list for the charter.')
         : localized('Dati ancora da completare.', 'Details still need to be completed.'),
     },
     {
       tone: briefingReady ? 'complete' : 'waiting',
-      label: localized('Briefing safety', 'Safety briefing'),
+      label: localized('Briefing di sicurezza', 'Safety briefing'),
       detail: briefingReady
         ? briefingAcceptedAt
           ? localized(`Accettato il ${briefingAcceptedAt}.`, `Accepted on ${briefingAcceptedAt}.`)
@@ -521,8 +521,8 @@ function projectedRefundableDepositSummary() {
   const amountCents = projectionAmountCents('refundableDepositCents');
   if (!amountCents) return contributionPlanFallback('refundable_deposit', { deposit: true });
   return {
-    value: `${formatCurrency(amountCents / 100)} ${localized('in loco', 'locally')}`,
-    detail: localized('Cauzione rimborsabile: da portare e regolare in loco, separata dalle richieste di pagamento.', 'Refundable deposit: bring and settle it locally, separate from payment requests.'),
+    value: `${formatCurrency(amountCents / 100)} ${localized('all’imbarco', 'at boarding')}`,
+    detail: localized('Cauzione rimborsabile: da portare e regolare all’imbarco, separata dalle richieste di pagamento.', 'Refundable deposit: bring and settle it at boarding, separate from payment requests.'),
   };
 }
 
@@ -537,13 +537,13 @@ function starterPackCashSummary() {
   const plannedItem = contributionPlanItems().find((item) => item.id === 'starter_pack');
   const amountCents = projectedCents || contributionAmountCents(plannedItem);
   const value = amountCents
-    ? `${formatCurrency(amountCents / 100)} ${localized('in contanti, in loco', 'cash on board')}`
-    : localized('Da definire · contanti in loco', 'To be confirmed · cash on board');
+    ? `${formatCurrency(amountCents / 100)} ${localized('in contanti a bordo', 'cash on board')}`
+    : localized('Da definire · contanti a bordo', 'To be confirmed · cash on board');
   return {
     value,
     detail: localized(
-      'Starter Pack da regolare esclusivamente in contanti a bordo: non entra nella quota richiesta online e non usa link di pagamento.',
-      'The Starter Pack is settled in cash on board only: it is not included in the online contribution and does not use payment links.',
+      'Lo Starter Pack riunisce i servizi scelti per la barca, per esempio lenzuola, asciugamani, SUP e fuoribordo. Per questa barca si paga solo in contanti a bordo: non entra nelle richieste online e non usa link di pagamento.',
+      'The Starter Pack brings together services chosen for the boat, for example bed linen, towels, a SUP and an outboard. For this boat it is settled in cash on board only: it is not included in online requests and does not use payment links.',
     ),
   };
 }
@@ -568,7 +568,7 @@ function contributionPlanFallback(itemId, { deposit = false } = {}) {
     return {
       value: localized('Da definire', 'To be confirmed'),
       detail: deposit
-        ? localized('Lo skipper indicherà importo e modalità di consegna in loco.', 'The skipper will confirm the amount and how it is settled locally.')
+        ? localized('Lo skipper indicherà importo e modalità di consegna all’imbarco.', 'The skipper will confirm the amount and how it is settled at boarding.')
         : localized('Lo skipper non ha ancora preparato una richiesta personale.', 'The skipper has not prepared a personal request yet.'),
     };
   }
@@ -581,15 +581,15 @@ function contributionPlanFallback(itemId, { deposit = false } = {}) {
   }
   if (item.state === 'extra') {
     return deposit
-      ? { value: amount, detail: localized('Da correggere: una cauzione rimborsabile si regola in loco.', 'To be corrected: a refundable deposit is settled locally.') }
+      ? { value: amount, detail: localized('Da correggere: una cauzione rimborsabile si regola all’imbarco.', 'To be corrected: a refundable deposit is settled at boarding.') }
       : { value: amount, detail: localized('Richiesta personale non ancora preparata.', 'A personal request has not been prepared yet.') };
   }
   if (item.state === 'local') {
     return {
       value: amount,
       detail: deposit
-        ? localized('Da portare e regolare in loco; non è sommata alle richieste online.', 'Bring and settle locally; it is not added to online requests.')
-        : localized('Da regolare in loco o da dividere a bordo.', 'To be settled locally or shared on board.'),
+        ? localized('Da portare e regolare all’imbarco; non è sommata alle richieste online.', 'Bring and settle it at boarding; it is not added to online requests.')
+        : localized('Da regolare separatamente o da dividere a bordo.', 'To be settled separately or shared on board.'),
     };
   }
   return {
@@ -641,7 +641,7 @@ function participantProjectionRows() {
     }),
     participantFinanceRow(localized('Sistemazione prevista', 'Planned accommodation'), {
       value: projectionBerthLabel(),
-      detail: localized('Posto riservato per te nella proiezione equipaggio.', 'A place reserved for you in the crew plan.'),
+      detail: localized('Posto riservato per te nell’elenco provvisorio dell’equipaggio.', 'A place reserved for you in the provisional crew list.'),
     }),
   ].join('');
 }
@@ -680,9 +680,9 @@ function renderParticipantFinanceSummary() {
     : paymentDetailBase;
   summary.hidden = false;
   summary.innerHTML = `
-    <p class="eyebrow">${escapeHtml(localized('Il mio riepilogo', 'My personal summary'))}</p>
-    <h4>${escapeHtml(localized('Le tue voci, senza conti degli altri', 'Your items, with no one else’s finances'))}</h4>
-    <p>${escapeHtml(localized('Qui vedi soltanto la tua previsione, le tue richieste, lo Starter Pack e la cauzione da regolare in contanti/in loco, oltre al briefing che hai accettato.', 'Here you only see your plan, your requests, the Starter Pack and refundable deposit settled in cash/on board, plus the briefing you accepted.'))}</p>
+    <p class="eyebrow">${escapeHtml(localized('Il tuo riepilogo dei costi', 'Your cost summary'))}</p>
+    <h4>${escapeHtml(localized('Cosa pagare e cosa portare a bordo', 'What to pay and what to bring on board'))}</h4>
+    <p>${escapeHtml(localized('Qui vedi solo i tuoi importi. Lo Starter Pack e la cauzione rimborsabile si regolano in contanti a bordo; le richieste personali arrivano invece dallo skipper e vengono verificate manualmente.', 'Here you only see your own amounts. The Starter Pack and refundable deposit are settled in cash on board; personal requests come from the skipper and are checked manually.'))}</p>
     <div class="participant-finance-grid">
       ${participantProjectionRows()}
       ${participantFinanceRow(localized('Posto / cabina', 'Berth / cabin'), berth)}
@@ -811,7 +811,7 @@ function contributionPlanItems(plan = activeContributionPlan) {
 function contributionItemMarkup(item) {
   const amount = item.amountCents > 0 ? ` · ${formatCurrency(item.amountCents / 100)} ${translate('crew.flow.perPerson', 'a persona')}` : '';
   const stateLabel = item.id === 'starter_pack'
-    ? localized('Solo contanti, in loco', 'Cash on board only')
+    ? localized('Solo contanti a bordo', 'Cash on board only')
     : CONTRIBUTION_ITEM_STATES.get(item.state);
   return `<div><span>${escapeHtml(stateLabel)}</span><strong>${escapeHtml(item.label)}${escapeHtml(amount)}</strong></div>`;
 }

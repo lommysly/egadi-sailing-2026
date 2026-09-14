@@ -13,40 +13,40 @@ window.PASSAGE_PLAN_DATA = {
   nextUpdateAt: "28 settembre 2026 · tendenza a dieci giorni",
   dataMode: "planning",
   summary: "Questo è il primo quadro per organizzare la flotta: conferma l'itinerario flessibile, la luce disponibile e gli scenari di cala da vivere. Non contiene una previsione di vento, onda o correnti; quella verrà pubblicata solo nella finestra utile, con fonti e ora di emissione.",
-  sourceNote: "Consultazione astronomica: 11 settembre 2026, 01:56 CEST, fuso Europe/Rome. Le calette sono scenari possibili, non posti assegnati: ogni sera lo skipper sceglie porto, campo boe autorizzato o rada ammessa solo dopo controllo di meteo, onda, fondale, zonazione AMP, ordinanze e disponibilità.",
+  sourceNote: "Consultazione astronomica: 11 settembre 2026, 01:56 CEST, fuso Europe/Rome. Le calette sono scenari possibili, non posti assegnati: ogni sera lo skipper sceglie porto, campo boe autorizzato o rada ammessa solo dopo aver verificato meteo, onde, profondità, regole dell’Area Marina Protetta delle Egadi (AMP), avvisi locali e disponibilità.",
   sources: [
     { label: "Fonte astronomica", url: "https://aa.usno.navy.mil/data/api", scope: "alba, tramonto e luna", checkedAt: "11 settembre 2026 · 01:56 CEST" },
-    { label: "AMP Egadi · zonazione", url: "https://www.ampisoleegadi.it/index.php/zonazione/", scope: "zone e disciplina da verificare", checkedAt: "11 settembre 2026" },
+    { label: "Area Marina Protetta delle Egadi · mappa e regole", url: "https://www.ampisoleegadi.it/index.php/zonazione/", scope: "zone e regole da verificare", checkedAt: "11 settembre 2026" },
     { label: "AMP Egadi · campi boe", url: "https://www.ampisoleegadi.it/index.php/campi-boe/", scope: "campi stagionali e autorizzazioni", checkedAt: "11 settembre 2026" }
   ],
-  stopsNote: "Per ottobre 2026, la disciplina AMP, le eventuali autorizzazioni, l'installazione stagionale dei campi boe e le ordinanze vigenti andranno controllate nel briefing operativo: una bella cala non equivale automaticamente a una rada idonea per la notte.",
+  stopsNote: "Prima della partenza verranno controllati i limiti dell’Area Marina Protetta, le eventuali autorizzazioni, la presenza stagionale dei campi boe e gli avvisi locali. Una bella cala non è automaticamente un posto adatto o consentito per dormire in rada.",
   mooringGuide: {
     title: "Rada, porto o campo boe?",
     introduction: "Le carte qui sotto aiutano a immaginare i luoghi; non sono istruzioni di ancoraggio. La stessa cala può essere splendida per un bagno e inadatta per una notte. Ogni barca riceve la decisione quotidiana del proprio skipper.",
     checks: [
-      { title: "1 · Prima le regole", text: "Lo skipper verifica zonazione AMP, ordinanze, autorizzazioni e l'eventuale stato stagionale del campo boe. Una boa vista online non equivale a una boa disponibile." },
-      { title: "2 · Poi il mare reale", text: "Direzione e intensità del vento, onda, periodo, fondale, spazio di manovra e comfort dell'equipaggio decidono se fermarsi, cambiare lato o proseguire." },
-      { title: "3 · Il piano B è parte del piano", text: "Se rada o campo boe non sono adatti, si passa al porto o a un ridosso alternativo. La sicurezza e il rientro puntuale valgono più della cala desiderata." }
+      { title: "1 · Prima le regole", text: "Lo skipper controlla se l’Area Marina Protetta permette la sosta, se servono autorizzazioni e se il campo boe è davvero attivo e disponibile. Una boa vista online non significa che sia utilizzabile." },
+      { title: "2 · Poi il mare reale", text: "Vento, onde, profondità, spazio per manovrare e comfort dell’equipaggio decidono se fermarsi, cambiare lato dell’isola o proseguire." },
+      { title: "3 · Il piano B è parte del piano", text: "Se rada o campo boe non sono adatti, si passa al porto o a un altro riparo dal vento e dalle onde. Sicurezza e rientro puntuale valgono più della cala desiderata." }
     ]
   },
   days: [
     {
       date: "Giovedì 8 ottobre",
       route: "Marsala → Levanzo",
-      plan: "Partenza alle 15:00 con cambusa già pronta. Cerchiamo la luce del tramonto e, se le condizioni lo consentono, una notte calma a Levanzo.",
-      overnight: "Rada a Levanzo solo se ammessa, ridossata e confortevole; altrimenti porto o ridosso alternativo scelto dallo skipper.",
+      plan: "Partenza alle 15:00 con spesa e provviste già a bordo. Cerchiamo la luce del tramonto e, se le condizioni lo consentono, una notte calma a Levanzo.",
+      overnight: "Rada a Levanzo solo se consentita e ben riparata da vento e onde; altrimenti porto o altro riparo scelto dallo skipper.",
       overnightType: "Rada da verificare",
       overnightStatus: "Non confermata",
-      alternative: "Ridosso alternativo o variazione di rotta decisi dagli skipper.",
+      alternative: "Altro riparo o variazione di rotta decisi dagli skipper.",
       stops: [
         {
           moment: "Tramonto · possibile rada",
           title: "Cala Tramontana o Cala del Genovese",
           description: "Scenari sul lato ovest / nord-ovest da considerare per la luce della sera, senza preassegnare una cala alla flotta.",
-          check: "Da validare: ridosso, fondale, zonazione AMP, ordinanze, autorizzazioni e traffico."
+          check: "Da verificare: riparo dal vento, profondità, regole dell’Area Marina Protetta, eventuali autorizzazioni e traffico in mare."
         },
         {
-          moment: "Alba · ridosso alternativo",
+          moment: "Alba · riparo alternativo",
           title: "Cala Fredda, Cala Minnola o Cala Dogana",
           description: "Alternative sul lato est per svegliarsi con il sole, se sono compatibili con la condizione reale e con il piano di navigazione del venerdì.",
           check: "La notte non è promessa: l'ultima scelta è dello skipper della singola barca."
@@ -57,7 +57,7 @@ window.PASSAGE_PLAN_DATA = {
       air: "Scenario stagionale soltanto; temperatura operativa nel briefing utile.",
       water: "Dato locale da verificare con fonte marina e osservazione a bordo.",
       currents: "Da valutare nella finestra operativa, non stimati ora.",
-      decision: "Rada, ridosso e orario definitivo vengono confermati dallo skipper prima della partenza.",
+      decision: "Rada, riparo e orario definitivo vengono confermati dallo skipper prima della partenza.",
       sun: "Alba 07:12 · tramonto 18:43 · crepuscolo civile fino alle 19:09.",
       moon: "Falce calante · levata 04:45 · tramonto 17:29."
     },
@@ -67,14 +67,14 @@ window.PASSAGE_PLAN_DATA = {
       plan: "Seconda caletta a Levanzo, pranzo a bordo e navigazione verso Marettimo. Notte in porto e serata nel borgo.",
       overnight: "Porto di Marettimo: è il piano base della serata, con cena libera a terra o a bordo e ritrovo nel borgo.",
       overnightType: "Porto",
-      overnightStatus: "Piano base da confermare con l'ormeggio",
+      overnightStatus: "Piano base · aspettiamo la conferma del posto barca in porto",
       alternative: "La traversata e le soste dipendono da onda, vento e comfort della flotta.",
       stops: [
         {
           moment: "Alba / bagno · sosta diurna",
           title: "Cala Fredda o Cala Minnola",
           description: "Una seconda cala di Levanzo, da scegliere al risveglio per luce, mare e comodità dell'equipaggio prima della traversata.",
-          check: "Sosta solo diurna e solo se ammessa dalle regole vigenti e dal fondale controllato."
+          check: "Sosta solo diurna e solo se ammessa dalle regole vigenti, con profondità e fondo del mare controllati."
         },
         {
           moment: "Marettimo · arrivo serale",
@@ -98,7 +98,7 @@ window.PASSAGE_PLAN_DATA = {
       plan: "Esplorazione di Marettimo, poi rotta verso Favignana. Arrivo in porto, cena collettiva, DJ set e festa.",
       overnight: "Porto di Favignana: cena collettiva, DJ set e festa, con rientro a bordo a fine serata.",
       overnightType: "Porto",
-      overnightStatus: "Piano base da confermare con l'ormeggio",
+      overnightStatus: "Piano base · aspettiamo la conferma del posto barca in porto",
       alternative: "Boe, porto e percorso costiero saranno confermati nel briefing del giorno.",
       stops: [
         {
@@ -119,7 +119,7 @@ window.PASSAGE_PLAN_DATA = {
       air: "Scenario stagionale soltanto; temperatura operativa nel briefing utile.",
       water: "Dato locale da verificare con fonte marina e osservazione a bordo.",
       currents: "Da valutare nella finestra operativa, non stimati ora.",
-      decision: "Boe, porto e approccio costiero restano subordinati a ordinanze, disponibilità e condizioni reali.",
+      decision: "Campo boe, porto e percorso vicino alla costa dipendono da regole locali, disponibilità e condizioni reali.",
       sun: "Alba 07:15 · tramonto 18:42 · crepuscolo civile fino alle 19:08.",
       moon: "Luna nuova · levata 06:58 · tramonto 18:20."
     },
@@ -135,8 +135,8 @@ window.PASSAGE_PLAN_DATA = {
         {
           moment: "Alba / bagno · costa est",
           title: "Cala Azzurra o Cala Rossa",
-          description: "Scenari per il sole del mattino, da scegliere soltanto se mare, fondale e affollamento rendono la sosta semplice e sicura.",
-          check: "Sono soste diurne possibili: non prevedono pernottamento e non sostituiscono la verifica AMP."
+          description: "Scenari per il sole del mattino, da scegliere soltanto se mare, profondità dell’acqua e affollamento rendono la sosta semplice e sicura.",
+          check: "Sono soste diurne possibili: non prevedono pernottamento e richiedono comunque la verifica delle regole dell’Area Marina Protetta."
         },
         {
           moment: "Piano B · costa ovest",
