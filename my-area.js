@@ -60,10 +60,56 @@ const CONTRIBUTION_ITEMS = [
   { id: 'mooring_fee', label: localized('Porto / ormeggio programmato', 'Planned port / mooring') },
   { id: 'refundable_deposit', label: localized('Cauzione rimborsabile', 'Refundable deposit') },
 ];
+const STARTER_PACK_ITEMS = [
+  { id: 'bed_linen', label: localized('Lenzuola', 'Bed linen') },
+  { id: 'bath_towels', label: localized('Asciugamani', 'Bath towels') },
+  { id: 'bath_kit', label: localized('Kit bagno / consumabili', 'Bathroom kit / essentials') },
+  { id: 'beach_towel', label: localized('Telo mare', 'Beach towel') },
+  { id: 'outboard', label: localized('Fuoribordo', 'Outboard engine') },
+  { id: 'final_cleaning', label: localized('Pulizie finali', 'Final cleaning') },
+  { id: 'sup', label: 'SUP' },
+  { id: 'egadi_navigation_permit', label: localized('Permesso di navigazione Egadi', 'Egadi navigation permit') },
+  { id: 'tender', label: localized('Tender, se previsto dal charter', 'Tender, if included by the charter') },
+];
+const STARTER_PACK_ITEM_IDS = new Set(STARTER_PACK_ITEMS.map((item) => item.id));
+const DEFAULT_STARTER_PACK_ITEM_IDS = Object.freeze(['bed_linen', 'bath_towels', 'outboard', 'sup']);
 const PERSONAL_PAYMENT_GROUPS = Object.freeze({
   berth: new Set(['berth_base', 'berth_double_cabin', 'berth_single_cabin', 'berth_dinette', 'berth_other']),
   protection_insurance: new Set(['protection_insurance']),
 });
+
+function normalizeStarterPackItems(value, { fallbackToDefault = false } = {}) {
+  const selected = Array.isArray(value)
+    ? value.filter((itemId) => typeof itemId === 'string' && STARTER_PACK_ITEM_IDS.has(itemId))
+    : [];
+  const unique = [...new Set(selected)];
+  if (unique.length || Array.isArray(value) || !fallbackToDefault) return unique;
+  return [...DEFAULT_STARTER_PACK_ITEM_IDS];
+}
+
+function starterPackItemsDescription(value) {
+  const labels = normalizeStarterPackItems(value)
+    .map((itemId) => STARTER_PACK_ITEMS.find((item) => item.id === itemId)?.label)
+    .filter(Boolean);
+  if (!labels.length) return localized('Servizi da definire con lo skipper.', 'Services to be confirmed with the skipper.');
+  return localized(`Comprende: ${labels.join(', ')}.`, `Includes: ${labels.join(', ')}.`);
+}
+
+function staticContributionDescription(itemId, starterPackItems = []) {
+  const descriptions = {
+    berth: localized('Il valore dipende dalla sistemazione assegnata dallo skipper.', 'The amount depends on the berth assigned by the skipper.'),
+    starter_pack: `${starterPackItemsDescription(starterPackItems)} ${localized('Si regola solo in contanti a bordo.', 'It is settled in cash on board only.')}`,
+    linen_towels: localized('Già raccontati nello Starter Pack: non sono una seconda spesa.', 'Already included in the Starter Pack: this is not a second charge.'),
+    protection_insurance: localized('Separata dalla quota del posto.', 'Separate from the berth contribution.'),
+    provisions: localized('Cambusa da dividere tra chi partecipa.', 'Provisions are shared among participants.'),
+    fuel: localized('Si calcola sul gasolio effettivamente consumato.', 'It is calculated on fuel actually used.'),
+    transfer: localized('Transfer aeroporto ↔ porto, andata e ritorno: sempre fuori dallo Starter Pack.', 'Airport ↔ port transfers, both ways: always outside the Starter Pack.'),
+    shore_dinner: localized('Solo se viene organizzata una cena a terra.', 'Only if a dinner ashore is organised.'),
+    mooring_fee: localized('Solo se porto, ormeggio o boa non sono già inclusi.', 'Only if port, mooring or buoy costs are not already included.'),
+    refundable_deposit: localized('Contanti all’imbarco; restituzione dopo il check-out del charter, salvo danni da definire.', 'Cash at boarding; returned after the charter check-out, unless damage needs to be assessed.'),
+  };
+  return descriptions[itemId] || '';
+}
 
 function setMessage(element, message, isError = false) {
   element.textContent = message;
@@ -228,6 +274,17 @@ function setupCrewDashboard() {
   navigation.setAttribute('aria-label', 'Sezioni area equipaggio');
   grid.before(overview, navigation);
   dashboard.addEventListener('click', (event) => {
+    const rulesReference = event.target.closest('[data-rules-reference="deposit"]');
+    if (rulesReference && dashboard.contains(rulesReference)) {
+      window.setTimeout(() => {
+        const recap = document.querySelector('#participantBriefing .briefing-recap');
+        if (recap) recap.open = true;
+        const heading = [...document.querySelectorAll('#participantRulesText .rules-section-heading')]
+          .find((node) => /cauzione|deposit/i.test(node.textContent));
+        heading?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 0);
+      return;
+    }
     const button = event.target.closest('[data-crew-view]');
     if (!button || !dashboard.contains(button)) return;
     const view = button.dataset.crewView;
@@ -541,13 +598,11 @@ function projectedRefundableDepositSummary() {
       detail: localized('Nella quota fissata dal tuo skipper non è prevista una cauzione rimborsabile per te.', 'Your skipper’s agreed contribution does not include a refundable deposit for you.'),
     };
   }
-  const plannedItem = contributionPlanItems().find((item) => item.id === 'refundable_deposit');
-  const description = String(plannedItem?.description || '').trim();
   return {
     value: `${formatCurrency(amountCents / 100)} ${localized('all’imbarco', 'at boarding')}`,
     detail: localized(
-      `${description || 'Cauzione rimborsabile'} Da portare e regolare all’imbarco, separata dalle richieste di pagamento.`,
-      `${description || 'Refundable deposit.'} Bring and settle it at boarding, separate from payment requests.`,
+      'Contanti all’imbarco; resta separata dalle richieste di pagamento.',
+      'Cash at boarding; it stays separate from payment requests.',
     ),
   };
 }
@@ -698,8 +753,9 @@ function personalContributionSummary(groupId, planItemId, projectionField) {
   };
 }
 
-function participantFinanceRow(label, summary, extraClass = '') {
-  return `<article class="participant-finance-row${extraClass ? ` ${extraClass}` : ''}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(summary.value)}</strong><small>${escapeHtml(summary.detail)}</small></article>`;
+function participantFinanceRow(label, summary, extraClass = '', detailMarkup = '') {
+  const detail = detailMarkup || escapeHtml(summary.detail);
+  return `<article class="participant-finance-row${extraClass ? ` ${extraClass}` : ''}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(summary.value)}</strong><small>${detail}</small></article>`;
 }
 
 function participantProjectionRows() {
@@ -799,7 +855,12 @@ function renderParticipantFinanceSummary() {
       ${participantFinanceRow(berthLabel, berth)}
       ${participantFinanceRow('Starter Pack', starterPack)}
       ${participantFinanceRow(localized('Assicurazione cauzione', 'Deposit insurance'), protectionInsurance)}
-      ${participantFinanceRow(localized('Cauzione rimborsabile', 'Refundable deposit'), refundableDeposit, 'participant-finance-row-deposit')}
+      ${participantFinanceRow(
+        localized('Cauzione rimborsabile', 'Refundable deposit'),
+        refundableDeposit,
+        'participant-finance-row-deposit',
+        `${escapeHtml(refundableDeposit.detail)} <a class="rules-reference-link" href="#crew-bacheca" data-rules-reference="deposit">${escapeHtml(localized('Leggi la regola sulla cauzione', 'Read the deposit rule'))}</a>`,
+      )}
       ${participantFinanceRow(localized('Richieste personali', 'My personal requests'), { value: paymentStatus, detail: paymentDetail })}
     </div>
     <div class="participant-finance-acceptance"><strong>${escapeHtml(localized('Regole di bordo accettate', 'Board rules accepted'))}</strong>${acceptedAt ? ` · ${escapeHtml(acceptedAt)}` : ''}. <a href="#crew-bacheca">${escapeHtml(localized('Rileggi il regolamento e la bacheca', 'Read the rules and updates again'))}</a></div>
@@ -904,6 +965,10 @@ function contributionAmountCents(item) {
 
 function contributionPlanItems(plan = activeContributionPlan) {
   const sourceItems = plan?.items && typeof plan.items === 'object' ? plan.items : {};
+  const isV4 = Array.isArray(plan?.starterPackItems);
+  const starterPackItems = normalizeStarterPackItems(plan?.starterPackItems, {
+    fallbackToDefault: !isV4,
+  });
   return CONTRIBUTION_ITEMS.map((item) => {
     const source = sourceItems[item.id] || {};
     const state = item.id === 'starter_pack'
@@ -915,7 +980,10 @@ function contributionPlanItems(plan = activeContributionPlan) {
       ...item,
       state,
       amountCents: item.id === 'linen_towels' ? 0 : contributionAmountCents(source),
-      description: String(source.description || '').trim().slice(0, 320),
+      description: isV4
+        ? staticContributionDescription(item.id, starterPackItems)
+        : String(source.description || '').trim().slice(0, 320) || staticContributionDescription(item.id, starterPackItems),
+      hideFromCrew: isV4 && item.id === 'linen_towels',
     };
   });
 }
@@ -925,7 +993,10 @@ function contributionItemMarkup(item) {
   const stateLabel = item.id === 'starter_pack' && item.state === 'local'
     ? localized('Solo contanti a bordo', 'Cash on board only')
     : CONTRIBUTION_ITEM_STATES.get(item.state);
-  const description = item.description ? `<small>${escapeHtml(item.description)}</small>` : '';
+  const depositLink = item.id === 'refundable_deposit'
+    ? ` <a class="rules-reference-link" href="#crew-bacheca" data-rules-reference="deposit">${escapeHtml(localized('Leggi la regola sulla cauzione', 'Read the deposit rule'))}</a>`
+    : '';
+  const description = item.description ? `<small>${escapeHtml(item.description)}${depositLink}</small>` : depositLink;
   return `<div><span>${escapeHtml(stateLabel)}</span><strong>${escapeHtml(item.label)}${escapeHtml(amount)}</strong>${description}</div>`;
 }
 
@@ -958,7 +1029,7 @@ function renderContributionPlan() {
   }
 
   const notApplicable = contributionNotApplicableContainer(plan);
-  const items = contributionPlanItems();
+  const items = contributionPlanItems().filter((item) => !item.hideFromCrew);
   const includedItems = items.filter((item) => item.state === 'included');
   const separateItems = items.filter((item) => ['extra', 'local', 'to_define'].includes(item.state));
   const notApplicableItems = items.filter((item) => item.state === 'not_applicable');

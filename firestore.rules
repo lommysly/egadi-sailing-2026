@@ -918,6 +918,57 @@ service cloud.firestore {
         && data.keys().hasAny(['starterPackSettlementMode']);
     }
 
+    // V4 elimina i testi liberi dal riepilogo dell'equipaggio. I servizi
+    // compresi nello Starter Pack sono una lista chiusa, senza duplicati:
+    // l'elenco può restare vuoto finché lo skipper non lo ha definito.
+    function hasValidStarterPackItems(items) {
+      return items is list
+        && items.size() <= 9
+        && items.toSet().size() == items.size()
+        && items.toSet().hasOnly(['bed_linen', 'bath_towels', 'bath_kit', 'beach_towel', 'outboard', 'final_cleaning', 'sup', 'egadi_navigation_permit', 'tender']);
+    }
+
+    function hasValidContributionPlanV4() {
+      let items = request.resource.data.items;
+      return request.resource.data.keys().hasAll(['items', 'starterPackItems', 'starterPackSettlementMode', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['items', 'starterPackItems', 'starterPackSettlementMode', 'updatedAt', 'updatedBy'])
+        && items is map
+        && items.keys().hasAll(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'shore_dinner', 'mooring_fee', 'refundable_deposit'])
+        && items.keys().hasOnly(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'provisions', 'fuel', 'transfer', 'shore_dinner', 'mooring_fee', 'refundable_deposit'])
+        && hasValidContributionItemV1(items.berth)
+        && hasValidContributionItemV1(items.starter_pack)
+        && hasValidContributionItemV1(items.linen_towels)
+        && hasValidContributionItemV1(items.protection_insurance)
+        && hasValidContributionItemV1(items.provisions)
+        && hasValidContributionItemV1(items.fuel)
+        && hasValidContributionItemV1(items.transfer)
+        && hasValidContributionItemV1(items.shore_dinner)
+        && hasValidContributionItemV1(items.mooring_fee)
+        && hasValidContributionItemV1(items.refundable_deposit)
+        && hasValidStarterPackItems(request.resource.data.starterPackItems)
+        && request.resource.data.starterPackSettlementMode == 'cash_on_board'
+        && items.starter_pack.state == 'local'
+        && items.linen_towels.state == 'included'
+        && items.refundable_deposit.state == 'local'
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    // Qualsiasi marcatore V4 rende il documento canonico: una pagina cache
+    // non può più rimuovere `starterPackItems` tornando al formato V1–V3.
+    function isContributionPlanV4(data) {
+      return data is map
+        && data.keys().hasAny(['starterPackItems']);
+    }
+
+    // Il ternario evita di valutare entrambi gli schemi durante una singola
+    // transazione che aggiorna anche il preventivo barca.
+    function hasValidContributionPlanV3OrV4() {
+      return isContributionPlanV4(request.resource.data)
+        ? hasValidContributionPlanV4()
+        : hasValidContributionPlanV3();
+    }
+
     // Il preventivo barca è un prospetto privato di soli importi aggregati.
     // Non può contenere nominativi, quote individuali, note, istruzioni di
     // pagamento o una categoria per cene: non è un listino né un incasso.
@@ -1509,16 +1560,20 @@ service cloud.firestore {
         allow create: if isPrivateAreaOpen()
           && planId == 'default'
           && isSkipper(boatId)
-          && hasValidContributionPlanV3();
+          && hasValidContributionPlanV3OrV4();
         allow update: if isPrivateAreaOpen()
           && planId == 'default'
           && isSkipper(boatId)
-          && (hasValidContributionPlanV3()
-            || (!isContributionPlanV3(resource.data)
-              && hasValidContributionPlanV2())
-            || (!isContributionPlanV3(resource.data)
-              && !isContributionPlanV2(resource.data)
-              && hasValidContributionPlanV1()));
+          && (isContributionPlanV4(request.resource.data)
+            ? hasValidContributionPlanV4()
+            : (!isContributionPlanV4(resource.data)
+              && (isContributionPlanV3(request.resource.data)
+                ? hasValidContributionPlanV3()
+                : (!isContributionPlanV3(resource.data)
+                  && (isContributionPlanV2(request.resource.data)
+                    ? hasValidContributionPlanV2()
+                    : (!isContributionPlanV2(resource.data)
+                      && hasValidContributionPlanV1()))))));
         allow delete: if false;
       }
 
