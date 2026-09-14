@@ -3233,7 +3233,10 @@ function prepareLegacyInviteProjection(invite) {
   const cancelButton = document.querySelector('#cancelProjectionEdit');
   cancelButton.textContent = 'Annulla collegamento';
   cancelButton.hidden = false;
-  setMessage(document.querySelector('#projectionFormMessage'), 'Controlla che nome e WhatsApp coincidano con l’invito esistente, quindi salva il posto e la quota prevista.');
+  const nameGuidance = /^[^\s]+$/.test(invite.displayName)
+    ? `Il numero WhatsApp deve coincidere esattamente. Il nome “${invite.displayName}” resta invariato e qui puoi aggiungere il cognome.`
+    : 'Nome e numero WhatsApp devono coincidere esattamente con l’invito esistente.';
+  setMessage(document.querySelector('#projectionFormMessage'), `${nameGuidance} Poi salva posto e quota prevista.`);
   form.scrollIntoView({ behavior: 'smooth', block: 'center' });
   form.elements.berthType.focus();
 }
@@ -3407,7 +3410,10 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
     const legacyNameMatches = projection.displayName === legacyInvite.displayName
       || (/^[^\s]+$/.test(legacyInvite.displayName) && legacyInvite.displayName === projection.firstName);
     if (!legacyNameMatches || projection.whatsappNumber !== legacyInvite.whatsappNumber) {
-      setMessage(message, 'Per riusare questo invito, il nome già presente e WhatsApp devono coincidere. Se l’invito storico contiene solo il nome, puoi aggiungere ora il cognome. Nessun accesso è stato modificato.', true);
+      const identityError = /^[^\s]+$/.test(legacyInvite.displayName)
+        ? `Il numero WhatsApp deve coincidere esattamente. Il nome “${legacyInvite.displayName}” resta invariato: puoi aggiungere il cognome, non sostituire il nome.`
+        : 'Per riusare questo invito, nome e numero WhatsApp devono coincidere esattamente con quelli già presenti.';
+      setMessage(message, `${identityError} Nessun accesso è stato modificato.`, true);
       return;
     }
   }
