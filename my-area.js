@@ -13,9 +13,26 @@ let activeInvite = null;
 let activeBriefing = null;
 let activeRuleAcceptance = null;
 let activeContributionPlan = null;
+let activeMember = null;
+let activeCrewPayments = [];
+let activeCrewAnnouncements = [];
 let stopPaymentSubscription = null;
 let stopAnnouncementSubscription = null;
 let stopContributionPlanSubscription = null;
+const CREW_DASHBOARD_HASHES = Object.freeze({
+  overview: 'crew-panorama',
+  profile: 'crew-profilo',
+  money: 'crew-quote',
+  board: 'crew-bacheca',
+});
+const CREW_DASHBOARD_LABELS = Object.freeze({
+  overview: 'Panoramica',
+  profile: 'I miei dati',
+  money: 'Quote e richieste',
+  board: 'Barca e bacheca',
+});
+let crewDashboardView = 'overview';
+let crewDashboardInitialized = false;
 const PAYMENT_METHODS = [
   { id: 'paypal', label: 'PayPal' },
   { id: 'satispay', label: 'Satispay' },
@@ -43,6 +60,272 @@ const CONTRIBUTION_ITEMS = [
 function setMessage(element, message, isError = false) {
   element.textContent = message;
   element.classList.toggle('is-error', isError);
+}
+
+function crewDashboardViewFromHash() {
+  const hash = window.location.hash.replace(/^#/, '');
+  return Object.entries(CREW_DASHBOARD_HASHES)
+    .find(([, value]) => value === hash)?.[0] || 'overview';
+}
+
+function crewDashboardIcon(kind) {
+  const paths = {
+    profile: '<circle cx="12" cy="8.25" r="3.25"/><path d="M5.25 19.25a6.75 6.75 0 0 1 13.5 0"/>',
+    money: '<rect x="3.5" y="5.25" width="17" height="13.5" rx="2"/><path d="M3.5 9.5h17M15.5 14.25h2.25"/>',
+    board: '<path d="M3 14.5h18l-2.25 4.25H5.25L3 14.5Z"/><path d="M12 3.5v11M12 4l5.25 7H12M11.75 6.25 7 11h4.75"/>',
+    activity: '<path d="M4 12h3l2-5 3 10 2-5h6"/>',
+  };
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths[kind] || paths.activity}</svg>`;
+}
+
+function crewDashboardCopy() {
+  if (activeLocale() === 'en') {
+    return {
+      eyebrow: 'Your onboard hub',
+      title: 'Your trip, <em>clear and personal.</em>',
+      description: 'Open only what you need. Your personal details, payments and skipper updates remain visible only to you.',
+      activity: 'Trip status',
+      activityDetail: 'What is ready for your trip.',
+      board: 'My boat',
+      boardDetail: 'Safety briefing and skipper updates.',
+      money: 'My contributions',
+      moneyDetail: 'Only requests addressed to you.',
+      profile: 'My details',
+      profileDetail: 'Your submitted charter details.',
+      nextStep: 'Next step',
+      nextButton: 'Open',
+      noPayments: 'No requests at the moment',
+      paymentsPending: '{count} request{suffix} awaiting verification',
+      paymentsVerified: '{count} contribution{suffix} verified by the skipper',
+      briefingReady: 'Safety briefing accepted',
+      briefingWaiting: 'Safety briefing to be accepted',
+      profileReady: 'Details submitted',
+      profileWaiting: 'Details to complete',
+      announcements: '{count} skipper update{suffix}',
+      activityProgress: '{count} of 2 steps ready',
+      allReady: 'Everything is ready. Keep this area handy for new updates or requests.',
+      pendingAction: 'You have a payment request awaiting verification. Check the details shared by the skipper.',
+      boardAction: 'The boat is ready. Check the latest skipper updates before departure.',
+      profileAction: 'Complete your details to enter your personal onboard area.',
+      openBoard: 'Open boat area',
+      openPayments: 'Open requests',
+      openProfile: 'Open my details',
+    };
+  }
+  return {
+    eyebrow: 'Il tuo centro di bordo',
+    title: 'Tutto il tuo viaggio, <em>chiaro e personale.</em>',
+    description: 'Apri solo ciò che ti serve. I tuoi dati, le richieste e le comunicazioni dello skipper restano visibili soltanto a te.',
+    activity: 'Stato del viaggio',
+    activityDetail: 'Quello che è pronto per la tua partenza.',
+    board: 'La mia barca',
+    boardDetail: 'Briefing safety e aggiornamenti dello skipper.',
+    money: 'Le mie quote',
+    moneyDetail: 'Solo le richieste indirizzate a te.',
+    profile: 'I miei dati',
+    profileDetail: 'Anagrafica inviata per il charter.',
+    nextStep: 'Prossimo passo',
+    nextButton: 'Apri',
+    noPayments: 'Nessuna richiesta al momento',
+    paymentsPending: '{count} richiest{suffix} in attesa di verifica',
+    paymentsVerified: '{count} contribut{suffix} verificat{suffixVerified} dallo skipper',
+    briefingReady: 'Briefing safety accettato',
+    briefingWaiting: 'Briefing safety da accettare',
+    profileReady: 'Dati inviati',
+    profileWaiting: 'Dati da completare',
+    announcements: '{count} comunicazion{suffix} dello skipper',
+    activityProgress: '{count} di 2 passaggi pronti',
+    allReady: 'Tutto pronto. Tieni questa area a portata di mano per nuovi avvisi o richieste.',
+    pendingAction: 'Hai una richiesta in attesa di verifica. Controlla i dettagli condivisi dallo skipper.',
+    boardAction: 'La barca è pronta: controlla gli ultimi aggiornamenti dello skipper prima della partenza.',
+    profileAction: 'Completa i tuoi dati per entrare nella tua area personale di bordo.',
+    openBoard: 'Apri la barca',
+    openPayments: 'Apri richieste',
+    openProfile: 'Apri i miei dati',
+  };
+}
+
+function crewPluralSuffix(count, italianSingular, italianPlural, englishSingular = '', englishPlural = 's') {
+  if (activeLocale() === 'en') return count === 1 ? englishSingular : englishPlural;
+  return count === 1 ? italianSingular : italianPlural;
+}
+
+function renderCrewDashboardShell() {
+  if (!crewDashboardInitialized) return;
+  const overview = document.querySelector('#crewDashboardOverview');
+  const navigation = document.querySelector('#crewDashboardNavigation');
+  if (!overview || !navigation) return;
+  const copy = crewDashboardCopy();
+  overview.setAttribute('aria-label', copy.eyebrow);
+  navigation.setAttribute('aria-label', activeLocale() === 'en' ? 'Crew area sections' : 'Sezioni area equipaggio');
+  overview.innerHTML = `
+    <div class="dashboard-overview-heading">
+      <div><p class="eyebrow">${escapeHtml(copy.eyebrow)}</p><h3>${copy.title}</h3></div>
+      <p>${escapeHtml(copy.description)}</p>
+    </div>
+    <div class="dashboard-hub" aria-label="${escapeHtml(copy.eyebrow)}">
+      <button class="dashboard-hub-card dashboard-hub-card-board" type="button" data-crew-view="board">
+        <span class="dashboard-hub-icon">${crewDashboardIcon('board')}</span><span class="dashboard-hub-label">${escapeHtml(copy.board)}</span>
+        <strong data-crew-summary="board">${escapeHtml(copy.briefingReady)}</strong><small data-crew-detail="board">${escapeHtml(copy.boardDetail)}</small>
+      </button>
+      <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-crew-view="money">
+        <span class="dashboard-hub-icon">${crewDashboardIcon('money')}</span><span class="dashboard-hub-label">${escapeHtml(copy.money)}</span>
+        <strong data-crew-summary="money">${escapeHtml(copy.noPayments)}</strong><small data-crew-detail="money">${escapeHtml(copy.moneyDetail)}</small>
+      </button>
+      <button class="dashboard-hub-card dashboard-hub-card-crew" type="button" data-crew-view="profile">
+        <span class="dashboard-hub-icon">${crewDashboardIcon('profile')}</span><span class="dashboard-hub-label">${escapeHtml(copy.profile)}</span>
+        <strong data-crew-summary="profile">${escapeHtml(copy.profileReady)}</strong><small data-crew-detail="profile">${escapeHtml(copy.profileDetail)}</small>
+      </button>
+      <button class="dashboard-hub-card dashboard-hub-card-activity" type="button" data-crew-view="overview">
+        <span class="dashboard-hub-icon">${crewDashboardIcon('activity')}</span><span class="dashboard-hub-label">${escapeHtml(copy.activity)}</span>
+        <strong data-crew-summary="activity">${escapeHtml(copy.briefingReady)}</strong><small data-crew-detail="activity">${escapeHtml(copy.activityDetail)}</small>
+      </button>
+    </div>
+    <div class="dashboard-next-step"><div><span>${escapeHtml(copy.nextStep)}</span><strong id="crewNextActionText">${escapeHtml(copy.boardAction)}</strong></div><button id="crewNextActionButton" class="button button-primary" type="button" data-crew-view="board">${escapeHtml(copy.nextButton)}</button></div>
+  `;
+  navigation.innerHTML = Object.entries(CREW_DASHBOARD_LABELS)
+    .map(([view, label]) => `<button type="button" data-crew-view="${view}">${view === 'overview' ? '← ' : ''}${escapeHtml(activeLocale() === 'en' ? ({ overview: 'Overview', profile: 'My details', money: 'Contributions', board: 'Boat and updates' }[view]) : label)}</button>`)
+    .join('');
+}
+
+function setupCrewDashboard() {
+  if (crewDashboardInitialized) return;
+  const dashboard = document.querySelector('#participantDashboard');
+  const grid = dashboard?.querySelector('.dashboard-grid');
+  const profilePanel = document.querySelector('#participantProfileSummary')?.closest('.dashboard-panel');
+  const boardPanel = document.querySelector('#participantAnnouncementList')?.closest('.dashboard-panel');
+  const contributionPanel = document.querySelector('#participantContributionPlan')?.closest('.dashboard-panel');
+  const paymentPanel = document.querySelector('#participantPaymentList')?.closest('.dashboard-panel');
+  if (!dashboard || !grid || !profilePanel || !boardPanel || !contributionPanel || !paymentPanel) return;
+
+  profilePanel.dataset.crewPanel = 'profile';
+  boardPanel.dataset.crewPanel = 'board';
+  contributionPanel.dataset.crewPanel = 'money';
+  paymentPanel.dataset.crewPanel = 'money';
+  const overview = document.createElement('section');
+  overview.id = 'crewDashboardOverview';
+  overview.className = 'dashboard-overview crew-dashboard-overview';
+  overview.setAttribute('aria-label', 'Panoramica area equipaggio');
+  const navigation = document.createElement('nav');
+  navigation.id = 'crewDashboardNavigation';
+  navigation.className = 'dashboard-view-navigation';
+  navigation.setAttribute('aria-label', 'Sezioni area equipaggio');
+  grid.before(overview, navigation);
+  dashboard.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-crew-view]');
+    if (!button || !dashboard.contains(button)) return;
+    const view = button.dataset.crewView;
+    if (!CREW_DASHBOARD_HASHES[view]) return;
+    const nextHash = `#${CREW_DASHBOARD_HASHES[view]}`;
+    if (window.location.hash === nextHash) {
+      setCrewDashboardView(view);
+    } else {
+      window.location.hash = nextHash;
+    }
+  });
+  window.addEventListener('hashchange', () => setCrewDashboardView(crewDashboardViewFromHash()));
+  document.addEventListener('egadi:localechange', () => {
+    renderCrewDashboardShell();
+    renderCrewDashboardOverview();
+    setCrewDashboardView(crewDashboardView);
+  });
+  crewDashboardInitialized = true;
+  renderCrewDashboardShell();
+  setCrewDashboardView(crewDashboardViewFromHash());
+  renderCrewDashboardOverview();
+}
+
+function setCrewDashboardView(nextView) {
+  if (!crewDashboardInitialized || !hasAcceptedCurrentBriefing()) return;
+  const view = CREW_DASHBOARD_HASHES[nextView] ? nextView : 'overview';
+  crewDashboardView = view;
+  const dashboard = document.querySelector('#participantDashboard');
+  const overview = document.querySelector('#crewDashboardOverview');
+  const navigation = document.querySelector('#crewDashboardNavigation');
+  const grid = dashboard?.querySelector('.dashboard-grid');
+  if (!overview || !navigation || !grid) return;
+  overview.hidden = view !== 'overview';
+  navigation.hidden = view === 'overview';
+  grid.hidden = view === 'overview';
+  grid.classList.toggle('dashboard-grid-single-view', view !== 'overview');
+  grid.querySelectorAll('[data-crew-panel]').forEach((panel) => {
+    panel.hidden = view === 'overview' || panel.dataset.crewPanel !== view;
+  });
+  navigation.querySelectorAll('[data-crew-view]').forEach((button) => {
+    button.toggleAttribute('aria-current', button.dataset.crewView === view);
+  });
+}
+
+function setCrewDashboardMetric(name, value, detail) {
+  const valueTarget = document.querySelector(`[data-crew-summary="${name}"]`);
+  const detailTarget = document.querySelector(`[data-crew-detail="${name}"]`);
+  if (valueTarget) valueTarget.textContent = value;
+  if (detailTarget) detailTarget.textContent = detail;
+}
+
+function renderCrewDashboardOverview() {
+  if (!crewDashboardInitialized) return;
+  const copy = crewDashboardCopy();
+  const pendingPayments = activeCrewPayments.filter((payment) => payment.status !== 'verified' && payment.status !== 'cancelled').length;
+  const verifiedPayments = activeCrewPayments.filter((payment) => payment.status === 'verified').length;
+  const announcements = activeCrewAnnouncements.length;
+  const profileReady = Boolean(activeMember);
+  const briefingReady = hasAcceptedCurrentBriefing();
+  const pendingPaymentSummary = copy.paymentsPending
+    .replace('{count}', String(pendingPayments))
+    .replace('{suffix}', crewPluralSuffix(pendingPayments, 'a', 'e'));
+  const verifiedPaymentSummary = copy.paymentsVerified
+    .replace('{count}', String(verifiedPayments))
+    .replace('{suffix}', crewPluralSuffix(verifiedPayments, 'o', 'i'))
+    .replace('{suffixVerified}', crewPluralSuffix(verifiedPayments, 'o', 'i'));
+  setCrewDashboardMetric(
+    'board',
+    briefingReady ? copy.briefingReady : copy.briefingWaiting,
+    copy.announcements
+      .replace('{count}', String(announcements))
+      .replace('{suffix}', crewPluralSuffix(announcements, 'e', 'i')),
+  );
+  setCrewDashboardMetric(
+    'money',
+    pendingPayments
+      ? pendingPaymentSummary
+      : copy.noPayments,
+    verifiedPayments
+      ? verifiedPaymentSummary
+      : copy.moneyDetail,
+  );
+  setCrewDashboardMetric('profile', profileReady ? copy.profileReady : copy.profileWaiting, copy.profileDetail);
+  const readyItems = [profileReady, briefingReady].filter(Boolean).length;
+  setCrewDashboardMetric('activity', copy.activityProgress.replace('{count}', String(readyItems)), copy.activityDetail);
+  const participantStatus = document.querySelector('#participantStatus');
+  if (participantStatus) {
+    participantStatus.textContent = [
+      profileReady ? copy.profileReady : copy.profileWaiting,
+      briefingReady ? copy.briefingReady : copy.briefingWaiting,
+      pendingPayments ? pendingPaymentSummary : (verifiedPayments ? verifiedPaymentSummary : copy.noPayments),
+    ].join(' · ');
+  }
+
+  const nextActionText = document.querySelector('#crewNextActionText');
+  const nextActionButton = document.querySelector('#crewNextActionButton');
+  if (!nextActionText || !nextActionButton) return;
+  if (!profileReady) {
+    nextActionText.textContent = copy.profileAction;
+    nextActionButton.textContent = copy.openProfile;
+    nextActionButton.dataset.crewView = 'profile';
+  } else if (!briefingReady) {
+    nextActionText.textContent = copy.boardAction;
+    nextActionButton.textContent = copy.openBoard;
+    nextActionButton.dataset.crewView = 'board';
+  } else if (pendingPayments) {
+    nextActionText.textContent = copy.pendingAction;
+    nextActionButton.textContent = copy.openPayments;
+    nextActionButton.dataset.crewView = 'money';
+  } else {
+    nextActionText.textContent = copy.allReady;
+    nextActionButton.textContent = copy.openBoard;
+    nextActionButton.dataset.crewView = 'board';
+  }
 }
 
 function escapeHtml(value = '') {
@@ -114,6 +397,9 @@ function clearPersonalDashboard() {
   activeBriefing = null;
   activeRuleAcceptance = null;
   activeContributionPlan = null;
+  activeMember = null;
+  activeCrewPayments = [];
+  activeCrewAnnouncements = [];
   ['#participantProfileSummary', '#participantPaymentList', '#boardingSchedule', '#participantSchedule', '#boardingRulesSummary', '#boardingRulesText', '#participantRulesSummary', '#participantRulesText', '#participantAnnouncementList', '#participantContributionIncluded', '#participantContributionSeparate'].forEach((selector) => {
     document.querySelector(selector).replaceChildren();
   });
@@ -125,6 +411,7 @@ function clearPersonalDashboard() {
   document.querySelector('#participantContributionPlanEmpty').hidden = false;
   document.querySelector('#participantContributionNotApplicable')?.replaceChildren();
   clearBoardingRulesGateState();
+  renderCrewDashboardOverview();
 }
 
 function handlePrivateReadError(error, messageElement, fallbackMessage) {
@@ -137,14 +424,18 @@ function handlePrivateReadError(error, messageElement, fallbackMessage) {
 }
 
 function renderProfile(member) {
+  activeMember = member || null;
   const documentTail = member.documentNumber ? `•••• ${escapeHtml(member.documentNumber.slice(-4))}` : translate('crew.flow.notProvided', 'Non indicato');
   document.querySelector('#participantProfileSummary').innerHTML = `<dl><div><dt>${escapeHtml(translate('crew.flow.profileName', 'Nome'))}</dt><dd>${escapeHtml(member.displayName || `${member.firstName || ''} ${member.lastName || ''}`)}</dd></div><div><dt>${escapeHtml(translate('crew.flow.profileBirth', 'Nascita'))}</dt><dd>${escapeHtml([formatDate(member.birthDate), member.birthPlace].filter(Boolean).join(' · '))}</dd></div><div><dt>${escapeHtml(translate('crew.flow.profileDocument', 'Documento'))}</dt><dd>${escapeHtml(member.documentType || translate('crew.flow.profileDocument', 'Documento'))} · ${documentTail}</dd></div><div><dt>${escapeHtml(translate('crew.flow.profileRole', 'Ruolo a bordo'))}</dt><dd>${escapeHtml(roleConfirmationText(member))}</dd></div></dl>`;
+  renderCrewDashboardOverview();
 }
 
 function renderPayments(snapshot) {
   const list = document.querySelector('#participantPaymentList');
+  activeCrewPayments = snapshot.docs.map((item) => item.data());
   if (snapshot.empty) {
     list.innerHTML = `<p class="empty-state">${escapeHtml(translate('crew.flow.noPayments', 'Nessuna richiesta al momento. Lo skipper può aggiungerne altre anche in seguito.'))}</p>`;
+    renderCrewDashboardOverview();
     return;
   }
   list.innerHTML = snapshot.docs.map((item) => {
@@ -156,6 +447,7 @@ function renderPayments(snapshot) {
     const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
     return `<article class="payment-row"><div><strong>${formatCurrency(paymentAmount(payment))} · ${escapeHtml(reason)}</strong><span>${escapeHtml(dueDate)}</span>${methods}${legacyInstructions}<span class="payment-detail-note">${escapeHtml(translate('crew.flow.paymentDetailsInWhatsApp', 'I dettagli del pagamento sono nel messaggio WhatsApp dello skipper.'))}</span></div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span></div></article>`;
   }).join('');
+  renderCrewDashboardOverview();
 }
 
 function contributionAmountCents(item) {
@@ -200,6 +492,7 @@ function renderContributionPlan() {
     included.replaceChildren();
     separate.replaceChildren();
     document.querySelector('#participantContributionNotApplicable')?.replaceChildren();
+    renderCrewDashboardOverview();
     return;
   }
 
@@ -219,6 +512,7 @@ function renderContributionPlan() {
   notApplicable.innerHTML = notApplicableItems.length
     ? notApplicableItems.map(contributionItemMarkup).join('')
     : `<p class="empty-state">${escapeHtml(translate('crew.flow.noExcludedItems', 'Nessuna voce è stata esclusa.'))}</p>`;
+  renderCrewDashboardOverview();
 }
 
 function hasItalianBriefing() {
@@ -391,6 +685,7 @@ function renderDashboardBriefing() {
   if (!hasPublishedBriefing()) {
     empty.hidden = false;
     briefing.hidden = true;
+    renderCrewDashboardOverview();
     return;
   }
   empty.hidden = true;
@@ -410,6 +705,7 @@ function renderDashboardBriefing() {
     version: currentBriefingVersion(),
     acceptedAt: acceptedAtSuffix,
   })}${originalNotice}`;
+  renderCrewDashboardOverview();
 }
 
 function renderBoardingGate() {
@@ -470,8 +766,11 @@ function renderBoardingGate() {
   if (hasAcceptedCurrentBriefing()) {
     gate.hidden = true;
     dashboard.hidden = false;
+    setupCrewDashboard();
+    setCrewDashboardView(crewDashboardViewFromHash());
     renderDashboardBriefing();
     startDashboardSubscriptions();
+    renderCrewDashboardOverview();
     return;
   }
 
@@ -486,8 +785,10 @@ function renderBoardingGate() {
 
 function renderAnnouncements(snapshot) {
   const list = document.querySelector('#participantAnnouncementList');
+  activeCrewAnnouncements = snapshot.docs.map((item) => item.data());
   if (snapshot.empty) {
     list.innerHTML = `<p class="empty-state">${escapeHtml(translate('crew.flow.noAnnouncements', 'Nessuna comunicazione al momento.'))}</p>`;
+    renderCrewDashboardOverview();
     return;
   }
   list.innerHTML = snapshot.docs.map((item) => {
@@ -495,6 +796,7 @@ function renderAnnouncements(snapshot) {
     const important = announcement.isImportant ? `<span class="announcement-important">${escapeHtml(translate('crew.flow.important', 'Importante'))}</span>` : '';
     return `<article class="announcement-row"><strong>${escapeHtml(announcement.title || translate('crew.flow.announcement', 'Comunicazione dello skipper'))}</strong><span>${escapeHtml(announcement.message || '')}</span><span class="announcement-meta">${important}${escapeHtml(formatDateTime(announcement.createdAt) || translate('crew.flow.justPublished', 'Appena pubblicato'))}</span></article>`;
   }).join('');
+  renderCrewDashboardOverview();
 }
 
 document.querySelector('#participantSignOutButton').addEventListener('click', async () => {

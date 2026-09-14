@@ -154,6 +154,7 @@ let activeContributionPlan = null;
 let activeCostPlan = null;
 let activeBriefing = null;
 let activeAcceptances = [];
+let skipperAnnouncementCount = 0;
 let stopBoatSubscription = null;
 let stopMemberSubscription = null;
 let stopPaymentSubscription = null;
@@ -168,10 +169,212 @@ let creatingBoat = false;
 let editingBoatId = null;
 let editingMemberId = null;
 const fleetPublicationInProgress = new Set();
+const SKIPPER_DASHBOARD_HASHES = Object.freeze({
+  overview: 'skipper-panorama',
+  crew: 'skipper-equipaggio',
+  money: 'skipper-conti',
+  boat: 'skipper-barca',
+  board: 'skipper-bacheca',
+});
+const SKIPPER_DASHBOARD_LABELS = Object.freeze({
+  overview: 'Panoramica',
+  crew: 'Equipaggio',
+  money: 'Quote e conti',
+  boat: 'Barca e flotta',
+  board: 'Briefing e bacheca',
+});
+let skipperDashboardView = 'overview';
+let skipperDashboardInitialized = false;
 
 function setMessage(element, message, isError = false) {
   element.textContent = message;
   element.classList.toggle('is-error', isError);
+}
+
+function skipperDashboardViewFromHash() {
+  const hash = window.location.hash.replace(/^#/, '');
+  return Object.entries(SKIPPER_DASHBOARD_HASHES)
+    .find(([, value]) => value === hash)?.[0] || 'overview';
+}
+
+function skipperDashboardIcon(kind) {
+  const paths = {
+    crew: '<path d="M8.5 11.25a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7 1.25a2.5 2.5 0 1 0 0-5"/><path d="M2.75 18.5a5.75 5.75 0 0 1 11.5 0M14.25 13.25a5 5 0 0 1 3 4.6"/>',
+    money: '<rect x="3.5" y="5.25" width="17" height="13.5" rx="2"/><path d="M3.5 9.5h17M15.5 14.25h2.25"/>',
+    boat: '<path d="M3 14.5h18l-2.25 4.25H5.25L3 14.5Z"/><path d="M12 3.5v11M12 4l5.25 7H12M11.75 6.25 7 11h4.75"/>',
+    board: '<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4.5"/>',
+  };
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths[kind] || paths.board}</svg>`;
+}
+
+function setupSkipperDashboard() {
+  if (skipperDashboardInitialized) return;
+  const grid = dashboard?.querySelector('.dashboard-grid');
+  const crewPanel = document.querySelector('#memberForm')?.closest('.dashboard-panel');
+  const moneyPanel = document.querySelector('#paymentProfileForm')?.closest('.dashboard-panel');
+  const boatPanel = document.querySelector('#fleetProfileForm')?.closest('.dashboard-panel');
+  const boardPanel = document.querySelector('#briefingForm')?.closest('.dashboard-panel');
+  if (!dashboard || !grid || !crewPanel || !moneyPanel || !boatPanel || !boardPanel) return;
+
+  crewPanel.dataset.skipperPanel = 'crew';
+  moneyPanel.dataset.skipperPanel = 'money';
+  boatPanel.dataset.skipperPanel = 'boat';
+  boardPanel.dataset.skipperPanel = 'board';
+
+  const overview = document.createElement('section');
+  overview.id = 'skipperDashboardOverview';
+  overview.className = 'dashboard-overview skipper-dashboard-overview';
+  overview.setAttribute('aria-label', 'Panoramica area skipper');
+  overview.innerHTML = `
+    <div class="dashboard-overview-heading">
+      <div>
+        <p class="eyebrow">Centro di comando</p>
+        <h3>Quattro aree, <em>una barca alla volta.</em></h3>
+      </div>
+      <p>Apri soltanto ciò che devi gestire: equipaggio, quote, barca oppure briefing. I dati restano separati e aggiornati.</p>
+    </div>
+    <div class="dashboard-hub" aria-label="Aree skipper">
+      <button class="dashboard-hub-card dashboard-hub-card-crew" type="button" data-skipper-view="crew">
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('crew')}</span><span class="dashboard-hub-label">Equipaggio</span>
+        <strong data-skipper-summary="crew">Carico i posti…</strong><small data-skipper-detail="crew">Inviti, Crew List e PDF charter.</small>
+      </button>
+      <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-skipper-view="money">
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('money')}</span><span class="dashboard-hub-label">Quote e conti</span>
+        <strong data-skipper-summary="money">Carico i conti…</strong><small data-skipper-detail="money">Metodi, quote, cassa e richieste.</small>
+      </button>
+      <button class="dashboard-hub-card dashboard-hub-card-boat" type="button" data-skipper-view="boat">
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('boat')}</span><span class="dashboard-hub-label">Barca e flotta</span>
+        <strong data-skipper-summary="boat">Carico la barca…</strong><small data-skipper-detail="boat">Sistemazioni e visibilità pubblica.</small>
+      </button>
+      <button class="dashboard-hub-card dashboard-hub-card-board" type="button" data-skipper-view="board">
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('board')}</span><span class="dashboard-hub-label">Briefing e bacheca</span>
+        <strong data-skipper-summary="board">Carico il briefing…</strong><small data-skipper-detail="board">Regole, orari e comunicazioni.</small>
+      </button>
+    </div>
+    <div class="dashboard-next-step"><div><span>Prossimo passo</span><strong id="skipperNextActionText">Preparo la tua panoramica.</strong></div><button id="skipperNextActionButton" class="button button-primary" type="button" data-skipper-view="crew">Apri</button></div>
+  `;
+
+  const navigation = document.createElement('nav');
+  navigation.id = 'skipperDashboardNavigation';
+  navigation.className = 'dashboard-view-navigation';
+  navigation.setAttribute('aria-label', 'Sezioni area skipper');
+  navigation.innerHTML = Object.entries(SKIPPER_DASHBOARD_LABELS)
+    .map(([view, label]) => `<button type="button" data-skipper-view="${view}">${view === 'overview' ? '← ' : ''}${label}</button>`)
+    .join('');
+
+  grid.before(overview, navigation);
+  dashboard.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-skipper-view]');
+    if (!button || !dashboard.contains(button)) return;
+    const view = button.dataset.skipperView;
+    if (!SKIPPER_DASHBOARD_HASHES[view]) return;
+    const nextHash = `#${SKIPPER_DASHBOARD_HASHES[view]}`;
+    if (window.location.hash === nextHash) {
+      setSkipperDashboardView(view);
+    } else {
+      window.location.hash = nextHash;
+    }
+  });
+  window.addEventListener('hashchange', () => setSkipperDashboardView(skipperDashboardViewFromHash()));
+  skipperDashboardInitialized = true;
+  setSkipperDashboardView(skipperDashboardViewFromHash());
+  renderSkipperDashboardOverview();
+}
+
+function setSkipperDashboardView(nextView) {
+  if (!skipperDashboardInitialized) return;
+  const view = SKIPPER_DASHBOARD_HASHES[nextView] ? nextView : 'overview';
+  skipperDashboardView = view;
+  const overview = document.querySelector('#skipperDashboardOverview');
+  const navigation = document.querySelector('#skipperDashboardNavigation');
+  const grid = dashboard.querySelector('.dashboard-grid');
+  const capacityStatus = document.querySelector('#capacityStatus');
+  const editBoatButton = document.querySelector('#editBoatButton');
+  overview.hidden = view !== 'overview';
+  navigation.hidden = view === 'overview';
+  grid.hidden = view === 'overview';
+  grid.classList.toggle('dashboard-grid-single-view', view !== 'overview');
+  grid.querySelectorAll('[data-skipper-panel]').forEach((panel) => {
+    panel.hidden = view === 'overview' || panel.dataset.skipperPanel !== view;
+  });
+  if (capacityStatus) capacityStatus.hidden = !['overview', 'crew'].includes(view);
+  if (editBoatButton) editBoatButton.hidden = !['overview', 'boat'].includes(view);
+  document.querySelectorAll('#skipperDashboardNavigation [data-skipper-view]').forEach((button) => {
+    const current = button.dataset.skipperView === view;
+    button.toggleAttribute('aria-current', current);
+  });
+}
+
+function setSkipperDashboardMetric(name, value, detail) {
+  const valueTarget = document.querySelector(`[data-skipper-summary="${name}"]`);
+  const detailTarget = document.querySelector(`[data-skipper-detail="${name}"]`);
+  if (valueTarget) valueTarget.textContent = value;
+  if (detailTarget) detailTarget.textContent = detail;
+}
+
+function renderSkipperDashboardOverview() {
+  if (!skipperDashboardInitialized) return;
+  const capacity = crewSeatLimit();
+  const allocated = allocatedCrewSeatCount();
+  const pendingInvites = activeInvites.filter((invite) => invite.status === 'pending').length;
+  const completedProfiles = activeMembers.length;
+  setSkipperDashboardMetric(
+    'crew',
+    capacity ? `${allocated} di ${capacity} posti` : 'Posti da configurare',
+    `${completedProfiles} schede completate · ${pendingInvites} inviti da attivare`,
+  );
+
+  const costPlan = normalizeCostPlan(activeCostPlan);
+  const targetCents = activeCostPlan ? costPlanTotalCents(costPlan) : 0;
+  const verifiedCents = activePayments
+    .filter((payment) => payment.status === 'verified' && paymentCountsTowardCostPlan(payment))
+    .reduce((total, payment) => total + paymentAmountCents(payment), 0);
+  const pendingPayments = activePayments.filter(isPendingPayment).length;
+  const collectionMethods = availablePaymentMethods().length;
+  setSkipperDashboardMetric(
+    'money',
+    targetCents ? `${formatCurrency(targetCents / 100)} da ripartire` : 'Quote da preparare',
+    `${collectionMethods} metodi attivi · ${pendingPayments} richieste da verificare · ${formatCurrency(verifiedCents / 100)} verificati`,
+  );
+
+  const totalBerths = declaredTotalBerths(activeBoat);
+  const fleetVisibility = activeBoat?.fleetShowAvailability === false
+    ? 'Posti liberi privati nella flotta.'
+    : 'Partecipazione e posti liberi pubblicati nella flotta.';
+  setSkipperDashboardMetric(
+    'boat',
+    totalBerths ? `${totalBerths} posti totali a bordo` : 'Configura la barca',
+    `${effectiveParticipantCapacity(activeBoat)} posti per partecipanti · ${fleetVisibility}`,
+  );
+
+  const currentAcceptanceCount = activeAcceptances.filter((acceptance) => acceptance.rulesVersion === (activeBriefing?.rulesVersion || 1)
+    && (activeBriefing?.fullRulesRequired !== true || acceptance.fullRulesRead === true)).length;
+  setSkipperDashboardMetric(
+    'board',
+    activeBriefing?.rulesText ? `Briefing v${activeBriefing.rulesVersion || 1} pubblicato` : 'Briefing da pubblicare',
+    `${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} comunicazioni pubblicate`,
+  );
+
+  const nextActionText = document.querySelector('#skipperNextActionText');
+  const nextActionButton = document.querySelector('#skipperNextActionButton');
+  if (!nextActionText || !nextActionButton) return;
+  if (!activeBriefing?.rulesText) {
+    nextActionText.textContent = 'Pubblica prima il briefing: è il passaggio che sblocca l’ingresso dell’equipaggio.';
+    nextActionButton.textContent = 'Apri briefing';
+    nextActionButton.dataset.skipperView = 'board';
+  } else if (!collectionMethods) {
+    nextActionText.textContent = 'Configura almeno un metodo di incasso prima di creare richieste personali.';
+    nextActionButton.textContent = 'Apri quote e conti';
+    nextActionButton.dataset.skipperView = 'money';
+  } else if (!allocated) {
+    nextActionText.textContent = 'La barca è pronta: invita la prima persona con un link WhatsApp personale.';
+    nextActionButton.textContent = 'Invita una persona';
+    nextActionButton.dataset.skipperView = 'crew';
+  } else {
+    nextActionText.textContent = 'Tutto sotto controllo: apri l’area che vuoi aggiornare.';
+    nextActionButton.textContent = 'Gestisci equipaggio';
+    nextActionButton.dataset.skipperView = 'crew';
+  }
 }
 
 function setupBriefingEditor() {
@@ -702,6 +905,7 @@ function resetPrivateView() {
   activeCostPlan = null;
   activeBriefing = null;
   activeAcceptances = [];
+  skipperAnnouncementCount = 0;
   creatingBoat = false;
   editingBoatId = null;
   editingMemberId = null;
@@ -728,6 +932,7 @@ function resetPrivateView() {
   stopAcceptanceSubscription = null;
   dashboard.hidden = true;
   registerSection.hidden = true;
+  renderSkipperDashboardOverview();
 }
 
 function showPrivateAreaBlocked() {
@@ -932,6 +1137,7 @@ function renderPaymentProfile(profile) {
   form.elements.bankAccountHolder.value = activePaymentProfile.paymentDetails.bankTransfer.accountHolder || '';
   renderPaymentProfileDetailVisibility(form);
   renderPaymentMethodOptions();
+  renderSkipperDashboardOverview();
 }
 
 function fillCostPlanForm(plan = activeCostPlan) {
@@ -994,6 +1200,7 @@ function renderCostPlan(plan) {
   fillCostPlanForm(activeCostPlan);
   renderCostPlanSummary();
   renderPaymentBerthOptions();
+  renderSkipperDashboardOverview();
 }
 
 function formatDate(value, locale = 'it') {
@@ -1420,6 +1627,7 @@ function renderMembers() {
     renderPaymentRecipientOptions();
     renderCapacityStatus();
     updateCharterReadiness();
+    renderSkipperDashboardOverview();
     return;
   }
   list.innerHTML = activeMembers.map((member) => {
@@ -1434,6 +1642,7 @@ function renderMembers() {
   renderPaymentRecipientOptions();
   renderCapacityStatus();
   updateCharterReadiness();
+  renderSkipperDashboardOverview();
 }
 
 function renderInvites() {
@@ -1442,6 +1651,7 @@ function renderInvites() {
     list.innerHTML = '<p class="empty-state">Nessun link personale creato.</p>';
     renderPaymentRecipientOptions();
     renderCapacityStatus();
+    renderSkipperDashboardOverview();
     return;
   }
   list.innerHTML = activeInvites.map((invite) => {
@@ -1458,6 +1668,7 @@ function renderInvites() {
   }).join('');
   renderPaymentRecipientOptions();
   renderCapacityStatus();
+  renderSkipperDashboardOverview();
 }
 
 function renderPayments(snapshot) {
@@ -1466,6 +1677,7 @@ function renderPayments(snapshot) {
     activePayments = [];
     list.innerHTML = '<p class="empty-state">Nessuna richiesta preparata.</p>';
     renderCostPlanSummary();
+    renderSkipperDashboardOverview();
     return;
   }
   activePayments = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
@@ -1494,6 +1706,7 @@ function renderPayments(snapshot) {
     return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}<button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>${inviteAction}${statusActions}</div></article>`;
   }).join('');
   renderCostPlanSummary();
+  renderSkipperDashboardOverview();
 }
 
 function renderBriefingForm() {
@@ -1521,6 +1734,7 @@ function renderBriefingStatus() {
   const status = document.querySelector('#briefingStatus');
   if (!activeBriefing?.rulesText) {
     status.textContent = 'Pubblica il briefing obbligatorio per attivare l’ingresso dell’equipaggio nella propria area.';
+    renderSkipperDashboardOverview();
     return;
   }
   const version = activeBriefing.rulesVersion || 1;
@@ -1528,12 +1742,15 @@ function renderBriefingStatus() {
     && (activeBriefing.fullRulesRequired !== true || item.fullRulesRead === true)).length;
   const hasOfficialEnglish = hasOfficialEnglishBriefing();
   status.textContent = `Briefing safety versione ${version} pubblicato. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} completato l’accettazione.${hasOfficialEnglish ? ' Versione inglese ufficiale disponibile.' : ' Versione inglese ufficiale non ancora pubblicata.'}`;
+  renderSkipperDashboardOverview();
 }
 
 function renderAnnouncements(snapshot) {
   const list = document.querySelector('#announcementList');
+  skipperAnnouncementCount = snapshot.size ?? snapshot.docs?.length ?? 0;
   if (snapshot.empty) {
     list.innerHTML = '<p class="empty-state">Nessuna comunicazione pubblicata.</p>';
+    renderSkipperDashboardOverview();
     return;
   }
   list.innerHTML = snapshot.docs.map((item) => {
@@ -1542,12 +1759,15 @@ function renderAnnouncements(snapshot) {
     const important = announcement.isImportant ? '<span class="announcement-important">Importante</span>' : '';
     return `<article class="announcement-row"><strong>${escapeHtml(announcement.title || 'Comunicazione dello skipper')}</strong><span>${escapeHtml(announcement.message || '')}</span><span class="announcement-meta">${important}${escapeHtml(date || 'Appena pubblicato')}</span></article>`;
   }).join('');
+  renderSkipperDashboardOverview();
 }
 
 function subscribeToBoat(boat) {
   activeBoat = boat;
   registerSection.hidden = true;
   dashboard.hidden = false;
+  setupSkipperDashboard();
+  setSkipperDashboardView(skipperDashboardViewFromHash());
   document.querySelector('#boatTitle').textContent = boat.name;
   const berthTotals = berthLayoutTotals(boat.berthLayout);
   const totalBerths = declaredTotalBerths(boat);
