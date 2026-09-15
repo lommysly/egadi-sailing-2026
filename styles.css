@@ -237,6 +237,17 @@ body.menu-open { overflow:hidden; }
 .skipper-profile-status strong,.skipper-profile-status span { display:block; }
 .skipper-profile-status strong { margin-bottom:4px; color:#063644; font:600 1.02rem/1.2 "Fraunces",serif; }
 .skipper-profile-status span { color:#416b6d; font-size:.82rem; line-height:1.45; }
+.visually-hidden { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+.skipper-document-upload-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.skipper-document-upload { display:grid; gap:15px; min-width:0; padding:15px; border:1px solid rgba(8,123,138,.2); border-radius:11px; background:rgba(255,255,255,.72); }
+.skipper-document-upload.is-uploaded { border-color:rgba(11,127,100,.38); background:#effbf7; }
+.skipper-document-upload.is-uploading { border-color:rgba(8,123,138,.5); background:#e9f8f7; }
+.skipper-document-upload.is-error { border-color:rgba(171,67,50,.36); background:#fff5f2; }
+.skipper-document-upload-copy h4 { margin:2px 0 7px; }
+.skipper-document-upload-copy p:last-child { margin:0; color:#416b6d; font-size:.8rem; line-height:1.4; }
+.skipper-document-upload-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.skipper-document-upload-actions .button { min-height:40px; }
+.skipper-document-upload-actions .text-button { min-height:32px; }
 .board-divider { height:1px; margin:28px 0; background:var(--line); }
 .contribution-catalog-panel,.skipper-cost-panel { padding:16px; border:1px solid var(--line); border-radius:12px; background:#f7fffe; }
 .contribution-catalog-panel summary,.skipper-cost-panel summary { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; font:700 .98rem "DM Sans",sans-serif; }
@@ -441,7 +452,7 @@ body.menu-open { overflow:hidden; }
 .passage-safety { margin-top:36px; background:#b8f2ed; color:#063644; }
 .passage-safety p { max-width:780px; line-height:1.6; }
 @media (max-width:800px) { .passage-status,.passage-data-grid,.passage-stop-grid,.passage-mooring-guide { grid-template-columns:1fr; }.passage-day-heading { display:grid; gap:0; }.passage-day-card,.passage-introduction,.passage-safety,.passage-mooring-guide { padding:24px; } }
-@media (max-width:800px) { .form-grid,.dashboard-grid,.schedule-list { grid-template-columns:1fr; }.dashboard-heading { display:grid; align-items:start; }.dashboard-actions { justify-content:start; }.form-actions { display:grid; align-items:start; }.form-actions .form-message { margin:0; }.dashboard-overview-heading { grid-template-columns:1fr; gap:14px; }.dashboard-hub { grid-template-columns:repeat(2,minmax(0,1fr)); }.dashboard-hub-card { min-height:160px; padding:15px; }.dashboard-next-step { display:grid; align-items:start; }.dashboard-next-step .button { width:100%; }.dashboard-view-navigation { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }.dashboard-view-navigation button { flex:0 0 auto; }.board-rules-overview,.skipper-profile-status { grid-template-columns:1fr; }.board-rules-overview-meta { grid-column:1; } }
+@media (max-width:800px) { .form-grid,.dashboard-grid,.schedule-list,.skipper-document-upload-grid { grid-template-columns:1fr; }.dashboard-heading { display:grid; align-items:start; }.dashboard-actions { justify-content:start; }.form-actions { display:grid; align-items:start; }.form-actions .form-message { margin:0; }.dashboard-overview-heading { grid-template-columns:1fr; gap:14px; }.dashboard-hub { grid-template-columns:repeat(2,minmax(0,1fr)); }.dashboard-hub-card { min-height:160px; padding:15px; }.dashboard-next-step { display:grid; align-items:start; }.dashboard-next-step .button { width:100%; }.dashboard-view-navigation { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }.dashboard-view-navigation button { flex:0 0 auto; }.board-rules-overview,.skipper-profile-status { grid-template-columns:1fr; }.board-rules-overview-meta { grid-column:1; } }
 @media (max-width:800px) { .contribution-catalog-row { grid-template-columns:1fr; }.starter-pack-options,.cost-plan-outside ul { grid-template-columns:1fr; }.finance-overview-heading { grid-template-columns:1fr; }.finance-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.cost-result-grid,.cost-result-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }.cost-result-heading { align-items:start; }.cost-result-heading > small { text-align:left; }.cost-result-actions-heading { display:grid; gap:3px; }.cost-result-actions-heading small { text-align:left; }.finance-dashboard-hub { grid-template-columns:1fr; }.finance-dashboard-panel { padding:22px; }.crew-activity-timeline-heading { display:grid; align-items:start; gap:6px; }.projection-row { grid-template-columns:1fr; grid-template-areas:"person" "cost" "actions"; gap:12px; }.projection-actions { display:flex; }.projection-action { justify-content:center; width:auto; }.projection-action-icon-only { width:34px; } }
 @media (max-width:430px) { .finance-overview-grid,.participant-finance-grid,.cost-result-grid,.cost-result-actions { grid-template-columns:1fr; }.projection-action { min-height:40px; }.projection-action-icon-only { width:40px; min-width:40px; } }
 @media (max-width:800px) { .charter-export { display:grid; align-items:start; } }

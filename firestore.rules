@@ -120,9 +120,9 @@ service cloud.firestore {
         && hasSafeCrewRoleConfirmation();
     }
 
-    // Il dossier skipper raccoglie riferimenti personali e abilitazioni che
-    // il charter può chiedere. Non ospita scansioni: quelle restano nel
-    // canale concordato con il charter e non entrano mai nella flotta o nella
+    // Il dossier skipper raccoglie soltanto riferimenti personali e
+    // abilitazioni. Le due copie consentite (patente nautica e certificato
+    // radio) vivono nel percorso Storage privato, mai nella flotta o nella
     // superficie equipaggio.
     function isValidCharterDocumentStatus(value) {
       return value in ['to_prepare', 'ready', 'sent', 'confirmed'];
@@ -1740,7 +1740,7 @@ service cloud.firestore {
 
       // Riferimenti personali e abilitazioni dello skipper: un documento
       // singolo privato, non consultabile da equipaggio, flotta o
-      // organizzatore. Le copie degli allegati non vengono caricate qui.
+      // organizzatore. Le copie non vengono mai caricate in Firestore.
       match /skipperProfile/{profileId} {
         allow get: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId);
         allow list: if false;

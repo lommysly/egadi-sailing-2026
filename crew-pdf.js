@@ -31,6 +31,10 @@ const skipperDocumentStatusFields = [
   'sailingLicenseStatus',
   'radioCertificateStatus',
 ];
+const skipperPrivateCopyFields = [
+  'sailingLicense',
+  'radioCertificate',
+];
 const skipperDocumentStatusLabels = {
   to_prepare: 'Da preparare',
   ready: 'Pronto da inviare',
@@ -73,7 +77,12 @@ export function isBoatReadyForPdf(boat) {
   return Boolean(boat?.name && boat?.flag && boat?.skipperName);
 }
 
-export function getMissingSkipperProfileFields(profile) {
+function hasPrivateSkipperCopy(documentCopies, documentKey) {
+  const copy = documentCopies?.[documentKey];
+  return copy === true || copy?.state === 'uploaded';
+}
+
+export function getMissingSkipperProfileFields(profile, documentCopies = {}) {
   if (!profile) return ['skipperProfile'];
   const missing = skipperProfileFields.filter((field) => !String(profile[field] || '').trim());
   if (!isIsoDate(profile.birthDate)) missing.push('birthDate');
@@ -84,11 +93,14 @@ export function getMissingSkipperProfileFields(profile) {
   skipperDocumentStatusFields.forEach((field) => {
     if (!skipperDocumentStatusLabels[profile[field]] || profile[field] === 'to_prepare') missing.push(field);
   });
+  skipperPrivateCopyFields.forEach((field) => {
+    if (!hasPrivateSkipperCopy(documentCopies, field)) missing.push(`${field}Copy`);
+  });
   return [...new Set(missing)];
 }
 
-export function isSkipperProfileCharterReady(profile) {
-  return getMissingSkipperProfileFields(profile).length === 0;
+export function isSkipperProfileCharterReady(profile, documentCopies = {}) {
+  return getMissingSkipperProfileFields(profile, documentCopies).length === 0;
 }
 
 function skipperDocumentStatus(profile, field) {
@@ -120,7 +132,7 @@ export function buildCapitaneriaPrintHtml({ boat, members, skipperProfile }) {
     <div><p class="label">Patente nautica</p><p class="value">${escapeHtml(skipper.sailingLicenseNumber || '—')}</p><p class="detail">${escapeHtml(`Scadenza: ${skipper.sailingLicenseExpiry ? formatDate(skipper.sailingLicenseExpiry) : 'non indicata'} · ${skipperDocumentStatus(skipper, 'sailingLicenseStatus')}`)}</p></div>
     <div><p class="label">Certificato radio</p><p class="value">${escapeHtml(`${skipper.radioCertificateType || ''} · ${skipper.radioCertificateNumber || ''}`.trim())}</p><p class="detail">${escapeHtml(`Scadenza: ${skipper.radioCertificateExpiry ? formatDate(skipper.radioCertificateExpiry) : 'non indicata'} · ${skipperDocumentStatus(skipper, 'radioCertificateStatus')}`)}</p></div>
   </div>
-  <p class="dossier-note">Le copie dei documenti seguono il canale richiesto dal charter; questo foglio registra solo riferimenti e stato operativo dichiarato dallo skipper.</p>`;
+  <p class="dossier-note">Le copie della patente nautica e del certificato radio restano nell’archivio privato dello skipper e non sono incluse in questo PDF. Allegale al charter soltanto tramite il canale concordato.</p>`;
 
   return `<!doctype html>
 <html lang="it"><head><meta charset="utf-8"><title>Elenco equipaggio - ${escapeHtml(boat.name)}</title>

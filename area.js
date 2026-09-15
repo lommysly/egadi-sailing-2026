@@ -1,8 +1,9 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { getBlob, getMetadata, getStorage, ref as storageRef, uploadBytesResumable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
-import { getMissingCharterFields, getMissingSkipperProfileFields, isBoatReadyForPdf, isCharterReady, isSkipperProfileCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260915-skipper-dossier-v1';
+import { getMissingCharterFields, getMissingSkipperProfileFields, isBoatReadyForPdf, isCharterReady, isSkipperProfileCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260915-skipper-documents-v1';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260914-en2';
 import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260914-en2';
@@ -11,6 +12,7 @@ const eventId = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
 const signInCard = document.querySelector('#signInCard');
@@ -22,6 +24,12 @@ const authMessage = document.querySelector('#authMessage');
 const PAYMENT_PROFILE_ID = 'default';
 const COST_PLAN_ID = 'default';
 const SKIPPER_PROFILE_ID = 'default';
+const SKIPPER_DOCUMENT_MAX_BYTES = 8 * 1024 * 1024;
+const SKIPPER_DOCUMENT_KINDS = Object.freeze({
+  sailingLicense: Object.freeze({ storageType: 'sailing-license', label: 'patente nautica', downloadName: 'patente-nautica' }),
+  radioCertificate: Object.freeze({ storageType: 'radio-certificate', label: 'certificato radio', downloadName: 'certificato-radio' }),
+});
+const SKIPPER_DOCUMENT_CONTENT_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 const PAYMENT_METHODS = [
   { id: 'paypal', label: 'PayPal', profileField: 'paypalEnabled', detailsField: 'paypalDetails' },
   { id: 'satispay', label: 'Satispay', profileField: 'satispayEnabled', detailsField: 'satispayDetails' },
@@ -253,6 +261,9 @@ let activeCostPlan = null;
 let activeBriefing = null;
 let activeAcceptances = [];
 let activeSkipperProfile = null;
+let activeSkipperDocumentCopies = emptySkipperDocumentCopies('idle');
+let skipperDocumentsEpoch = 0;
+const activeSkipperDocumentUploads = new Map();
 let skipperAnnouncementCount = 0;
 let stopBoatSubscription = null;
 let stopMemberSubscription = null;
@@ -322,6 +333,240 @@ let skipperFinanceDashboardInitialized = false;
 function setMessage(element, message, isError = false) {
   element.textContent = message;
   element.classList.toggle('is-error', isError);
+}
+
+function emptySkipperDocumentCopies(state = 'checking') {
+  return Object.fromEntries(Object.keys(SKIPPER_DOCUMENT_KINDS).map((key) => [key, {
+    state,
+    metadata: null,
+    progress: null,
+  }]));
+}
+
+function skipperDocumentReference(boatId, documentKey) {
+  const documentDefinition = SKIPPER_DOCUMENT_KINDS[documentKey];
+  if (!documentDefinition || !boatId) return null;
+  return storageRef(storage, `boats/${boatId}/skipper-documents/${documentDefinition.storageType}/current`);
+}
+
+function isCurrentSkipperDocumentContext(boatId, uid, epoch) {
+  return activeBoat?.id === boatId
+    && auth.currentUser?.uid === uid
+    && skipperDocumentsEpoch === epoch;
+}
+
+function documentCopyIsUploaded(documentKey) {
+  return activeSkipperDocumentCopies?.[documentKey]?.state === 'uploaded';
+}
+
+function skipperDocumentExtension(contentType) {
+  if (contentType === 'image/jpeg') return 'jpg';
+  if (contentType === 'image/png') return 'png';
+  return 'pdf';
+}
+
+function getStorageErrorMessage(error, fallbackMessage) {
+  console.error('Egadi Storage:', error);
+  if (error?.code === 'storage/unauthorized') {
+    return 'Operazione non autorizzata. Esci e rientra con l’account Google associato alla barca, poi riprova.';
+  }
+  if (error?.code === 'storage/quota-exceeded') {
+    return 'Lo spazio documenti non è disponibile in questo momento. Riprova più tardi.';
+  }
+  if (error?.code === 'storage/retry-limit-exceeded' || error?.code === 'storage/unavailable') {
+    return 'Connessione ai documenti non disponibile. Controlla la rete e riprova.';
+  }
+  return fallbackMessage;
+}
+
+function renderSkipperDocumentCopies() {
+  const hasActiveSkipperDocumentUpload = activeSkipperDocumentUploads.size > 0;
+  Object.entries(SKIPPER_DOCUMENT_KINDS).forEach(([documentKey, definition]) => {
+    const copy = activeSkipperDocumentCopies?.[documentKey] || { state: 'idle' };
+    const card = document.querySelector(`[data-skipper-document-card="${documentKey}"]`);
+    const state = document.querySelector(`[data-skipper-document-state="${documentKey}"]`);
+    const uploadButton = document.querySelector(`[data-skipper-document-upload="${documentKey}"]`);
+    const downloadButton = document.querySelector(`[data-skipper-document-download="${documentKey}"]`);
+    const input = document.querySelector(`[data-skipper-document-input="${documentKey}"]`);
+    const isUploading = copy.state === 'uploading';
+    const isUploaded = copy.state === 'uploaded';
+    const stateText = {
+      idle: 'Accedi alla tua barca per gestire la copia privata.',
+      checking: 'Controllo della copia privata…',
+      missing: `Manca la copia della ${definition.label}.`,
+      uploaded: 'Copia privata archiviata. Non è stata inviata al charter.',
+      error: 'Non riesco a verificare la copia. Ricarica la pagina e riprova.',
+    }[copy.state] || 'Controllo della copia privata…';
+    const uploadText = isUploading
+      ? `Caricamento ${Math.max(0, Math.min(100, Math.round(copy.progress || 0)))}%`
+      : isUploaded ? 'Sostituisci copia' : 'Scegli e carica copia';
+
+    if (state) state.textContent = isUploading ? `Caricamento privato in corso: ${Math.max(0, Math.min(100, Math.round(copy.progress || 0)))}%.` : stateText;
+    if (uploadButton) {
+      uploadButton.textContent = uploadText;
+      uploadButton.disabled = hasActiveSkipperDocumentUpload || !activeBoat;
+    }
+    if (downloadButton) downloadButton.disabled = !isUploaded || isUploading;
+    if (input) input.disabled = hasActiveSkipperDocumentUpload || !activeBoat;
+    if (card) {
+      card.classList.toggle('is-uploaded', isUploaded);
+      card.classList.toggle('is-uploading', isUploading);
+      card.classList.toggle('is-error', copy.state === 'error');
+    }
+  });
+}
+
+function resetSkipperDocumentCopies(state = 'idle') {
+  skipperDocumentsEpoch += 1;
+  activeSkipperDocumentUploads.forEach((task) => task.cancel());
+  activeSkipperDocumentUploads.clear();
+  activeSkipperDocumentCopies = emptySkipperDocumentCopies(state);
+  document.querySelectorAll('[data-skipper-document-input]').forEach((input) => {
+    input.value = '';
+  });
+  renderSkipperDocumentCopies();
+}
+
+async function refreshSkipperDocumentCopies(boatId = activeBoat?.id) {
+  const uid = auth.currentUser?.uid;
+  if (!boatId || !uid) {
+    resetSkipperDocumentCopies('idle');
+    return;
+  }
+  const epoch = skipperDocumentsEpoch + 1;
+  skipperDocumentsEpoch = epoch;
+  activeSkipperDocumentCopies = emptySkipperDocumentCopies('checking');
+  renderSkipperDocumentCopies();
+
+  const copies = await Promise.all(Object.keys(SKIPPER_DOCUMENT_KINDS).map(async (documentKey) => {
+    try {
+      const metadata = await getMetadata(skipperDocumentReference(boatId, documentKey));
+      return [documentKey, { state: 'uploaded', metadata, progress: null }];
+    } catch (error) {
+      if (error?.code === 'storage/object-not-found') {
+        return [documentKey, { state: 'missing', metadata: null, progress: null }];
+      }
+      console.error('Egadi Storage metadata:', error);
+      return [documentKey, { state: 'error', metadata: null, progress: null }];
+    }
+  }));
+
+  if (!isCurrentSkipperDocumentContext(boatId, uid, epoch)) return;
+  activeSkipperDocumentCopies = Object.fromEntries(copies);
+  renderSkipperDocumentCopies();
+  renderSkipperProfileStatus();
+  updateCharterReadiness();
+  renderSkipperDashboardOverview();
+}
+
+function validateSkipperDocumentFile(file) {
+  if (!file) return 'Scegli prima una copia da caricare.';
+  if (!SKIPPER_DOCUMENT_CONTENT_TYPES.has(file.type)) {
+    return 'Sono accettati soltanto PDF, JPG o PNG. Se il file è in un altro formato, esportalo prima in uno di questi.';
+  }
+  if (file.size <= 0) return 'Il file selezionato è vuoto. Scegline un altro.';
+  if (file.size > SKIPPER_DOCUMENT_MAX_BYTES) return 'La copia supera 8 MB. Riduci il file e riprova.';
+  return '';
+}
+
+async function uploadSkipperDocumentCopy(documentKey, file) {
+  const message = document.querySelector('#skipperProfileMessage');
+  const documentDefinition = SKIPPER_DOCUMENT_KINDS[documentKey];
+  const boatId = activeBoat?.id;
+  const uid = auth.currentUser?.uid;
+  if (blockPrivateAction(message) || !documentDefinition || !boatId || !uid) return;
+  if (activeSkipperDocumentUploads.has(documentKey)) return;
+  if (activeSkipperDocumentUploads.size > 0) {
+    setMessage(message, 'Attendi che il caricamento in corso sia concluso prima di gestire l’altra copia.', true);
+    return;
+  }
+
+  const validationMessage = validateSkipperDocumentFile(file);
+  if (validationMessage) {
+    setMessage(message, validationMessage, true);
+    return;
+  }
+  if (documentCopyIsUploaded(documentKey) && !window.confirm(`Vuoi sostituire la copia privata della ${documentDefinition.label}? La copia precedente non resterà disponibile nell’area.`)) return;
+
+  const epoch = skipperDocumentsEpoch;
+  const documentReference = skipperDocumentReference(boatId, documentKey);
+  const uploadTask = uploadBytesResumable(documentReference, file, {
+    contentType: file.type,
+    contentDisposition: 'attachment',
+    cacheControl: 'private, max-age=0, no-store',
+    customMetadata: {
+      documentType: documentDefinition.storageType,
+      schema: '1',
+    },
+  });
+  activeSkipperDocumentUploads.set(documentKey, uploadTask);
+  activeSkipperDocumentCopies = {
+    ...activeSkipperDocumentCopies,
+    [documentKey]: { state: 'uploading', metadata: null, progress: 0 },
+  };
+  renderSkipperDocumentCopies();
+  setMessage(message, `Carico privatamente la copia della ${documentDefinition.label}…`);
+  uploadTask.on('state_changed', (snapshot) => {
+    if (!isCurrentSkipperDocumentContext(boatId, uid, epoch)) return;
+    activeSkipperDocumentCopies = {
+      ...activeSkipperDocumentCopies,
+      [documentKey]: {
+        state: 'uploading',
+        metadata: null,
+        progress: snapshot.totalBytes ? (snapshot.bytesTransferred / snapshot.totalBytes) * 100 : 0,
+      },
+    };
+    renderSkipperDocumentCopies();
+  });
+
+  try {
+    await uploadTask;
+    if (!isCurrentSkipperDocumentContext(boatId, uid, epoch)) return;
+    setMessage(message, `Copia della ${documentDefinition.label} archiviata privatamente. Ricorda di allegarla al charter solo nel canale concordato.`);
+    await refreshSkipperDocumentCopies(boatId);
+  } catch (error) {
+    if (error?.code === 'storage/canceled') return;
+    if (isCurrentSkipperDocumentContext(boatId, uid, epoch)) {
+      setMessage(message, getStorageErrorMessage(error, `Non riesco a caricare la copia della ${documentDefinition.label}. Riprova.`), true);
+      await refreshSkipperDocumentCopies(boatId);
+    }
+  } finally {
+    if (activeSkipperDocumentUploads.get(documentKey) === uploadTask) activeSkipperDocumentUploads.delete(documentKey);
+    if (activeBoat?.id === boatId && auth.currentUser?.uid === uid) renderSkipperDocumentCopies();
+  }
+}
+
+async function downloadSkipperDocumentCopy(documentKey) {
+  const message = document.querySelector('#skipperProfileMessage');
+  const documentDefinition = SKIPPER_DOCUMENT_KINDS[documentKey];
+  const boatId = activeBoat?.id;
+  const uid = auth.currentUser?.uid;
+  if (blockPrivateAction(message) || !documentDefinition || !boatId || !uid || !documentCopyIsUploaded(documentKey)) return;
+  const epoch = skipperDocumentsEpoch;
+  const downloadButton = document.querySelector(`[data-skipper-document-download="${documentKey}"]`);
+  if (downloadButton) downloadButton.disabled = true;
+  setMessage(message, `Preparo la copia privata della ${documentDefinition.label}…`);
+  try {
+    const blob = await getBlob(skipperDocumentReference(boatId, documentKey), SKIPPER_DOCUMENT_MAX_BYTES);
+    if (!isCurrentSkipperDocumentContext(boatId, uid, epoch)) return;
+    const contentType = activeSkipperDocumentCopies?.[documentKey]?.metadata?.contentType;
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `${documentDefinition.downloadName}.${skipperDocumentExtension(contentType)}`;
+    link.hidden = true;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    setMessage(message, 'Download avviato. Invia la copia al charter soltanto attraverso il canale concordato.');
+  } catch (error) {
+    if (isCurrentSkipperDocumentContext(boatId, uid, epoch)) {
+      setMessage(message, getStorageErrorMessage(error, 'Non riesco a scaricare la copia privata. Riprova.'), true);
+    }
+  } finally {
+    if (activeBoat?.id === boatId && auth.currentUser?.uid === uid) renderSkipperDocumentCopies();
+  }
 }
 
 function skipperDashboardViewFromHash() {
@@ -743,12 +988,12 @@ function renderSkipperDashboardOverview() {
     `${completedProfiles} schede completate · ${pendingInvites} link pronti · ${projectedCrew} proiezioni`,
   );
 
-  const skipperProfileMissing = getMissingSkipperProfileFields(activeSkipperProfile);
+  const skipperProfileMissing = getMissingSkipperProfileFields(activeSkipperProfile, activeSkipperDocumentCopies);
   setSkipperDashboardMetric(
     'profile',
-    isSkipperProfileCharterReady(activeSkipperProfile) ? 'Dossier pronto' : 'Dossier da completare',
-    isSkipperProfileCharterReady(activeSkipperProfile)
-      ? 'Anagrafica, patente e certificato radio aggiornati.'
+    isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies) ? 'Dossier pronto' : 'Dossier da completare',
+    isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies)
+      ? 'Anagrafica, abilitazioni e copie private aggiornate.'
       : `${skipperProfileMissing.length} ${skipperProfileMissing.length === 1 ? 'voce da controllare' : 'voci da controllare'} per il charter.`,
   );
 
@@ -791,8 +1036,8 @@ function renderSkipperDashboardOverview() {
   const nextActionText = document.querySelector('#skipperNextActionText');
   const nextActionButton = document.querySelector('#skipperNextActionButton');
   if (!nextActionText || !nextActionButton) return;
-  if (!isSkipperProfileCharterReady(activeSkipperProfile)) {
-    nextActionText.textContent = 'Completa prima il tuo dossier charter: anche lo skipper deve comparire nella Crew List con i propri riferimenti.';
+  if (!isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies)) {
+    nextActionText.textContent = 'Completa prima il tuo dossier charter: dati, abilitazioni e le due copie private richieste devono essere pronti.';
     nextActionButton.textContent = 'Apri il mio dossier';
     nextActionButton.dataset.skipperView = 'profile';
   } else if (!activeBriefing?.rulesText) {
@@ -2201,6 +2446,7 @@ async function publishExistingBoatToFleet(boat) {
 }
 
 function resetPrivateView() {
+  resetSkipperDocumentCopies('idle');
   activeBoat = null;
   activeMembers = [];
   activePayments = [];
@@ -4151,8 +4397,7 @@ function openBoatEdit() {
 function renderSkipperProfile(profile) {
   activeSkipperProfile = profile || null;
   const form = document.querySelector('#skipperProfileForm');
-  const status = document.querySelector('#skipperProfileStatus');
-  if (!form || !status) return;
+  if (!form) return;
 
   if (profile && form.dataset.editing !== 'true') {
     for (const [field, value] of Object.entries(profile)) {
@@ -4163,14 +4408,22 @@ function renderSkipperProfile(profile) {
     }
   }
 
-  const missing = getMissingSkipperProfileFields(profile);
-  const ready = isSkipperProfileCharterReady(profile);
+  renderSkipperProfileStatus();
+}
+
+function renderSkipperProfileStatus() {
+  const profile = activeSkipperProfile;
+  const status = document.querySelector('#skipperProfileStatus');
+  if (!status) return;
+
+  const missing = getMissingSkipperProfileFields(profile, activeSkipperDocumentCopies);
+  const ready = isSkipperProfileCharterReady(profile, activeSkipperDocumentCopies);
   if (ready) {
-    status.innerHTML = '<span class="skipper-profile-status-icon" aria-hidden="true">✓</span><div><strong>Dossier charter pronto</strong><span>La tua riga entra nella Crew List e il PDF include i riferimenti a patente, certificato radio e stato dei documenti.</span></div>';
+    status.innerHTML = '<span class="skipper-profile-status-icon" aria-hidden="true">✓</span><div><strong>Dossier charter pronto</strong><span>La tua riga entra nella Crew List. Le due copie restano private e puoi scaricarle quando devi allegarle al charter.</span></div>';
   } else if (!profile) {
-    status.innerHTML = '<span class="skipper-profile-status-icon is-pending" aria-hidden="true">!</span><div><strong>Il tuo dossier è ancora vuoto</strong><span>Compila qui la tua anagrafica, la patente nautica e il certificato radio: non verranno mostrati né alla flotta né all’equipaggio.</span></div>';
+    status.innerHTML = '<span class="skipper-profile-status-icon is-pending" aria-hidden="true">!</span><div><strong>Il tuo dossier è ancora vuoto</strong><span>Compila qui anagrafica e abilitazioni, poi archivia le due copie richieste dal charter. Non compariranno mai alla flotta o all’equipaggio.</span></div>';
   } else {
-    status.innerHTML = `<span class="skipper-profile-status-icon is-pending" aria-hidden="true">!</span><div><strong>Ci sono ancora ${missing.length} ${missing.length === 1 ? 'voce da completare' : 'voci da completare'}</strong><span>Quando il dossier è pronto, il PDF potrà inserire anche lo skipper e il riepilogo dei documenti per il charter.</span></div>`;
+    status.innerHTML = `<span class="skipper-profile-status-icon is-pending" aria-hidden="true">!</span><div><strong>Ci sono ancora ${missing.length} ${missing.length === 1 ? 'voce da completare' : 'voci da completare'}</strong><span>Completa i dati, gli stati e le due copie private: poi il PDF potrà inserire anche lo skipper e il riepilogo per il charter.</span></div>`;
   }
   updateCharterReadiness();
   renderSkipperDashboardOverview();
@@ -4181,7 +4434,7 @@ function updateCharterReadiness() {
   const readiness = document.querySelector('#charterReadiness');
   const incomplete = activeMembers.filter((member) => !isCharterReady(member));
   const boatMissing = !isBoatReadyForPdf(activeBoat);
-  const skipperProfileMissing = !isSkipperProfileCharterReady(activeSkipperProfile);
+  const skipperProfileMissing = !isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies);
   const overCapacity = activeBoat && activeMembers.length > crewSeatLimit();
   generatePdfButton.disabled = !activeBoat || activeMembers.length === 0 || incomplete.length > 0 || boatMissing || skipperProfileMissing || overCapacity;
   readiness.textContent = !activeBoat
@@ -4189,7 +4442,7 @@ function updateCharterReadiness() {
     : boatMissing
       ? 'Completa bandiera e comandante della barca per attivare il PDF.'
       : skipperProfileMissing
-        ? 'Completa prima il dossier dello skipper: anagrafica, patente, certificato radio e stato dei documenti per il charter.'
+        ? 'Completa prima il dossier dello skipper: anagrafica, abilitazioni, stati e le due copie private richieste dal charter.'
       : overCapacity
         ? 'La Crew List supera i posti per partecipanti indicati per la barca.'
       : activeMembers.length === 0
@@ -4484,7 +4737,13 @@ function renderAnnouncements(snapshot) {
 }
 
 function subscribeToBoat(boat) {
+  const boatContextChanged = activeBoat?.id !== boat.id;
+  const documentsNeedInitialLoad = Object.values(activeSkipperDocumentCopies).some((copy) => copy.state === 'idle');
   activeBoat = boat;
+  if (boatContextChanged || documentsNeedInitialLoad) {
+    resetSkipperDocumentCopies('checking');
+    void refreshSkipperDocumentCopies(boat.id);
+  }
   registerSection.hidden = true;
   dashboard.hidden = false;
   setupSkipperDashboard();
@@ -5625,7 +5884,7 @@ document.querySelector('#announcementForm').addEventListener('submit', async (ev
 });
 document.querySelector('#generatePdfButton').addEventListener('click', () => {
   if (blockPrivateAction(document.querySelector('#memberFormMessage'))) return;
-  if (!activeBoat || !isBoatReadyForPdf(activeBoat) || !isSkipperProfileCharterReady(activeSkipperProfile) || activeMembers.length > crewSeatLimit() || activeMembers.some((member) => !isCharterReady(member))) return;
+  if (!activeBoat || !isBoatReadyForPdf(activeBoat) || !isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies) || activeMembers.length > crewSeatLimit() || activeMembers.some((member) => !isCharterReady(member))) return;
   try {
     openCapitaneriaPdf({ boat: activeBoat, members: activeMembers, skipperProfile: activeSkipperProfile });
     setMessage(document.querySelector('#memberFormMessage'), 'Si apre la stampa: scegli “Salva come PDF” per scaricare il foglio.');
@@ -5635,8 +5894,28 @@ document.querySelector('#generatePdfButton').addEventListener('click', () => {
 });
 
 const skipperProfileForm = document.querySelector('#skipperProfileForm');
-skipperProfileForm.addEventListener('input', () => {
+skipperProfileForm.addEventListener('input', (event) => {
+  if (event.target.matches('[data-skipper-document-input]')) return;
   skipperProfileForm.dataset.editing = 'true';
+});
+document.querySelectorAll('[data-skipper-document-upload]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const documentKey = button.dataset.skipperDocumentUpload;
+    document.querySelector(`[data-skipper-document-input="${documentKey}"]`)?.click();
+  });
+});
+document.querySelectorAll('[data-skipper-document-input]').forEach((input) => {
+  input.addEventListener('change', () => {
+    const documentKey = input.dataset.skipperDocumentInput;
+    const [file] = Array.from(input.files || []);
+    input.value = '';
+    void uploadSkipperDocumentCopy(documentKey, file);
+  });
+});
+document.querySelectorAll('[data-skipper-document-download]').forEach((button) => {
+  button.addEventListener('click', () => {
+    void downloadSkipperDocumentCopy(button.dataset.skipperDocumentDownload);
+  });
 });
 skipperProfileForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -6169,10 +6448,13 @@ onAuthStateChanged(auth, async (user) => {
   setBoatFormDefaults(user);
   try {
     const eventSnapshot = await getDoc(doc(db, 'events', eventId));
+    if (auth.currentUser?.uid !== user.uid) return;
     const isOrganizer = eventSnapshot.exists() && (eventSnapshot.data().organizerIds || []).includes(user.uid);
     document.querySelector('#accountStatus').textContent = isOrganizer ? 'Organizzatore configurato.' : 'Accesso skipper attivo. Per l’organizzatore: completa il documento iniziale nel README usando questo identificativo.';
   } catch (error) {
+    if (auth.currentUser?.uid !== user.uid) return;
     document.querySelector('#accountStatus').textContent = 'Accesso skipper attivo.';
   }
+  if (auth.currentUser?.uid !== user.uid) return;
   loadSkipperArea(user);
 });

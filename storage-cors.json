@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://egadi.thatsablast.it"],
+    "method": ["GET", "HEAD", "POST", "PUT"],
+    "responseHeader": ["Content-Type", "Content-Disposition"],
+    "maxAgeSeconds": 3600
+  }
+]
