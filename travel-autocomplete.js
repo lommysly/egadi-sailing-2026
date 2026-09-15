@@ -151,7 +151,11 @@ class TravelAutocomplete {
     this.menu.hidden = true;
     this.menu.setAttribute('role', 'listbox');
     this.menu.setAttribute('aria-label', input.getAttribute('aria-label') || 'Suggerimenti');
-    this.wrapper?.append(this.menu);
+    this.selectionCard = document.createElement('div');
+    this.selectionCard.className = 'travel-airport-selection';
+    this.selectionCard.hidden = true;
+    this.selectionCard.setAttribute('aria-live', 'polite');
+    this.wrapper?.append(this.selectionCard, this.menu);
     input.setAttribute('role', 'combobox');
     input.setAttribute('aria-autocomplete', 'list');
     input.setAttribute('aria-expanded', 'false');
@@ -187,10 +191,39 @@ class TravelAutocomplete {
     if (this.kind !== 'airport') return;
     const code = asText(this.input.dataset.travelAirportCode).toUpperCase();
     const city = asText(this.input.dataset.travelAirportCity);
-    if (!code || this.input.dataset.travelEditing === 'true') return;
+    if (!code || this.input.dataset.travelEditing === 'true') {
+      this.renderAirportSelection(null);
+      return;
+    }
     const entry = exactEntry('airport', code);
     this.input.value = entry ? entry.label : [city, code].filter(Boolean).join(' · ');
     this.input.dataset.travelSelectedValue = code;
+    this.renderAirportSelection(entry);
+  }
+
+  renderAirportSelection(entry) {
+    if (this.kind !== 'airport' || !this.selectionCard) return;
+    const code = asText(entry?.code || this.input.dataset.travelAirportCode).toUpperCase();
+    const city = asText(entry?.city || this.input.dataset.travelAirportCity);
+    if (!code || this.input.dataset.travelEditing === 'true') {
+      this.selectionCard.hidden = true;
+      this.selectionCard.replaceChildren();
+      return;
+    }
+    const title = entry ? airportLabel(entry) : [city, code].filter(Boolean).join(' · ');
+    const description = entry ? airportDescription(entry) : city;
+    const kicker = document.createElement('span');
+    kicker.className = 'travel-airport-selection-kicker';
+    kicker.textContent = 'Aeroporto selezionato';
+    const name = document.createElement('strong');
+    name.textContent = title;
+    this.selectionCard.replaceChildren(kicker, name);
+    if (description) {
+      const detail = document.createElement('small');
+      detail.textContent = description;
+      this.selectionCard.append(detail);
+    }
+    this.selectionCard.hidden = false;
   }
 
   handleFocus() {
@@ -219,6 +252,7 @@ class TravelAutocomplete {
     if (airportField) airportField.value = '';
     this.input.dataset.travelAirportCode = '';
     this.input.dataset.travelAirportCity = '';
+    this.renderAirportSelection(null);
   }
 
   showMatches() {
@@ -286,6 +320,7 @@ class TravelAutocomplete {
   }
 
   choose(entry, { silent = false } = {}) {
+    this.input.dataset.travelEditing = '';
     if (this.kind === 'airport') {
       const form = this.input.closest('form');
       const cityField = getNamedField(form, this.input.dataset.travelCityTarget);
@@ -296,11 +331,11 @@ class TravelAutocomplete {
       this.input.dataset.travelSelectedValue = entry.code;
       if (cityField) cityField.value = entry.city;
       if (airportField) airportField.value = entry.code;
+      this.renderAirportSelection(entry);
     } else {
       this.input.value = entry.value;
       this.input.dataset.travelSelectedValue = entry.value;
     }
-    this.input.dataset.travelEditing = '';
     this.close();
     if (!silent) this.input.dispatchEvent(new Event('change', { bubbles: true }));
   }
@@ -350,4 +385,5 @@ export function clearTravelAirportLookup(input) {
   input.dataset.travelAirportCode = '';
   input.dataset.travelSelectedValue = '';
   input.dataset.travelEditing = '';
+  instances.get(input)?.refreshSavedAirportLabel();
 }

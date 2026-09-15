@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260915-dashboard-cards-v2" />
+  <link rel="stylesheet" href="styles.css?v=20260915-dashboard-cards-v3" />
 </head>
 <body class="area-page">
   <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
@@ -246,12 +246,13 @@
             <aside id="charterDeliveryPanel" class="charter-delivery-panel" aria-labelledby="charterDeliveryTitle">
               <div class="charter-delivery-heading"><div><p class="eyebrow">Consegna al charter</p><h4 id="charterDeliveryTitle">Prepara il dossier, poi invialo.</h4></div><span class="charter-delivery-lock" aria-hidden="true">↗</span></div>
               <p>Il foglio Crew List contiene anche il riepilogo dello skipper. Le due copie restano private finché non le scarichi tu: WhatsApp non consente a un sito di allegare file o premere “Invia” al posto tuo.</p>
+              <p id="charterDeliveryReadiness" class="charter-delivery-readiness" role="status" aria-live="polite">Controllo cosa manca al dossier…</p>
               <ol class="charter-delivery-steps">
                 <li><span>1</span><div><strong>Crew List in PDF</strong><small data-charter-delivery-state="pdf">Controllo dei dati necessari…</small></div><button class="text-button" type="button" data-charter-delivery-pdf disabled>Apri e salva PDF</button></li>
                 <li><span>2</span><div><strong>Patente nautica</strong><small data-charter-delivery-state="sailingLicense">Controllo della copia privata…</small></div><button class="text-button" type="button" data-charter-delivery-download="sailingLicense" disabled>Scarica</button></li>
                 <li><span>3</span><div><strong>Certificato radio</strong><small data-charter-delivery-state="radioCertificate">Controllo della copia privata…</small></div><button class="text-button" type="button" data-charter-delivery-download="radioCertificate" disabled>Scarica</button></li>
               </ol>
-              <div class="charter-delivery-actions"><button class="button button-whatsapp" type="button" data-charter-delivery-whatsapp disabled><span class="whatsapp-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M20.25 11.2a8.25 8.25 0 0 1-12.05 7.35L4 19.75l1.2-4.2A8.25 8.25 0 1 1 20.25 11.2Z"></path><path d="M9.1 8.25c.22-.48.46-.5.72-.5h.2c.2 0 .42.02.5.22l.7 1.7c.08.2.05.43-.08.6l-.42.52c.42.82 1.08 1.47 1.9 1.9l.52-.42c.17-.13.4-.16.6-.08l1.7.7c.2.08.22.3.22.5v.2c0 .26-.02.5-.5.72-.36.16-1.05.22-2.2-.3-1.42-.64-2.87-2.1-3.5-3.5-.52-1.16-.47-1.85-.3-2.2Z"></path></svg></span>Apri messaggio WhatsApp</button><span>Allega i tre file scaricati alla chat del charter e invia tu.</span></div>
+              <div class="charter-delivery-actions"><button class="button button-whatsapp" type="button" data-charter-delivery-whatsapp aria-describedby="charterDeliveryReadiness" disabled><span class="whatsapp-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M20.25 11.2a8.25 8.25 0 0 1-12.05 7.35L4 19.75l1.2-4.2A8.25 8.25 0 1 1 20.25 11.2Z"></path><path d="M9.1 8.25c.22-.48.46-.5.72-.5h.2c.2 0 .42.02.5.22l.7 1.7c.08.2.05.43-.08.6l-.42.52c.42.82 1.08 1.47 1.9 1.9l.52-.42c.17-.13.4-.16.6-.08l1.7.7c.2.08.22.3.22.5v.2c0 .26-.02.5-.5.72-.36.16-1.05.22-2.2-.3-1.42-.64-2.87-2.1-3.5-3.5-.52-1.16-.47-1.85-.3-2.2Z"></path></svg></span>Apri messaggio WhatsApp</button><span data-charter-delivery-action-caption>Allega i tre file scaricati alla chat del charter e invia tu.</span></div>
               <p id="charterDeliveryMessage" class="form-message" role="status" aria-live="polite"></p>
             </aside>
             <label class="consent-field"><input name="charterConsent" type="checkbox" required /> Confermo che i miei dati e riferimenti possono essere inseriti nella Crew List e comunicati al charter. *</label>
@@ -580,6 +581,6 @@
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="area.js?v=20260915-dashboard-cards-v2"></script>
+  <script type="module" src="area.js?v=20260915-dashboard-cards-v3"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@ import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260914-en2';
 import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
-import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260915-travel-catalog-v2';
+import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260915-travel-card-v3';
 
 const eventId = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
@@ -4897,10 +4897,32 @@ function isCharterPackageReady() {
   );
 }
 
+function charterDeliveryReadinessMessage(packageReady) {
+  const incomplete = activeMembers.filter((member) => !isCharterReady(member));
+  const plannedCount = activeProjections.length;
+  if (packageReady) return 'Dossier pronto: puoi generare il PDF e aprire WhatsApp con la didascalia già scritta.';
+  if (!activeBoat) return 'Registra prima la barca: nome, bandiera e skipper devono comparire nella Crew List.';
+  if (!isBoatReadyForPdf(activeBoat)) return 'Completa la barca: per il charter servono nome, bandiera e skipper.';
+  if (!isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies)) {
+    return 'Il tuo dossier è ancora da completare: conferma i dati e le due copie private richieste dal charter.';
+  }
+  if (activeMembers.length > crewSeatLimit()) return 'La Crew List supera i posti riservati ai partecipanti: correggi prima la configurazione della barca.';
+  if (!activeMembers.length) {
+    return plannedCount
+      ? `Hai ${plannedCount} ${plannedCount === 1 ? 'scheda' : 'schede'} nel Piano equipaggio, ma ancora nessuna Crew List completa. Le card con posto e invito sono una preparazione: il PDF si sblocca quando arriva almeno una persona con regole accettate e dati confermati.`
+      : 'Manca ancora una Crew List completa: prepara una persona e inviale il suo link personale.';
+  }
+  if (incomplete.length) {
+    return `${incomplete.length} ${incomplete.length === 1 ? 'Crew List è da completare' : 'Crew List sono da completare'}: controlla i dati richiesti e il consenso di ogni persona già entrata.`;
+  }
+  return 'Controlla la configurazione del dossier prima di inviarlo al charter.';
+}
+
 function renderCharterDeliveryPanel() {
   const panel = document.querySelector('#charterDeliveryPanel');
   if (!panel) return;
   const packageReady = isCharterPackageReady();
+  const readinessMessage = charterDeliveryReadinessMessage(packageReady);
   const copies = {
     sailingLicense: documentCopyIsUploaded('sailingLicense'),
     radioCertificate: documentCopyIsUploaded('radioCertificate'),
@@ -4909,18 +4931,29 @@ function renderCharterDeliveryPanel() {
   if (pdfState) {
     pdfState.textContent = packageReady
       ? 'Pronto: apri la stampa e scegli “Salva come PDF”.'
-      : 'Si attiva quando barca, skipper e Crew List sono completi.';
+      : 'In attesa della Crew List completa: leggi il riepilogo qui sopra.';
+  }
+  const readiness = panel.querySelector('#charterDeliveryReadiness');
+  if (readiness) {
+    readiness.textContent = readinessMessage;
+    readiness.classList.toggle('is-ready', packageReady);
   }
   Object.entries(copies).forEach(([documentKey, uploaded]) => {
     const state = panel.querySelector('[data-charter-delivery-state="' + documentKey + '"]');
     if (state) state.textContent = uploaded ? 'Copia privata pronta da scaricare.' : 'Carica prima la copia privata richiesta.';
     const button = panel.querySelector('[data-charter-delivery-download="' + documentKey + '"]');
-    if (button) button.disabled = !packageReady || !uploaded;
+    if (button) button.disabled = !uploaded;
   });
   const pdfButton = panel.querySelector('[data-charter-delivery-pdf]');
   if (pdfButton) pdfButton.disabled = !packageReady;
   const whatsappButton = panel.querySelector('[data-charter-delivery-whatsapp]');
   if (whatsappButton) whatsappButton.disabled = !packageReady || !copies.sailingLicense || !copies.radioCertificate;
+  const actionCaption = panel.querySelector('[data-charter-delivery-action-caption]');
+  if (actionCaption) {
+    actionCaption.textContent = packageReady
+      ? 'Allega i tre file scaricati alla chat del charter e invia tu.'
+      : 'Puoi già scaricare le copie private. Il messaggio si sblocca insieme al PDF.';
+  }
 }
 
 function openCharterPdf(messageTarget) {
