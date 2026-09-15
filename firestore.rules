@@ -120,6 +120,68 @@ service cloud.firestore {
         && hasSafeCrewRoleConfirmation();
     }
 
+    // Il dossier skipper raccoglie riferimenti personali e abilitazioni che
+    // il charter può chiedere. Non ospita scansioni: quelle restano nel
+    // canale concordato con il charter e non entrano mai nella flotta o nella
+    // superficie equipaggio.
+    function isValidCharterDocumentStatus(value) {
+      return value in ['to_prepare', 'ready', 'sent', 'confirmed'];
+    }
+
+    function isIsoDate(value) {
+      return value is string
+        && value.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
+    }
+
+    function isOptionalIsoDate(value) {
+      return value is string && (value.size() == 0 || isIsoDate(value));
+    }
+
+    function hasValidSkipperProfilePayload() {
+      return request.resource.data.keys().hasAll(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'email', 'phone', 'sailingLicenseNumber', 'sailingLicenseExpiry', 'radioCertificateType', 'radioCertificateNumber', 'radioCertificateExpiry', 'identityDocumentStatus', 'sailingLicenseStatus', 'radioCertificateStatus', 'charterConsent', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'email', 'phone', 'sailingLicenseNumber', 'sailingLicenseExpiry', 'radioCertificateType', 'radioCertificateNumber', 'radioCertificateExpiry', 'identityDocumentStatus', 'sailingLicenseStatus', 'radioCertificateStatus', 'charterConsent', 'updatedAt', 'updatedBy'])
+        && request.resource.data.firstName is string
+        && request.resource.data.firstName.size() > 0
+        && request.resource.data.firstName.size() <= 80
+        && request.resource.data.lastName is string
+        && request.resource.data.lastName.size() > 0
+        && request.resource.data.lastName.size() <= 80
+        && isIsoDate(request.resource.data.birthDate)
+        && request.resource.data.birthPlace is string
+        && request.resource.data.birthPlace.size() > 0
+        && request.resource.data.birthPlace.size() <= 100
+        && request.resource.data.nationality is string
+        && request.resource.data.nationality.size() > 0
+        && request.resource.data.nationality.size() <= 80
+        && request.resource.data.gender in ['F', 'M', 'Altro']
+        && request.resource.data.documentType in ['Carta d\'identità', 'Passaporto', 'Patente nautica', 'Altro']
+        && request.resource.data.documentNumber is string
+        && request.resource.data.documentNumber.size() > 0
+        && request.resource.data.documentNumber.size() <= 60
+        && isIsoDate(request.resource.data.documentExpiry)
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 0
+        && request.resource.data.email.size() <= 160
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() > 0
+        && request.resource.data.phone.size() <= 40
+        && request.resource.data.sailingLicenseNumber is string
+        && request.resource.data.sailingLicenseNumber.size() > 0
+        && request.resource.data.sailingLicenseNumber.size() <= 80
+        && isOptionalIsoDate(request.resource.data.sailingLicenseExpiry)
+        && request.resource.data.radioCertificateType in ['Certificato limitato di radiotelefonista', 'SRC', 'LRC', 'Altro certificato radio']
+        && request.resource.data.radioCertificateNumber is string
+        && request.resource.data.radioCertificateNumber.size() > 0
+        && request.resource.data.radioCertificateNumber.size() <= 80
+        && isOptionalIsoDate(request.resource.data.radioCertificateExpiry)
+        && isValidCharterDocumentStatus(request.resource.data.identityDocumentStatus)
+        && isValidCharterDocumentStatus(request.resource.data.sailingLicenseStatus)
+        && isValidCharterDocumentStatus(request.resource.data.radioCertificateStatus)
+        && request.resource.data.charterConsent == true
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
     function isValidNewInvite(boatId, inviteId) {
       return request.resource.data.keys().hasAll(['id', 'boatId', 'displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'createdAt', 'createdBy'])
         && request.resource.data.keys().hasOnly(['id', 'boatId', 'displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'preferredLocale', 'createdAt', 'createdBy'])
@@ -669,15 +731,18 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid;
     }
 
-    function boardContentHasChanged() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['rulesTitle', 'rulesSummary', 'rulesText', 'rulesTitleEn', 'rulesSummaryEn', 'rulesTextEn', 'fullRulesRequired', 'meetingPoint', 'boardingAt', 'departureAt', 'returnAt', 'scheduleNote', 'scheduleNoteEn']);
+    // Solo il regolamento è soggetto a rilettura. Ritrovo, orari e nota
+    // operativa sono bacheca del viaggio: possono cambiare senza invalidare
+    // una conferma già data su sicurezza e vita a bordo.
+    function rulesContentHasChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['rulesTitle', 'rulesSummary', 'rulesText', 'rulesTitleEn', 'rulesSummaryEn', 'rulesTextEn', 'fullRulesRequired']);
     }
 
     function hasValidBoardVersionUpdate() {
       return (resource.data.keys().hasAll(['rulesVersion'])
           && resource.data.rulesVersion is int
-          && ((boardContentHasChanged() && request.resource.data.rulesVersion == resource.data.rulesVersion + 1)
-            || (!boardContentHasChanged() && request.resource.data.rulesVersion == resource.data.rulesVersion)))
+          && ((rulesContentHasChanged() && request.resource.data.rulesVersion == resource.data.rulesVersion + 1)
+            || (!rulesContentHasChanged() && request.resource.data.rulesVersion == resource.data.rulesVersion)))
         || (!resource.data.keys().hasAll(['rulesVersion']) && request.resource.data.rulesVersion == 1);
     }
 
@@ -1611,9 +1676,14 @@ service cloud.firestore {
             || get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid)));
       allow list: if false;
       allow create: if isPrivateAreaOpen() && isGoogleSkipperAccount() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid && hasValidPrivateBoatCapacity();
-      allow update: if isPrivateAreaOpen() && (isOrganizer() || (isSkipper(boatId)
+      // Nemmeno l'organizzatore può prendere temporaneamente possesso di una
+      // barca cambiando skipperId: quel legame protegge anche il dossier
+      // privato dello skipper. Un eventuale trasferimento di proprieta va
+      // gestito con una procedura amministrativa separata, non dal client.
+      allow update: if isPrivateAreaOpen()
         && request.resource.data.skipperId == resource.data.skipperId
         && request.resource.data.eventId == resource.data.eventId
+        && (isOrganizer() || (isSkipper(boatId)
         // L'ID della vetrina può essere aggiunto alla barca legacy una sola
         // volta, poi resta immutabile per non sostituire una card esistente.
         && (!resource.data.keys().hasAll(['publicFleetId'])
@@ -1666,6 +1736,19 @@ service cloud.firestore {
         allow update: if isPrivateAreaOpen() && (((isOrganizer() || isSkipper(boatId)) && isValidOwnerMemberUpdate())
           || isValidCrewMemberUpdate(boatId, memberId));
         allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+      }
+
+      // Riferimenti personali e abilitazioni dello skipper: un documento
+      // singolo privato, non consultabile da equipaggio, flotta o
+      // organizzatore. Le copie degli allegati non vengono caricate qui.
+      match /skipperProfile/{profileId} {
+        allow get: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId);
+        allow list: if false;
+        allow create, update: if isPrivateAreaOpen()
+          && profileId == 'default'
+          && isSkipper(boatId)
+          && hasValidSkipperProfilePayload();
+        allow delete: if false;
       }
 
       // Percorso legacy: il nuovo accesso usa soltanto /crewAccess/{uid}.
