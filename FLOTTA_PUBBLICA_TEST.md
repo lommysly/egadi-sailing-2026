@@ -11,14 +11,14 @@ L'ID casuale è collegato in una raccolta non leggibile dal web allo skipper che
 ## Test Rules eseguiti in emulatore Firestore
 
 - Registrazione atomica iniziale: barca privata, collegamento tecnico e card pubblica create insieme.
-- Skipper proprietario: crea e aggiorna la propria card.
+- Skipper associato alla barca: crea e aggiorna la relativa card.
 - Visitatore anonimo: non legge la flotta finché l'interruttore pubblico è spento.
 - Visitatore anonimo: legge card e lista soltanto dopo l'attivazione della flotta pubblica.
 - Visitatore anonimo: non legge il collegamento tecnico dello skipper.
 - Altro skipper: non cambia l'ID pubblico della propria barca già associata.
 - Altro skipper: non sovrascrive né cancella la card di un'altra barca.
 - Payload non previsto: un campo come telefono della crew viene rifiutato.
-- Skipper proprietario: può ritirare la propria card; l'organizzatore può moderarla.
+- Skipper associato alla barca: può ritirare la relativa card; l'organizzatore può moderarla.
 
 Esito: 11 controlli superati nell'emulatore Firestore con le Rules candidate.
 

@@ -9,7 +9,9 @@ service firebase.storage {
       return firestore.get(/databases/(default)/documents/events/egadi-2026).data.privateAreaEnabled == true;
     }
 
-    function ownsActiveBoat(boatId) {
+    // La barca può essere noleggiata: questo controllo identifica lo skipper
+    // associato alla barca per l'evento, non il proprietario dell'imbarcazione.
+    function isAssignedSkipperForBoat(boatId) {
       return request.auth != null
         && request.auth.uid == boatId
         && privateAreaIsOpen()
@@ -36,10 +38,10 @@ service firebase.storage {
 
     match /boats/{boatId}/skipper-documents/{documentType}/{fileName} {
       // Mai listare il bucket: persino lo skipper conosce solo i due percorsi
-      // fissi della propria barca.
-      allow get: if ownsActiveBoat(boatId) && isAllowedDocument(documentType, fileName);
+      // fissi della barca a lui associata.
+      allow get: if isAssignedSkipperForBoat(boatId) && isAllowedDocument(documentType, fileName);
       allow list: if false;
-      allow create, update: if ownsActiveBoat(boatId)
+      allow create, update: if isAssignedSkipperForBoat(boatId)
         && isAllowedDocument(documentType, fileName)
         && hasSafeUploadMetadata(documentType);
 

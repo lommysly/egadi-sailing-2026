@@ -4842,7 +4842,7 @@ function subscribeToBoat(boat) {
 function loadSkipperArea(user) {
   // Ogni skipper ha una sola barca, salvata con il proprio UID come ID del
   // documento. La lettura puntuale evita una query-list che Firestore non può
-  // autorizzare in base a una Rule proprietaria per singolo documento.
+  // autorizzare lo skipper associato alla singola barca.
   const boatRef = doc(db, 'boats', user.uid);
   stopBoatSubscription = onSnapshot(boatRef, (snapshot) => {
     if (creatingBoat) {
