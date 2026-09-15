@@ -52,28 +52,116 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId)).data.participantUid == request.auth.uid;
     }
 
+    function isBoundedText(value, maxLength) {
+      return value is string && value.size() <= maxLength;
+    }
+
+    function isRequiredText(value, maxLength) {
+      return isBoundedText(value, maxLength) && value.size() > 0;
+    }
+
+    // Anche nella bozza il nome visualizzato non e' libero: deriva dai due
+    // campi disponibili, senza spazi finali quando manca uno dei due valori.
+    function hasValidDraftMemberDisplayName() {
+      return isBoundedText(request.resource.data.displayName, 161)
+        && ((request.resource.data.firstName == ''
+            && request.resource.data.lastName == ''
+            && request.resource.data.displayName == '')
+          || (request.resource.data.firstName != ''
+            && request.resource.data.lastName == ''
+            && request.resource.data.displayName == request.resource.data.firstName)
+          || (request.resource.data.firstName == ''
+            && request.resource.data.lastName != ''
+            && request.resource.data.displayName == request.resource.data.lastName)
+          || (request.resource.data.firstName != ''
+            && request.resource.data.lastName != ''
+            && request.resource.data.displayName == request.resource.data.firstName + ' ' + request.resource.data.lastName));
+    }
+
+    // L'invito puo' essere rigenerato con lo stesso ID ma una nuova versione.
+    // La bozza resta quindi vincolata sia all'UID che alla versione che l'ha
+    // creata, per non esporre dati del precedente destinatario.
+    function hasCurrentCrewDraftAudience(boatId, inviteId, draft) {
+      let invite = get(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId)).data;
+      return draft.keys().hasAll(['participantUid', 'accessVersion'])
+        && draft.participantUid == request.auth.uid
+        && draft.accessVersion is int
+        && ((invite.keys().hasAll(['accessVersion'])
+            && invite.accessVersion is int
+            && draft.accessVersion == invite.accessVersion)
+          || (!invite.keys().hasAll(['accessVersion'])
+            && draft.accessVersion == 0));
+    }
+
+    // La riemissione mantiene lo stesso inviteId, ma sostituisce il
+    // destinatario. La bozza precedente viene quindi eliminata nello stesso
+    // batch: lo skipper non la legge e il nuovo invitato non la eredita.
+    function isCrewDraftCleanupDuringInviteReissue(boatId, inviteId) {
+      let before = get(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId)).data;
+      let after = getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId)).data;
+      return isSkipper(boatId)
+        && after.keys().hasAll(['status', 'participantUid', 'accessVersion', 'reissuedAt', 'reissuedBy'])
+        && after.status == 'pending'
+        && after.participantUid == null
+        && after.accessVersion is int
+        && after.reissuedAt == request.time
+        && after.reissuedBy == request.auth.uid
+        && ((before.keys().hasAll(['accessVersion'])
+            && before.accessVersion is int
+            && after.accessVersion == before.accessVersion + 1)
+          || (!before.keys().hasAll(['accessVersion'])
+            && after.accessVersion == 1));
+    }
+
+    // /members è la Crew List definitiva: una bozza vive nel percorso
+    // separato /crewDrafts e non può mai comparire nel PDF del charter.
     function hasValidMemberPayload() {
       return request.resource.data.keys().hasAll(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt'])
         && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'roleConfirmed', 'email', 'phone', 'charterConsent', 'displayName', 'updatedAt', 'updatedBy', 'createdAt', 'createdBy'])
-        && request.resource.data.firstName is string
-        && request.resource.data.firstName.size() > 0
-        && request.resource.data.lastName is string
-        && request.resource.data.lastName.size() > 0
-        && request.resource.data.birthDate is string
-        && request.resource.data.birthPlace is string
-        && request.resource.data.nationality is string
-        && request.resource.data.gender is string
-        && request.resource.data.documentType is string
-        && request.resource.data.documentNumber is string
-        && request.resource.data.documentExpiry is string
-        && request.resource.data.role is string
+        && isRequiredText(request.resource.data.firstName, 80)
+        && isRequiredText(request.resource.data.lastName, 80)
+        && isIsoDate(request.resource.data.birthDate)
+        && isRequiredText(request.resource.data.birthPlace, 100)
+        && isRequiredText(request.resource.data.nationality, 80)
+        && request.resource.data.gender in ['F', 'M', 'Altro']
+        && request.resource.data.documentType in ['Carta d\'identità', 'Passaporto', 'Patente nautica', 'Altro']
+        && isRequiredText(request.resource.data.documentNumber, 60)
+        && isIsoDate(request.resource.data.documentExpiry)
+        && isRequiredText(request.resource.data.role, 100)
         && (!request.resource.data.keys().hasAll(['roleConfirmed']) || request.resource.data.roleConfirmed is bool)
-        && request.resource.data.email is string
-        && request.resource.data.phone is string
-        && request.resource.data.charterConsent is bool
-        && request.resource.data.displayName is string
+        && isBoundedText(request.resource.data.email, 160)
+        && isBoundedText(request.resource.data.phone, 40)
+        && request.resource.data.charterConsent == true
+        && isRequiredText(request.resource.data.displayName, 161)
         && request.resource.data.displayName == request.resource.data.firstName + ' ' + request.resource.data.lastName
+        && (!request.resource.data.keys().hasAll(['updatedBy']) || request.resource.data.updatedBy is string)
         && request.resource.data.updatedAt == request.time;
+    }
+
+    // La bozza della persona è privata all'invitato. Mantiene tutti i campi
+    // attesi, ma consente stringhe vuote: nessun campo supplementare (file,
+    // pagamenti o istruzioni) può essere inserito in questo documento.
+    function hasValidCrewDraftPayload() {
+      return request.resource.data.keys().hasAll(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'participantUid', 'accessVersion', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'role', 'email', 'phone', 'charterConsent', 'displayName', 'participantUid', 'accessVersion', 'updatedAt', 'updatedBy'])
+        && isBoundedText(request.resource.data.firstName, 80)
+        && isBoundedText(request.resource.data.lastName, 80)
+        && isOptionalIsoDate(request.resource.data.birthDate)
+        && isBoundedText(request.resource.data.birthPlace, 100)
+        && isBoundedText(request.resource.data.nationality, 80)
+        && request.resource.data.gender in ['', 'F', 'M', 'Altro']
+        && request.resource.data.documentType in ['', 'Carta d\'identità', 'Passaporto', 'Patente nautica', 'Altro']
+        && isBoundedText(request.resource.data.documentNumber, 60)
+        && isOptionalIsoDate(request.resource.data.documentExpiry)
+        && isBoundedText(request.resource.data.role, 100)
+        && isBoundedText(request.resource.data.email, 160)
+        && isBoundedText(request.resource.data.phone, 40)
+        && request.resource.data.charterConsent is bool
+        && hasValidDraftMemberDisplayName()
+        && request.resource.data.participantUid == request.auth.uid
+        && request.resource.data.accessVersion is int
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
     }
 
     function isValidOwnerMemberCreate() {
@@ -178,6 +266,82 @@ service cloud.firestore {
         && isValidCharterDocumentStatus(request.resource.data.sailingLicenseStatus)
         && isValidCharterDocumentStatus(request.resource.data.radioCertificateStatus)
         && request.resource.data.charterConsent == true
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    // Il dossier finale resta in /skipperProfile. Questa bozza vive in un
+    // documento distinto, privato allo skipper, e permette di sospendere la
+    // compilazione finché non sono disponibili i riferimenti dei documenti.
+    function hasValidSkipperProfileDraftPayload() {
+      return request.resource.data.keys().hasAll(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'email', 'phone', 'sailingLicenseNumber', 'sailingLicenseExpiry', 'radioCertificateType', 'radioCertificateNumber', 'radioCertificateExpiry', 'identityDocumentStatus', 'sailingLicenseStatus', 'radioCertificateStatus', 'charterConsent', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'birthDate', 'birthPlace', 'nationality', 'gender', 'documentType', 'documentNumber', 'documentExpiry', 'email', 'phone', 'sailingLicenseNumber', 'sailingLicenseExpiry', 'radioCertificateType', 'radioCertificateNumber', 'radioCertificateExpiry', 'identityDocumentStatus', 'sailingLicenseStatus', 'radioCertificateStatus', 'charterConsent', 'updatedAt', 'updatedBy'])
+        && isBoundedText(request.resource.data.firstName, 80)
+        && isBoundedText(request.resource.data.lastName, 80)
+        && isOptionalIsoDate(request.resource.data.birthDate)
+        && isBoundedText(request.resource.data.birthPlace, 100)
+        && isBoundedText(request.resource.data.nationality, 80)
+        && request.resource.data.gender in ['', 'F', 'M', 'Altro']
+        && request.resource.data.documentType in ['', 'Carta d\'identità', 'Passaporto', 'Patente nautica', 'Altro']
+        && isBoundedText(request.resource.data.documentNumber, 60)
+        && isOptionalIsoDate(request.resource.data.documentExpiry)
+        && isBoundedText(request.resource.data.email, 160)
+        && isBoundedText(request.resource.data.phone, 40)
+        && isBoundedText(request.resource.data.sailingLicenseNumber, 80)
+        && isOptionalIsoDate(request.resource.data.sailingLicenseExpiry)
+        && request.resource.data.radioCertificateType in ['', 'Certificato limitato di radiotelefonista', 'SRC', 'LRC', 'Altro certificato radio']
+        && isBoundedText(request.resource.data.radioCertificateNumber, 80)
+        && isOptionalIsoDate(request.resource.data.radioCertificateExpiry)
+        && request.resource.data.identityDocumentStatus in ['', 'to_prepare', 'ready', 'sent', 'confirmed']
+        && request.resource.data.sailingLicenseStatus in ['', 'to_prepare', 'ready', 'sent', 'confirmed']
+        && request.resource.data.radioCertificateStatus in ['', 'to_prepare', 'ready', 'sent', 'confirmed']
+        && request.resource.data.charterConsent is bool
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    // Le tratte dello skipper sono una bozza operativa privata, separata sia
+    // dal dossier charter sia dalla Crew List. Città, orari e bagagli non
+    // vengono esposti a organizzatore, equipaggio o società transfer: quando
+    // quest'ultima sarà nominata, un processo dedicato costruirà una scheda
+    // aeroportuale minima dopo l'informativa e il consenso specifici.
+    function isOptionalIsoTime(value) {
+      return value is string
+        && (value.size() == 0 || value.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$'));
+    }
+
+    function isOptionalIataAirport(value) {
+      return value is string
+        && (value.size() == 0 || value.matches('^[A-Z]{3}$'));
+    }
+
+    function hasValidSkipperTravelPayload(legId) {
+      let transferAirport = legId == 'outbound'
+        ? request.resource.data.destinationAirport
+        : request.resource.data.originAirport;
+      return (legId == 'outbound' || legId == 'return')
+        && request.resource.data.keys().hasAll(['schemaVersion', 'transportMode', 'originCity', 'originAirport', 'destinationCity', 'destinationAirport', 'departureDate', 'departureTime', 'arrivalDate', 'arrivalTime', 'carrier', 'serviceNumber', 'luggageCount', 'bulkyLuggage', 'needsAirportMarsalaTransfer', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['schemaVersion', 'transportMode', 'originCity', 'originAirport', 'destinationCity', 'destinationAirport', 'departureDate', 'departureTime', 'arrivalDate', 'arrivalTime', 'carrier', 'serviceNumber', 'luggageCount', 'bulkyLuggage', 'needsAirportMarsalaTransfer', 'updatedAt', 'updatedBy'])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.transportMode in ['', 'flight', 'train', 'car', 'ferry', 'other']
+        && isBoundedText(request.resource.data.originCity, 100)
+        && isOptionalIataAirport(request.resource.data.originAirport)
+        && isBoundedText(request.resource.data.destinationCity, 100)
+        && isOptionalIataAirport(request.resource.data.destinationAirport)
+        && isOptionalIsoDate(request.resource.data.departureDate)
+        && isOptionalIsoTime(request.resource.data.departureTime)
+        && isOptionalIsoDate(request.resource.data.arrivalDate)
+        && isOptionalIsoTime(request.resource.data.arrivalTime)
+        && isBoundedText(request.resource.data.carrier, 100)
+        && isBoundedText(request.resource.data.serviceNumber, 40)
+        && request.resource.data.luggageCount is int
+        && request.resource.data.luggageCount >= 0
+        && request.resource.data.luggageCount <= 12
+        && request.resource.data.bulkyLuggage is bool
+        && request.resource.data.needsAirportMarsalaTransfer is bool
+        && (request.resource.data.needsAirportMarsalaTransfer == false
+          || (request.resource.data.transportMode == 'flight'
+            && (transferAirport == 'TPS' || transferAirport == 'PMO')))
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
     }
@@ -591,6 +755,11 @@ service cloud.firestore {
           || request.resource.data.preferredLocale in ['it', 'en'])
         && request.resource.data.reissuedAt == request.time
         && request.resource.data.reissuedBy == request.auth.uid
+        // Se esiste una bozza del precedente destinatario, la riemissione
+        // deve eliminarla nello stesso batch. Così un client vecchio non può
+        // lasciare dati personali orfani e non più raggiungibili.
+        && (!exists(/databases/$(database)/documents/boats/$(boatId)/crewDrafts/$(inviteId))
+          || !existsAfter(/databases/$(database)/documents/boats/$(boatId)/crewDrafts/$(inviteId)))
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'preferredLocale', 'activatedAt', 'reissuedAt', 'reissuedBy']);
     }
 
@@ -1473,6 +1642,28 @@ service cloud.firestore {
         && request.resource.data.cancelledBy == null;
     }
 
+    // La nota è rivolta alla persona nel messaggio WhatsApp, ma non deve
+    // comparire nel documento di pagamento letto dall'equipaggio. Viene
+    // quindi creata una sola volta, nello stesso batch della richiesta, in un
+    // figlio leggibile soltanto dallo skipper.
+    function hasValidPrivatePaymentMessageCreate(boatId, requestId) {
+      let paymentRef = /databases/$(database)/documents/boats/$(boatId)/paymentRequests/$(requestId);
+      return request.resource.data.keys().hasAll(['messageDetails', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasOnly(['messageDetails', 'createdAt', 'createdBy'])
+        && request.resource.data.messageDetails is string
+        && request.resource.data.messageDetails.size() > 0
+        && request.resource.data.messageDetails.size() <= 1000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid
+        // Una nota non può essere aggiunta né riscritta dopo la preparazione
+        // della richiesta: il batch deve creare entrambe le risorse.
+        && !exists(paymentRef)
+        && existsAfter(paymentRef)
+        && getAfter(paymentRef).data.createdBy == request.auth.uid
+        && getAfter(paymentRef).data.status == 'prepared'
+        && getAfter(paymentRef).data.entryType == 'request';
+    }
+
     // Un acconto già ricevuto non è una "richiesta" inviata retroattivamente:
     // viene registrato dal solo skipper associato alla barca come incasso verificato. Può
     // nascere dalla proiezione prima dell'invito, ma senza canali, link,
@@ -1738,6 +1929,34 @@ service cloud.firestore {
         allow delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
       }
 
+      // Bozza personale dell'equipaggio: non e' una voce Crew List e non e'
+      // leggibile da skipper, organizzatore o altri partecipanti. Per
+      // riprenderla e' richiesta l'accettazione del briefing corrente.
+      match /crewDrafts/{inviteId} {
+        allow get: if isPrivateAreaOpen()
+          && isInviteHolder(boatId, inviteId)
+          && hasCurrentBriefingAcceptance(boatId, inviteId)
+          && (!exists(/databases/$(database)/documents/boats/$(boatId)/crewDrafts/$(inviteId))
+            || hasCurrentCrewDraftAudience(boatId, inviteId, resource.data));
+        allow list: if false;
+        allow create: if isPrivateAreaOpen()
+          && isInviteHolder(boatId, inviteId)
+          && hasCurrentBriefingAcceptance(boatId, inviteId)
+          && hasValidCrewDraftPayload()
+          && hasCurrentCrewDraftAudience(boatId, inviteId, request.resource.data);
+        allow update: if isPrivateAreaOpen()
+          && isInviteHolder(boatId, inviteId)
+          && hasCurrentBriefingAcceptance(boatId, inviteId)
+          && hasValidCrewDraftPayload()
+          && hasCurrentCrewDraftAudience(boatId, inviteId, resource.data)
+          && hasCurrentCrewDraftAudience(boatId, inviteId, request.resource.data);
+        allow delete: if isPrivateAreaOpen()
+          && ((isInviteHolder(boatId, inviteId)
+              && hasCurrentBriefingAcceptance(boatId, inviteId)
+              && hasCurrentCrewDraftAudience(boatId, inviteId, resource.data))
+            || isCrewDraftCleanupDuringInviteReissue(boatId, inviteId));
+      }
+
       // Riferimenti personali e abilitazioni dello skipper: un documento
       // singolo privato, non consultabile da equipaggio, flotta o
       // organizzatore. Le copie non vengono mai caricate in Firestore.
@@ -1748,6 +1967,33 @@ service cloud.firestore {
           && profileId == 'default'
           && isSkipper(boatId)
           && hasValidSkipperProfilePayload();
+        allow delete: if false;
+      }
+
+      // La bozza non sostituisce il dossier finale e non e' usata dal PDF.
+      // Solo lo skipper associato alla barca puo' riprendere o cancellare il
+      // proprio lavoro parziale.
+      match /skipperProfileDraft/{profileId} {
+        allow get: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId);
+        allow list: if false;
+        allow create, update: if isPrivateAreaOpen()
+          && profileId == 'default'
+          && isSkipper(boatId)
+          && hasValidSkipperProfileDraftPayload();
+        allow delete: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId);
+      }
+
+      // Due tratte private dello skipper: andata e ritorno. Sono bozze
+      // salvabili anche incomplete; non sono una lista transfer e non danno
+      // alcun accesso diretto alla società che lo gestirà.
+      match /skipperTravel/{legId} {
+        allow get: if isPrivateAreaOpen()
+          && (legId == 'outbound' || legId == 'return')
+          && isSkipper(boatId);
+        allow list: if false;
+        allow create, update: if isPrivateAreaOpen()
+          && isSkipper(boatId)
+          && hasValidSkipperTravelPayload(legId);
         allow delete: if false;
       }
 
@@ -1845,6 +2091,21 @@ service cloud.firestore {
             || canCancelPayment()
             || canClassifyVerifiedLegacyPaymentInstallment());
         allow delete: if false;
+
+        match /private/{detailId} {
+          // Le note del messaggio non sono una comunicazione dentro l'area
+          // equipaggio. Non si elencano e possono essere lette solo dallo
+          // skipper della stessa barca.
+          allow get: if isPrivateAreaOpen()
+            && detailId == 'message'
+            && isSkipper(boatId);
+          allow list: if false;
+          allow create: if isPrivateAreaOpen()
+            && detailId == 'message'
+            && isSkipper(boatId)
+            && hasValidPrivatePaymentMessageCreate(boatId, requestId);
+          allow update, delete: if false;
+        }
       }
 
       match /briefing/{briefingId} {

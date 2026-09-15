@@ -24,6 +24,10 @@ const authMessage = document.querySelector('#authMessage');
 const PAYMENT_PROFILE_ID = 'default';
 const COST_PLAN_ID = 'default';
 const SKIPPER_PROFILE_ID = 'default';
+const PAYMENT_PRIVATE_MESSAGE_ID = 'message';
+const SKIPPER_TRAVEL_LEG_IDS = Object.freeze(['outbound', 'return']);
+const SKIPPER_TRAVEL_MODES = new Set(['', 'flight', 'train', 'car', 'ferry', 'other']);
+const SKIPPER_TRAVEL_TRANSFER_AIRPORTS = new Set(['TPS', 'PMO']);
 const SKIPPER_DOCUMENT_MAX_BYTES = 8 * 1024 * 1024;
 const SKIPPER_DOCUMENT_KINDS = Object.freeze({
   sailingLicense: Object.freeze({ storageType: 'sailing-license', label: 'patente nautica', downloadName: 'patente-nautica' }),
@@ -253,6 +257,7 @@ const DEFAULT_FULL_RULES_EN = [
 let activeBoat = null;
 let activeMembers = [];
 let activePayments = [];
+const paymentPrivateMessageCache = new Map();
 let activeInvites = [];
 let activeProjections = [];
 let activePaymentProfile = null;
@@ -261,6 +266,8 @@ let activeCostPlan = null;
 let activeBriefing = null;
 let activeAcceptances = [];
 let activeSkipperProfile = null;
+let activeSkipperProfileDraft = null;
+let activeSkipperTravel = { outbound: null, return: null };
 let activeSkipperDocumentCopies = emptySkipperDocumentCopies('idle');
 let skipperDocumentsEpoch = 0;
 const activeSkipperDocumentUploads = new Map();
@@ -277,6 +284,8 @@ let stopBriefingSubscription = null;
 let stopAnnouncementSubscription = null;
 let stopAcceptanceSubscription = null;
 let stopSkipperProfileSubscription = null;
+let stopSkipperProfileDraftSubscription = null;
+let stopSkipperTravelSubscriptions = { outbound: null, return: null };
 let creatingBoat = false;
 let editingBoatId = null;
 let editingMemberId = null;
@@ -292,6 +301,7 @@ const SKIPPER_DASHBOARD_HASHES = Object.freeze({
   overview: 'skipper-panorama',
   crew: 'skipper-equipaggio',
   profile: 'skipper-profilo',
+  travel: 'skipper-viaggio',
   money: 'skipper-conti',
   boat: 'skipper-barca',
   board: 'skipper-bacheca',
@@ -300,6 +310,7 @@ const SKIPPER_DASHBOARD_LABELS = Object.freeze({
   overview: 'Panoramica',
   crew: 'Equipaggio',
   profile: 'Il tuo dossier',
+  travel: 'Arrivi e transfer',
   money: 'Quote e conti',
   boat: 'Barca e flotta',
   board: 'Regole e avvisi',
@@ -579,6 +590,7 @@ function skipperDashboardIcon(kind) {
   const paths = {
     crew: '<path d="M8.5 11.25a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7 1.25a2.5 2.5 0 1 0 0-5"/><path d="M2.75 18.5a5.75 5.75 0 0 1 11.5 0M14.25 13.25a5 5 0 0 1 3 4.6"/>',
     profile: '<circle cx="12" cy="8" r="3.25"/><path d="M5.25 20a6.75 6.75 0 0 1 13.5 0M17.5 4.5l1 1 1.75-1.75"/>',
+    travel: '<path d="m3 13 18-8-6.4 7.9L12 20l-1.55-6.15L3 13Z"/><path d="m10.45 13.85 4.15-.95"/>',
     money: '<rect x="3.5" y="5.25" width="17" height="13.5" rx="2"/><path d="M3.5 9.5h17M15.5 14.25h2.25"/>',
     boat: '<path d="M3 14.5h18l-2.25 4.25H5.25L3 14.5Z"/><path d="M12 3.5v11M12 4l5.25 7H12M11.75 6.25 7 11h4.75"/>',
     board: '<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4.5"/>',
@@ -788,13 +800,15 @@ function setupSkipperDashboard() {
   const grid = dashboard?.querySelector('.dashboard-grid');
   const crewPanel = document.querySelector('#memberForm')?.closest('.dashboard-panel');
   const profilePanel = document.querySelector('#skipperProfileForm')?.closest('.dashboard-panel');
+  const travelPanel = document.querySelector('#skipperTravelPanel');
   const moneyPanel = document.querySelector('#paymentProfileForm')?.closest('.dashboard-panel');
   const boatPanel = document.querySelector('#fleetProfileForm')?.closest('.dashboard-panel');
   const boardPanel = document.querySelector('#briefingForm')?.closest('.dashboard-panel');
-  if (!dashboard || !grid || !crewPanel || !profilePanel || !moneyPanel || !boatPanel || !boardPanel) return;
+  if (!dashboard || !grid || !crewPanel || !profilePanel || !travelPanel || !moneyPanel || !boatPanel || !boardPanel) return;
 
   crewPanel.dataset.skipperPanel = 'crew';
   profilePanel.dataset.skipperPanel = 'profile';
+  travelPanel.dataset.skipperPanel = 'travel';
   moneyPanel.dataset.skipperPanel = 'money';
   boatPanel.dataset.skipperPanel = 'boat';
   boardPanel.dataset.skipperPanel = 'board';
@@ -809,7 +823,7 @@ function setupSkipperDashboard() {
         <p class="eyebrow">Area skipper</p>
         <h3>Gestisci la barca,<br /><em>una cosa alla volta.</em></h3>
       </div>
-      <p>Equipaggio, conti, dati della barca e regole di sicurezza: apri l’area che ti serve.</p>
+      <p>Equipaggio, viaggio, conti, dati della barca e regole di sicurezza: apri l’area che ti serve.</p>
     </div>
     <div class="dashboard-hub" aria-label="Aree skipper">
       <button class="dashboard-hub-card dashboard-hub-card-crew" type="button" data-skipper-view="crew">
@@ -819,6 +833,10 @@ function setupSkipperDashboard() {
       <button class="dashboard-hub-card dashboard-hub-card-profile" type="button" data-skipper-view="profile">
         <span class="dashboard-hub-icon">${skipperDashboardIcon('profile')}</span><span class="dashboard-hub-label">Il tuo dossier</span>
         <strong data-skipper-summary="profile">Carico i tuoi documenti…</strong><small data-skipper-detail="profile">Anagrafica, patente e certificato radio.</small>
+      </button>
+      <button class="dashboard-hub-card dashboard-hub-card-travel" type="button" data-skipper-view="travel">
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('travel')}</span><span class="dashboard-hub-label">Arrivi e transfer</span>
+        <strong data-skipper-summary="travel">Carico i tuoi spostamenti…</strong><small data-skipper-detail="travel">Andata, ritorno e richiesta transfer privata.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-skipper-view="money">
         <span class="dashboard-hub-icon">${skipperDashboardIcon('money')}</span><span class="dashboard-hub-label">Contributi e conti</span>
@@ -996,6 +1014,9 @@ function renderSkipperDashboardOverview() {
       ? 'Anagrafica, abilitazioni e copie private aggiornate.'
       : `${skipperProfileMissing.length} ${skipperProfileMissing.length === 1 ? 'voce da controllare' : 'voci da controllare'} per il charter.`,
   );
+
+  const travelSummary = skipperTravelDashboardSummary();
+  setSkipperDashboardMetric('travel', travelSummary.value, travelSummary.detail);
 
   const costPlan = normalizeCostPlan(activeCostPlan);
   const costModel = activeCostPlan ? costPlanQuoteModel(costPlan) : null;
@@ -2450,6 +2471,7 @@ function resetPrivateView() {
   activeBoat = null;
   activeMembers = [];
   activePayments = [];
+  paymentPrivateMessageCache.clear();
   activeInvites = [];
   activeProjections = [];
   activePaymentProfile = null;
@@ -2458,6 +2480,8 @@ function resetPrivateView() {
   activeBriefing = null;
   activeAcceptances = [];
   activeSkipperProfile = null;
+  activeSkipperProfileDraft = null;
+  activeSkipperTravel = { outbound: null, return: null };
   skipperAnnouncementCount = 0;
   creatingBoat = false;
   editingBoatId = null;
@@ -2478,6 +2502,8 @@ function resetPrivateView() {
   stopAnnouncementSubscription?.();
   stopAcceptanceSubscription?.();
   stopSkipperProfileSubscription?.();
+  stopSkipperProfileDraftSubscription?.();
+  Object.values(stopSkipperTravelSubscriptions).forEach((unsubscribe) => unsubscribe?.());
   stopBoatSubscription = null;
   stopMemberSubscription = null;
   stopPaymentSubscription = null;
@@ -2490,6 +2516,8 @@ function resetPrivateView() {
   stopAnnouncementSubscription = null;
   stopAcceptanceSubscription = null;
   stopSkipperProfileSubscription = null;
+  stopSkipperProfileDraftSubscription = null;
+  stopSkipperTravelSubscriptions = { outbound: null, return: null };
   const skipperProfileForm = document.querySelector('#skipperProfileForm');
   if (skipperProfileForm) {
     skipperProfileForm.reset();
@@ -2499,6 +2527,15 @@ function resetPrivateView() {
   if (skipperProfileStatus) skipperProfileStatus.replaceChildren();
   const skipperProfileMessage = document.querySelector('#skipperProfileMessage');
   if (skipperProfileMessage) setMessage(skipperProfileMessage, '');
+  document.querySelectorAll('[data-skipper-travel-leg]').forEach((form) => {
+    form.reset();
+    form.dataset.editing = '';
+    const luggageCount = form.elements.namedItem('luggageCount');
+    if (luggageCount) luggageCount.value = '0';
+  });
+  const skipperTravelStatus = document.querySelector('#skipperTravelStatus');
+  if (skipperTravelStatus) skipperTravelStatus.replaceChildren();
+  document.querySelectorAll('[id^="skipperTravel"][id$="Message"]').forEach((message) => setMessage(message, ''));
   dashboard.hidden = true;
   registerSection.hidden = true;
   renderSkipperDashboardOverview();
@@ -3149,7 +3186,35 @@ function normalizeWhatsAppNumber(value) {
   return normalized ? normalized.slice(1) : '';
 }
 
-function whatsappUrl(invite) {
+function whatsappLinks(number, message) {
+  const normalizedNumber = String(number || '').replace(/\D/g, '');
+  if (!normalizedNumber || !String(message || '').trim()) return { nativeUrl: '', webUrl: '' };
+  const text = encodeURIComponent(message);
+  return {
+    nativeUrl: `whatsapp://send?phone=${normalizedNumber}&text=${text}`,
+    webUrl: `https://wa.me/${normalizedNumber}?text=${text}`,
+  };
+}
+
+function prefersNativeMacWhatsapp() {
+  return /Macintosh/i.test(navigator.userAgent || '') && Number(navigator.maxTouchPoints || 0) === 0;
+}
+
+function selectWhatsappUrl(links, mode = 'preferred') {
+  if (mode === 'native') return links.nativeUrl;
+  if (mode === 'web') return links.webUrl;
+  return prefersNativeMacWhatsapp() ? links.nativeUrl : links.webUrl;
+}
+
+function whatsappIconSvg() {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.25 11.2a8.25 8.25 0 0 1-12.05 7.35L4 19.75l1.2-4.2A8.25 8.25 0 1 1 20.25 11.2Z"/><path d="M9.1 8.25c.22-.48.46-.5.72-.5h.2c.2 0 .42.02.5.22l.7 1.7c.08.2.05.43-.08.6l-.42.52c.42.82 1.08 1.47 1.9 1.9l.52-.42c.17-.13.4-.16.6-.08l1.7.7c.2.08.22.3.22.5v.2c0 .26-.02.5-.5.72-.36.16-1.05.22-2.2-.3-1.42-.64-2.87-2.1-3.5-3.5-.52-1.16-.47-1.85-.3-2.2Z"/></svg>';
+}
+
+function whatsappActionIconMarkup({ external = false } = {}) {
+  return `<span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${external ? '<span class="whatsapp-action-external" aria-hidden="true">↗</span>' : ''}`;
+}
+
+function whatsappUrl(invite, { mode = 'preferred' } = {}) {
   const number = normalizeWhatsAppNumber(invite.whatsappNumber);
   const personalUrl = participantUrl(invite);
   if (!number || !personalUrl) return '';
@@ -3157,7 +3222,7 @@ function whatsappUrl(invite) {
   const message = inviteLocale(invite) === 'en'
     ? `Hi ${invite.displayName}, here is your personal test invitation to the Egadi private area. Open the link, confirm your WhatsApp number and choose a six-digit personal code: ${personalUrl}\n\nBefore activating access, please read Privacy & data: ${privacyUrl}\n\nThe private area is still being tested. Until the final privacy notice is published, please use fictitious data only.`
     : `Ciao ${invite.displayName}, ecco il tuo invito personale di prova per l’area Egadi. Apri il link, conferma il numero WhatsApp e scegli un codice personale di 6 cifre: ${personalUrl}\n\nPrima di attivarlo puoi leggere Privacy e dati: ${privacyUrl}\n\nL’area è in test: fino alla pubblicazione dell’informativa finale inserisci esclusivamente dati fittizi.`;
-  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+  return selectWhatsappUrl(whatsappLinks(number, message), mode);
 }
 
 function inviteForRecipient(recipientId) {
@@ -3311,11 +3376,71 @@ function paymentWhatsappMessage(payment, { messageDetails = '', profile = active
     : `Ciao ${recipientName(recipientId)} 🌊\n\nPer ${reason}, da versare ora: ${amount}.${dueDate}${methodText}${detailsText}${tripBreakdown}\n\nIl sito non riceve denaro: dopo il contributo avvisami qui, così controllo l’accredito reale. Grazie! ⛵`;
 }
 
-function paymentWhatsappUrl(payment, options = {}) {
+function paymentWhatsappUrl(payment, { mode = 'preferred', ...messageOptions } = {}) {
   const recipientId = payment.recipientId || payment.memberId || payment.payerInviteId;
   const number = paymentRecipientWhatsappNumber(recipientId);
   if (!number) return '';
-  return `https://wa.me/${number}?text=${encodeURIComponent(paymentWhatsappMessage(payment, options))}`;
+  return selectWhatsappUrl(whatsappLinks(number, paymentWhatsappMessage(payment, messageOptions)), mode);
+}
+
+function privatePaymentMessageRef(payment) {
+  if (!activeBoat?.id || !payment?.id) return null;
+  return doc(db, 'boats', activeBoat.id, 'paymentRequests', payment.id, 'private', PAYMENT_PRIVATE_MESSAGE_ID);
+}
+
+async function paymentMessageDetailsFor(payment) {
+  if (!payment?.id) return '';
+  if (paymentPrivateMessageCache.has(payment.id)) return paymentPrivateMessageCache.get(payment.id);
+  const privateRef = privatePaymentMessageRef(payment);
+  if (!privateRef) return '';
+  const snapshot = await getDoc(privateRef);
+  const messageDetails = snapshot.exists() ? String(snapshot.data().messageDetails || '').trim() : '';
+  paymentPrivateMessageCache.set(payment.id, messageDetails);
+  return messageDetails;
+}
+
+function warmPaymentMessageDetails(payment) {
+  void paymentMessageDetailsFor(payment).catch((error) => {
+    console.error('Egadi nota privata richiesta:', error);
+  });
+}
+
+async function openPaymentWhatsApp(payment, { mode = 'preferred' } = {}) {
+  if (!payment) return { opened: false, invalidNumber: true };
+
+  // Se la nota è già stata letta, l'apertura nasce direttamente dal gesto
+  // dell'utente e Chrome può consegnare senza ritardi il protocollo nativo
+  // all'app WhatsApp su macOS.
+  if (paymentPrivateMessageCache.has(payment.id)) {
+    const url = paymentWhatsappUrl(payment, { messageDetails: paymentPrivateMessageCache.get(payment.id), mode });
+    if (!url) return { opened: false, invalidNumber: true };
+    // Con `noopener` alcuni browser restituiscono intenzionalmente `null`
+    // anche quando hanno consegnato il protocollo all'app. Non scambiamo quel
+    // valore per un blocco: il recupero esplicito Web/copia resta disponibile
+    // nella card se WhatsApp non si mostra.
+    window.open(url, '_blank', 'noopener');
+    return { opened: true, invalidNumber: false };
+  }
+
+  // Al primo click la nota privata può non essere ancora in cache. Prenotiamo
+  // subito una finestra vuota, poi la completiamo dopo la lettura: così il
+  // browser non trasforma il recupero della nota in un popup non richiesto.
+  const targetWindow = window.open('', '_blank');
+  if (targetWindow) targetWindow.opener = null;
+  try {
+    const messageDetails = await paymentMessageDetailsFor(payment);
+    const url = paymentWhatsappUrl(payment, { messageDetails, mode });
+    if (!url) {
+      targetWindow?.close();
+      return { opened: false, invalidNumber: true };
+    }
+    if (!targetWindow) return { opened: false, invalidNumber: false };
+    targetWindow.location.replace(url);
+    return { opened: true, invalidNumber: false };
+  } catch (error) {
+    targetWindow?.close();
+    throw error;
+  }
 }
 
 function createInviteId() {
@@ -3406,12 +3531,18 @@ async function reissueInvite(invite) {
     preferredLocale: inviteLocale(invite),
     existingInvite: invite,
   });
-  await updateDoc(doc(db, 'boats', activeBoat.id, 'invites', invite.id), {
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'boats', activeBoat.id, 'invites', invite.id), {
     ...renewedInvite,
     activatedAt: null,
     reissuedAt: serverTimestamp(),
     reissuedBy: auth.currentUser.uid,
   });
+  // Un nuovo invito sullo stesso ID non deve mai ereditare una bozza
+  // anagrafica della persona precedente. La cancellazione è verificata
+  // nelle Rules solo insieme alla riemissione atomica dell'invito.
+  batch.delete(doc(db, 'boats', activeBoat.id, 'crewDrafts', invite.id));
+  await batch.commit();
   return renewedInvite;
 }
 
@@ -4396,29 +4527,47 @@ function openBoatEdit() {
 
 function renderSkipperProfile(profile) {
   activeSkipperProfile = profile || null;
+  renderSkipperProfileForm();
+  renderSkipperProfileStatus();
+}
+
+function renderSkipperProfileDraft(draft) {
+  activeSkipperProfileDraft = draft || null;
+  renderSkipperProfileForm();
+  renderSkipperProfileStatus();
+}
+
+function renderSkipperProfileForm() {
   const form = document.querySelector('#skipperProfileForm');
   if (!form) return;
+  if (form.dataset.editing === 'true') return;
 
-  if (profile && form.dataset.editing !== 'true') {
-    for (const [field, value] of Object.entries(profile)) {
-      const input = form.elements.namedItem(field);
-      if (!input) continue;
-      if (input.type === 'checkbox') input.checked = Boolean(value);
-      else input.value = value || '';
-    }
+  form.reset();
+  const profile = activeSkipperProfileDraft || activeSkipperProfile;
+  if (!profile) return;
+
+  for (const [field, value] of Object.entries(profile)) {
+    const input = form.elements.namedItem(field);
+    if (!input) continue;
+    if (input.type === 'checkbox') input.checked = Boolean(value);
+    else input.value = value || '';
   }
-
-  renderSkipperProfileStatus();
 }
 
 function renderSkipperProfileStatus() {
   const profile = activeSkipperProfile;
+  const draft = activeSkipperProfileDraft;
   const status = document.querySelector('#skipperProfileStatus');
   if (!status) return;
 
   const missing = getMissingSkipperProfileFields(profile, activeSkipperDocumentCopies);
   const ready = isSkipperProfileCharterReady(profile, activeSkipperDocumentCopies);
-  if (ready) {
+  if (draft) {
+    const canonicalMessage = ready
+      ? 'Il dossier già confermato resta disponibile nel PDF finché non confermi questa nuova versione.'
+      : 'La bozza non entra nella Crew List, nel PDF o nel charter finché non la completi e la confermi.';
+    status.innerHTML = `<span class="skipper-profile-status-icon is-pending" aria-hidden="true">!</span><div><strong>Hai una bozza privata in corso</strong><span>${canonicalMessage}</span></div>`;
+  } else if (ready) {
     status.innerHTML = '<span class="skipper-profile-status-icon" aria-hidden="true">✓</span><div><strong>Dossier charter pronto</strong><span>La tua riga entra nella Crew List. Le due copie restano private e puoi scaricarle quando devi allegarle al charter.</span></div>';
   } else if (!profile) {
     status.innerHTML = '<span class="skipper-profile-status-icon is-pending" aria-hidden="true">!</span><div><strong>Il tuo dossier è ancora vuoto</strong><span>Compila qui anagrafica e abilitazioni, poi archivia le due copie richieste dal charter. Non compariranno mai alla flotta o all’equipaggio.</span></div>';
@@ -4427,6 +4576,136 @@ function renderSkipperProfileStatus() {
   }
   updateCharterReadiness();
   renderSkipperDashboardOverview();
+}
+
+function emptySkipperTravelLeg() {
+  return {
+    schemaVersion: 1,
+    transportMode: '',
+    originCity: '',
+    originAirport: '',
+    destinationCity: '',
+    destinationAirport: '',
+    departureDate: '',
+    departureTime: '',
+    arrivalDate: '',
+    arrivalTime: '',
+    carrier: '',
+    serviceNumber: '',
+    luggageCount: 0,
+    bulkyLuggage: false,
+    needsAirportMarsalaTransfer: false,
+  };
+}
+
+function normalizeSkipperTravelLeg(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const luggageCount = Number.parseInt(source.luggageCount, 10);
+  return {
+    ...emptySkipperTravelLeg(),
+    transportMode: SKIPPER_TRAVEL_MODES.has(source.transportMode) ? source.transportMode : '',
+    originCity: String(source.originCity || '').trim(),
+    originAirport: String(source.originAirport || '').trim().toUpperCase(),
+    destinationCity: String(source.destinationCity || '').trim(),
+    destinationAirport: String(source.destinationAirport || '').trim().toUpperCase(),
+    departureDate: String(source.departureDate || ''),
+    departureTime: String(source.departureTime || ''),
+    arrivalDate: String(source.arrivalDate || ''),
+    arrivalTime: String(source.arrivalTime || ''),
+    carrier: String(source.carrier || '').trim(),
+    serviceNumber: String(source.serviceNumber || '').trim().toUpperCase(),
+    luggageCount: Number.isInteger(luggageCount) ? Math.min(Math.max(luggageCount, 0), 12) : 0,
+    bulkyLuggage: source.bulkyLuggage === true,
+    needsAirportMarsalaTransfer: source.needsAirportMarsalaTransfer === true,
+  };
+}
+
+function skipperTravelLegHasDetails(value) {
+  const travel = normalizeSkipperTravelLeg(value);
+  return Boolean(
+    travel.transportMode
+    || travel.originCity
+    || travel.originAirport
+    || travel.destinationCity
+    || travel.destinationAirport
+    || travel.departureDate
+    || travel.departureTime
+    || travel.arrivalDate
+    || travel.arrivalTime
+    || travel.carrier
+    || travel.serviceNumber
+    || travel.luggageCount > 0
+    || travel.bulkyLuggage
+    || travel.needsAirportMarsalaTransfer,
+  );
+}
+
+function skipperTravelDashboardSummary() {
+  const outboundSaved = Boolean(activeSkipperTravel.outbound);
+  const returnSaved = Boolean(activeSkipperTravel.return);
+  const outboundDetailed = skipperTravelLegHasDetails(activeSkipperTravel.outbound);
+  const returnDetailed = skipperTravelLegHasDetails(activeSkipperTravel.return);
+  const transfers = SKIPPER_TRAVEL_LEG_IDS.filter((legId) => activeSkipperTravel[legId]?.needsAirportMarsalaTransfer === true);
+  const transferDetail = transfers.length
+    ? `Transfer richiesto ${transfers.length === 2 ? 'per andata e ritorno' : transfers[0] === 'outbound' ? 'all’andata' : 'al ritorno'} · resta privato.`
+    : '';
+  if (!outboundSaved && !returnSaved) {
+    return { value: 'Viaggio da inserire', detail: 'Aggiungi andata e ritorno quando hai gli orari.' };
+  }
+  if (!outboundDetailed && !returnDetailed) {
+    return { value: 'Bozza di viaggio salvata', detail: 'Puoi completarla con calma, una tratta alla volta.' };
+  }
+  if (outboundDetailed && returnDetailed) {
+    return { value: 'Andata e ritorno salvati', detail: transferDetail || 'Orari e aeroporti restano nel tuo spazio privato.' };
+  }
+  return {
+    value: outboundDetailed ? 'Andata salvata' : 'Ritorno salvato',
+    detail: transferDetail || (outboundDetailed ? 'Aggiungi il ritorno quando hai gli orari.' : 'Aggiungi l’andata quando hai gli orari.'),
+  };
+}
+
+function updateSkipperTravelTransferHint(form) {
+  const transferInput = form?.elements.namedItem('needsAirportMarsalaTransfer');
+  const modeInput = form?.elements.namedItem('transportMode');
+  const hint = form?.querySelector('[data-travel-transfer-hint]');
+  if (!transferInput || !hint) return;
+  const wantsTransfer = transferInput.checked;
+  form.querySelector('.skipper-transfer-fieldset')?.classList.toggle('is-requested', wantsTransfer);
+  hint.textContent = !wantsTransfer
+    ? 'Puoi indicarlo già ora: la richiesta resta privata finché non viene attivato il servizio con la società transfer e una conferma dedicata.'
+    : modeInput?.value !== 'flight'
+      ? 'Il transfer previsto collega aeroporto e porto: seleziona “Aereo” e indica TPS o PMO prima di salvare la richiesta.'
+      : 'Richiesta preparata solo per te: nessun dato viene ancora inviato alla società transfer.';
+}
+
+function renderSkipperTravelStatus() {
+  const status = document.querySelector('#skipperTravelStatus');
+  if (!status) return;
+  const summary = skipperTravelDashboardSummary();
+  const ready = summary.value === 'Andata e ritorno salvati';
+  status.innerHTML = `<span class="skipper-travel-status-icon${ready ? '' : ' is-pending'}" aria-hidden="true">${ready ? '✓' : '✈'}</span><div><strong>${escapeHtml(summary.value)}</strong><span>${escapeHtml(summary.detail)} Non entra nel PDF charter né nella flotta.</span></div>`;
+  renderSkipperDashboardOverview();
+}
+
+function renderSkipperTravelLeg(legId, value) {
+  if (!SKIPPER_TRAVEL_LEG_IDS.includes(legId)) return;
+  activeSkipperTravel = { ...activeSkipperTravel, [legId]: value || null };
+  const form = document.querySelector(`[data-skipper-travel-leg="${legId}"]`);
+  if (!form || form.dataset.editing === 'true') {
+    renderSkipperTravelStatus();
+    return;
+  }
+  const travel = normalizeSkipperTravelLeg(value);
+  form.reset();
+  Object.entries(travel).forEach(([field, fieldValue]) => {
+    const input = form.elements.namedItem(field);
+    if (!input) return;
+    if (input.type === 'checkbox') input.checked = Boolean(fieldValue);
+    else input.value = fieldValue;
+  });
+  form.dataset.editing = '';
+  updateSkipperTravelTransferHint(form);
+  renderSkipperTravelStatus();
 }
 
 function updateCharterReadiness() {
@@ -4476,7 +4755,7 @@ function projectionCardActions(projection, invite) {
     actions.push(projectionActionButton('register-manual-receipt', projection.id, `Registra un acconto già ricevuto per ${projection.displayName}`, '+'));
   }
   if (!invite) {
-    actions.push(projectionActionButton('send-projection', projection.id, `Crea invito WhatsApp per ${projection.displayName}`, '↗', 'primary'));
+    actions.push(projectionActionButton('send-projection', projection.id, `Crea invito WhatsApp per ${projection.displayName}`, whatsappIconSvg(), 'primary'));
     actions.push(projectionActionButton('release-projection', projection.id, `Libera il posto di ${projection.displayName}`, '×', 'release'));
     return actions.join('');
   }
@@ -4489,7 +4768,7 @@ function projectionCardActions(projection, invite) {
   }
   if (invite.status === 'pending' && invite.accessKey) {
     actions.push(projectionActionButton('copy-invite', invite.id, `Copia il link personale di ${projection.displayName}`, '⧉'));
-    actions.push(projectionActionButton('whatsapp-invite', invite.id, `Apri WhatsApp per ${projection.displayName}`, '↗', 'primary'));
+    actions.push(projectionActionButton('whatsapp-invite', invite.id, `Apri WhatsApp per ${projection.displayName}`, whatsappIconSvg(), 'primary'));
   }
   actions.push(projectionActionButton('reissue-invite', invite.id, `Revoca e genera un nuovo link per ${projection.displayName}`, '↻', 'release'));
   return actions.join('');
@@ -4542,7 +4821,7 @@ function renderLegacyInviteCard(invite) {
   if (linkable) actions.push(projectionActionButton('link-legacy-invite', invite.id, `Completa la scheda di ${invite.displayName}`, '✎', 'primary'));
   if (linkReady) {
     actions.push(projectionActionButton('copy-invite', invite.id, `Copia il link personale di ${invite.displayName}`, '⧉'));
-    actions.push(projectionActionButton('whatsapp-invite', invite.id, `Apri WhatsApp per ${invite.displayName}`, '↗'));
+    actions.push(projectionActionButton('whatsapp-invite', invite.id, `Apri WhatsApp per ${invite.displayName}`, whatsappIconSvg()));
   }
   if (invite.status !== 'revoked') actions.push(projectionActionButton('reissue-invite', invite.id, `Revoca e genera un nuovo link per ${invite.displayName}`, '↻', 'release'));
   const instruction = linkable
@@ -4618,6 +4897,7 @@ function renderPayments(snapshot) {
     return;
   }
   activePayments = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  activePayments.forEach(warmPaymentMessageDetails);
   list.innerHTML = activePayments.map((payment) => {
     const recipientId = payment.recipientId || payment.memberId || payment.payerInviteId;
     const name = recipientName(recipientId);
@@ -4635,10 +4915,13 @@ function renderPayments(snapshot) {
       ? `<button class="text-button" type="button" data-verify-payment="${escapeHtml(payment.id)}">Conferma accredito</button><button class="text-button" type="button" data-cancel-payment="${escapeHtml(payment.id)}">Annulla richiesta</button>`
       : '';
     const inviteAction = activeInvites.some((invite) => invite.id === recipientId && invite.status === 'pending' && invite.accessKey)
-      ? `<button class="text-button" type="button" data-whatsapp-invite="${escapeHtml(recipientId)}">Invia invito</button>`
+      ? `<button class="text-button payment-action-control" type="button" data-whatsapp-invite="${escapeHtml(recipientId)}" title="Apri una bozza WhatsApp con l’invito">${whatsappActionIconMarkup()}<span>Invia invito WhatsApp</span></button>`
       : '';
     const paymentMessageAction = !manualReceipt && paymentRecipientWhatsappNumber(recipientId)
-      ? `<button class="text-button" type="button" data-whatsapp-payment="${escapeHtml(payment.id)}">Apri WhatsApp</button>`
+      ? `<button class="text-button payment-action-control" type="button" data-whatsapp-payment="${escapeHtml(payment.id)}" title="Apri una bozza nell’app WhatsApp">${whatsappActionIconMarkup()}<span>Apri nell’app WhatsApp</span></button>`
+      : '';
+    const paymentWebMessageAction = !manualReceipt && paymentRecipientWhatsappNumber(recipientId)
+      ? `<button class="text-button payment-action-control" type="button" data-whatsapp-payment-web="${escapeHtml(payment.id)}" title="Apri la bozza in WhatsApp Web">${whatsappActionIconMarkup({ external: true })}<span>Apri in WhatsApp Web</span></button>`
       : '';
     const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
     const methods = manualReceipt
@@ -4651,8 +4934,8 @@ function renderPayments(snapshot) {
     const contributionTag = contributionLabel
       ? `<span class="payment-contribution-tag">${escapeHtml(contributionLabel)}</span>`
       : '';
-    const copyAction = manualReceipt ? '' : `<button class="text-button" type="button" data-copy-payment="${escapeHtml(payment.id)}">Copia messaggio</button>`;
-    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${contributionTag}${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}${copyAction}${inviteAction}${statusActions}</div></article>`;
+    const copyAction = manualReceipt ? '' : `<button class="text-button payment-action-control" type="button" data-copy-payment="${escapeHtml(payment.id)}" title="Copia il testo della richiesta"><span class="payment-copy-icon" aria-hidden="true">⧉</span><span>Copia messaggio</span></button>`;
+    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${contributionTag}${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}${paymentWebMessageAction}${copyAction}${inviteAction}${statusActions}</div></article>`;
   }).join('');
   renderCostPlanSummary();
   renderProjections({ syncFleet: false });
@@ -4744,6 +5027,22 @@ function subscribeToBoat(boat) {
     resetSkipperDocumentCopies('checking');
     void refreshSkipperDocumentCopies(boat.id);
   }
+  if (boatContextChanged) {
+    activeSkipperProfile = null;
+    activeSkipperProfileDraft = null;
+    activeSkipperTravel = { outbound: null, return: null };
+    const skipperProfileForm = document.querySelector('#skipperProfileForm');
+    if (skipperProfileForm) {
+      skipperProfileForm.reset();
+      skipperProfileForm.dataset.editing = '';
+    }
+    document.querySelectorAll('[data-skipper-travel-leg]').forEach((form) => {
+      form.reset();
+      form.dataset.editing = '';
+      const luggageCount = form.elements.namedItem('luggageCount');
+      if (luggageCount) luggageCount.value = '0';
+    });
+  }
   registerSection.hidden = true;
   dashboard.hidden = false;
   setupSkipperDashboard();
@@ -4778,12 +5077,28 @@ function subscribeToBoat(boat) {
   stopAnnouncementSubscription?.();
   stopAcceptanceSubscription?.();
   stopSkipperProfileSubscription?.();
+  stopSkipperProfileDraftSubscription?.();
+  Object.values(stopSkipperTravelSubscriptions).forEach((unsubscribe) => unsubscribe?.());
   stopSkipperProfileSubscription = onSnapshot(doc(db, 'boats', boat.id, 'skipperProfile', SKIPPER_PROFILE_ID), (snapshot) => {
     renderSkipperProfile(snapshot.exists() ? snapshot.data() : null);
   }, () => {
     renderSkipperProfile(null);
     setMessage(document.querySelector('#skipperProfileMessage'), 'Impossibile leggere il dossier skipper.', true);
   });
+  stopSkipperProfileDraftSubscription = onSnapshot(doc(db, 'boats', boat.id, 'skipperProfileDraft', SKIPPER_PROFILE_ID), (snapshot) => {
+    renderSkipperProfileDraft(snapshot.exists() ? snapshot.data() : null);
+  }, () => {
+    renderSkipperProfileDraft(null);
+    setMessage(document.querySelector('#skipperProfileMessage'), 'Impossibile leggere la bozza privata del dossier.', true);
+  });
+  stopSkipperTravelSubscriptions = Object.fromEntries(SKIPPER_TRAVEL_LEG_IDS.map((legId) => [legId,
+    onSnapshot(doc(db, 'boats', boat.id, 'skipperTravel', legId), (snapshot) => {
+      renderSkipperTravelLeg(legId, snapshot.exists() ? snapshot.data() : null);
+    }, () => {
+      renderSkipperTravelLeg(legId, null);
+      setMessage(document.querySelector(`#skipperTravel${legId === 'outbound' ? 'Outbound' : 'Return'}Message`), 'Impossibile leggere questa tratta privata.', true);
+    }),
+  ]));
   stopMemberSubscription = onSnapshot(collection(db, 'boats', boat.id, 'members'), (snapshot) => {
     activeMembers = snapshot.docs.map((item) => normalizeMember(item.id, item.data())).sort((first, second) => memberName(first).localeCompare(memberName(second), 'it'));
     renderMembers();
@@ -5898,6 +6213,10 @@ skipperProfileForm.addEventListener('input', (event) => {
   if (event.target.matches('[data-skipper-document-input]')) return;
   skipperProfileForm.dataset.editing = 'true';
 });
+skipperProfileForm.addEventListener('change', (event) => {
+  if (event.target.matches('[data-skipper-document-input]')) return;
+  skipperProfileForm.dataset.editing = 'true';
+});
 document.querySelectorAll('[data-skipper-document-upload]').forEach((button) => {
   button.addEventListener('click', () => {
     const documentKey = button.dataset.skipperDocumentUpload;
@@ -5922,18 +6241,19 @@ skipperProfileForm.addEventListener('submit', async (event) => {
   if (blockPrivateAction(document.querySelector('#skipperProfileMessage'))) return;
   if (!activeBoat || !auth.currentUser) return;
   const form = event.currentTarget;
+  const saveMode = event.submitter?.dataset.skipperProfileSave === 'draft' ? 'draft' : 'final';
   const fields = new FormData(form);
   const sailingLicenseExpiry = String(fields.get('sailingLicenseExpiry') || '');
   const radioCertificateExpiry = String(fields.get('radioCertificateExpiry') || '');
-  if (sailingLicenseExpiry && sailingLicenseExpiry < '2026-10-11') {
+  if (saveMode === 'final' && sailingLicenseExpiry && sailingLicenseExpiry < '2026-10-11') {
     setMessage(document.querySelector('#skipperProfileMessage'), 'La patente nautica risulta scaduta prima della fine del viaggio. Verifica la data o lasciala vuota se non è prevista.', true);
     return;
   }
-  if (radioCertificateExpiry && radioCertificateExpiry < '2026-10-11') {
+  if (saveMode === 'final' && radioCertificateExpiry && radioCertificateExpiry < '2026-10-11') {
     setMessage(document.querySelector('#skipperProfileMessage'), 'Il certificato radio risulta scaduto prima della fine del viaggio. Verifica la data o lasciala vuota se non è prevista.', true);
     return;
   }
-  const submitButton = form.querySelector('button[type="submit"]');
+  const submitButtons = Array.from(form.querySelectorAll('button[type="submit"]'));
   const profile = {
     firstName: String(fields.get('firstName') || '').trim(),
     lastName: String(fields.get('lastName') || '').trim(),
@@ -5958,17 +6278,114 @@ skipperProfileForm.addEventListener('submit', async (event) => {
     updatedAt: serverTimestamp(),
     updatedBy: auth.currentUser.uid,
   };
-  submitButton.disabled = true;
-  setMessage(document.querySelector('#skipperProfileMessage'), 'Salvo il dossier skipper…');
+  submitButtons.forEach((button) => { button.disabled = true; });
+  setMessage(document.querySelector('#skipperProfileMessage'), saveMode === 'draft' ? 'Salvo la bozza privata…' : 'Confermo il dossier per il charter…');
   try {
-    await setDoc(doc(db, 'boats', activeBoat.id, 'skipperProfile', SKIPPER_PROFILE_ID), profile);
+    const draftRef = doc(db, 'boats', activeBoat.id, 'skipperProfileDraft', SKIPPER_PROFILE_ID);
+    if (saveMode === 'draft') {
+      await setDoc(draftRef, profile);
+    } else {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'boats', activeBoat.id, 'skipperProfile', SKIPPER_PROFILE_ID), profile);
+      batch.delete(draftRef);
+      await batch.commit();
+    }
     form.dataset.editing = '';
-    setMessage(document.querySelector('#skipperProfileMessage'), 'Dossier skipper salvato. Il PDF userà anche la tua riga nella Crew List e il riepilogo documentale per il charter.');
+    setMessage(
+      document.querySelector('#skipperProfileMessage'),
+      saveMode === 'draft'
+        ? 'Bozza privata salvata. Puoi tornare quando hai i documenti: non compare nella Crew List, nel PDF e non viene comunicata al charter.'
+        : 'Dati del dossier confermati. Il PDF sarà pronto quando saranno presenti anche le due copie private richieste dal charter.',
+    );
   } catch (error) {
-    setMessage(document.querySelector('#skipperProfileMessage'), 'Non riesco a salvare il dossier skipper. Esci e rientra con l’account Google associato alla barca, poi riprova.', true);
+    setMessage(
+      document.querySelector('#skipperProfileMessage'),
+      getFirestoreErrorMessage(
+        error,
+        saveMode === 'draft'
+          ? 'Non riesco a salvare la bozza privata. Esci e rientra con l’account Google associato alla barca, poi riprova.'
+          : 'Non riesco a confermare il dossier skipper. Esci e rientra con l’account Google associato alla barca, poi riprova.',
+      ),
+      true,
+    );
   } finally {
-    submitButton.disabled = false;
+    submitButtons.forEach((button) => { button.disabled = false; });
   }
+});
+
+document.querySelectorAll('[data-skipper-travel-leg]').forEach((travelForm) => {
+  const legId = travelForm.dataset.skipperTravelLeg;
+  const message = document.querySelector(`#skipperTravel${legId === 'outbound' ? 'Outbound' : 'Return'}Message`);
+  const normalizeTravelCode = (input) => {
+    if (!input?.matches?.('[name="originAirport"], [name="destinationAirport"], [name="serviceNumber"]')) return;
+    input.value = String(input.value || '').replace(/\s+/g, input.name === 'serviceNumber' ? ' ' : '').toUpperCase();
+  };
+  travelForm.addEventListener('input', (event) => {
+    normalizeTravelCode(event.target);
+    travelForm.dataset.editing = 'true';
+    updateSkipperTravelTransferHint(travelForm);
+  });
+  travelForm.addEventListener('change', (event) => {
+    normalizeTravelCode(event.target);
+    travelForm.dataset.editing = 'true';
+    updateSkipperTravelTransferHint(travelForm);
+  });
+  travelForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (blockPrivateAction(message) || !activeBoat || !auth.currentUser || !SKIPPER_TRAVEL_LEG_IDS.includes(legId)) return;
+    if (!travelForm.reportValidity()) return;
+    const fields = new FormData(travelForm);
+    const luggageCount = Number.parseInt(String(fields.get('luggageCount') || '0'), 10);
+    const travel = {
+      schemaVersion: 1,
+      transportMode: String(fields.get('transportMode') || ''),
+      originCity: String(fields.get('originCity') || '').trim(),
+      originAirport: String(fields.get('originAirport') || '').trim().toUpperCase(),
+      destinationCity: String(fields.get('destinationCity') || '').trim(),
+      destinationAirport: String(fields.get('destinationAirport') || '').trim().toUpperCase(),
+      departureDate: String(fields.get('departureDate') || ''),
+      departureTime: String(fields.get('departureTime') || ''),
+      arrivalDate: String(fields.get('arrivalDate') || ''),
+      arrivalTime: String(fields.get('arrivalTime') || ''),
+      carrier: String(fields.get('carrier') || '').trim(),
+      serviceNumber: String(fields.get('serviceNumber') || '').trim().toUpperCase(),
+      luggageCount: Number.isInteger(luggageCount) ? luggageCount : 0,
+      bulkyLuggage: fields.get('bulkyLuggage') === 'on',
+      needsAirportMarsalaTransfer: fields.get('needsAirportMarsalaTransfer') === 'on',
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser.uid,
+    };
+    if (!SKIPPER_TRAVEL_MODES.has(travel.transportMode) || travel.luggageCount < 0 || travel.luggageCount > 12) {
+      setMessage(message, 'Controlla il mezzo di viaggio e il numero di bagagli.', true);
+      return;
+    }
+    if (travel.needsAirportMarsalaTransfer) {
+      const transferAirport = legId === 'outbound' ? travel.destinationAirport : travel.originAirport;
+      if (travel.transportMode !== 'flight' || !SKIPPER_TRAVEL_TRANSFER_AIRPORTS.has(transferAirport)) {
+        setMessage(message, `Per il transfer seleziona “Aereo” e indica ${legId === 'outbound' ? 'l’aeroporto di arrivo' : 'l’aeroporto di partenza'}: TPS (Trapani) o PMO (Palermo).`, true);
+        return;
+      }
+    }
+    const submitButton = travelForm.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    setMessage(message, `Salvo ${legId === 'outbound' ? 'l’andata' : 'il ritorno'} nella tua area privata…`);
+    try {
+      await setDoc(doc(db, 'boats', activeBoat.id, 'skipperTravel', legId), travel);
+      travelForm.dataset.editing = '';
+      activeSkipperTravel = { ...activeSkipperTravel, [legId]: travel };
+      renderSkipperTravelStatus();
+      setMessage(
+        message,
+        travel.needsAirportMarsalaTransfer
+          ? `${legId === 'outbound' ? 'Andata' : 'Ritorno'} salvato. La richiesta transfer resta privata e non è stata inviata a nessuno.`
+          : `${legId === 'outbound' ? 'Andata' : 'Ritorno'} salvato. Puoi completare o correggere questa tratta quando vuoi.`,
+      );
+    } catch (error) {
+      setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare questa tratta privata. Esci e rientra con l’account Google associato alla barca, poi riprova.'), true);
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
 });
 
 const paymentProfileForm = document.querySelector('#paymentProfileForm');
@@ -6320,17 +6737,29 @@ paymentForm.addEventListener('submit', async (event) => {
     cancelledAt: null,
     cancelledBy: null,
   };
-  const whatsappUrl = paymentWhatsappUrl(payment, { messageDetails: fields.get('messageDetails') });
+  const messageDetails = String(fields.get('messageDetails') || '').trim();
+  const whatsappUrl = paymentWhatsappUrl(payment, { messageDetails });
   if (!whatsappUrl) {
     setMessage(document.querySelector('#paymentFormMessage'), 'Per aprire WhatsApp serve un numero valido nell’invito della persona. Crea o correggi prima l’invito personale.', true);
     return;
   }
+  const paymentRef = doc(collection(db, 'boats', activeBoat.id, 'paymentRequests'));
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
   const whatsappWindow = window.open('', '_blank');
   if (whatsappWindow) whatsappWindow.opener = null;
   try {
-    await addDoc(collection(db, 'boats', activeBoat.id, 'paymentRequests'), payment);
+    const batch = writeBatch(db);
+    batch.set(paymentRef, payment);
+    if (messageDetails) {
+      batch.set(doc(paymentRef, 'private', PAYMENT_PRIVATE_MESSAGE_ID), {
+        messageDetails,
+        createdAt: serverTimestamp(),
+        createdBy: auth.currentUser.uid,
+      });
+    }
+    await batch.commit();
+    paymentPrivateMessageCache.set(paymentRef.id, messageDetails);
     form.reset();
     delete form.elements.amount.dataset.autoBerthRate;
     delete form.elements.reason.dataset.autoBerthReason;
@@ -6339,9 +6768,12 @@ paymentForm.addEventListener('submit', async (event) => {
     renderPaymentBalancePreview();
     renderPaymentMethodOptions();
     if (whatsappWindow) whatsappWindow.location.replace(whatsappUrl);
+    const nativeMessage = prefersNativeMacWhatsapp()
+      ? 'Richiesta preparata: WhatsApp dovrebbe aprirsi nell’app. Se non accade, usa “Apri WhatsApp nel browser” o “Copia messaggio” dalla richiesta.'
+      : 'Richiesta preparata: WhatsApp è aperto con il messaggio da inviare personalmente.';
     setMessage(document.querySelector('#paymentFormMessage'), whatsappWindow
-      ? 'Richiesta preparata: WhatsApp è aperto con il messaggio da inviare personalmente.'
-      : 'Richiesta preparata. Il browser ha bloccato la nuova finestra: usa “Apri WhatsApp” dalla richiesta.');
+      ? nativeMessage
+      : 'Richiesta preparata. Il browser ha bloccato la nuova finestra: usa “Apri WhatsApp” o “Apri WhatsApp nel browser” dalla richiesta.');
   } catch (error) {
     whatsappWindow?.close();
     setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco a preparare la richiesta.', true);
@@ -6363,9 +6795,25 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
   const paymentWhatsappButton = event.target.closest('[data-whatsapp-payment]');
   if (paymentWhatsappButton) {
     const payment = activePayments.find((candidate) => candidate.id === paymentWhatsappButton.dataset.whatsappPayment);
-    const url = payment && paymentWhatsappUrl(payment);
-    if (url) window.open(url, '_blank', 'noopener');
-    else setMessage(document.querySelector('#paymentFormMessage'), 'Non trovo un numero WhatsApp valido per questa richiesta.', true);
+    try {
+      const result = await openPaymentWhatsApp(payment);
+      if (result.invalidNumber) setMessage(document.querySelector('#paymentFormMessage'), 'Non trovo un numero WhatsApp valido per questa richiesta.', true);
+      else if (!result.opened) setMessage(document.querySelector('#paymentFormMessage'), 'Il browser ha bloccato WhatsApp. Usa “Apri WhatsApp nel browser” o “Copia messaggio”.', true);
+    } catch (error) {
+      setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco a recuperare la nota privata della richiesta. Riprova tra poco.', true);
+    }
+    return;
+  }
+  const paymentWhatsappWebButton = event.target.closest('[data-whatsapp-payment-web]');
+  if (paymentWhatsappWebButton) {
+    const payment = activePayments.find((candidate) => candidate.id === paymentWhatsappWebButton.dataset.whatsappPaymentWeb);
+    try {
+      const result = await openPaymentWhatsApp(payment, { mode: 'web' });
+      if (result.invalidNumber) setMessage(document.querySelector('#paymentFormMessage'), 'Non trovo un numero WhatsApp valido per questa richiesta.', true);
+      else if (!result.opened) setMessage(document.querySelector('#paymentFormMessage'), 'Il browser ha bloccato WhatsApp Web. Usa “Copia messaggio”.', true);
+    } catch (error) {
+      setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco a recuperare la nota privata della richiesta. Riprova tra poco.', true);
+    }
     return;
   }
   const inviteCopyButton = event.target.closest('[data-copy-invite]');
@@ -6384,7 +6832,12 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
   if (copyButton) {
     const payment = activePayments.find((candidate) => candidate.id === copyButton.dataset.copyPayment);
     if (!payment) return;
-    const message = paymentWhatsappMessage(payment);
+    if (!paymentPrivateMessageCache.has(payment.id)) {
+      warmPaymentMessageDetails(payment);
+      setMessage(document.querySelector('#paymentFormMessage'), 'Sto preparando la nota privata: riprova tra un istante.', true);
+      return;
+    }
+    const message = paymentWhatsappMessage(payment, { messageDetails: paymentPrivateMessageCache.get(payment.id) });
     try {
       await navigator.clipboard.writeText(message);
       setMessage(document.querySelector('#paymentFormMessage'), 'Messaggio copiato con i dettagli privati dei metodi selezionati.');

@@ -31,9 +31,10 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 2. Quando decide di coinvolgere quella persona, lo skipper trasforma la stessa proiezione in un invito: il sito mantiene il medesimo identificativo e genera un link personale casuale, valido 14 giorni. Lo skipper lo invia direttamente su WhatsApp: messaggio, Privacy e primo accesso usano la lingua selezionata.
 3. Al primo accesso la persona apre quel link, conferma il numero WhatsApp e sceglie il proprio codice personale di **esattamente 6 cifre**. Non è il PIN di sblocco del telefono.
 4. Prima della Crew List la persona legge una sintesi, scorre il regolamento completo della propria barca e conferma esplicitamente la versione pubblicata dallo skipper. La sintesi non sostituisce il testo integrale né il briefing pratico a bordo. In inglese la conferma è possibile soltanto quando lo skipper ha pubblicato anche la versione inglese ufficiale completa.
-5. Il codice viene verificato da Firebase Authentication e non viene salvato nella Crew List, in Firestore o nel browser.
-6. Dopo aver completato la scheda, la persona torna quando vuole da `crew.html`: inserisce numero + codice e viene portata soltanto nella barca e nell'area dello skipper associati. Per il weekend un numero WhatsApp può avere una sola barca attiva.
-7. Una proiezione può essere liberata solo prima di creare il link. Dopo l'invito, la riemissione usa sempre lo stesso identificativo: proiezione, invito, scheda Crew List, richieste e PDF restano nella stessa posizione senza occupare un secondo posto.
+5. Dopo il briefing, la persona può salvare una **bozza privata** della propria anagrafica anche se non ha ancora un documento sotto mano. La bozza non è una Crew List, non occupa un posto, non attiva pagamenti e non entra nel PDF. È leggibile soltanto dalla stessa persona e resta legata alla versione del suo invito.
+6. Solo con dati completi e consenso esplicito la scheda viene confermata nella Crew List. Il codice viene verificato da Firebase Authentication e non viene salvato nella Crew List, in Firestore o nel browser.
+7. Dopo aver completato la scheda, la persona torna quando vuole da `crew.html`: inserisce numero + codice e viene portata soltanto nella barca e nell'area dello skipper associati. Se ha una bozza, torna direttamente alla compilazione precompilata. Per il weekend un numero WhatsApp può avere una sola barca attiva.
+7. Una proiezione può essere liberata solo prima di creare il link. Dopo l'invito, la riemissione usa sempre lo stesso identificativo: proiezione, invito, scheda Crew List, richieste e PDF restano nella stessa posizione senza occupare un secondo posto. Se esiste una bozza anagrafica incompleta, viene cancellata nello stesso passaggio: il nuovo destinatario non può mai ereditarla.
 
 Il link WhatsApp è un codice di attivazione, non un accesso permanente. Se viene inoltrato e usato **prima** della persona destinataria, chi lo possiede può attivarlo: un link diretto non può dimostrare l'identità del destinatario senza OTP o verifica esterna. Per questo scade, non va inoltrato e lo skipper può revocarlo.
 
@@ -88,10 +89,23 @@ boats/{skipperUid}
     firstName, lastName, birthDate, birthPlace, nationality, gender
     documentType, documentNumber, documentExpiry, charterConsent
     role, email, phone, displayName, updatedAt
+  crewDrafts/{inviteId}
+    bozza anagrafica incompleta dell'invitato attivo, participantUid e accessVersion
+    privata alla sola persona; mai PDF, capienza, flotta, pagamenti o Crew List
   skipperProfile/default
     anagrafica Crew List, documento, patente nautica e certificato radio
     stati di consegna al charter, consenso, updatedAt, updatedBy
     nessuna copia o URL di download nel documento Firestore
+  skipperProfileDraft/default
+    bozza privata e incompleta del dossier skipper; mai PDF o Crew List
+  skipperTravel/outbound
+  skipperTravel/return
+    due bozze operative indipendenti, una per l’andata verso Marsala e una per il ritorno
+    transportMode, città/aeroporti IATA, date/orari, compagnia/numero servizio,
+    bagagli e flag transfer aeroporto ↔ Marsala
+    i campi possono restare vuoti: ogni tratta si salva e si completa separatamente
+    solo skipper della propria barca; mai Crew List, PDF, flotta, pagamenti,
+    organizzatore, equipaggio, altro skipper o società transfer
   Cloud Storage privato
     boats/{skipperUid}/skipper-documents/sailing-license/current
     boats/{skipperUid}/skipper-documents/radio-certificate/current
@@ -128,6 +142,8 @@ boats/{skipperUid}
     recipientId, memberId, payerInviteId, contributionItemId, amountCents, currency, reason, accountingCategory, isOptional, dueDate
     collectorId, collectorName, paymentMethods, status, createdAt, createdBy
     verifiedAt, verifiedBy, cancelledAt, cancelledBy
+    private/message (facoltativo, solo skipper)
+      messageDetails, createdAt, createdBy
   briefing/board
     rulesTitle, rulesSummary, rulesText, fullRulesRequired, rulesVersion
     rulesTitleEn, rulesSummaryEn, rulesTextEn (tutti completi oppure tutti vuoti)
@@ -153,7 +169,7 @@ Il vincolo operativo è **un numero WhatsApp, una barca attiva** nello stesso ev
 
 ## Crew List PDF e capienza
 
-Il pulsante **Genera Crew List PDF** apre un foglio A4 orizzontale prestampato creato localmente nel browser. Lo skipper sceglie “Salva come PDF” dalla finestra di stampa. Il PDF si attiva solo con dati della barca, dossier skipper completo, le due copie private dello skipper caricate, dati richiesti per ogni persona e conferma di condivisione completati; non contiene proiezioni né inviti non completati. La prima riga è lo skipper/comandante e una sezione separata riporta riferimenti e stato di documento, patente nautica e certificato radio. È un foglio operativo da verificare con il modello e il canale richiesti dal charter, non una conferma automatica di ricezione o un archivio di allegati. Le copie non sono incorporate nel PDF: lo skipper le scarica dal proprio archivio privato e le allega solo nel canale richiesto dal charter. Il porto di iscrizione non è un campo necessario.
+Il pulsante **Genera Crew List PDF** apre un foglio A4 orizzontale prestampato creato localmente nel browser. Lo skipper sceglie “Salva come PDF” dalla finestra di stampa. Il PDF si attiva solo con dati della barca, dossier skipper completo, le due copie private dello skipper caricate, dati richiesti per ogni persona e conferma di condivisione completati; non contiene proiezioni, inviti non completati o bozze private. La prima riga è lo skipper/comandante e una sezione separata riporta riferimenti e stato di documento, patente nautica e certificato radio. È un foglio operativo da verificare con il modello e il canale richiesti dal charter, non una conferma automatica di ricezione o un archivio di allegati. Le copie non sono incorporate nel PDF: lo skipper le scarica dal proprio archivio privato e le allega solo nel canale richiesto dal charter. Il porto di iscrizione non è un campo necessario.
 
 Lo skipper inserisce `totalBerths`, cioè i posti totali a bordo incluso lo skipper. Il sito salva anche `capacity`, derivato come `totalBerths - 1`, per inviti, Crew List e flotta pubblica. Per Karibu: 4 cabine doppie + 2 posti dinette + cabina marinaio = 11 posti totali; 1 è dello skipper e 10 sono partecipanti invitabili o quotabili. Il conteggio operativo usa l'unione per identificativo di proiezioni, inviti e schede Crew List: quando una proiezione diventa invito e poi scheda, resta un solo posto. Le schede manuali o gli inviti legacy senza proiezione contano una volta ciascuno. Non è un vincolo atomico server-side e non sostituisce la valutazione nautica dello skipper.
 
@@ -183,7 +199,7 @@ Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvis
 
 Lo scorrimento e la conferma registrano una dichiarazione di lettura della versione, non possono dimostrare materialmente che ogni parola sia stata compresa. Indicazioni operative reali della singola barca, del charter, delle dotazioni e di eventuali cauzioni devono essere verificate dallo skipper e pubblicate solo quando confermate.
 
-Il sito non incassa denaro, non genera o valida link dei provider e non dichiara pagamenti come eseguiti. Lo skipper configura una volta il proprio nome, i metodi e i dettagli privati di PayPal, Satispay, Revolut e/o bonifico; quindi crea una richiesta con importo, causale, scadenza e una o più alternative. Ogni nuova richiesta porta due etichette tecniche chiuse: `cost_recovery` se il versamento deve concorrere al recupero dei costi della barca, `other` negli altri casi; e `contributionItemId`, che identifica quota posto, assicurazione o altra voce senza interpretare la causale libera. Starter Pack e cauzione rimborsabile non sono ammessi nelle nuove richieste. Lo Starter Pack resta sempre cash/in loco; il flag “compreso nel charter” indica solo che il suo valore è già dentro il charter e viene scorporato dalla quota cabina. La cauzione resta sempre cash/in loco. Il messaggio WhatsApp prende soltanto i dettagli dei metodi selezionati e non li copia nella richiesta Firestore, che resta leggibile soltanto dallo skipper e dalla persona destinataria dopo l'accettazione corrente del briefing. Il pagamento avviene fuori dal sito e può essere segnato come verificato solo dallo skipper, dopo controllo manuale dell'accredito reale. Le richieste create prima dell'introduzione di queste etichette restano aggiornabili soltanto nelle normali transizioni di stato, così possono essere verificate o annullate senza riscriverne il contenuto; restano fuori dai riepiloghi classificati finché il sito non conosce la loro voce.
+Il sito non incassa denaro, non genera o valida link dei provider e non dichiara pagamenti come eseguiti. Lo skipper configura una volta il proprio nome, i metodi e i dettagli privati di PayPal, Satispay, Revolut e/o bonifico; quindi crea una richiesta con importo, causale, scadenza e una o più alternative. Ogni nuova richiesta porta due etichette tecniche chiuse: `cost_recovery` se il versamento deve concorrere al recupero dei costi della barca, `other` negli altri casi; e `contributionItemId`, che identifica quota posto, assicurazione o altra voce senza interpretare la causale libera. Starter Pack e cauzione rimborsabile non sono ammessi nelle nuove richieste. Lo Starter Pack resta sempre cash/in loco; il flag “compreso nel charter” indica solo che il suo valore è già dentro il charter e viene scorporato dalla quota cabina. La cauzione resta sempre cash/in loco. Il messaggio WhatsApp prende soltanto i dettagli dei metodi selezionati e non li copia nella richiesta Firestore, che resta leggibile soltanto dallo skipper e dalla persona destinataria dopo l'accettazione corrente del briefing. Un'eventuale nota libera del messaggio vive invece nel figlio privato e immutabile `paymentRequests/{requestId}/private/message`: serve allo skipper per riaprire o copiare lo stesso testo, ma non compare nell'area della persona. Su Mac il pulsante prova l'app WhatsApp nativa; il recupero esplicito resta WhatsApp nel browser o la copia del messaggio. Il pagamento avviene fuori dal sito e può essere segnato come verificato solo dallo skipper, dopo controllo manuale dell'accredito reale. Le richieste create prima dell'introduzione di queste etichette restano aggiornabili soltanto nelle normali transizioni di stato, così possono essere verificate o annullate senza riscriverne il contenuto; restano fuori dai riepiloghi classificati finché il sito non conosce la loro voce.
 
 Prima di chiedere una quota, lo skipper può pubblicare il **piano quote** della propria barca. È un riepilogo a dieci voci fisse, non un listino libero e non una prova di pagamento:
 
@@ -225,9 +241,11 @@ Prima di inserire l'equipaggio reale, usare soltanto account, nomi, numeri, impo
 
 ## Arrivi e partenze
 
-La sezione pubblica è online e descrive il flusso per aeroporto, Marsala e passaggi fra amici. La futura scheda privata richiederà città di partenza/arrivo, aeroporto reale, data e orari, compagnia e numero di volo facoltativi, bagagli e una finestra di compatibilità fissa di ±120 minuti.
+La sezione pubblica è online e descrive il flusso per aeroporto, Marsala e passaggi fra amici. Nell’area skipper esiste ora il solo modulo privato `skipperTravel`: i documenti fissi `outbound` e `return` raccolgono in modo indipendente città di partenza/arrivo, aeroporto reale, data e orari, compagnia e numero di servizio facoltativi, bagagli e una richiesta indicativa di transfer aeroporto ↔ Marsala. Sono bozze operative: si possono salvare anche incomplete, non inviano una richiesta alla società transfer e non entrano nella Crew List, nel PDF, nella flotta o nella contabilità.
 
-La società transfer avrà un'area riservata separata per le sole tratte aeroporto ↔ Marsala: potrà raggruppare persone, assegnare il mezzo e contattarle. I passaggi casa ↔ aeroporto restano fuori dalla sua area. I contatti fra partecipanti non saranno pubblici: saranno visibili solo dopo la scelta per tratta e l'accettazione del collegamento da entrambe le persone. La raccolta effettiva e le Rules dedicate verranno implementate soltanto dopo la definizione dell'accesso nominativo della società e dell'informativa definitiva.
+Le due tratte sono leggibili e modificabili soltanto dallo skipper associato alla propria barca; `list`, cancellazione e accessi di equipaggio, organizzatore, altro skipper o società transfer sono negati. Il flag transfer resta quindi privato finché non saranno pronti informativa specifica, consenso e un processo distinto che generi una scheda aeroportuale minimizzata.
+
+La società transfer avrà in seguito un’area riservata separata per le sole tratte aeroporto ↔ Marsala: potrà raggruppare persone, assegnare il mezzo e contattarle. I passaggi casa ↔ aeroporto restano fuori dalla sua area. I contatti fra partecipanti non saranno pubblici: saranno visibili solo dopo la scelta per tratta e l'accettazione del collegamento da entrambe le persone. La raccolta effettiva per equipaggio e le Rules dedicate verranno implementate soltanto dopo la definizione dell'accesso nominativo della società e dell'informativa definitiva.
 
 ## Attivazione operativa
 

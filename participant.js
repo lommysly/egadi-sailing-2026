@@ -21,9 +21,11 @@ const translate = (key, fallback, params) => {
 const activeLocale = () => i18n?.getLocale?.() === 'en' ? 'en' : 'it';
 let activeInvite = null;
 let activeMember = null;
+let activeCrewDraft = null;
 let activatedPhone = '';
 let activeBriefing = null;
 let activeRuleAcceptance = null;
+let pendingParticipantProfile = null;
 let stopBriefingSubscription = null;
 let stopRuleAcceptanceSubscription = null;
 let preRegistrationGateResolved = false;
@@ -303,9 +305,11 @@ function showOpening(message = '', isError = false) {
   stopPreRegistrationSubscriptions();
   activeInvite = null;
   activeMember = null;
+  activeCrewDraft = null;
   activatedPhone = '';
   activeBriefing = null;
   activeRuleAcceptance = null;
+  pendingParticipantProfile = null;
   preRegistrationGateResolved = false;
   clearPreRegistrationRulesGate();
   document.querySelector('#invalidLink').hidden = true;
@@ -318,6 +322,8 @@ function showOpening(message = '', isError = false) {
 
 function showActivation() {
   stopPreRegistrationSubscriptions();
+  activeCrewDraft = null;
+  pendingParticipantProfile = null;
   activeBriefing = null;
   activeRuleAcceptance = null;
   preRegistrationGateResolved = false;
@@ -334,9 +340,11 @@ function showInvalid() {
   stopPreRegistrationSubscriptions();
   activeInvite = null;
   activeMember = null;
+  activeCrewDraft = null;
   activatedPhone = '';
   activeBriefing = null;
   activeRuleAcceptance = null;
+  pendingParticipantProfile = null;
   preRegistrationGateResolved = false;
   clearPreRegistrationRulesGate();
   document.querySelector('#signInSection').hidden = true;
@@ -402,9 +410,30 @@ async function readProjectionForInvite(invite) {
   }
 }
 
-function showProfile({ invite, member, projection = null, phone = '' }) {
+async function readCrewDraftForInvite(invite) {
+  if (!invite?.boatId || !invite?.id) return null;
+  try {
+    const snapshot = await getDoc(doc(db, 'boats', invite.boatId, 'crewDrafts', invite.id));
+    return snapshot.exists() ? snapshot.data() : null;
+  } catch {
+    // Fino al deploy delle nuove Rules, un invito esistente resta comunque utilizzabile.
+    return null;
+  }
+}
+
+function renderDraftHint(draft) {
+  const hint = document.querySelector('#participantDraftHint');
+  if (!hint) return;
+  hint.hidden = !draft;
+  hint.textContent = draft
+    ? translate('page.participant.draftLoadedHint', 'Hai una bozza privata in corso. Completa i dati quando hai tutto: finché non confermi, non compare nella Crew List e non entra nel PDF del charter.')
+    : '';
+}
+
+function showProfile({ invite, member, draft = null, projection = null, phone = '' }) {
   activeInvite = invite;
   activeMember = member;
+  activeCrewDraft = draft;
   activatedPhone = phone;
   stopPreRegistrationSubscriptions();
   document.querySelector('#signInSection').hidden = true;
@@ -413,15 +442,24 @@ function showProfile({ invite, member, projection = null, phone = '' }) {
   document.querySelector('#invalidLink').hidden = true;
   document.querySelector('#profileSection').hidden = false;
   document.querySelector('#participantTitle').textContent = invite.displayName || translate('crew.flow.titleFallback', 'Dati per la Crew List');
-  if (member) fillProfile(member);
-  else fillProjectionProfileDefaults(projection);
+  const form = document.querySelector('#participantForm');
+  form.reset();
+  if (draft) fillProfile(draft, { allowEmptyRole: true });
+  else if (member) fillProfile(member);
+  fillProjectionProfileDefaults(projection);
+  if (pendingParticipantProfile) {
+    fillProfile(pendingParticipantProfile, { allowEmptyRole: true });
+    pendingParticipantProfile = null;
+  }
   renderProjectionHint(projection);
-  if (phone && !document.querySelector('#participantForm [name="phone"]').value) {
-    document.querySelector('#participantForm [name="phone"]').value = phone;
+  renderDraftHint(draft);
+  setMessage(document.querySelector('#participantFormMessage'), '');
+  if (phone && !form.elements.namedItem('phone').value) {
+    form.elements.namedItem('phone').value = phone;
   }
 }
 
-function fillProfile(member) {
+function fillProfile(member, { allowEmptyRole = false } = {}) {
   const form = document.querySelector('#participantForm');
   for (const [field, value] of Object.entries(member || {})) {
     const input = form.elements.namedItem(field);
@@ -429,19 +467,20 @@ function fillProfile(member) {
     if (input.type === 'checkbox') input.checked = Boolean(value);
     else input.value = value || '';
   }
-  fillRoleFields(form, 'role', member?.role);
+  fillRoleFields(form, 'role', member?.role, { allowEmpty: allowEmptyRole });
 }
 
 async function openProfile({ invite, phone = '', redirectWhenCompleted = true }) {
-  const [member, projection] = await Promise.all([
+  const [member, draft, projection] = await Promise.all([
     getDoc(doc(db, 'boats', invite.boatId, 'members', invite.id)),
+    readCrewDraftForInvite(invite),
     readProjectionForInvite(invite),
   ]);
-  if (member.exists() && redirectWhenCompleted) {
+  if (member.exists() && !draft && redirectWhenCompleted) {
     window.location.replace(personalAreaUrl());
     return;
   }
-  showProfile({ invite, member: member.exists() ? member.data() : null, projection, phone });
+  showProfile({ invite, member: member.exists() ? member.data() : null, draft, projection, phone });
 }
 
 function renderPreRegistrationGate() {
@@ -593,6 +632,27 @@ document.querySelector('#activationForm').addEventListener('submit', async (even
   }
 });
 
+function profilePayloadFromFields(fields, { allowEmptyRole = false } = {}) {
+  const firstName = String(fields.get('firstName') || '').trim();
+  const lastName = String(fields.get('lastName') || '').trim();
+  return {
+    firstName,
+    lastName,
+    birthDate: String(fields.get('birthDate') || ''),
+    birthPlace: String(fields.get('birthPlace') || '').trim(),
+    nationality: String(fields.get('nationality') || '').trim(),
+    gender: String(fields.get('gender') || ''),
+    documentType: String(fields.get('documentType') || ''),
+    documentNumber: String(fields.get('documentNumber') || '').trim(),
+    documentExpiry: String(fields.get('documentExpiry') || ''),
+    role: roleFromFields(fields, 'role', { allowEmpty: allowEmptyRole }),
+    email: String(fields.get('email') || '').trim().toLowerCase(),
+    phone: String(fields.get('phone') || '').trim() || activatedPhone,
+    charterConsent: fields.get('charterConsent') === 'on',
+    displayName: [firstName, lastName].filter(Boolean).join(' '),
+  };
+}
+
 document.querySelector('#participantForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!canUsePrivateArea()) {
@@ -602,32 +662,69 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
   if (!activeInvite || !auth.currentUser) return;
   const form = event.currentTarget;
   const fields = new FormData(form);
-  const submitButton = form.querySelector('button[type="submit"]');
-  submitButton.disabled = true;
-  setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.savingDetails', 'Salvo i tuoi dati…'));
+  const isDraft = event.submitter?.dataset.participantSave === 'draft';
+  const saveButtons = [...form.querySelectorAll('[data-participant-save]')];
+  let keepButtonsDisabled = false;
+  saveButtons.forEach((button) => { button.disabled = true; });
+  setMessage(
+    document.querySelector('#participantFormMessage'),
+    isDraft
+      ? translate('crew.flow.savingDraft', 'Salvo la tua bozza privata…')
+      : translate('crew.flow.savingDetails', 'Salvo i tuoi dati…'),
+  );
   try {
+    const profile = profilePayloadFromFields(fields, { allowEmptyRole: isDraft });
     if (!await hasCurrentBriefingAcceptance(activeInvite)) {
-      setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.briefingUpdated', 'Il briefing è stato aggiornato: rileggilo e accettalo prima di comparire nella Crew List.'), true);
+      pendingParticipantProfile = profile;
+      setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.briefingUpdated', 'Il briefing è stato aggiornato: rileggilo e accettalo prima di salvare i dati.'), true);
       openPreRegistrationBriefing({ invite: activeInvite, phone: activatedPhone });
       return;
     }
-    const firstName = fields.get('firstName').trim();
-    const lastName = fields.get('lastName').trim();
-    const role = roleFromFields(fields, 'role');
-    const roleChanged = role !== String(activeMember?.role || '').trim();
-    await setDoc(doc(db, 'boats', activeInvite.boatId, 'members', activeInvite.id), {
-      firstName, lastName, birthDate: fields.get('birthDate'), birthPlace: fields.get('birthPlace').trim(),
-      nationality: fields.get('nationality').trim(), gender: fields.get('gender'), documentType: fields.get('documentType'),
-      documentNumber: fields.get('documentNumber').trim(), documentExpiry: fields.get('documentExpiry'), role,
+    const draftRef = doc(db, 'boats', activeInvite.boatId, 'crewDrafts', activeInvite.id);
+    if (isDraft) {
+      await setDoc(draftRef, {
+        ...profile,
+        // La bozza resta legata alla persona e alla versione dell'invito che
+        // l'ha creata: una riemissione sullo stesso ID non può esporla a un
+        // nuovo destinatario.
+        participantUid: auth.currentUser.uid,
+        accessVersion: Number.isInteger(activeInvite.accessVersion) ? activeInvite.accessVersion : 0,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser.uid,
+      });
+      activeCrewDraft = profile;
+      pendingParticipantProfile = null;
+      renderDraftHint(activeCrewDraft);
+      setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.draftSaved', 'Bozza salvata nella tua area privata. Non è ancora nella Crew List e non entra nel PDF del charter.'));
+      return;
+    }
+
+    const roleChanged = profile.role !== String(activeMember?.role || '').trim();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'boats', activeInvite.boatId, 'members', activeInvite.id), {
+      ...profile,
       roleConfirmed: roleChanged ? false : activeMember?.roleConfirmed === true,
-      email: fields.get('email').trim().toLowerCase(), phone: fields.get('phone').trim() || activatedPhone, charterConsent: fields.get('charterConsent') === 'on',
-      displayName: `${firstName} ${lastName}`, updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser.uid,
     }, { merge: true });
+    if (activeCrewDraft) batch.delete(draftRef);
+    await batch.commit();
+    activeCrewDraft = null;
+    pendingParticipantProfile = null;
+    renderDraftHint(null);
     setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.detailsSaved', 'Dati inviati con successo. Apro la tua area personale…'));
+    keepButtonsDisabled = true;
     window.setTimeout(() => window.location.replace(personalAreaUrl()), 900);
   } catch (error) {
-    setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.detailsNotSaved', 'I dati non sono stati inviati. Controlla la connessione e riprova.'), true);
-    submitButton.disabled = false;
+    setMessage(
+      document.querySelector('#participantFormMessage'),
+      isDraft
+        ? translate('crew.flow.draftNotSaved', 'La bozza non è stata salvata. Controlla la connessione e riprova.')
+        : translate('crew.flow.detailsNotSaved', 'I dati non sono stati inviati. Controlla la connessione e riprova.'),
+      true,
+    );
+  } finally {
+    if (!keepButtonsDisabled) saveButtons.forEach((button) => { button.disabled = false; });
   }
 });
 
@@ -684,24 +781,20 @@ if (isEditMode) {
     onOpening: showOpening,
     onInvalid: showInvalid,
     onReady: async ({ invite }) => {
-      let member;
       let briefingAccepted = false;
-      let projection = null;
       try {
-        [member, briefingAccepted, projection] = await Promise.all([
-          getDoc(doc(db, 'boats', invite.boatId, 'members', invite.id)),
-          hasCurrentBriefingAcceptance(invite),
-          readProjectionForInvite(invite),
-        ]);
+        briefingAccepted = await hasCurrentBriefingAcceptance(invite);
       } catch {
         openPreRegistrationBriefing({ invite, phone: '' });
         return;
       }
-      if (!member.exists() || !briefingAccepted) {
+      if (!briefingAccepted) {
         openPreRegistrationBriefing({ invite, phone: '' });
         return;
       }
-      showProfile({ invite, member: member.data(), projection });
+      openProfile({ invite, phone: '', redirectWhenCompleted: false }).catch(() => {
+        openPreRegistrationBriefing({ invite, phone: '' });
+      });
     },
   });
 } else {
