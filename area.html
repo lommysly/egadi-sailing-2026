@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260915-rules-dossier-v1" />
+  <link rel="stylesheet" href="styles.css?v=20260915-skipper-documents-v1" />
 </head>
 <body class="area-page">
   <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
@@ -207,13 +207,25 @@
               </div>
             </fieldset>
             <fieldset>
-              <legend>Documenti da consegnare al charter</legend>
-              <p class="field-hint">Qui annoti lo stato di invio. Se selezioni “Conferma di ricezione registrata”, fallo solo dopo una risposta del charter. Per ora non carichiamo copie di documento sul sito: le scansioni restano nel canale richiesto dal charter.</p>
+              <legend>Copie da inviare al charter</legend>
+              <p class="field-hint">Carica qui soltanto la copia della patente nautica e del certificato radio. Restano nella tua area privata: il sito non le invia automaticamente al charter. Scaricale e allegale solo nel canale che il charter ti ha indicato.</p>
+              <div id="skipperDocumentUploads" class="skipper-document-upload-grid" aria-live="polite">
+                <article class="skipper-document-upload" data-skipper-document-card="sailingLicense">
+                  <div class="skipper-document-upload-copy"><p class="eyebrow">Abilitazione 1</p><h4>Patente nautica</h4><p data-skipper-document-state="sailingLicense">Controllo della copia privata…</p></div>
+                  <div class="skipper-document-upload-actions"><input id="sailingLicenseFile" class="visually-hidden" data-skipper-document-input="sailingLicense" type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" aria-label="Scegli la copia della patente nautica" /><button class="button button-ghost" type="button" data-skipper-document-upload="sailingLicense">Scegli e carica copia</button><button class="text-button" type="button" data-skipper-document-download="sailingLicense" disabled>Scarica copia</button></div>
+                </article>
+                <article class="skipper-document-upload" data-skipper-document-card="radioCertificate">
+                  <div class="skipper-document-upload-copy"><p class="eyebrow">Abilitazione 2</p><h4>Certificato radio</h4><p data-skipper-document-state="radioCertificate">Controllo della copia privata…</p></div>
+                  <div class="skipper-document-upload-actions"><input id="radioCertificateFile" class="visually-hidden" data-skipper-document-input="radioCertificate" type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" aria-label="Scegli la copia del certificato radio" /><button class="button button-ghost" type="button" data-skipper-document-upload="radioCertificate">Scegli e carica copia</button><button class="text-button" type="button" data-skipper-document-download="radioCertificate" disabled>Scarica copia</button></div>
+                </article>
+              </div>
+              <p class="field-hint">PDF, JPG o PNG · massimo 8 MB per copia. Puoi sostituire una copia, non eliminarla dall’area: la pulizia finale segue la procedura privacy dell’evento.</p>
               <div class="form-grid">
                 <label>Documento d’identità<select name="identityDocumentStatus" required><option value="to_prepare">Da preparare</option><option value="ready">Pronto da inviare</option><option value="sent">Inviato al charter</option><option value="confirmed">Conferma di ricezione registrata</option></select></label>
                 <label>Patente nautica<select name="sailingLicenseStatus" required><option value="to_prepare">Da preparare</option><option value="ready">Pronta da inviare</option><option value="sent">Inviata al charter</option><option value="confirmed">Conferma di ricezione registrata</option></select></label>
                 <label>Certificato radio<select name="radioCertificateStatus" required><option value="to_prepare">Da preparare</option><option value="ready">Pronto da inviare</option><option value="sent">Inviato al charter</option><option value="confirmed">Conferma di ricezione registrata</option></select></label>
               </div>
+              <p class="field-hint">Caricare una copia non equivale a inviarla: aggiorna lo stato solo quando usi il canale concordato con il charter.</p>
             </fieldset>
             <label class="consent-field"><input name="charterConsent" type="checkbox" required /> Confermo che i miei dati e riferimenti possono essere inseriti nella Crew List e comunicati al charter. *</label>
             <button class="button button-primary" type="submit">Salva dossier skipper</button><p id="skipperProfileMessage" class="form-message" role="status" aria-live="polite"></p>
@@ -372,6 +384,6 @@
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="area.js?v=20260915-rules-dossier-v1"></script>
+  <script type="module" src="area.js?v=20260915-skipper-documents-v1"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 # Egadi Sailing Experience · 8–11 ottobre 2026
 
-Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il progetto resta sul piano Firebase Spark: nessun checkout, nessuna Cloud Function, nessun SMS e nessun servizio a consumo.
+Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il progetto usa Firebase Blaze soltanto per l’archivio privato delle due copie documentali dello skipper: nessun checkout, nessuna Cloud Function, nessun SMS e nessun pagamento automatico.
 
 ## Stato reale
 
@@ -20,7 +20,8 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - `participant.html`: primo accesso dal link WhatsApp; la persona conferma il suo numero e sceglie il proprio codice di 6 cifre, poi completa i dati necessari alla Crew List.
 - `crew.html`: ingresso quotidiano dell'equipaggio con numero WhatsApp e codice personale.
 - `my-area.html`: area personale con scheda, bacheca, regole e richieste dedicate.
-- `crew-pdf.js`: foglio A4 orizzontale da salvare in PDF per charter / eventuali controlli, con skipper nella Crew List e riepilogo privato di patente/certificato radio; non esporta CSV.
+- `crew-pdf.js`: foglio A4 orizzontale da salvare in PDF per charter / eventuali controlli, con skipper nella Crew List e riepilogo privato di patente/certificato radio; non esporta CSV né incorpora le copie dei documenti.
+- `storage.rules` e `storage-cors.json`: archivio Firebase Storage privato per patente nautica e certificato radio dello skipper; non esiste un archivio documenti dell’equipaggio.
 - `FIRESTORE_RULES_TEST_MATRIX.md`, `CHECKLIST_PUBBLICAZIONE.md` e `PRIVACY_DA_COMPLETARE.md`: tracciabilità dei controlli, delle verifiche da completare e delle decisioni privacy da formalizzare.
 - `ARRIVI_PARTENZE_SPEC.md`: modello operativo per la futura scheda privata dell'equipaggio e per l'area riservata della società transfer.
 
@@ -63,6 +64,7 @@ Nel progetto `egadi-sailing-2026`:
 5. Il provider **Anonimo** non è usato dal nuovo sorgente. Disabilitarlo soltanto dopo che la nuova versione e le nuove Rules sono pubblicate e provate, così non si interrompe una sessione della versione precedente durante il passaggio.
 6. Lasciare autorizzati soltanto i domini necessari in Authentication, compreso `egadi.thatsablast.it` e, per i test locali, `127.0.0.1`.
 7. Il documento `events/egadi-2026` contiene `organizerIds` con il solo UID autorizzato e `privateAreaEnabled: true`. Per chiudere l'operatività, riportare il flag a `false` e pubblicare anche `PRIVATE_AREA_ENABLED=false`.
+8. Il bucket predefinito `egadi-sailing-2026.firebasestorage.app` è in `EUROPE-WEST1`; applicare `storage.rules` e il CORS ristretto al solo dominio HTTPS di produzione prima di abilitare caricamenti reali.
 
 Nel profilo privato dello skipper possono essere conservati solo i dettagli necessari per ricevere il contributo: link HTTPS PayPal/Satispay, link HTTPS o Revtag Revolut e, per bonifico, IBAN più intestatario. Non inserire mai password, OTP, numeri di carta, chiavi API o credenziali dei provider. I dettagli non entrano nella Crew List o nella richiesta di pagamento e vengono composti solo nel messaggio WhatsApp per il destinatario scelto.
 
@@ -89,7 +91,12 @@ boats/{skipperUid}
   skipperProfile/default
     anagrafica Crew List, documento, patente nautica e certificato radio
     stati di consegna al charter, consenso, updatedAt, updatedBy
-    nessuna scansione o allegato caricato nel sito
+    nessuna copia o URL di download nel documento Firestore
+  Cloud Storage privato
+    boats/{skipperUid}/skipper-documents/sailing-license/current
+    boats/{skipperUid}/skipper-documents/radio-certificate/current
+    solo PDF, JPG o PNG fino a 8 MB; mai file dell’equipaggio, URL pubblici,
+    nomi originali o metadati in Firestore
   invites/{inviteId}
     displayName, whatsappNumber, phoneFingerprint, loginEmail, accessKey
     participantUid, status, accessVersion, expiresAt, preferredLocale, createdAt
@@ -146,7 +153,7 @@ Il vincolo operativo è **un numero WhatsApp, una barca attiva** nello stesso ev
 
 ## Crew List PDF e capienza
 
-Il pulsante **Genera Crew List PDF** apre un foglio A4 orizzontale prestampato creato localmente nel browser. Lo skipper sceglie “Salva come PDF” dalla finestra di stampa. Il PDF si attiva solo con dati della barca, dossier skipper completo, dati richiesti per ogni persona e conferma di condivisione completati; non contiene proiezioni né inviti non completati. La prima riga è lo skipper/comandante e una sezione separata riporta riferimenti e stato di documento, patente nautica e certificato radio. È un foglio operativo da verificare con il modello e il canale richiesti dal charter, non una conferma automatica di ricezione o un archivio di allegati. Le copie restano nel canale richiesto dal charter e non vengono caricate sul sito. Il porto di iscrizione non è un campo necessario.
+Il pulsante **Genera Crew List PDF** apre un foglio A4 orizzontale prestampato creato localmente nel browser. Lo skipper sceglie “Salva come PDF” dalla finestra di stampa. Il PDF si attiva solo con dati della barca, dossier skipper completo, le due copie private dello skipper caricate, dati richiesti per ogni persona e conferma di condivisione completati; non contiene proiezioni né inviti non completati. La prima riga è lo skipper/comandante e una sezione separata riporta riferimenti e stato di documento, patente nautica e certificato radio. È un foglio operativo da verificare con il modello e il canale richiesti dal charter, non una conferma automatica di ricezione o un archivio di allegati. Le copie non sono incorporate nel PDF: lo skipper le scarica dal proprio archivio privato e le allega solo nel canale richiesto dal charter. Il porto di iscrizione non è un campo necessario.
 
 Lo skipper inserisce `totalBerths`, cioè i posti totali a bordo incluso lo skipper. Il sito salva anche `capacity`, derivato come `totalBerths - 1`, per inviti, Crew List e flotta pubblica. Per Karibu: 4 cabine doppie + 2 posti dinette + cabina marinaio = 11 posti totali; 1 è dello skipper e 10 sono partecipanti invitabili o quotabili. Il conteggio operativo usa l'unione per identificativo di proiezioni, inviti e schede Crew List: quando una proiezione diventa invito e poi scheda, resta un solo posto. Le schede manuali o gli inviti legacy senza proiezione contano una volta ciascuno. Non è un vincolo atomico server-side e non sostituisce la valutazione nautica dello skipper.
 
@@ -214,6 +221,7 @@ Prima di inserire l'equipaggio reale, usare soltanto account, nomi, numeri, impo
 3. Provare a liberare un posto prima dell'invito e verificare che, dopo l'invito o l'attivazione, l'azione non cancelli la storia né l'accesso; usare solo la riemissione del link sullo stesso invito.
 4. Verificare nella dashboard crew che quota prevista e cauzione rimborsabile siano separate dalle richieste personali; creare poi una richiesta fittizia separata e segnare manualmente uno stato, senza simulare o dichiarare un pagamento reale.
 5. Su HTTPS e da una seconda sessione, controllare la disponibilità pubblica dopo riserva, invito, completamento e liberazione di un posto. Deve cambiare soltanto il numero; nessun dato personale o economico deve apparire in flotta.
+6. Con account skipper e file fittizi, caricare soltanto i due file consentiti, scaricarli dallo stesso account e verificare che equipaggio, organizzatore, altro skipper, estraneo e `list` siano negati. Non usare documenti reali.
 
 ## Arrivi e partenze
 

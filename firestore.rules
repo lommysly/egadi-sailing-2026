@@ -120,9 +120,9 @@ service cloud.firestore {
         && hasSafeCrewRoleConfirmation();
     }
 
-    // Il dossier skipper raccoglie riferimenti personali e abilitazioni che
-    // il charter può chiedere. Non ospita scansioni: quelle restano nel
-    // canale concordato con il charter e non entrano mai nella flotta o nella
+    // Il dossier skipper raccoglie soltanto riferimenti personali e
+    // abilitazioni. Le due copie consentite (patente nautica e certificato
+    // radio) vivono nel percorso Storage privato, mai nella flotta o nella
     // superficie equipaggio.
     function isValidCharterDocumentStatus(value) {
       return value in ['to_prepare', 'ready', 'sent', 'confirmed'];
@@ -682,7 +682,7 @@ service cloud.firestore {
         && board.scheduleNoteEn is string;
     }
 
-    // Lo skipper resta proprietario del contenuto, ma non può modificare il
+    // Lo skipper resta responsabile del contenuto, ma non può modificare il
     // briefing già accettato senza produrre una nuova versione. I documenti
     // legacy sono ammessi soltanto in lettura: il primo salvataggio li porta
     // nel formato completo e rende obbligatoria la rilettura.
@@ -1474,7 +1474,7 @@ service cloud.firestore {
     }
 
     // Un acconto già ricevuto non è una "richiesta" inviata retroattivamente:
-    // viene registrato dal solo proprietario come incasso verificato. Può
+    // viene registrato dal solo skipper associato alla barca come incasso verificato. Può
     // nascere dalla proiezione prima dell'invito, ma senza canali, link,
     // coordinate o note da mostrare al futuro partecipante.
     function isValidManualReceiptCreate(boatId) {
@@ -1669,17 +1669,17 @@ service cloud.firestore {
     match /boats/{boatId} {
       // La pagina skipper legge esclusivamente /boats/{proprio UID}. Se il
       // documento non esiste, la lettura puntuale serve solo a mostrare la
-      // registrazione; se esiste, resta leggibile al solo vero proprietario.
+      // registrazione; se esiste, resta leggibile allo skipper associato.
       allow get: if isPrivateAreaOpen() && (isOrganizer()
         || (isGoogleSkipperAccount() && boatId == request.auth.uid
           && (!exists(/databases/$(database)/documents/boats/$(boatId))
             || get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid)));
       allow list: if false;
       allow create: if isPrivateAreaOpen() && isGoogleSkipperAccount() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid && hasValidPrivateBoatCapacity();
-      // Nemmeno l'organizzatore può prendere temporaneamente possesso di una
-      // barca cambiando skipperId: quel legame protegge anche il dossier
-      // privato dello skipper. Un eventuale trasferimento di proprieta va
-      // gestito con una procedura amministrativa separata, non dal client.
+      // Nemmeno l'organizzatore può riassociare temporaneamente uno skipper
+      // cambiando skipperId: quel legame protegge anche il dossier privato.
+      // Un'eventuale riassegnazione dello skipper segue una procedura
+      // amministrativa separata, non eseguibile dal client.
       allow update: if isPrivateAreaOpen()
         && request.resource.data.skipperId == resource.data.skipperId
         && request.resource.data.eventId == resource.data.eventId
@@ -1740,7 +1740,7 @@ service cloud.firestore {
 
       // Riferimenti personali e abilitazioni dello skipper: un documento
       // singolo privato, non consultabile da equipaggio, flotta o
-      // organizzatore. Le copie degli allegati non vengono caricate qui.
+      // organizzatore. Le copie non vengono mai caricate in Firestore.
       match /skipperProfile/{profileId} {
         allow get: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId);
         allow list: if false;

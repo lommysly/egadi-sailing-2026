@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// Le copie della patente nautica e del certificato radio sono documenti
+// privati dello skipper. Il percorso fisso evita nomi, numeri o token nel
+// bucket e consente una sola copia corrente per ciascuna abilitazione.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function privateAreaIsOpen() {
+      return firestore.get(/databases/(default)/documents/events/egadi-2026).data.privateAreaEnabled == true;
+    }
+
+    // La barca può essere noleggiata: questo controllo identifica lo skipper
+    // associato alla barca per l'evento, non il proprietario dell'imbarcazione.
+    function isAssignedSkipperForBoat(boatId) {
+      return request.auth != null
+        && request.auth.uid == boatId
+        && privateAreaIsOpen()
+        && firestore.get(/databases/(default)/documents/boats/$(boatId)).data.skipperId == request.auth.uid;
+    }
+
+    function isAllowedDocument(documentType, fileName) {
+      return fileName == 'current'
+        && documentType in ['sailing-license', 'radio-certificate'];
+    }
+
+    function hasSafeUploadMetadata(documentType) {
+      return request.resource.size > 0
+        && request.resource.size <= 8 * 1024 * 1024
+        && request.resource.contentType in [
+          'application/pdf',
+          'image/jpeg',
+          'image/png'
+        ]
+        && request.resource.metadata.size() == 2
+        && request.resource.metadata.documentType == documentType
+        && request.resource.metadata.schema == '1';
+    }
+
+    match /boats/{boatId}/skipper-documents/{documentType}/{fileName} {
+      // Mai listare il bucket: persino lo skipper conosce solo i due percorsi
+      // fissi della barca a lui associata.
+      allow get: if isAssignedSkipperForBoat(boatId) && isAllowedDocument(documentType, fileName);
+      allow list: if false;
+      allow create, update: if isAssignedSkipperForBoat(boatId)
+        && isAllowedDocument(documentType, fileName)
+        && hasSafeUploadMetadata(documentType);
+
+      // Una copia si sostituisce nello stesso percorso. La cancellazione a
+      // fine evento avviene soltanto con la procedura amministrativa prevista.
+      allow delete: if false;
+    }
+  }
+}
