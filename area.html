@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260915-skipper-documents-v1" />
+  <link rel="stylesheet" href="styles.css?v=20260915-dashboard-cards-v2" />
 </head>
 <body class="area-page">
   <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
@@ -46,9 +46,9 @@
           <label>Modello<input name="model" autocomplete="off" required maxlength="100" placeholder="Es. Fountaine Pajot Isla 40" /></label>
           <label>Tipo di imbarcazione<select name="boatType" required><option value="">Seleziona</option><option value="Catamarano">Catamarano</option><option value="Monoscafo">Monoscafo</option><option value="Gommone">Gommone</option><option value="Altro">Altro</option></select></label>
           <label>Posti totali a bordo · skipper incluso<input name="totalBerths" type="number" required min="2" max="31" inputmode="numeric" placeholder="Es. 10" /><small class="field-hint">Indica tutti i posti letto reali, skipper compreso. Il sito usa questo numero per sapere quanti partecipanti puoi invitare.</small></label>
-          <label>Porto di partenza<input name="homePort" autocomplete="off" required maxlength="80" value="Marsala" /></label>
+          <label>Porto di partenza<input name="homePort" autocomplete="off" required maxlength="80" value="Marsala" data-format="place-name" /></label>
           <label>Bandiera<input name="flag" autocomplete="off" required maxlength="60" value="Italiana" /></label>
-          <label>Comandante / skipper<input name="skipperName" autocomplete="name" required maxlength="100" /></label>
+          <label>Comandante / skipper<input name="skipperName" autocomplete="name" required maxlength="100" data-format="person-name" /></label>
         </div>
         <fieldset class="boat-accommodation-fieldset">
           <legend>Sistemazioni e posti letto</legend>
@@ -102,16 +102,30 @@
           <h3>Prepara le persone, poi manda gli inviti</h3>
           <p class="panel-lead">Prima crea una scheda con nome, ruolo, sistemazione e importo previsto. Quando sei pronto, invia il link WhatsApp dalla stessa scheda: la persona ritroverà quel posto, leggerà le regole e completerà poi i dati richiesti dal charter.</p>
           <p class="field-hint">Questa fase è un elenco privato di lavoro: non compare nella flotta né nel PDF. La Crew List è l’elenco anagrafico finale da inviare al charter. Aggiungi un contatto solo con il suo consenso. Consulta <a href="privacy.html">Privacy e dati</a>.</p>
-          <section class="crew-projection-panel" aria-labelledby="projectionTitle">
+          <section class="crew-projection-panel" aria-labelledby="projectionPanelTitle">
             <p class="eyebrow">1 · Elenco provvisorio dell’equipaggio</p>
-            <h4 id="projectionTitle">Nuovo partecipante</h4>
-            <p class="panel-lead">Questa è una scheda organizzativa: scegli persona, ruolo e sistemazione. Il sito prende gli importi dalla Dashboard economica; se non è ancora compilata, usa il listino base della barca. Non parte nessun messaggio e non viene registrato alcun pagamento.</p>
-            <p class="field-hint projection-flow-hint"><strong>Come funziona:</strong> dopo il salvataggio resti sulla stessa persona per controllare o correggere posto, cabina e importi. Per aggiungere un altro nominativo scegli esplicitamente “Nuovo partecipante”.</p>
-            <p id="projectionLegacyLinkHint" class="field-hint" role="status" aria-live="polite" hidden></p>
-            <form id="projectionForm" class="compact-form">
+            <div class="projection-editor-toolbar">
+              <div>
+                <h4 id="projectionPanelTitle">Piano equipaggio</h4>
+                <p class="panel-lead">Ogni persona resta in una card compatta con posto, quota e stato. Apri una scheda soltanto per aggiungere o modificare qualcuno.</p>
+              </div>
+              <button id="openProjectionEditor" class="button button-primary" type="button" aria-controls="projectionEditor" aria-expanded="false">+ Nuovo partecipante</button>
+            </div>
+            <p class="field-hint projection-flow-hint"><strong>Come funziona:</strong> salva una persona, controlla la sua card e riapri la scheda solo con la matita. Per un altro nominativo usa “Nuovo partecipante”.</p>
+            <p id="projectionEditorStatus" class="form-message" role="status" aria-live="polite"></p>
+            <section id="projectionEditor" class="projection-editor" aria-labelledby="projectionTitle" hidden>
+              <div class="projection-editor-heading">
+                <div>
+                  <h4 id="projectionTitle">Nuovo partecipante</h4>
+                  <p class="panel-lead">Questa è una scheda organizzativa: scegli persona, ruolo e sistemazione. Il sito prende gli importi dalla Dashboard economica; se non è ancora compilata, usa il listino base della barca. Non parte nessun messaggio e non viene registrato alcun pagamento.</p>
+                </div>
+                <button id="closeProjectionEditor" class="text-button" type="button">Chiudi senza salvare</button>
+              </div>
+              <p id="projectionLegacyLinkHint" class="field-hint" role="status" aria-live="polite" hidden></p>
+              <form id="projectionForm" class="compact-form">
               <div class="form-grid">
-                <label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" /></label>
-                <label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" /></label>
+                <label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" data-format="person-name" /></label>
+                <label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" data-format="person-name" /></label>
                 <label>WhatsApp *<input name="whatsappNumber" required maxlength="30" inputmode="tel" autocomplete="tel" pattern="\+[1-9][0-9 .()\-]{7,29}" title="Inserisci il prefisso internazionale, per esempio +39 333 1234567" placeholder="Es. +39 333 1234567" /></label>
               </div>
               <div class="form-grid">
@@ -140,8 +154,9 @@
                 </details>
               </fieldset>
               <label class="consent-field"><input name="contactConsent" type="checkbox" required /> Ho ricevuto il consenso della persona a essere contattata per questo viaggio. *</label>
-              <div class="form-actions"><button id="projectionSubmitButton" class="button button-primary" type="submit">Salva la scheda e riserva il posto</button><button id="newProjectionButton" class="button button-ghost" type="button" hidden>Nuovo partecipante</button><button id="cancelProjectionEdit" class="text-button" type="button" hidden>Annulla modifica</button><p id="projectionFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
-            </form>
+                <div class="form-actions"><button id="projectionSubmitButton" class="button button-primary" type="submit">Salva la scheda e riserva il posto</button><button id="cancelProjectionEdit" class="text-button" type="button" hidden>Annulla modifica</button><p id="projectionFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
+              </form>
+            </section>
             <section id="projectionSummary" class="projection-summary" aria-live="polite"></section>
             <div id="projectionList" class="projection-list" aria-live="polite"></div>
             <section id="manualReceiptPanel" class="manual-receipt-panel" hidden aria-labelledby="manualReceiptTitle">
@@ -162,10 +177,10 @@
             </section>
           </section>
           <details class="manual-entry"><summary>Inserimento manuale nella Crew List · solo eccezione</summary><p class="panel-lead">Usalo soltanto se una persona non può aprire il proprio invito WhatsApp. Qui compili direttamente l’elenco anagrafico richiesto dal charter; questa scheda non crea né sostituisce un invito personale.</p><form id="memberForm" class="compact-form">
-          <div class="form-grid"><label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" /></label><label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" /></label></div>
-          <div class="form-grid"><label>Data di nascita *<input name="birthDate" type="date" required /></label><label>Luogo di nascita *<input name="birthPlace" required maxlength="100" autocomplete="off" /></label></div>
-          <div class="form-grid"><label>Nazionalità *<input name="nationality" required maxlength="80" autocomplete="country-name" placeholder="Es. Italiana" /></label><label>Sesso *<select name="gender" required><option value="">Seleziona</option><option>F</option><option>M</option><option>Altro</option></select></label></div>
-          <div class="form-grid"><label>Tipo documento *<select name="documentType" required><option value="">Seleziona</option><option>Carta d'identità</option><option>Passaporto</option><option>Patente nautica</option><option>Altro</option></select></label><label>Numero documento *<input name="documentNumber" required maxlength="60" autocomplete="off" /></label></div>
+          <div class="form-grid"><label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" data-format="person-name" /></label><label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" data-format="person-name" /></label></div>
+          <div class="form-grid"><label>Data di nascita *<input name="birthDate" type="date" required /></label><label>Luogo di nascita *<input name="birthPlace" required maxlength="100" autocomplete="off" data-format="place-name" /></label></div>
+          <div class="form-grid"><label>Nazionalità *<input name="nationality" required maxlength="80" autocomplete="country-name" placeholder="Es. Italiana" data-format="place-name" /></label><label>Sesso *<select name="gender" required><option value="">Seleziona</option><option>F</option><option>M</option><option>Altro</option></select></label></div>
+          <div class="form-grid"><label>Tipo documento *<select name="documentType" required><option value="">Seleziona</option><option>Carta d'identità</option><option>Passaporto</option><option>Patente nautica</option><option>Altro</option></select></label><label>Numero documento *<input name="documentNumber" required maxlength="60" autocomplete="off" spellcheck="false" data-format="upper-code" /></label></div>
           <div class="form-grid"><label>Scadenza documento *<input name="documentExpiry" type="date" min="2026-10-11" required /></label><label>Ruolo a bordo *<select name="rolePreset" required><option value="crew" selected>Equipaggio</option><option value="co_skipper">Co-skipper</option><option value="hostess">Hostess</option><option value="collaborator">Collaboratore</option><option value="other">Altro ruolo</option></select></label></div>
           <label>Specifica altro ruolo dichiarato<input name="roleOther" maxlength="100" placeholder="Solo se è stato selezionato “Altro ruolo”" /></label>
           <p class="field-hint">Nell’inserimento manuale il ruolo viene confermato dallo skipper. Quando modifichi una scheda arrivata da invito, il salvataggio conferma il ruolo qui indicato.</p>
@@ -183,14 +198,14 @@
             <fieldset>
               <legend>Anagrafica per Crew List</legend>
               <div class="form-grid">
-                <label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" /></label>
-                <label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" /></label>
+                <label>Nome *<input name="firstName" required maxlength="80" autocomplete="given-name" data-format="person-name" /></label>
+                <label>Cognome *<input name="lastName" required maxlength="80" autocomplete="family-name" data-format="person-name" /></label>
                 <label>Data di nascita *<input name="birthDate" type="date" required /></label>
-                <label>Luogo di nascita *<input name="birthPlace" required maxlength="100" autocomplete="off" /></label>
-                <label>Nazionalità *<input name="nationality" required maxlength="80" autocomplete="country-name" placeholder="Es. Italiana" /></label>
+                <label>Luogo di nascita *<input name="birthPlace" required maxlength="100" autocomplete="off" data-format="place-name" /></label>
+                <label>Nazionalità *<input name="nationality" required maxlength="80" autocomplete="country-name" placeholder="Es. Italiana" data-format="place-name" /></label>
                 <label>Sesso *<select name="gender" required><option value="">Seleziona</option><option>F</option><option>M</option><option>Altro</option></select></label>
                 <label>Documento per il charter *<select name="documentType" required><option value="">Seleziona</option><option>Carta d'identità</option><option>Passaporto</option><option>Patente nautica</option><option>Altro</option></select></label>
-                <label>Numero documento *<input name="documentNumber" required maxlength="60" autocomplete="off" /></label>
+                <label>Numero documento *<input name="documentNumber" required maxlength="60" autocomplete="off" spellcheck="false" data-format="upper-code" /></label>
                 <label>Scadenza documento *<input name="documentExpiry" type="date" min="2026-10-11" required /></label>
                 <label>Email di contatto *<input name="email" type="email" required maxlength="160" autocomplete="email" /></label>
                 <label>Telefono *<input name="phone" type="tel" required maxlength="40" autocomplete="tel" /></label>
@@ -200,10 +215,10 @@
               <legend>Abilitazioni dello skipper</legend>
               <p class="field-hint">Indica i riferimenti che il charter ti chiede. Se un documento non riporta una scadenza, lascia vuota la relativa data.</p>
               <div class="form-grid">
-                <label>Numero patente nautica *<input name="sailingLicenseNumber" required maxlength="80" autocomplete="off" /></label>
+                <label>Numero patente nautica *<input name="sailingLicenseNumber" required maxlength="80" autocomplete="off" spellcheck="false" data-format="upper-code" /></label>
                 <label>Scadenza patente · se presente<input name="sailingLicenseExpiry" type="date" /></label>
                 <label>Tipo certificato radio *<select name="radioCertificateType" required><option value="">Seleziona</option><option>Certificato limitato di radiotelefonista</option><option>SRC</option><option>LRC</option><option>Altro certificato radio</option></select></label>
-                <label>Numero certificato radio *<input name="radioCertificateNumber" required maxlength="80" autocomplete="off" /></label>
+                <label>Numero certificato radio *<input name="radioCertificateNumber" required maxlength="80" autocomplete="off" spellcheck="false" data-format="upper-code" /></label>
                 <label>Scadenza certificato radio · se presente<input name="radioCertificateExpiry" type="date" /></label>
               </div>
             </fieldset>
@@ -228,6 +243,17 @@
               </div>
               <p class="field-hint">Caricare una copia non equivale a inviarla: aggiorna lo stato solo quando usi il canale concordato con il charter.</p>
             </fieldset>
+            <aside id="charterDeliveryPanel" class="charter-delivery-panel" aria-labelledby="charterDeliveryTitle">
+              <div class="charter-delivery-heading"><div><p class="eyebrow">Consegna al charter</p><h4 id="charterDeliveryTitle">Prepara il dossier, poi invialo.</h4></div><span class="charter-delivery-lock" aria-hidden="true">↗</span></div>
+              <p>Il foglio Crew List contiene anche il riepilogo dello skipper. Le due copie restano private finché non le scarichi tu: WhatsApp non consente a un sito di allegare file o premere “Invia” al posto tuo.</p>
+              <ol class="charter-delivery-steps">
+                <li><span>1</span><div><strong>Crew List in PDF</strong><small data-charter-delivery-state="pdf">Controllo dei dati necessari…</small></div><button class="text-button" type="button" data-charter-delivery-pdf disabled>Apri e salva PDF</button></li>
+                <li><span>2</span><div><strong>Patente nautica</strong><small data-charter-delivery-state="sailingLicense">Controllo della copia privata…</small></div><button class="text-button" type="button" data-charter-delivery-download="sailingLicense" disabled>Scarica</button></li>
+                <li><span>3</span><div><strong>Certificato radio</strong><small data-charter-delivery-state="radioCertificate">Controllo della copia privata…</small></div><button class="text-button" type="button" data-charter-delivery-download="radioCertificate" disabled>Scarica</button></li>
+              </ol>
+              <div class="charter-delivery-actions"><button class="button button-whatsapp" type="button" data-charter-delivery-whatsapp disabled><span class="whatsapp-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M20.25 11.2a8.25 8.25 0 0 1-12.05 7.35L4 19.75l1.2-4.2A8.25 8.25 0 1 1 20.25 11.2Z"></path><path d="M9.1 8.25c.22-.48.46-.5.72-.5h.2c.2 0 .42.02.5.22l.7 1.7c.08.2.05.43-.08.6l-.42.52c.42.82 1.08 1.47 1.9 1.9l.52-.42c.17-.13.4-.16.6-.08l1.7.7c.2.08.22.3.22.5v.2c0 .26-.02.5-.5.72-.36.16-1.05.22-2.2-.3-1.42-.64-2.87-2.1-3.5-3.5-.52-1.16-.47-1.85-.3-2.2Z"></path></svg></span>Apri messaggio WhatsApp</button><span>Allega i tre file scaricati alla chat del charter e invia tu.</span></div>
+              <p id="charterDeliveryMessage" class="form-message" role="status" aria-live="polite"></p>
+            </aside>
             <label class="consent-field"><input name="charterConsent" type="checkbox" required /> Confermo che i miei dati e riferimenti possono essere inseriti nella Crew List e comunicati al charter. *</label>
             <div class="form-actions">
               <button class="button button-primary" type="submit" data-skipper-profile-save="final">Conferma dossier per il charter</button>
@@ -239,71 +265,154 @@
         <article id="skipperTravelPanel" class="dashboard-panel skipper-travel-panel">
           <p class="eyebrow">Il tuo viaggio operativo</p>
           <h3>Arrivi e transfer</h3>
-          <p class="panel-lead">Segna qui l’andata e il ritorno quando hai le informazioni. Puoi salvare anche una bozza: questi dati non entrano nella Crew List, non compaiono nella flotta e per ora li vedi soltanto tu.</p>
+          <p class="panel-lead">Andata e ritorno sono due schede indipendenti. Scegli prima il mezzo: se voli, aeroporto e città diventano una sola scelta leggibile; se viaggi in auto, treno o traghetto compaiono solo i campi che servono. Puoi sempre salvare una bozza privata.</p>
           <section id="skipperTravelStatus" class="skipper-travel-status" aria-live="polite"></section>
           <div class="skipper-travel-grid">
             <form id="skipperTravelOutboundForm" class="compact-form skipper-travel-form" data-skipper-travel-leg="outbound">
-              <header class="skipper-travel-form-heading"><span class="skipper-travel-direction" aria-hidden="true">→</span><div><p class="eyebrow">Andata</p><h4>Verso Marsala</h4><p>Inserisci il volo, il treno o il viaggio che ti porta all’imbarco.</p></div></header>
-              <p class="skipper-travel-terminal"><span>Destinazione finale</span><strong>Porto di Marsala · ritrovo dalle 15:00</strong></p>
-              <fieldset>
-                <legend>Tratta principale</legend>
-                <div class="form-grid">
-                  <label>Come viaggi<select name="transportMode"><option value="">Lo inserisco più tardi</option><option value="flight">Aereo</option><option value="train">Treno</option><option value="car">Auto</option><option value="ferry">Traghetto</option><option value="other">Altro mezzo</option></select></label>
-                  <label>Città di partenza<input name="originCity" maxlength="100" list="skipperTravelCities" autocomplete="address-level2" placeholder="Es. Torino" /></label>
-                  <label>Aeroporto di partenza · IATA<input name="originAirport" maxlength="3" list="skipperTravelAirports" pattern="[A-Za-z]{3}" autocapitalize="characters" autocomplete="off" placeholder="Es. TRN" /><small class="field-hint">Tre lettere, se viaggi in aereo.</small></label>
-                  <label>Città di arrivo<input name="destinationCity" maxlength="100" list="skipperTravelCities" autocomplete="address-level2" placeholder="Es. Trapani" /></label>
-                  <label>Aeroporto di arrivo · IATA<input name="destinationAirport" maxlength="3" list="skipperTravelAirports" pattern="[A-Za-z]{3}" autocapitalize="characters" autocomplete="off" placeholder="Es. TPS" /><small class="field-hint">Per il transfer: TPS o PMO.</small></label>
+              <header class="skipper-travel-form-heading"><span class="skipper-travel-direction" aria-hidden="true">→</span><div><p class="eyebrow">Andata</p><h4>Verso Marsala</h4><p>Prima il viaggio principale, poi scegli come raggiungere il porto.</p></div></header>
+              <p class="skipper-travel-terminal"><span>Imbarco</span><strong>Porto di Marsala · ritrovo dalle 15:00</strong></p>
+              <fieldset class="skipper-travel-main-fieldset">
+                <legend>1 · Il viaggio principale</legend>
+                <label class="travel-mode-control">Come viaggi<select name="transportMode"><option value="">Lo inserisco più tardi</option><option value="flight">Aereo</option><option value="train">Treno</option><option value="car">Auto</option><option value="ferry">Traghetto</option><option value="other">Altro mezzo</option></select></label>
+                <p class="field-hint" data-travel-mode-hint>Scegli il mezzo: puoi salvare anche solo l’idea della tratta.</p>
+                <div class="travel-route" aria-label="Tratta di andata">
+                  <section class="travel-location-card">
+                    <p class="travel-location-kicker">Da</p>
+                    <div data-travel-mode-only="flight">
+                      <label for="outboundOriginAirportLookup">Aeroporto di partenza</label>
+                      <div class="travel-autocomplete" data-travel-combobox><input id="outboundOriginAirportLookup" name="originAirportLookup" maxlength="120" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Es. Torino Caselle · TRN" data-travel-autocomplete="airport" data-travel-city-target="originCity" data-travel-airport-target="originAirport" /></div>
+                      <small class="field-hint">Cerca per città, nome o sigla.</small>
+                    </div>
+                    <div data-travel-mode-except="flight">
+                      <label for="outboundOriginPlace">Città o punto di partenza</label>
+                      <div class="travel-autocomplete" data-travel-combobox><input id="outboundOriginPlace" name="originPlace" maxlength="100" autocomplete="address-level2" placeholder="Es. Torino" data-format="place-name" data-travel-autocomplete="city" /></div>
+                    </div>
+                  </section>
+                  <span class="travel-route-arrow" aria-hidden="true">→</span>
+                  <section class="travel-location-card">
+                    <p class="travel-location-kicker">A</p>
+                    <div data-travel-mode-only="flight">
+                      <label for="outboundDestinationAirportLookup">Aeroporto di arrivo</label>
+                      <div class="travel-autocomplete" data-travel-combobox><input id="outboundDestinationAirportLookup" name="destinationAirportLookup" maxlength="120" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Es. Trapani Birgi · TPS" data-travel-autocomplete="airport" data-travel-city-target="destinationCity" data-travel-airport-target="destinationAirport" /></div>
+                      <small class="field-hint">Per il porto: Trapani · TPS o Palermo · PMO.</small>
+                    </div>
+                    <div data-travel-mode-except="flight">
+                      <label for="outboundDestinationPlace">Città o punto di arrivo</label>
+                      <div class="travel-autocomplete" data-travel-combobox><input id="outboundDestinationPlace" name="destinationPlace" maxlength="100" autocomplete="address-level2" placeholder="Es. Marsala" data-format="place-name" data-travel-autocomplete="city" /></div>
+                    </div>
+                  </section>
+                </div>
+                <input name="originCity" type="hidden" />
+                <input name="originAirport" type="hidden" />
+                <input name="destinationCity" type="hidden" />
+                <input name="destinationAirport" type="hidden" />
+                <div class="travel-timing-grid">
                   <label>Partenza · data<input name="departureDate" type="date" /></label>
                   <label>Partenza · ora<input name="departureTime" type="time" /><small class="field-hint">Formato 24 ore.</small></label>
                   <label>Arrivo · data<input name="arrivalDate" type="date" /></label>
                   <label>Arrivo · ora<input name="arrivalTime" type="time" /><small class="field-hint">Formato 24 ore.</small></label>
-                  <label>Compagnia<input name="carrier" maxlength="100" list="skipperTravelCarriers" autocomplete="organization" placeholder="Es. ITA Airways" /></label>
-                  <label>Volo / numero servizio<input name="serviceNumber" maxlength="40" autocapitalize="characters" autocomplete="off" placeholder="Es. AZ 1783" /></label>
-                  <label>Bagagli da stiva<input name="luggageCount" type="number" min="0" max="12" step="1" inputmode="numeric" value="0" /></label>
                 </div>
-                <label class="consent-field"><input name="bulkyLuggage" type="checkbox" /> Ho un bagaglio ingombrante (attrezzatura, valigia extra o simile).</label>
+                <div class="form-grid" data-travel-mode-only="flight">
+                  <label>Compagnia aerea<div class="travel-autocomplete" data-travel-combobox><input name="carrier" maxlength="100" autocomplete="organization" placeholder="Es. ITA Airways" data-travel-autocomplete="carrier" /></div></label>
+                  <label>Numero del volo<input name="serviceNumber" maxlength="40" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="Es. AZ 1783" data-format="upper-code" /></label>
+                </div>
+                <div class="form-grid">
+                  <label>Bagagli da stiva<input name="luggageCount" type="number" min="0" max="12" step="1" inputmode="numeric" value="0" /></label>
+                  <label class="consent-field"><input name="bulkyLuggage" type="checkbox" /> Ho un bagaglio ingombrante.</label>
+                </div>
               </fieldset>
-              <fieldset class="skipper-transfer-fieldset">
-                <legend>Transfer aeroporto → Marsala</legend>
-                <label class="consent-field"><input name="needsAirportMarsalaTransfer" type="checkbox" /> Vorrei un transfer dall’aeroporto al porto.</label>
-                <p class="field-hint" data-travel-transfer-hint>Puoi indicarlo già ora: la richiesta resta privata finché non viene attivato il servizio con la società transfer e una conferma dedicata.</p>
+              <fieldset class="skipper-transfer-fieldset" data-travel-mode-only="flight">
+                <legend>2 · Dall’aeroporto al porto</legend>
+                <p class="field-hint">Questa scelta è distinta dal volo: puoi chiedere il transfer, organizzarti da solo oppure offrire posti in auto.</p>
+                <div class="travel-connection-options">
+                  <label><input name="airportMarsalaPlan" type="radio" value="" checked /> Decido più tardi</label>
+                  <label><input name="airportMarsalaPlan" type="radio" value="transfer" /> Chiedo il transfer aeroporto → Marsala</label>
+                  <label><input name="airportMarsalaPlan" type="radio" value="independent" /> Mi organizzo autonomamente</label>
+                  <label><input name="airportMarsalaPlan" type="radio" value="ride_offer" /> Noleggio / guido un’auto e posso offrire posti</label>
+                </div>
+                <div class="travel-ride-offer" data-travel-ride-offer hidden>
+                  <label>Posti che puoi offrire<input name="rideOfferSeats" type="number" min="1" max="8" step="1" inputmode="numeric" value="1" /></label>
+                  <label class="consent-field"><input name="rideOfferConsent" type="checkbox" /> Confermo che il messaggio sarà condiviso da me nel gruppo: il sito non pubblica il mio numero.</label>
+                  <div class="travel-ride-offer-actions"><button class="button button-whatsapp" type="button" data-travel-ride-share-message disabled><span class="whatsapp-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M20.25 11.2a8.25 8.25 0 0 1-12.05 7.35L4 19.75l1.2-4.2A8.25 8.25 0 1 1 20.25 11.2Z"></path><path d="M9.1 8.25c.22-.48.46-.5.72-.5h.2c.2 0 .42.02.5.22l.7 1.7c.08.2.05.43-.08.6l-.42.52c.42.82 1.08 1.47 1.9 1.9l.52-.42c.17-.13.4-.16.6-.08l1.7.7c.2.08.22.3.22.5v.2c0 .26-.02.5-.5.72-.36.16-1.05.22-2.2-.3-1.42-.64-2.87-2.1-3.5-3.5-.52-1.16-.47-1.85-.3-2.2Z"></path></svg></span>Prepara messaggio WhatsApp</button><button class="text-button" type="button" data-travel-ride-share-copy disabled>Copia testo</button></div>
+                </div>
+                <p class="field-hint" data-travel-transfer-hint>Puoi indicarlo già ora: resta nella tua scheda privata finché non attivi il messaggio nel gruppo.</p>
               </fieldset>
               <div class="form-actions"><button class="button button-primary" type="submit">Salva l’andata</button><p id="skipperTravelOutboundMessage" class="form-message" role="status" aria-live="polite"></p></div>
             </form>
             <form id="skipperTravelReturnForm" class="compact-form skipper-travel-form" data-skipper-travel-leg="return">
-              <header class="skipper-travel-form-heading"><span class="skipper-travel-direction is-return" aria-hidden="true">←</span><div><p class="eyebrow">Ritorno</p><h4>Da Marsala</h4><p>Segna il viaggio di rientro, anche se hai ancora soltanto l’orario indicativo.</p></div></header>
-              <p class="skipper-travel-terminal"><span>Partenza finale</span><strong>Porto di Marsala · rientro barche entro le 18:00</strong></p>
-              <fieldset>
-                <legend>Tratta principale</legend>
-                <div class="form-grid">
-                  <label>Come viaggi<select name="transportMode"><option value="">Lo inserisco più tardi</option><option value="flight">Aereo</option><option value="train">Treno</option><option value="car">Auto</option><option value="ferry">Traghetto</option><option value="other">Altro mezzo</option></select></label>
-                  <label>Città di partenza<input name="originCity" maxlength="100" list="skipperTravelCities" autocomplete="address-level2" placeholder="Es. Trapani" /></label>
-                  <label>Aeroporto di partenza · IATA<input name="originAirport" maxlength="3" list="skipperTravelAirports" pattern="[A-Za-z]{3}" autocapitalize="characters" autocomplete="off" placeholder="Es. TPS" /><small class="field-hint">Per il transfer: TPS o PMO.</small></label>
-                  <label>Città di arrivo<input name="destinationCity" maxlength="100" list="skipperTravelCities" autocomplete="address-level2" placeholder="Es. Torino" /></label>
-                  <label>Aeroporto di arrivo · IATA<input name="destinationAirport" maxlength="3" list="skipperTravelAirports" pattern="[A-Za-z]{3}" autocapitalize="characters" autocomplete="off" placeholder="Es. TRN" /><small class="field-hint">Tre lettere, se viaggi in aereo.</small></label>
+              <header class="skipper-travel-form-heading"><span class="skipper-travel-direction is-return" aria-hidden="true">←</span><div><p class="eyebrow">Ritorno</p><h4>Da Marsala</h4><p>Segna il rientro, anche se hai ancora soltanto un orario indicativo.</p></div></header>
+              <p class="skipper-travel-terminal"><span>Rientro barche</span><strong>Porto di Marsala · entro le 18:00</strong></p>
+              <fieldset class="skipper-travel-main-fieldset">
+                <legend>1 · Il viaggio principale</legend>
+                <label class="travel-mode-control">Come viaggi<select name="transportMode"><option value="">Lo inserisco più tardi</option><option value="flight">Aereo</option><option value="train">Treno</option><option value="car">Auto</option><option value="ferry">Traghetto</option><option value="other">Altro mezzo</option></select></label>
+                <p class="field-hint" data-travel-mode-hint>Scegli il mezzo: puoi salvare anche solo l’idea della tratta.</p>
+                <div class="travel-route" aria-label="Tratta di ritorno">
+                  <section class="travel-location-card">
+                    <p class="travel-location-kicker">Da</p>
+                    <div data-travel-mode-only="flight">
+                      <label for="returnOriginAirportLookup">Aeroporto di partenza</label>
+                      <div class="travel-autocomplete" data-travel-combobox><input id="returnOriginAirportLookup" name="originAirportLookup" maxlength="120" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Es. Trapani Birgi · TPS" data-travel-autocomplete="airport" data-travel-city-target="originCity" data-travel-airport-target="originAirport" /></div>
+                      <small class="field-hint">Dal porto: Trapani · TPS o Palermo · PMO.</small>
+                    </div>
+                    <div data-travel-mode-except="flight">
+                      <label for="returnOriginPlace">Città o punto di partenza</label>
+                      <div class="travel-autocomplete" data-travel-combobox><input id="returnOriginPlace" name="originPlace" maxlength="100" autocomplete="address-level2" placeholder="Es. Marsala" data-format="place-name" data-travel-autocomplete="city" /></div>
+                    </div>
+                  </section>
+                  <span class="travel-route-arrow" aria-hidden="true">→</span>
+                  <section class="travel-location-card">
+                    <p class="travel-location-kicker">A</p>
+                    <div data-travel-mode-only="flight">
+                      <label for="returnDestinationAirportLookup">Aeroporto di arrivo</label>
+                      <div class="travel-autocomplete" data-travel-combobox><input id="returnDestinationAirportLookup" name="destinationAirportLookup" maxlength="120" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Es. Torino Caselle · TRN" data-travel-autocomplete="airport" data-travel-city-target="destinationCity" data-travel-airport-target="destinationAirport" /></div>
+                      <small class="field-hint">Cerca per città, nome o sigla.</small>
+                    </div>
+                    <div data-travel-mode-except="flight">
+                      <label for="returnDestinationPlace">Città o punto di arrivo</label>
+                      <div class="travel-autocomplete" data-travel-combobox><input id="returnDestinationPlace" name="destinationPlace" maxlength="100" autocomplete="address-level2" placeholder="Es. Torino" data-format="place-name" data-travel-autocomplete="city" /></div>
+                    </div>
+                  </section>
+                </div>
+                <input name="originCity" type="hidden" />
+                <input name="originAirport" type="hidden" />
+                <input name="destinationCity" type="hidden" />
+                <input name="destinationAirport" type="hidden" />
+                <div class="travel-timing-grid">
                   <label>Partenza · data<input name="departureDate" type="date" /></label>
                   <label>Partenza · ora<input name="departureTime" type="time" /><small class="field-hint">Formato 24 ore.</small></label>
                   <label>Arrivo · data<input name="arrivalDate" type="date" /></label>
                   <label>Arrivo · ora<input name="arrivalTime" type="time" /><small class="field-hint">Formato 24 ore.</small></label>
-                  <label>Compagnia<input name="carrier" maxlength="100" list="skipperTravelCarriers" autocomplete="organization" placeholder="Es. Ryanair" /></label>
-                  <label>Volo / numero servizio<input name="serviceNumber" maxlength="40" autocapitalize="characters" autocomplete="off" placeholder="Es. FR 1234" /></label>
-                  <label>Bagagli da stiva<input name="luggageCount" type="number" min="0" max="12" step="1" inputmode="numeric" value="0" /></label>
                 </div>
-                <label class="consent-field"><input name="bulkyLuggage" type="checkbox" /> Ho un bagaglio ingombrante (attrezzatura, valigia extra o simile).</label>
+                <div class="form-grid" data-travel-mode-only="flight">
+                  <label>Compagnia aerea<div class="travel-autocomplete" data-travel-combobox><input name="carrier" maxlength="100" autocomplete="organization" placeholder="Es. Ryanair" data-travel-autocomplete="carrier" /></div></label>
+                  <label>Numero del volo<input name="serviceNumber" maxlength="40" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="Es. FR 1234" data-format="upper-code" /></label>
+                </div>
+                <div class="form-grid">
+                  <label>Bagagli da stiva<input name="luggageCount" type="number" min="0" max="12" step="1" inputmode="numeric" value="0" /></label>
+                  <label class="consent-field"><input name="bulkyLuggage" type="checkbox" /> Ho un bagaglio ingombrante.</label>
+                </div>
               </fieldset>
-              <fieldset class="skipper-transfer-fieldset">
-                <legend>Transfer Marsala → aeroporto</legend>
-                <label class="consent-field"><input name="needsAirportMarsalaTransfer" type="checkbox" /> Vorrei un transfer dal porto all’aeroporto.</label>
-                <p class="field-hint" data-travel-transfer-hint>Puoi indicarlo già ora: la richiesta resta privata finché non viene attivato il servizio con la società transfer e una conferma dedicata.</p>
+              <fieldset class="skipper-transfer-fieldset" data-travel-mode-only="flight">
+                <legend>2 · Dal porto all’aeroporto</legend>
+                <p class="field-hint">Questa scelta è distinta dal volo: puoi chiedere il transfer, organizzarti da solo oppure offrire posti in auto.</p>
+                <div class="travel-connection-options">
+                  <label><input name="airportMarsalaPlan" type="radio" value="" checked /> Decido più tardi</label>
+                  <label><input name="airportMarsalaPlan" type="radio" value="transfer" /> Chiedo il transfer Marsala → aeroporto</label>
+                  <label><input name="airportMarsalaPlan" type="radio" value="independent" /> Mi organizzo autonomamente</label>
+                  <label><input name="airportMarsalaPlan" type="radio" value="ride_offer" /> Guido un’auto e posso offrire posti</label>
+                </div>
+                <div class="travel-ride-offer" data-travel-ride-offer hidden>
+                  <label>Posti che puoi offrire<input name="rideOfferSeats" type="number" min="1" max="8" step="1" inputmode="numeric" value="1" /></label>
+                  <label class="consent-field"><input name="rideOfferConsent" type="checkbox" /> Confermo che il messaggio sarà condiviso da me nel gruppo: il sito non pubblica il mio numero.</label>
+                  <div class="travel-ride-offer-actions"><button class="button button-whatsapp" type="button" data-travel-ride-share-message disabled><span class="whatsapp-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M20.25 11.2a8.25 8.25 0 0 1-12.05 7.35L4 19.75l1.2-4.2A8.25 8.25 0 1 1 20.25 11.2Z"></path><path d="M9.1 8.25c.22-.48.46-.5.72-.5h.2c.2 0 .42.02.5.22l.7 1.7c.08.2.05.43-.08.6l-.42.52c.42.82 1.08 1.47 1.9 1.9l.52-.42c.17-.13.4-.16.6-.08l1.7.7c.2.08.22.3.22.5v.2c0 .26-.02.5-.5.72-.36.16-1.05.22-2.2-.3-1.42-.64-2.87-2.1-3.5-3.5-.52-1.16-.47-1.85-.3-2.2Z"></path></svg></span>Prepara messaggio WhatsApp</button><button class="text-button" type="button" data-travel-ride-share-copy disabled>Copia testo</button></div>
+                </div>
+                <p class="field-hint" data-travel-transfer-hint>Puoi indicarlo già ora: resta nella tua scheda privata finché non attivi il messaggio nel gruppo.</p>
               </fieldset>
               <div class="form-actions"><button class="button button-primary" type="submit">Salva il ritorno</button><p id="skipperTravelReturnMessage" class="form-message" role="status" aria-live="polite"></p></div>
             </form>
           </div>
-          <datalist id="skipperTravelCities"><option value="Torino"></option><option value="Milano"></option><option value="Bergamo"></option><option value="Bologna"></option><option value="Roma"></option><option value="Napoli"></option><option value="Catania"></option><option value="Palermo"></option><option value="Trapani"></option><option value="Marsala"></option></datalist>
-          <datalist id="skipperTravelAirports"><option value="TRN"></option><option value="MXP"></option><option value="LIN"></option><option value="BGY"></option><option value="BLQ"></option><option value="FCO"></option><option value="CIA"></option><option value="NAP"></option><option value="CTA"></option><option value="PMO"></option><option value="TPS"></option></datalist>
-          <datalist id="skipperTravelCarriers"><option value="ITA Airways"></option><option value="Ryanair"></option><option value="easyJet"></option><option value="Wizz Air"></option><option value="Volotea"></option><option value="Aeroitalia"></option><option value="Trenitalia"></option><option value="Italo"></option></datalist>
         </article>
-        <article class="dashboard-panel"><p class="eyebrow">Flotta pubblica</p><h3>La tua partecipazione</h3><p class="panel-lead">Nella pagina pubblica compaiono nome della barca, modello, tipo e skipper. I posti liberi sono calcolati dalle schede preparate, dagli inviti e dalle anagrafiche confermate; scegli tu se mostrarli o tenerli privati.</p><form id="fleetProfileForm" class="compact-form"><div class="form-grid"><label>Posti liberi calcolati<input name="availableSeats" type="number" min="0" max="30" inputmode="numeric" readonly aria-readonly="true" /><small class="field-hint">Si aggiorna quando riservi o liberi un posto.</small></label><label>Tipo di posto da mostrare<select name="berthPreference"><option value="not_specified">Nessuna indicazione</option><option value="cabin_female">Posto in cabina femminile</option><option value="cabin_male">Posto in cabina maschile</option><option value="cabin_mixed">Posto in cabina mista</option><option value="dinette">Posto in dinette</option><option value="other">Altra sistemazione</option></select></label></div><label class="consent-field"><input name="showAvailability" type="checkbox" checked /> Mostra pubblicamente i posti liberi e il tipo di posto selezionato.</label><button class="button button-ghost" type="submit">Aggiorna la flotta</button><p id="fleetProfileMessage" class="form-message" role="status" aria-live="polite"></p></form></article>
+        <article class="dashboard-panel boat-panel"><p class="eyebrow">La barca</p><h3>Configurazione, quote<br />e presenza in flotta.</h3><p class="panel-lead">Qui restano i dati della barca: posti, sistemazioni, preventivo, quote e visibilità pubblica. I metodi con cui incassi e gli accrediti stanno invece nella Cassa skipper.</p><form id="fleetProfileForm" class="compact-form"><div class="form-grid"><label>Posti liberi calcolati<input name="availableSeats" type="number" min="0" max="30" inputmode="numeric" readonly aria-readonly="true" /><small class="field-hint">Si aggiorna quando riservi o liberi un posto.</small></label><label>Tipo di posto da mostrare<select name="berthPreference"><option value="not_specified">Nessuna indicazione</option><option value="cabin_female">Posto in cabina femminile</option><option value="cabin_male">Posto in cabina maschile</option><option value="cabin_mixed">Posto in cabina mista</option><option value="dinette">Posto in dinette</option><option value="other">Altra sistemazione</option></select></label></div><label class="consent-field"><input name="showAvailability" type="checkbox" checked /> Mostra pubblicamente i posti liberi e il tipo di posto selezionato.</label><button class="button button-ghost" type="submit">Aggiorna la flotta</button><p id="fleetProfileMessage" class="form-message" role="status" aria-live="polite"></p></form><div id="boatQuoteMount" class="boat-quote-mount" aria-label="Preventivo e quote della barca"></div></article>
         <article class="dashboard-panel payment-panel"><p class="eyebrow">Richieste di contributo</p><h3>Come vuoi ricevere i contributi</h3><p class="panel-lead">Configura una volta i metodi che vuoi proporre. I dettagli restano privati nell’area skipper e vengono aggiunti soltanto al messaggio WhatsApp della persona che scegli.</p><section id="skipperFinanceOverview" class="skipper-finance-overview" aria-live="polite"></section><form id="paymentProfileForm" class="compact-form">
           <label>Nome di chi incassa<input name="collectorName" required maxlength="100" placeholder="Es. Silvio · skipper Karibu" /></label>
           <fieldset class="payment-method-fieldset"><legend>Metodi e dati privati</legend><div class="payment-method-selector">
@@ -320,17 +429,31 @@
           <p class="field-hint">Salva solo link HTTPS, codice utente Revolut (Revtag), IBAN e intestatario: non inserire password, codici temporanei, numeri di carta o codici di accesso. Questi dati sono privati, non compaiono nella flotta né nel PDF e non vengono salvati nella richiesta di pagamento.</p>
           <button class="button button-ghost" type="submit">Salva profilo di incasso</button><p id="paymentProfileMessage" class="form-message" role="status" aria-live="polite"></p>
         </form>
+        <details class="skipper-recoverable-cost-panel" id="skipperRecoverableCostPanel">
+          <summary><span>Costi dello skipper da recuperare</span><small>Privati · incidono sulle quote</small></summary>
+          <p class="panel-lead">Qui annoti solo le spese sostenute dallo skipper per rendere possibile il viaggio: volo o treno, auto e transfer locali. Non sono costi del charter; una volta salvati, il calcolo aggiorna le quote nella sezione <strong>La barca</strong>.</p>
+          <fieldset class="cost-plan-section cost-plan-section-skipper">
+            <legend>Trasferte dello skipper</legend>
+            <div class="form-grid">
+              <label>Volo o treno A/R skipper · €<input form="costPlanForm" name="skipperFlightTrainCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 180,00" /></label>
+              <label>Auto skipper · carburante, pedaggi, parcheggi · €<input form="costPlanForm" name="skipperCarCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 90,00" /></label>
+              <label>Transfer locali skipper · €<input form="costPlanForm" name="skipperLocalTransferCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 45,00" /></label>
+            </div>
+          </fieldset>
+          <p class="field-hint">Non inserire qui cene personali o altre spese che non vuoi dividere con l’equipaggio.</p>
+          <div class="form-actions"><button class="button button-ghost" type="submit" form="costPlanForm" formnovalidate data-cost-plan-save-scope="skipper">Salva costi skipper e aggiorna quote</button><p id="skipperCostPlanMessage" class="form-message" role="status" aria-live="polite"></p></div>
+        </details>
         <div class="board-divider"></div>
         <details class="skipper-cost-panel" id="costPlanPanel">
-          <summary><span>Dashboard economica · costi e quote</span><small>Privato · conti trasparenti</small></summary>
-          <p class="panel-lead">Inserisci qui i conti una volta sola. Il charter è il totale reale della barca: non viene mai modificato per far tornare una cifra tonda. Se comprende già lo Starter Pack, indicane qui il valore: il sito lo scorpora dalla quota cabina, senza aggiungerlo una seconda volta al totale. Lo skipper resta fuori dalle quote.</p>
+          <summary><span>Preventivo della barca · costi e quote</span><small>Privato · conti trasparenti</small></summary>
+          <p class="panel-lead">Qui definisci i costi della barca che generano le quote. Il charter è il totale reale della barca: non viene mai modificato per far tornare una cifra tonda. Le trasferte dello skipper si impostano separatamente nella Cassa skipper.</p>
           <p class="field-hint">Alla fine vedrai cosa chiedere con il metodo concordato e cosa portare in contanti. Assicurazione, Starter Pack e cauzione restano sempre distinguibili dalla quota del posto.</p>
           <form id="costPlanForm" class="compact-form">
-            <div class="form-grid">
+            <fieldset class="cost-plan-section cost-plan-section-boat">
+              <legend>La barca · costi e quote da condividere</legend>
+              <p class="field-hint">Queste voci descrivono il noleggio e ciò che l’equipaggio divide. Se il charter comprende già lo Starter Pack, indicane qui il valore: il sito lo scorpora dalla quota cabina senza aggiungerlo una seconda volta.</p>
+              <div class="form-grid">
               <label>Costo charter / barca · totale · €<input name="charterCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 2350,00" /><small class="field-hint">È il totale del charter, anche se include Starter Pack o accessori.</small></label>
-              <label>Volo o treno A/R skipper · €<input name="skipperFlightTrainCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 180,00" /></label>
-              <label>Auto skipper · carburante, pedaggi, parcheggi · €<input name="skipperCarCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 90,00" /></label>
-              <label>Transfer locali skipper · €<input name="skipperLocalTransferCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 45,00" /></label>
               <label>Altri costi già inclusi nella quota posto · €<input name="otherRecoverableCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 0,00" /><small class="field-hint">Per esempio un porto già certo. Non inserire qui una voce che vuoi chiedere come extra programmato.</small></label>
               <label>Ospiti paganti previsti<input name="payingParticipants" type="number" min="1" max="30" required inputmode="numeric" /><small class="field-hint">Solo chi divide i costi: skipper, co-skipper o hostess gratuiti restano fuori.</small></label>
               <label>Starter Pack · dove si trova questo costo?<select name="starterPackIncludedInCharter" required><option value="" selected>Seleziona prima di calcolare</option><option value="true">È già nel totale charter</option><option value="false">È un costo esterno al charter</option></select><small class="field-hint">È una scelta importante: se è nel charter, il suo valore viene tolto dalla quota cabina. Non è una spesa in più.</small></label>
@@ -349,7 +472,8 @@
               <label>Quota cabina · come vuoi comunicarla?<select name="berthRoundingMode"><option value="automatic">Calcolo esatto al centesimo</option><option value="ceil_increment">Arrotonda sempre per eccesso</option><option value="manual_up">Scelgo io l’importo cabina</option></select><small class="field-hint">Il costo reale del charter non cambia: se chiedi una cifra più alta, il sito mostra sempre la differenza da riallocare nella cassa comune.</small></label>
               <label data-berth-rounding-increment hidden>Arrotonda al prossimo<select name="berthRoundingIncrement"><option value="100">euro</option><option value="500">5 euro</option><option value="1000">10 euro</option></select><small class="field-hint">Vale per le quote calcolate. Una dinette a prezzo fisso resta al valore che hai scelto.</small></label>
               <label data-manual-standard-berth hidden>Quota cabina scelta · €<input name="manualStandardBerthPrice" type="number" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 370,00" /><small class="field-hint">Non può essere inferiore al pareggio calcolato. Il riepilogo mostra l’eventuale avanzo da riallocare.</small></label>
-            </div>
+              </div>
+            </fieldset>
             <fieldset class="starter-pack-fieldset">
               <legend>Starter Pack · cosa trova pronto a bordo</legend>
               <p class="field-hint">Seleziona solo i servizi effettivamente compresi per questa barca. L’equipaggio leggerà lo stesso elenco dopo avere accettato le Regole di bordo. Lo Starter Pack resta sempre in contanti a bordo.</p>
@@ -456,6 +580,6 @@
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="area.js?v=20260915-skipper-travel-whatsapp-v1"></script>
+  <script type="module" src="area.js?v=20260915-dashboard-cards-v2"></script>
 </body>
 </html>

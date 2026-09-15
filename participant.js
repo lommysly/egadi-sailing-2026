@@ -12,6 +12,7 @@ import {
 } from './crew-session.js?v=20260914-en2';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260914-en2';
 import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260914-en2';
+import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
 
 const i18n = window.EgadiI18n;
 const translate = (key, fallback, params) => {
@@ -30,6 +31,8 @@ let stopBriefingSubscription = null;
 let stopRuleAcceptanceSubscription = null;
 let preRegistrationGateResolved = false;
 const isEditMode = new URLSearchParams(window.location.search).get('edit') === '1';
+
+installInputNormalization();
 
 function setMessage(element, message, isError = false) {
   element.textContent = message;
@@ -661,6 +664,7 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
   }
   if (!activeInvite || !auth.currentUser) return;
   const form = event.currentTarget;
+  normalizeFormFields(form);
   const fields = new FormData(form);
   const isDraft = event.submitter?.dataset.participantSave === 'draft';
   const saveButtons = [...form.querySelectorAll('[data-participant-save]')];
