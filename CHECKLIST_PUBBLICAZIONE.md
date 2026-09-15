@@ -45,6 +45,7 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [ ] Eseguire ogni caso di `FIRESTORE_RULES_TEST_MATRIX.md` nel Playground/emulatore con soli UID, telefoni e dati fittizi.
 - [ ] Verificare che il flag chiuso neghi anche il client Firebase diretto, non solo l'interfaccia.
 - [ ] Test skipper: Google Sign-In, propria barca, altra barca negata, PDF, bacheca e richiesta contributo.
+- [ ] Test dossier skipper con soli dati fittizi: lo skipper completa anagrafica, documento, patente, certificato radio e stati di consegna; il PDF mostra la sua prima riga e il riepilogo documentale. Crew, organizzatore, flotta e altri skipper non possono leggere né modificare `skipperProfile/default`; nessuna scansione viene caricata.
 - [ ] Test crew: claim dal nuovo link, creazione scheda, ingresso successivo con numero + codice e accesso soltanto alla propria barca.
 - [ ] Test negativo: numero assente, codice errato, link scaduto, token Google/anonimo e account estraneo non leggono dati.
 - [ ] Test riemissione: il vecchio codice/UID perde accesso; il nuovo link conserva lo stesso `inviteId`, scheda, richieste e PDF.

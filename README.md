@@ -16,11 +16,11 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - `passage-plan.html`: unica pagina pubblica per meteo e Passage Plan, alimentata da `passage-plan-data.js` e dalla sua edizione inglese editoriale `passage-plan-data-en.js`.
 - `arrivi-partenze.html`: sezione pubblica che spiega le quattro tratte, la finestra di match ±2 ore e la visibilità controllata dei contatti; non raccoglie dati in pagina.
 - `film.html` e `VIDEO_STORYBOARD.md`: storyboard del film; nessun filmato di terzi viene incorporato senza licenza.
-- `area.html`: area skipper con Google Sign-In, una barca per skipper, piano equipaggio privato, Crew List, PDF, bacheca, inviti WhatsApp, profilo privato di incasso, dashboard economica, piano quote a dieci voci e richieste di contributo con messaggio WhatsApp diretto.
+- `area.html`: area skipper con Google Sign-In, una barca per skipper, piano equipaggio privato, dossier charter privato dello skipper, Crew List, PDF, bacheca, inviti WhatsApp, profilo privato di incasso, dashboard economica, piano quote a dieci voci e richieste di contributo con messaggio WhatsApp diretto.
 - `participant.html`: primo accesso dal link WhatsApp; la persona conferma il suo numero e sceglie il proprio codice di 6 cifre, poi completa i dati necessari alla Crew List.
 - `crew.html`: ingresso quotidiano dell'equipaggio con numero WhatsApp e codice personale.
 - `my-area.html`: area personale con scheda, bacheca, regole e richieste dedicate.
-- `crew-pdf.js`: foglio A4 orizzontale da salvare in PDF per charter / eventuali controlli; non esporta CSV.
+- `crew-pdf.js`: foglio A4 orizzontale da salvare in PDF per charter / eventuali controlli, con skipper nella Crew List e riepilogo privato di patente/certificato radio; non esporta CSV.
 - `FIRESTORE_RULES_TEST_MATRIX.md`, `CHECKLIST_PUBBLICAZIONE.md` e `PRIVACY_DA_COMPLETARE.md`: tracciabilità dei controlli, delle verifiche da completare e delle decisioni privacy da formalizzare.
 - `ARRIVI_PARTENZE_SPEC.md`: modello operativo per la futura scheda privata dell'equipaggio e per l'area riservata della società transfer.
 
@@ -40,7 +40,7 @@ Il link WhatsApp è un codice di attivazione, non un accesso permanente. Se vien
 
 Le pagine pubbliche, la navigazione e il percorso equipaggio hanno una traduzione inglese editoriale, non Google Translate. La lingua scelta dallo skipper nell’invito (`preferredLocale`) è privata e serve solo a comporre il messaggio WhatsApp e il primo link nella lingua della persona. Il sito non traduce automaticamente nomi, anagrafica, contatti, richieste di contributo, causali, annunci dello skipper, istruzioni di pagamento o note operative libere: una traduzione automatica potrebbe alterarne il significato o divulgare dati non necessari. Le richieste WhatsApp usano invece un testo guida italiano o inglese; una causale scritta liberamente dallo skipper resta nella sua lingua originale.
 
-Il briefing safety segue una regola più rigorosa: italiano e inglese sono due versioni ufficiali parallele. Lo skipper completa e verifica titolo, sintesi e regolamento inglesi prima della pubblicazione; un contenuto inglese parziale viene rifiutato. Ogni modifica italiana o inglese aumenta `rulesVersion`, richiede una nuova accettazione e registra `acceptedLocale`. Il browser non usa Google Translate per questo testo.
+Il briefing safety segue una regola più rigorosa: italiano e inglese sono due versioni ufficiali parallele. Lo skipper completa e verifica titolo, sintesi e regolamento inglesi prima della pubblicazione; un contenuto inglese parziale viene rifiutato. Ogni modifica al regolamento italiano o inglese aumenta `rulesVersion`, richiede una nuova accettazione e registra `acceptedLocale`. Ritrovo, orari e note operative sono invece bacheca del viaggio: si aggiornano senza invalidare un regolamento già letto. Il browser non usa Google Translate per questo testo.
 
 La pagina di attivazione imposta inoltre `Referrer-Policy: no-referrer`, così il codice presente nel link non viene passato come referrer a font, script o altre risorse esterne caricate dalla pagina.
 
@@ -86,6 +86,10 @@ boats/{skipperUid}
     firstName, lastName, birthDate, birthPlace, nationality, gender
     documentType, documentNumber, documentExpiry, charterConsent
     role, email, phone, displayName, updatedAt
+  skipperProfile/default
+    anagrafica Crew List, documento, patente nautica e certificato radio
+    stati di consegna al charter, consenso, updatedAt, updatedBy
+    nessuna scansione o allegato caricato nel sito
   invites/{inviteId}
     displayName, whatsappNumber, phoneFingerprint, loginEmail, accessKey
     participantUid, status, accessVersion, expiresAt, preferredLocale, createdAt
@@ -142,7 +146,7 @@ Il vincolo operativo è **un numero WhatsApp, una barca attiva** nello stesso ev
 
 ## Crew List PDF e capienza
 
-Il pulsante **Genera Crew List PDF** apre un foglio A4 orizzontale prestampato. Lo skipper sceglie “Salva come PDF” dalla finestra di stampa. Il PDF si attiva solo con dati della barca, dati richiesti per ogni persona e conferma di condivisione completati; non contiene proiezioni né inviti non completati. Il porto di iscrizione non è un campo necessario.
+Il pulsante **Genera Crew List PDF** apre un foglio A4 orizzontale prestampato creato localmente nel browser. Lo skipper sceglie “Salva come PDF” dalla finestra di stampa. Il PDF si attiva solo con dati della barca, dossier skipper completo, dati richiesti per ogni persona e conferma di condivisione completati; non contiene proiezioni né inviti non completati. La prima riga è lo skipper/comandante e una sezione separata riporta riferimenti e stato di documento, patente nautica e certificato radio. È un foglio operativo da verificare con il modello e il canale richiesti dal charter, non una conferma automatica di ricezione o un archivio di allegati. Le copie restano nel canale richiesto dal charter e non vengono caricate sul sito. Il porto di iscrizione non è un campo necessario.
 
 Lo skipper inserisce `totalBerths`, cioè i posti totali a bordo incluso lo skipper. Il sito salva anche `capacity`, derivato come `totalBerths - 1`, per inviti, Crew List e flotta pubblica. Per Karibu: 4 cabine doppie + 2 posti dinette + cabina marinaio = 11 posti totali; 1 è dello skipper e 10 sono partecipanti invitabili o quotabili. Il conteggio operativo usa l'unione per identificativo di proiezioni, inviti e schede Crew List: quando una proiezione diventa invito e poi scheda, resta un solo posto. Le schede manuali o gli inviti legacy senza proiezione contano una volta ciascuno. Non è un vincolo atomico server-side e non sostituisce la valutazione nautica dello skipper.
 
@@ -168,7 +172,7 @@ Solo dopo una scelta esplicita dello skipper la proiezione diventa un invito Wha
 
 ## Bacheca e contributi
 
-Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Il regolamento è composto da una sintesi iniziale e dal testo completo: la sintesi orienta ma non sostituisce mai il testo integrale. Prima dell'accettazione resta leggibile solo il briefing necessario a decidere consapevolmente; bacheca, piano quote e richieste personali si sbloccano soltanto con la conferma della versione corrente. Per i briefing pubblicati con `fullRulesRequired: true`, l'interfaccia sblocca la conferma solo dopo lo scorrimento del testo completo e Firestore richiede la dichiarazione `fullRulesRead: true` prima della Crew List o dell'aggiornamento della propria scheda. Quando cambia il regolamento, in italiano o nell'eventuale edizione inglese ufficiale, aumenta la versione e la persona deve confermare di nuovo la lettura della nuova versione.
+Lo skipper pubblica regole di bordo, ritrovo, imbarco, partenza, rientro e avvisi. Il regolamento è composto da una sintesi iniziale e dal testo completo: la sintesi orienta ma non sostituisce mai il testo integrale. Prima dell'accettazione resta leggibile solo il briefing necessario a decidere consapevolmente; bacheca, piano quote e richieste personali si sbloccano soltanto con la conferma della versione corrente. Per i briefing pubblicati con `fullRulesRequired: true`, l'interfaccia sblocca la conferma solo dopo lo scorrimento del testo completo e Firestore richiede la dichiarazione `fullRulesRead: true` prima della Crew List o dell'aggiornamento della propria scheda. Quando cambia il regolamento, in italiano o nell'eventuale edizione inglese ufficiale, aumenta la versione e la persona deve confermare di nuovo la lettura della nuova versione; un aggiornamento di solo ritrovo, orario o avviso non tocca invece le conferme già raccolte.
 
 Lo scorrimento e la conferma registrano una dichiarazione di lettura della versione, non possono dimostrare materialmente che ogni parola sia stata compresa. Indicazioni operative reali della singola barca, del charter, delle dotazioni e di eventuali cauzioni devono essere verificate dallo skipper e pubblicate solo quando confermate.
 

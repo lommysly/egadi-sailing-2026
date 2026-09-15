@@ -2,7 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/fireba
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
-import { getMissingCharterFields, isBoatReadyForPdf, isCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260913-berth-pricing1';
+import { getMissingCharterFields, getMissingSkipperProfileFields, isBoatReadyForPdf, isCharterReady, isSkipperProfileCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260915-skipper-dossier-v1';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260914-en2';
 import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260914-en2';
@@ -21,6 +21,7 @@ const signInButton = document.querySelector('#signInButton');
 const authMessage = document.querySelector('#authMessage');
 const PAYMENT_PROFILE_ID = 'default';
 const COST_PLAN_ID = 'default';
+const SKIPPER_PROFILE_ID = 'default';
 const PAYMENT_METHODS = [
   { id: 'paypal', label: 'PayPal', profileField: 'paypalEnabled', detailsField: 'paypalDetails' },
   { id: 'satispay', label: 'Satispay', profileField: 'satispayEnabled', detailsField: 'satispayDetails' },
@@ -251,6 +252,7 @@ let activeContributionPlan = null;
 let activeCostPlan = null;
 let activeBriefing = null;
 let activeAcceptances = [];
+let activeSkipperProfile = null;
 let skipperAnnouncementCount = 0;
 let stopBoatSubscription = null;
 let stopMemberSubscription = null;
@@ -263,6 +265,7 @@ let stopProjectionSubscription = null;
 let stopBriefingSubscription = null;
 let stopAnnouncementSubscription = null;
 let stopAcceptanceSubscription = null;
+let stopSkipperProfileSubscription = null;
 let creatingBoat = false;
 let editingBoatId = null;
 let editingMemberId = null;
@@ -277,6 +280,7 @@ let fleetAvailabilitySyncInProgress = false;
 const SKIPPER_DASHBOARD_HASHES = Object.freeze({
   overview: 'skipper-panorama',
   crew: 'skipper-equipaggio',
+  profile: 'skipper-profilo',
   money: 'skipper-conti',
   boat: 'skipper-barca',
   board: 'skipper-bacheca',
@@ -284,10 +288,27 @@ const SKIPPER_DASHBOARD_HASHES = Object.freeze({
 const SKIPPER_DASHBOARD_LABELS = Object.freeze({
   overview: 'Panoramica',
   crew: 'Equipaggio',
+  profile: 'Il tuo dossier',
   money: 'Quote e conti',
   boat: 'Barca e flotta',
-  board: 'Briefing e bacheca',
+  board: 'Regole e avvisi',
 });
+const BRIEFING_RULE_FIELDS = Object.freeze([
+  'rulesTitle',
+  'rulesSummary',
+  'rulesText',
+  'rulesTitleEn',
+  'rulesSummaryEn',
+  'rulesTextEn',
+]);
+const BRIEFING_TRIP_FIELDS = Object.freeze([
+  'meetingPoint',
+  'boardingAt',
+  'departureAt',
+  'returnAt',
+  'scheduleNote',
+  'scheduleNoteEn',
+]);
 const SKIPPER_FINANCE_VIEWS = Object.freeze({
   overview: 'overview',
   setup: 'setup',
@@ -312,6 +333,7 @@ function skipperDashboardViewFromHash() {
 function skipperDashboardIcon(kind) {
   const paths = {
     crew: '<path d="M8.5 11.25a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7 1.25a2.5 2.5 0 1 0 0-5"/><path d="M2.75 18.5a5.75 5.75 0 0 1 11.5 0M14.25 13.25a5 5 0 0 1 3 4.6"/>',
+    profile: '<circle cx="12" cy="8" r="3.25"/><path d="M5.25 20a6.75 6.75 0 0 1 13.5 0M17.5 4.5l1 1 1.75-1.75"/>',
     money: '<rect x="3.5" y="5.25" width="17" height="13.5" rx="2"/><path d="M3.5 9.5h17M15.5 14.25h2.25"/>',
     boat: '<path d="M3 14.5h18l-2.25 4.25H5.25L3 14.5Z"/><path d="M12 3.5v11M12 4l5.25 7H12M11.75 6.25 7 11h4.75"/>',
     board: '<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4.5"/>',
@@ -520,12 +542,14 @@ function setupSkipperDashboard() {
   if (skipperDashboardInitialized) return;
   const grid = dashboard?.querySelector('.dashboard-grid');
   const crewPanel = document.querySelector('#memberForm')?.closest('.dashboard-panel');
+  const profilePanel = document.querySelector('#skipperProfileForm')?.closest('.dashboard-panel');
   const moneyPanel = document.querySelector('#paymentProfileForm')?.closest('.dashboard-panel');
   const boatPanel = document.querySelector('#fleetProfileForm')?.closest('.dashboard-panel');
   const boardPanel = document.querySelector('#briefingForm')?.closest('.dashboard-panel');
-  if (!dashboard || !grid || !crewPanel || !moneyPanel || !boatPanel || !boardPanel) return;
+  if (!dashboard || !grid || !crewPanel || !profilePanel || !moneyPanel || !boatPanel || !boardPanel) return;
 
   crewPanel.dataset.skipperPanel = 'crew';
+  profilePanel.dataset.skipperPanel = 'profile';
   moneyPanel.dataset.skipperPanel = 'money';
   boatPanel.dataset.skipperPanel = 'boat';
   boardPanel.dataset.skipperPanel = 'board';
@@ -546,6 +570,10 @@ function setupSkipperDashboard() {
       <button class="dashboard-hub-card dashboard-hub-card-crew" type="button" data-skipper-view="crew">
         <span class="dashboard-hub-icon">${skipperDashboardIcon('crew')}</span><span class="dashboard-hub-label">Equipaggio</span>
         <strong data-skipper-summary="crew">Carico i posti…</strong><small data-skipper-detail="crew">Inviti, elenco per il charter e PDF.</small>
+      </button>
+      <button class="dashboard-hub-card dashboard-hub-card-profile" type="button" data-skipper-view="profile">
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('profile')}</span><span class="dashboard-hub-label">Il tuo dossier</span>
+        <strong data-skipper-summary="profile">Carico i tuoi documenti…</strong><small data-skipper-detail="profile">Anagrafica, patente e certificato radio.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-skipper-view="money">
         <span class="dashboard-hub-icon">${skipperDashboardIcon('money')}</span><span class="dashboard-hub-label">Contributi e conti</span>
@@ -623,6 +651,85 @@ function setSkipperDashboardMetric(name, value, detail) {
   if (detailTarget) detailTarget.textContent = detail;
 }
 
+function currentBriefingAcceptanceCount() {
+  return activeAcceptances.filter((acceptance) => acceptance.rulesVersion === (activeBriefing?.rulesVersion || 1)
+    && (activeBriefing?.fullRulesRequired !== true || acceptance.fullRulesRead === true)).length;
+}
+
+function briefingFieldValue(form, field) {
+  const input = form?.elements.namedItem(field);
+  if (!input) return '';
+  if (input instanceof RadioNodeList) return input.value || '';
+  if (input.type === 'checkbox') return input.checked ? 'true' : 'false';
+  return input.value || '';
+}
+
+function briefingFieldChanged(form, field) {
+  if (!activeBriefing) return true;
+  const current = briefingFieldValue(form, field);
+  const previous = field.endsWith('At') ? toDateTimeLocal(activeBriefing[field]) : activeBriefing[field];
+  return String(previous ?? '') !== String(current ?? '');
+}
+
+function briefingRulesChanged(form) {
+  // I documenti legacy possono non avere l'obbligo di lettura integrale.
+  // Al primo salvataggio quel passaggio diventa parte delle regole e richiede
+  // quindi una nuova accettazione, anche se nessun campo visibile è cambiato.
+  return !activeBriefing
+    || activeBriefing.fullRulesRequired !== true
+    || BRIEFING_RULE_FIELDS.some((field) => briefingFieldChanged(form, field));
+}
+
+function briefingTripChanged(form) {
+  return !activeBriefing || BRIEFING_TRIP_FIELDS.some((field) => briefingFieldChanged(form, field));
+}
+
+function renderBoardRulesOverview() {
+  const overview = document.querySelector('#boardRulesOverview');
+  const form = document.querySelector('#briefingForm');
+  const editor = document.querySelector('#rulesEditor');
+  const editorSummary = document.querySelector('#rulesEditorSummary');
+  const editorLead = document.querySelector('#rulesEditorLead');
+  const rulesButton = form?.querySelector('[data-board-save="rules"]');
+  const tripButton = document.querySelector('#saveTripUpdateButton');
+  const hasRules = Boolean(activeBriefing?.rulesText);
+  const accepted = currentBriefingAcceptanceCount();
+
+  if (overview) {
+    if (hasRules) {
+      const acceptanceText = accepted === 1
+        ? '1 persona ha già confermato la lettura.'
+        : `${accepted} persone hanno già confermato la lettura.`;
+      overview.innerHTML = `<div class="board-rules-overview-icon" aria-hidden="true">✓</div><div class="board-rules-overview-copy"><p class="eyebrow">Regole di bordo · attive</p><h4>${escapeHtml(activeBriefing.rulesTitle || 'Regolamento di bordo')}</h4><p>${escapeHtml(acceptanceText)} L’equipaggio le legge prima di compilare la Crew List.</p><div class="board-rules-overview-meta"><span>Briefing pratico a bordo</span><span>Testo inglese ${hasOfficialEnglishBriefing() ? 'disponibile' : 'da preparare se serve'}</span></div></div>`;
+    } else {
+      overview.innerHTML = '<div class="board-rules-overview-icon is-pending" aria-hidden="true">!</div><div class="board-rules-overview-copy"><p class="eyebrow">Regole di bordo · da attivare</p><h4>Prepara il testo che la tua barca condividerà</h4><p>L’equipaggio potrà leggere, confermare e poi compilare la Crew List soltanto dopo l’attivazione.</p><div class="board-rules-overview-meta"><span>Nessuna data da approvare</span><span>Briefing pratico sempre a bordo</span></div></div>';
+    }
+  }
+
+  if (editorSummary) editorSummary.textContent = hasRules
+    ? 'Modifica il regolamento già attivo'
+    : 'Prepara il regolamento da leggere prima dell’imbarco';
+  if (editorLead) editorLead.textContent = hasRules
+    ? 'Modifica qui soltanto il patto di bordo. Se cambi questo testo, chi lo ha già accettato dovrà rileggerlo; gli orari si aggiornano più sotto senza toccare le conferme.'
+    : 'Questo è il patto condiviso della barca. Il briefing pratico su giubbotti, dotazioni e procedure reali si farà insieme a bordo.';
+  if (rulesButton) rulesButton.textContent = hasRules ? 'Salva modifiche al regolamento' : 'Attiva regolamento di bordo';
+  if (tripButton) tripButton.disabled = !hasRules;
+  if (editor && !hasRules) editor.open = true;
+}
+
+function updateRulesEditorChangeWarning() {
+  const form = document.querySelector('#briefingForm');
+  const warning = document.querySelector('#rulesChangeWarning');
+  if (!form || !warning) return;
+  const rulesChanged = Boolean(activeBriefing && briefingRulesChanged(form));
+  warning.hidden = !rulesChanged;
+  if (!rulesChanged) return;
+  const accepted = currentBriefingAcceptanceCount();
+  warning.textContent = accepted
+    ? `Stai modificando le regole già lette da ${accepted} ${accepted === 1 ? 'persona' : 'persone'}. Dopo il salvataggio dovranno rileggerle e confermarle prima di usare la loro area.`
+    : 'Stai modificando il regolamento attivo. Dopo il salvataggio le nuove persone leggeranno questo testo prima della Crew List.';
+}
+
 function renderSkipperDashboardOverview() {
   if (!skipperDashboardInitialized) return;
   const capacity = crewSeatLimit();
@@ -634,6 +741,15 @@ function renderSkipperDashboardOverview() {
     'crew',
     capacity ? `${allocated} di ${capacity} posti` : 'Posti da configurare',
     `${completedProfiles} schede completate · ${pendingInvites} link pronti · ${projectedCrew} proiezioni`,
+  );
+
+  const skipperProfileMissing = getMissingSkipperProfileFields(activeSkipperProfile);
+  setSkipperDashboardMetric(
+    'profile',
+    isSkipperProfileCharterReady(activeSkipperProfile) ? 'Dossier pronto' : 'Dossier da completare',
+    isSkipperProfileCharterReady(activeSkipperProfile)
+      ? 'Anagrafica, patente e certificato radio aggiornati.'
+      : `${skipperProfileMissing.length} ${skipperProfileMissing.length === 1 ? 'voce da controllare' : 'voci da controllare'} per il charter.`,
   );
 
   const costPlan = normalizeCostPlan(activeCostPlan);
@@ -664,11 +780,10 @@ function renderSkipperDashboardOverview() {
     `${effectiveParticipantCapacity(activeBoat)} posti per partecipanti · ${fleetVisibility}`,
   );
 
-  const currentAcceptanceCount = activeAcceptances.filter((acceptance) => acceptance.rulesVersion === (activeBriefing?.rulesVersion || 1)
-    && (activeBriefing?.fullRulesRequired !== true || acceptance.fullRulesRead === true)).length;
+  const currentAcceptanceCount = currentBriefingAcceptanceCount();
   setSkipperDashboardMetric(
     'board',
-    activeBriefing?.rulesText ? 'Regolamento pubblicato' : 'Regolamento da pubblicare',
+    activeBriefing?.rulesText ? 'Regole attive' : 'Regole da attivare',
     `${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} comunicazioni pubblicate`,
   );
 
@@ -676,9 +791,13 @@ function renderSkipperDashboardOverview() {
   const nextActionText = document.querySelector('#skipperNextActionText');
   const nextActionButton = document.querySelector('#skipperNextActionButton');
   if (!nextActionText || !nextActionButton) return;
-  if (!activeBriefing?.rulesText) {
-    nextActionText.textContent = 'Pubblica prima il regolamento di bordo: è il passaggio che sblocca l’ingresso dell’equipaggio.';
-    nextActionButton.textContent = 'Apri regolamento';
+  if (!isSkipperProfileCharterReady(activeSkipperProfile)) {
+    nextActionText.textContent = 'Completa prima il tuo dossier charter: anche lo skipper deve comparire nella Crew List con i propri riferimenti.';
+    nextActionButton.textContent = 'Apri il mio dossier';
+    nextActionButton.dataset.skipperView = 'profile';
+  } else if (!activeBriefing?.rulesText) {
+    nextActionText.textContent = 'Attiva prima le regole di bordo: è il passaggio che permette all’equipaggio di leggere e confermare il patto della barca.';
+    nextActionButton.textContent = 'Apri le regole';
     nextActionButton.dataset.skipperView = 'board';
   } else if (!collectionMethods) {
     nextActionText.textContent = 'Configura almeno un metodo di incasso prima di creare richieste personali.';
@@ -2092,6 +2211,7 @@ function resetPrivateView() {
   activeCostPlan = null;
   activeBriefing = null;
   activeAcceptances = [];
+  activeSkipperProfile = null;
   skipperAnnouncementCount = 0;
   creatingBoat = false;
   editingBoatId = null;
@@ -2111,6 +2231,7 @@ function resetPrivateView() {
   stopBriefingSubscription?.();
   stopAnnouncementSubscription?.();
   stopAcceptanceSubscription?.();
+  stopSkipperProfileSubscription?.();
   stopBoatSubscription = null;
   stopMemberSubscription = null;
   stopPaymentSubscription = null;
@@ -2122,6 +2243,16 @@ function resetPrivateView() {
   stopBriefingSubscription = null;
   stopAnnouncementSubscription = null;
   stopAcceptanceSubscription = null;
+  stopSkipperProfileSubscription = null;
+  const skipperProfileForm = document.querySelector('#skipperProfileForm');
+  if (skipperProfileForm) {
+    skipperProfileForm.reset();
+    skipperProfileForm.dataset.editing = '';
+  }
+  const skipperProfileStatus = document.querySelector('#skipperProfileStatus');
+  if (skipperProfileStatus) skipperProfileStatus.replaceChildren();
+  const skipperProfileMessage = document.querySelector('#skipperProfileMessage');
+  if (skipperProfileMessage) setMessage(skipperProfileMessage, '');
   dashboard.hidden = true;
   registerSection.hidden = true;
   renderSkipperDashboardOverview();
@@ -4017,17 +4148,48 @@ function openBoatEdit() {
   registerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function renderSkipperProfile(profile) {
+  activeSkipperProfile = profile || null;
+  const form = document.querySelector('#skipperProfileForm');
+  const status = document.querySelector('#skipperProfileStatus');
+  if (!form || !status) return;
+
+  if (profile && form.dataset.editing !== 'true') {
+    for (const [field, value] of Object.entries(profile)) {
+      const input = form.elements.namedItem(field);
+      if (!input) continue;
+      if (input.type === 'checkbox') input.checked = Boolean(value);
+      else input.value = value || '';
+    }
+  }
+
+  const missing = getMissingSkipperProfileFields(profile);
+  const ready = isSkipperProfileCharterReady(profile);
+  if (ready) {
+    status.innerHTML = '<span class="skipper-profile-status-icon" aria-hidden="true">✓</span><div><strong>Dossier charter pronto</strong><span>La tua riga entra nella Crew List e il PDF include i riferimenti a patente, certificato radio e stato dei documenti.</span></div>';
+  } else if (!profile) {
+    status.innerHTML = '<span class="skipper-profile-status-icon is-pending" aria-hidden="true">!</span><div><strong>Il tuo dossier è ancora vuoto</strong><span>Compila qui la tua anagrafica, la patente nautica e il certificato radio: non verranno mostrati né alla flotta né all’equipaggio.</span></div>';
+  } else {
+    status.innerHTML = `<span class="skipper-profile-status-icon is-pending" aria-hidden="true">!</span><div><strong>Ci sono ancora ${missing.length} ${missing.length === 1 ? 'voce da completare' : 'voci da completare'}</strong><span>Quando il dossier è pronto, il PDF potrà inserire anche lo skipper e il riepilogo dei documenti per il charter.</span></div>`;
+  }
+  updateCharterReadiness();
+  renderSkipperDashboardOverview();
+}
+
 function updateCharterReadiness() {
   const generatePdfButton = document.querySelector('#generatePdfButton');
   const readiness = document.querySelector('#charterReadiness');
   const incomplete = activeMembers.filter((member) => !isCharterReady(member));
   const boatMissing = !isBoatReadyForPdf(activeBoat);
+  const skipperProfileMissing = !isSkipperProfileCharterReady(activeSkipperProfile);
   const overCapacity = activeBoat && activeMembers.length > crewSeatLimit();
-  generatePdfButton.disabled = !activeBoat || activeMembers.length === 0 || incomplete.length > 0 || boatMissing || overCapacity;
+  generatePdfButton.disabled = !activeBoat || activeMembers.length === 0 || incomplete.length > 0 || boatMissing || skipperProfileMissing || overCapacity;
   readiness.textContent = !activeBoat
     ? 'Registra prima la barca per preparare il PDF.'
     : boatMissing
       ? 'Completa bandiera e comandante della barca per attivare il PDF.'
+      : skipperProfileMissing
+        ? 'Completa prima il dossier dello skipper: anagrafica, patente, certificato radio e stato dei documenti per il charter.'
       : overCapacity
         ? 'La Crew List supera i posti per partecipanti indicati per la barca.'
       : activeMembers.length === 0
@@ -4247,16 +4409,35 @@ function renderPayments(snapshot) {
 
 function renderBriefingForm() {
   const form = document.querySelector('#briefingForm');
-  if (!activeBriefing || form.dataset.editing === 'true') return;
+  if (!form) return;
+  if (!activeBriefing || form.dataset.editing === 'true') {
+    renderBoardRulesOverview();
+    updateRulesEditorChangeWarning();
+    return;
+  }
   for (const [field, value] of Object.entries(activeBriefing)) {
     const input = form.elements.namedItem(field);
     if (!input) continue;
     input.value = input.type === 'datetime-local' ? toDateTimeLocal(value) : value || '';
   }
+  // Una bacheca italiana già attiva non deve trasformarsi in bilingue solo
+  // perché l'editor propone una bozza inglese quando si crea una nuova barca.
+  // Se nel documento non esiste il testo EN, i suoi campi restano davvero
+  // vuoti e un salvataggio di orari non cambia il regolamento.
+  ['rulesTitleEn', 'rulesSummaryEn', 'rulesTextEn', 'scheduleNoteEn'].forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(activeBriefing, field)) return;
+    const input = form.elements.namedItem(field);
+    if (!input) return;
+    input.value = '';
+    input.defaultValue = '';
+  });
   if (typeof activeBriefing.rulesSummary !== 'string' || !activeBriefing.rulesSummary.trim()) {
     form.elements.rulesSummary.value = DEFAULT_RULES_SUMMARY;
   }
   form.dataset.loadedVersion = String(activeBriefing.rulesVersion || 1);
+  document.querySelector('#rulesEditor').open = false;
+  renderBoardRulesOverview();
+  updateRulesEditorChangeWarning();
 }
 
 function hasOfficialEnglishBriefing() {
@@ -4269,7 +4450,9 @@ function hasOfficialEnglishBriefing() {
 function renderBriefingStatus() {
   const status = document.querySelector('#briefingStatus');
   if (!activeBriefing?.rulesText) {
-  status.textContent = 'Pubblica il regolamento di bordo per attivare l’ingresso dell’equipaggio nella propria area.';
+    status.textContent = 'Attiva il regolamento: le persone lo leggeranno e lo confermeranno prima di compilare la Crew List.';
+    renderBoardRulesOverview();
+    updateRulesEditorChangeWarning();
     renderSkipperDashboardOverview();
     return;
   }
@@ -4277,7 +4460,9 @@ function renderBriefingStatus() {
   const accepted = activeAcceptances.filter((item) => item.rulesVersion === version
     && (activeBriefing.fullRulesRequired !== true || item.fullRulesRead === true)).length;
   const hasOfficialEnglish = hasOfficialEnglishBriefing();
-  status.textContent = `Regolamento di bordo pubblicato. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} completato l’accettazione.${hasOfficialEnglish ? ' Testo inglese ufficiale disponibile.' : ' Testo inglese ufficiale non ancora pubblicato.'}`;
+  status.textContent = `Regole attive. ${accepted} ${accepted === 1 ? 'persona ha' : 'persone hanno'} confermato la lettura.${hasOfficialEnglish ? ' Testo inglese ufficiale disponibile.' : ' La versione inglese va completata solo se inviti una persona in inglese.'}`;
+  renderBoardRulesOverview();
+  updateRulesEditorChangeWarning();
   renderSkipperDashboardOverview();
 }
 
@@ -4333,6 +4518,13 @@ function subscribeToBoat(boat) {
   stopBriefingSubscription?.();
   stopAnnouncementSubscription?.();
   stopAcceptanceSubscription?.();
+  stopSkipperProfileSubscription?.();
+  stopSkipperProfileSubscription = onSnapshot(doc(db, 'boats', boat.id, 'skipperProfile', SKIPPER_PROFILE_ID), (snapshot) => {
+    renderSkipperProfile(snapshot.exists() ? snapshot.data() : null);
+  }, () => {
+    renderSkipperProfile(null);
+    setMessage(document.querySelector('#skipperProfileMessage'), 'Impossibile leggere il dossier skipper.', true);
+  });
   stopMemberSubscription = onSnapshot(collection(db, 'boats', boat.id, 'members'), (snapshot) => {
     activeMembers = snapshot.docs.map((item) => normalizeMember(item.id, item.data())).sort((first, second) => memberName(first).localeCompare(memberName(second), 'it'));
     renderMembers();
@@ -5320,16 +5512,22 @@ document.querySelector('#memberList').addEventListener('click', async (event) =>
 
 document.querySelector('#cancelMemberEdit').addEventListener('click', resetMemberForm);
 setupBriefingEditor();
-document.querySelector('#briefingForm').addEventListener('input', () => {
-  document.querySelector('#briefingForm').dataset.editing = 'true';
+const briefingForm = document.querySelector('#briefingForm');
+briefingForm.addEventListener('input', () => {
+  briefingForm.dataset.editing = 'true';
+  updateRulesEditorChangeWarning();
 });
-document.querySelector('#briefingForm').addEventListener('submit', async (event) => {
+briefingForm.addEventListener('change', updateRulesEditorChangeWarning);
+briefingForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (blockPrivateAction(document.querySelector('#briefingFormMessage'))) return;
   if (!activeBoat || !auth.currentUser) return;
   const form = event.currentTarget;
   const fields = new FormData(form);
-  const submitButton = form.querySelector('button[type="submit"]');
+  const submitButton = event.submitter?.matches?.('[data-board-save]')
+    ? event.submitter
+    : form.querySelector('[data-board-save="rules"]');
+  const saveIntent = submitButton?.dataset.boardSave || 'rules';
   const rulesTitle = fields.get('rulesTitle').trim();
   const rulesSummary = fields.get('rulesSummary').trim();
   const rulesText = fields.get('rulesText').trim();
@@ -5361,22 +5559,30 @@ document.querySelector('#briefingForm').addEventListener('submit', async (event)
   // La conferma è legata al regolamento, non agli orari. Un cambio di
   // ritrovo, meteo o cambusa diventa un aggiornamento di bacheca e non deve
   // costringere l'equipaggio a riaccettare un testo che non è cambiato.
-  const rulesFields = ['rulesTitle', 'rulesSummary', 'rulesText', 'rulesTitleEn', 'rulesSummaryEn', 'rulesTextEn', 'fullRulesRequired'];
-  const scheduleFields = ['meetingPoint', 'boardingAt', 'departureAt', 'returnAt', 'scheduleNote', 'scheduleNoteEn'];
-  const fieldChanged = (field) => {
-    if (!activeBriefing) return true;
-    const value = briefingData[field];
-    const previous = field.endsWith('At') ? toDateTimeLocal(activeBriefing[field]) : activeBriefing[field];
-    return String(previous ?? '') !== String(value ?? '');
-  };
-  const rulesChanged = !activeBriefing || rulesFields.some(fieldChanged);
-  const scheduleChanged = !activeBriefing || scheduleFields.some(fieldChanged);
+  const rulesChanged = briefingRulesChanged(form);
+  const scheduleChanged = briefingTripChanged(form);
+  if (!activeBriefing && saveIntent === 'schedule') {
+    document.querySelector('#rulesEditor').open = true;
+    setMessage(document.querySelector('#briefingFormMessage'), 'Prima attiva il regolamento di bordo: solo dopo puoi aggiornare orari e bacheca.', true);
+    return;
+  }
+  if (activeBriefing && saveIntent === 'schedule' && rulesChanged) {
+    document.querySelector('#rulesEditor').open = true;
+    setMessage(document.querySelector('#briefingFormMessage'), 'Hai modificato anche il regolamento. Salva quelle modifiche dal pulsante “Salva modifiche al regolamento”, così l’equipaggio saprà che dovrà rileggerlo.', true);
+    return;
+  }
+  if (activeBriefing && saveIntent === 'rules' && !rulesChanged && scheduleChanged) {
+    setMessage(document.querySelector('#briefingFormMessage'), 'Hai aggiornato soltanto orari o informazioni del viaggio. Usa “Salva aggiornamento del viaggio”: non richiederà una nuova lettura delle regole.', true);
+    return;
+  }
+  const currentAcceptanceCount = currentBriefingAcceptanceCount();
+  if (activeBriefing && rulesChanged && currentAcceptanceCount > 0 && !window.confirm(`Stai cambiando le regole già confermate da ${currentAcceptanceCount} ${currentAcceptanceCount === 1 ? 'persona' : 'persone'}. Dopo il salvataggio dovranno rileggerle prima di usare la loro area. Vuoi continuare?`)) return;
   const currentRulesVersion = Number.isInteger(activeBriefing?.rulesVersion) ? activeBriefing.rulesVersion : 0;
   // `rulesVersion` resta un dettaglio tecnico per la Rule di sicurezza: non
   // viene mostrato all'equipaggio né usato come nome di una nuova edizione.
   const rulesVersion = activeBriefing ? currentRulesVersion + (rulesChanged ? 1 : 0) : 1;
-  submitButton.disabled = true;
-  setMessage(document.querySelector('#briefingFormMessage'), 'Pubblico la bacheca…');
+  form.querySelectorAll('[data-board-save]').forEach((button) => { button.disabled = true; });
+  setMessage(document.querySelector('#briefingFormMessage'), saveIntent === 'schedule' ? 'Aggiorno la bacheca del viaggio…' : 'Salvo il regolamento di bordo…');
   try {
     await setDoc(doc(db, 'boats', activeBoat.id, 'briefing', 'board'), {
       ...briefingData, rulesVersion, updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid,
@@ -5393,7 +5599,7 @@ document.querySelector('#briefingForm').addEventListener('submit', async (event)
   } catch (error) {
     setMessage(document.querySelector('#briefingFormMessage'), 'Non riesco a pubblicare la bacheca.', true);
   } finally {
-    submitButton.disabled = false;
+    form.querySelectorAll('[data-board-save]').forEach((button) => { button.disabled = false; });
   }
 });
 document.querySelector('#announcementForm').addEventListener('submit', async (event) => {
@@ -5419,12 +5625,70 @@ document.querySelector('#announcementForm').addEventListener('submit', async (ev
 });
 document.querySelector('#generatePdfButton').addEventListener('click', () => {
   if (blockPrivateAction(document.querySelector('#memberFormMessage'))) return;
-  if (!activeBoat || !isBoatReadyForPdf(activeBoat) || activeMembers.length > crewSeatLimit() || activeMembers.some((member) => !isCharterReady(member))) return;
+  if (!activeBoat || !isBoatReadyForPdf(activeBoat) || !isSkipperProfileCharterReady(activeSkipperProfile) || activeMembers.length > crewSeatLimit() || activeMembers.some((member) => !isCharterReady(member))) return;
   try {
-    openCapitaneriaPdf({ boat: activeBoat, members: activeMembers });
+    openCapitaneriaPdf({ boat: activeBoat, members: activeMembers, skipperProfile: activeSkipperProfile });
     setMessage(document.querySelector('#memberFormMessage'), 'Si apre la stampa: scegli “Salva come PDF” per scaricare il foglio.');
   } catch (error) {
     setMessage(document.querySelector('#memberFormMessage'), 'Impossibile aprire la stampa. Consenti le finestre popup e riprova.', true);
+  }
+});
+
+const skipperProfileForm = document.querySelector('#skipperProfileForm');
+skipperProfileForm.addEventListener('input', () => {
+  skipperProfileForm.dataset.editing = 'true';
+});
+skipperProfileForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (blockPrivateAction(document.querySelector('#skipperProfileMessage'))) return;
+  if (!activeBoat || !auth.currentUser) return;
+  const form = event.currentTarget;
+  const fields = new FormData(form);
+  const sailingLicenseExpiry = String(fields.get('sailingLicenseExpiry') || '');
+  const radioCertificateExpiry = String(fields.get('radioCertificateExpiry') || '');
+  if (sailingLicenseExpiry && sailingLicenseExpiry < '2026-10-11') {
+    setMessage(document.querySelector('#skipperProfileMessage'), 'La patente nautica risulta scaduta prima della fine del viaggio. Verifica la data o lasciala vuota se non è prevista.', true);
+    return;
+  }
+  if (radioCertificateExpiry && radioCertificateExpiry < '2026-10-11') {
+    setMessage(document.querySelector('#skipperProfileMessage'), 'Il certificato radio risulta scaduto prima della fine del viaggio. Verifica la data o lasciala vuota se non è prevista.', true);
+    return;
+  }
+  const submitButton = form.querySelector('button[type="submit"]');
+  const profile = {
+    firstName: String(fields.get('firstName') || '').trim(),
+    lastName: String(fields.get('lastName') || '').trim(),
+    birthDate: String(fields.get('birthDate') || ''),
+    birthPlace: String(fields.get('birthPlace') || '').trim(),
+    nationality: String(fields.get('nationality') || '').trim(),
+    gender: String(fields.get('gender') || ''),
+    documentType: String(fields.get('documentType') || ''),
+    documentNumber: String(fields.get('documentNumber') || '').trim(),
+    documentExpiry: String(fields.get('documentExpiry') || ''),
+    email: String(fields.get('email') || '').trim(),
+    phone: String(fields.get('phone') || '').trim(),
+    sailingLicenseNumber: String(fields.get('sailingLicenseNumber') || '').trim(),
+    sailingLicenseExpiry,
+    radioCertificateType: String(fields.get('radioCertificateType') || ''),
+    radioCertificateNumber: String(fields.get('radioCertificateNumber') || '').trim(),
+    radioCertificateExpiry,
+    identityDocumentStatus: String(fields.get('identityDocumentStatus') || ''),
+    sailingLicenseStatus: String(fields.get('sailingLicenseStatus') || ''),
+    radioCertificateStatus: String(fields.get('radioCertificateStatus') || ''),
+    charterConsent: fields.get('charterConsent') === 'on',
+    updatedAt: serverTimestamp(),
+    updatedBy: auth.currentUser.uid,
+  };
+  submitButton.disabled = true;
+  setMessage(document.querySelector('#skipperProfileMessage'), 'Salvo il dossier skipper…');
+  try {
+    await setDoc(doc(db, 'boats', activeBoat.id, 'skipperProfile', SKIPPER_PROFILE_ID), profile);
+    form.dataset.editing = '';
+    setMessage(document.querySelector('#skipperProfileMessage'), 'Dossier skipper salvato. Il PDF userà anche la tua riga nella Crew List e il riepilogo documentale per il charter.');
+  } catch (error) {
+    setMessage(document.querySelector('#skipperProfileMessage'), 'Non riesco a salvare il dossier skipper. Esci e rientra con l’account Google associato alla barca, poi riprova.', true);
+  } finally {
+    submitButton.disabled = false;
   }
 });
 
