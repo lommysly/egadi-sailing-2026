@@ -546,12 +546,17 @@ service cloud.firestore {
     }
 
     function isValidCrewProjectionDraftUpdate(boatId, projectionId) {
-      return ((hasValidCrewProjectionPayload(projectionId)
+      // Un record V3 deve validare una sola volta lo schema V3. La formula
+      // precedente lo validava dapprima nel check V2-or-V3 e una seconda
+      // volta dopo il controllo versione, superando il budget di espressioni.
+      return ((isCrewProjectionV3(resource.data)
+          && hasValidCrewProjectionPayloadV3(projectionId)
           && hasCrewProjectionCabinGroupWithinBoat(boatId))
-          || (!isCrewProjectionV2(resource.data)
-            && hasValidLegacyCrewProjectionPayload(projectionId)))
-        && (!isCrewProjectionV3(resource.data)
-          || hasValidCrewProjectionPayloadV3(projectionId))
+          || (!isCrewProjectionV3(resource.data)
+            && ((hasValidCrewProjectionPayload(projectionId)
+                && hasCrewProjectionCabinGroupWithinBoat(boatId))
+              || (!isCrewProjectionV2(resource.data)
+                && hasValidLegacyCrewProjectionPayload(projectionId)))))
         && resource.data.status == 'projected'
         && resource.data.inviteId == null
         && resource.data.invitedAt == null
@@ -1918,15 +1923,21 @@ service cloud.firestore {
         allow create: if isPrivateAreaOpen()
           && (((isOrganizer() || isSkipper(boatId)) && isValidCrewProjectionCreate(boatId, projectionId))
             || (isSkipper(boatId) && isValidCrewProjectionLegacyInviteCreate(boatId, projectionId)));
+        // Le tre operazioni usano validatori completi. Il passaggio di stato
+        // viene verificato prima, così Firestore valuta solo il ramo utile e
+        // una bozza può aggiornare la propria quota senza superare il limite
+        // di complessità delle Rules.
         allow update: if isPrivateAreaOpen()
           && (isOrganizer() || isSkipper(boatId))
-          && isValidCrewProjectionDraftUpdate(boatId, projectionId);
-        allow update: if isPrivateAreaOpen()
-          && (isOrganizer() || isSkipper(boatId))
-          && isValidCrewProjectionInvitedUpdate(boatId, projectionId);
-        allow update: if isPrivateAreaOpen()
-          && (isOrganizer() || isSkipper(boatId))
-          && isValidCrewProjectionInviteTransition(boatId, projectionId);
+          && ((resource.data.status == 'projected'
+              && request.resource.data.status == 'projected'
+              && isValidCrewProjectionDraftUpdate(boatId, projectionId))
+            || (resource.data.status == 'invited'
+              && request.resource.data.status == 'invited'
+              && isValidCrewProjectionInvitedUpdate(boatId, projectionId))
+            || (resource.data.status == 'projected'
+              && request.resource.data.status == 'invited'
+              && isValidCrewProjectionInviteTransition(boatId, projectionId)));
         // Si libera solo una bozza senza accesso. Dopo l'invito il record
         // resta la traccia privata che collega lo stesso posto alla Crew List.
         allow delete: if isPrivateAreaOpen()

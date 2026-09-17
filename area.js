@@ -5002,6 +5002,7 @@ function projectionCardActions(projection, invite) {
     actions.push(projectionActionButton('register-manual-receipt', projection.id, `Registra un acconto già ricevuto per ${projection.displayName}`, '+'));
   }
   if (!invite) {
+    actions.push(projectionActionButton('edit-projection-pricing', projection.id, `Imposta la quota prevista di ${projection.displayName}`, '€'));
     actions.push(projectionActionButton('send-projection', projection.id, `Crea invito WhatsApp per ${projection.displayName}`, whatsappIconSvg(), 'primary'));
     actions.push(projectionActionButton('release-projection', projection.id, `Libera il posto di ${projection.displayName}`, '×', 'release'));
     return actions.join('');
@@ -6091,24 +6092,26 @@ document.querySelector('#projectionList').addEventListener('click', async (event
   if (editPricingButton) {
     const projection = activeProjections.find((candidate) => candidate.id === editPricingButton.dataset.editProjectionPricing);
     const invite = projection ? projectionInvite(projection) : null;
-    if (!projection || !invite) return;
+    if (!projection) return;
     if (!canReplaceProjectionEditor()) return;
     setProjectionEditorVisibility(true);
     setProjectionEditorStatus('');
-    fillProjectionForm(projection);
     editingProjectionId = projection.id;
-    editingInvitedPricing = true;
-    setProjectionIdentityFieldsLocked(true);
-    projectionForm.elements.preferredLocale.disabled = true;
+    editingInvitedPricing = Boolean(invite);
+    fillProjectionForm(projection);
+    setProjectionIdentityFieldsLocked(Boolean(invite));
+    projectionForm.elements.preferredLocale.disabled = Boolean(invite);
     projectionForm.elements.useCustomPricing.checked = true;
     const exception = projectionForm.querySelector('.projection-pricing-exception');
     if (exception) exception.open = true;
     syncProjectionCabinGroupField();
     syncProjectionCostParticipation();
-    document.querySelector('#projectionSubmitButton').textContent = 'Aggiorna quota concordata';
+    document.querySelector('#projectionSubmitButton').textContent = invite ? 'Aggiorna quota concordata' : 'Salva quota prevista';
     document.querySelector('#cancelProjectionEdit').hidden = false;
-    document.querySelector('#projectionTitle').textContent = `Quota concordata di ${projection.displayName}`;
-    setMessage(document.querySelector('#projectionFormMessage'), `Stai rivedendo solo la quota di ${projection.displayName}. I nuovi importi restano fissi e non generano un pagamento: salvali soltanto dopo esserti accordato con la persona.`);
+    document.querySelector('#projectionTitle').textContent = invite ? `Quota concordata di ${projection.displayName}` : `Quota prevista di ${projection.displayName}`;
+    setMessage(document.querySelector('#projectionFormMessage'), invite
+      ? `Stai rivedendo solo la quota di ${projection.displayName}. I nuovi importi restano fissi e non generano un pagamento: salvali soltanto dopo esserti accordato con la persona.`
+      : `Stai impostando la quota prevista di ${projection.displayName} prima dell’invito. Puoi modificare importi e sistemazione: il link personale non verrà creato né inviato.`);
     projectionForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
     projectionForm.elements.berthAmount.focus();
     return;
