@@ -495,15 +495,27 @@ service cloud.firestore {
     // un'eccezione esplicita. `pricingSnapshotAt`, quando presente, attesta
     // che l'invito ha già fissato gli importi; resta opzionale per permettere
     // la lettura e la manutenzione delle schede V3 già esistenti.
+    // Anche l'elenco dello Starter Pack può essere fotografato solo durante
+    // l'invito: è una lista chiusa, senza testi liberi o dettagli di incasso.
+    function hasValidCrewProjectionStarterPackSnapshot() {
+      return !request.resource.data.keys().hasAny(['starterPackItemsSnapshot'])
+        || (request.resource.data.status == 'invited'
+          && request.resource.data.starterPackItemsSnapshot is list
+          && request.resource.data.starterPackItemsSnapshot.size() <= 9
+          && request.resource.data.starterPackItemsSnapshot.toSet().size() == request.resource.data.starterPackItemsSnapshot.size()
+          && request.resource.data.starterPackItemsSnapshot.toSet().hasOnly(['bed_linen', 'bath_towels', 'bath_kit', 'beach_towel', 'outboard', 'final_cleaning', 'sup', 'egadi_navigation_permit', 'tender']));
+    }
+
     function hasValidCrewProjectionPayloadV3(projectionId) {
       return request.resource.data.keys().hasAll(['contributesToCosts', 'pricingMode'])
-        && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'starterPackItemsSnapshot', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
         && hasValidCrewProjectionPayloadCore(projectionId)
         && request.resource.data.contributesToCosts is bool
         && request.resource.data.pricingMode is string
         && request.resource.data.pricingMode in ['dashboard', 'custom']
         && (!request.resource.data.keys().hasAny(['pricingSnapshotAt'])
           || request.resource.data.pricingSnapshotAt is timestamp)
+        && hasValidCrewProjectionStarterPackSnapshot()
         && (!request.resource.data.keys().hasAny(['cabinGroupId'])
           || (request.resource.data.cabinGroupId is string
             && (request.resource.data.cabinGroupId == ''
@@ -700,7 +712,7 @@ service cloud.firestore {
         && (!resource.data.keys().hasAny(['pricingMode'])
           ? request.resource.data.pricingMode == 'custom'
           : request.resource.data.pricingMode == resource.data.pricingMode)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'inviteId', 'invitedAt', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'updatedAt', 'updatedBy'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'inviteId', 'invitedAt', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'starterPackItemsSnapshot', 'updatedAt', 'updatedBy'])
         && hasMatchingCrewProjectionInviteAfter(boatId, projectionId);
     }
 

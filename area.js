@@ -115,7 +115,7 @@ const STARTER_PACK_ITEMS = Object.freeze([
   { id: 'outboard', label: 'Fuoribordo' },
   { id: 'final_cleaning', label: 'Pulizie finali' },
   { id: 'sup', label: 'SUP' },
-  { id: 'egadi_navigation_permit', label: 'Permesso / contributo di navigazione Egadi' },
+  { id: 'egadi_navigation_permit', label: 'Permesso di navigazione Egadi' },
   { id: 'tender', label: 'Tender, se previsto dal charter' },
 ]);
 const STARTER_PACK_ITEM_IDS = new Set(STARTER_PACK_ITEMS.map((item) => item.id));
@@ -3265,8 +3265,8 @@ function whatsappUrl(invite, { mode = 'preferred' } = {}) {
   const locale = inviteLocale(invite);
   const tripSummary = invitationTripBreakdownMessage(invite, locale);
   const message = locale === 'en'
-    ? `Hi ${invite.displayName} 🌊\n\nI have reserved your place for Egadi Sailing Experience, from 8 to 11 October 2026.${tripSummary}\n\nOpen your personal area: ${personalUrl}\n\nConfirm the WhatsApp number that received this invitation, choose a six-digit personal code and read the onboard rules. In your area you will find this summary again, the boat updates and your personal requests.\n\nBefore activating access, please read Privacy & data: ${privacyUrl}\n\nThe private area is still being tested. Until the final privacy notice is published, please use fictitious data only.`
-    : `Ciao ${invite.displayName} 🌊\n\nTi ho riservato il tuo posto per Egadi Sailing Experience, dall’8 all’11 ottobre 2026.${tripSummary}\n\nApri la tua area personale: ${personalUrl}\n\nConferma il numero WhatsApp che ha ricevuto l’invito, scegli un codice personale di 6 cifre e leggi le regole di bordo. Nella tua area ritroverai questo riepilogo, le comunicazioni della barca e le tue richieste personali.\n\nPrima di attivarlo puoi leggere Privacy e dati: ${privacyUrl}\n\nL’area è in test: fino alla pubblicazione dell’informativa finale inserisci esclusivamente dati fittizi.`;
+    ? `Hi ${invite.displayName} 🌊\n\nI have reserved your place for Egadi Sailing Experience, from 8 to 11 October 2026.${tripSummary}\n\nOpen your personal area: ${personalUrl}\n\nConfirm the WhatsApp number that received this invitation, choose a six-digit personal code and read the onboard rules. Once inside, you will find this same summary again, clearly split between your agreed contribution and the cash to bring on board. You do not need a second invitation.\n\nThe website does not collect money. For the transfer, use the method you agree with the skipper; if you have already paid, let them know so they can confirm it.\n\nBefore activating access, please read Privacy & data: ${privacyUrl}\n\nThe private area is still being tested. Until the final privacy notice is published, please use fictitious data only.`
+    : `Ciao ${invite.displayName} 🌊\n\nTi ho riservato il tuo posto per Egadi Sailing Experience, dall’8 all’11 ottobre 2026.${tripSummary}\n\nApri la tua area personale: ${personalUrl}\n\nConferma il numero WhatsApp che ha ricevuto l’invito, scegli un codice personale di 6 cifre e leggi le regole di bordo. Una volta dentro ritroverai questo stesso riepilogo, con la distinzione chiara tra quota concordata e contanti da portare a bordo. Non serve un secondo invito.\n\nIl sito non riceve denaro: per il versamento usa il metodo che concorderai con lo skipper; se hai già versato, avvisalo così potrà confermarlo.\n\nPrima di attivarlo puoi leggere Privacy e dati: ${privacyUrl}\n\nL’area è in test: fino alla pubblicazione dell’informativa finale inserisci esclusivamente dati fittizi.`;
   return selectWhatsappUrl(whatsappLinks(number, message), mode);
 }
 
@@ -3310,8 +3310,8 @@ function starterPackContentsForPaymentMessage(value, locale) {
     outboard: 'outboard engine',
     final_cleaning: 'final cleaning',
     sup: 'SUP',
-    egadi_navigation_permit: 'Egadi navigation permit / contribution',
-    tender: 'tender, if included by the charter',
+    egadi_navigation_permit: 'Egadi navigation permit',
+    tender: 'tender, if included by charter',
   };
   const labels = normalizeStarterPackItems(value)
     .map((itemId) => locale === 'en'
@@ -3320,6 +3320,19 @@ function starterPackContentsForPaymentMessage(value, locale) {
     .filter(Boolean);
   if (!labels.length) return '';
   return locale === 'en' ? `includes ${labels.join(', ')}` : `include ${labels.join(', ')}`;
+}
+
+// Al momento dell'invito l'elenco del Pack viene fotografato insieme agli
+// importi. Una modifica successiva al piano della barca deve valere per i
+// nuovi inviti, non riscrivere ciò che una persona ha già ricevuto.
+function starterPackItemsForProjection(projection) {
+  const hasSnapshot = Array.isArray(projection?.starterPackItemsSnapshot);
+  const source = hasSnapshot
+    ? projection.starterPackItemsSnapshot
+    : activeContributionPlan?.starterPackItems;
+  return normalizeStarterPackItems(source, {
+    fallbackToDefault: hasSnapshot ? false : !Array.isArray(activeContributionPlan?.starterPackItems),
+  });
 }
 
 function invitationAccommodationLabel(projection, locale) {
@@ -3352,9 +3365,7 @@ function invitationTripBreakdownMessage(invite, locale) {
   if (!hasAnyAmount && !accommodation) return '';
 
   const euro = (cents) => formatCurrency(cents / 100, locale);
-  const starterPackItems = normalizeStarterPackItems(activeContributionPlan?.starterPackItems, {
-    fallbackToDefault: !Array.isArray(activeContributionPlan?.starterPackItems),
-  });
+  const starterPackItems = starterPackItemsForProjection(normalized);
   const starterPackContents = starterPackContentsForPaymentMessage(starterPackItems, locale);
   const rows = [];
   if (accommodation) {
@@ -3374,8 +3385,8 @@ function invitationTripBreakdownMessage(invite, locale) {
   }
   if (payableCents > 0) {
     rows.push(locale === 'en'
-      ? `• Expected contribution to be requested separately: ${euro(payableCents)}`
-      : `• Quota prevista, richiesta con messaggio separato: ${euro(payableCents)}`);
+      ? `• Agreed contribution to pay to the skipper: ${euro(payableCents)} (berth + deposit-protection insurance)`
+      : `• Quota concordata da versare allo skipper: ${euro(payableCents)} (posto/cabina + assicurazione cauzione)`);
   }
   if (starterPackCents > 0) {
     rows.push(locale === 'en'
@@ -3393,8 +3404,8 @@ function invitationTripBreakdownMessage(invite, locale) {
       : `• Contanti da portare a bordo: ${euro(starterPackCents + refundableDepositCents)}`);
   }
   const heading = locale === 'en'
-    ? 'Your expected participation summary:'
-    : 'Riepilogo previsto della tua partecipazione:';
+    ? 'Your participation summary:'
+    : 'Riepilogo della tua partecipazione:';
   return `\n\n${[heading, ...rows].join('\n')}`;
 }
 
@@ -3414,9 +3425,7 @@ function paymentTripBreakdownMessage(payment, locale) {
   if (!berthCents && !insuranceCents && !starterPackCents && !refundableDepositCents) return '';
 
   const euro = (cents) => formatCurrency(cents / 100, locale);
-  const starterPackItems = normalizeStarterPackItems(activeContributionPlan?.starterPackItems, {
-    fallbackToDefault: !Array.isArray(activeContributionPlan?.starterPackItems),
-  });
+  const starterPackItems = starterPackItemsForProjection(normalized);
   const starterPackContents = starterPackContentsForPaymentMessage(starterPackItems, locale);
   const quoteRows = [];
   if (berthCents > 0) {
@@ -3628,6 +3637,7 @@ async function createInviteFromProjection(projection) {
   // importi effettivi che la persona vedrà nella propria area.
   const normalizedProjection = normalizeProjection(projection.id, projection);
   const currentPricing = effectiveProjectionPricing(normalizedProjection);
+  const starterPackItemsSnapshot = starterPackItemsForProjection(normalizedProjection);
   batch.update(doc(db, 'boats', activeBoat.id, 'crewProjections', projection.id), {
     pricingMode: currentPricing.pricingMode,
     contributesToCosts: currentPricing.contributesToCosts,
@@ -3635,6 +3645,7 @@ async function createInviteFromProjection(projection) {
     starterPackCents: currentPricing.starterPackCents,
     protectionInsuranceCents: currentPricing.protectionInsuranceCents,
     refundableDepositCents: currentPricing.refundableDepositCents,
+    starterPackItemsSnapshot,
     status: 'invited',
     inviteId: invite.id,
     invitedAt: serverTimestamp(),
@@ -4265,7 +4276,7 @@ function projectionPaymentBalanceMarkup(projection) {
     : balance.pendingCents > 0
       ? `<span class="projection-payment-balance-warning">Le richieste aperte non riducono il saldo finché l'accredito non è verificato.</span>`
       : '';
-  return `<div class="projection-payment-balance"><span>Situazione contributi · Starter Pack e cauzione restano separati</span><span>Quota concordata<b>${euro(balance.expectedCents)}</b></span><span>Già ricevuto e verificato<b>${euro(balance.verifiedCents)}</b></span>${advance}<span class="projection-payment-balance-open">Saldo da richiedere<b>${euro(balance.remainingCents)}</b></span>${pending}${warning}</div>`;
+  return `<div class="projection-payment-balance"><span>Situazione contributi · Starter Pack e cauzione restano separati</span><span>Quota concordata<b>${euro(balance.expectedCents)}</b></span><span>Già ricevuto e verificato<b>${euro(balance.verifiedCents)}</b></span>${advance}<span class="projection-payment-balance-open">Saldo da ricevere<b>${euro(balance.remainingCents)}</b></span>${pending}${warning}</div>`;
 }
 
 function manualReceiptAllocation(projection, target, amountCents) {
@@ -4310,7 +4321,7 @@ function prepareProjectionBalanceRequest(projection) {
   form.elements.berthType.value = 'assigned:balance';
   applyPaymentBerthPreset();
   renderPaymentBalancePreview();
-  setMessage(document.querySelector('#paymentFormMessage'), `Saldo pronto per ${projection.displayName}: controlla importo e metodi prima di aprire WhatsApp.`);
+  setMessage(document.querySelector('#paymentFormMessage'), `Promemoria di saldo pronto per ${projection.displayName}: usalo solo se serve dopo l’invito iniziale, controllando importo e metodi prima di aprire WhatsApp.`);
   form.scrollIntoView({ behavior: 'smooth', block: 'center' });
   form.elements.amount.focus({ preventScroll: true });
 }
@@ -5097,7 +5108,7 @@ function projectionCardActions(projection, invite) {
   }
   actions.push(projectionActionButton('edit-projection-pricing', projection.id, `Rivedi la quota concordata di ${projection.displayName}`, '€'));
   if (balance.remainingCents > 0) {
-    actions.push(projectionActionButton('request-projection-balance', projection.id, `Prepara la richiesta di saldo per ${projection.displayName}`, '€', 'primary'));
+    actions.push(projectionActionButton('request-projection-balance', projection.id, `Prepara un promemoria di saldo per ${projection.displayName}, solo se serve`, '€', 'primary'));
   }
   if (projection.pricingMode === 'dashboard') {
     actions.push(projectionActionButton('refresh-projection-pricing', projection.id, `Aggiorna gli importi di ${projection.displayName} dalla dashboard attuale`, '⟳'));

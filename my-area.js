@@ -95,6 +95,19 @@ function starterPackItemsDescription(value) {
   return localized(`Comprende: ${labels.join(', ')}.`, `Includes: ${labels.join(', ')}.`);
 }
 
+// Per un invito recente la lista è congelata nella sua proiezione. Gli inviti
+// storici non possono ricostruire ciò che ricevettero allora: per loro resta
+// visibile il piano attuale della barca.
+function starterPackItemsForActiveProjection() {
+  const hasSnapshot = Array.isArray(activeProjection?.starterPackItemsSnapshot);
+  const source = hasSnapshot
+    ? activeProjection.starterPackItemsSnapshot
+    : activeContributionPlan?.starterPackItems;
+  return normalizeStarterPackItems(source, {
+    fallbackToDefault: hasSnapshot ? false : !Array.isArray(activeContributionPlan?.starterPackItems),
+  });
+}
+
 function staticContributionDescription(itemId, starterPackItems = []) {
   const descriptions = {
     berth: localized('Il valore dipende dalla sistemazione assegnata dallo skipper.', 'The amount depends on the berth assigned by the skipper.'),
@@ -137,20 +150,20 @@ function crewDashboardCopy() {
     return {
       eyebrow: 'Your crew area',
       title: 'Before departure,<br /><em>here is what to check.</em>',
-      description: 'Your charter details, safety briefing, skipper updates and payment requests — only information for you.',
+      description: 'Your charter details, safety briefing, skipper updates and your own contribution summary — only information for you.',
       activity: 'Your progress',
       activityDetail: 'What you have already completed.',
       activityTimelineEyebrow: 'Your trip status',
       activityTimelineTitle: 'What you have already done',
       board: 'Rules and updates',
       boardDetail: 'Safety briefing, timings and skipper messages.',
-      money: 'Costs and requests',
-      moneyDetail: 'Only costs and requests that concern you.',
+      money: 'Your contribution',
+      moneyDetail: 'The invitation summary, cash on board and later confirmations.',
       profile: 'Charter details',
       profileDetail: 'Personal details requested before boarding.',
       nextStep: 'Next step',
       nextButton: 'Open',
-      noPayments: 'No requests at the moment',
+      noPayments: 'Contribution to be confirmed',
       paymentsPending: '{count} request{suffix} to settle',
       paymentsVerified: '{count} confirmed contribution{suffix}',
       briefingReady: 'Safety briefing accepted',
@@ -171,20 +184,20 @@ function crewDashboardCopy() {
   return {
     eyebrow: 'La tua area equipaggio',
     title: 'Prima di partire,<br /><em>ecco cosa controllare.</em>',
-    description: 'Dati per il charter, briefing di sicurezza, messaggi dello skipper e richieste di pagamento: qui trovi solo ciò che riguarda te.',
+    description: 'Dati per il charter, briefing di sicurezza, messaggi dello skipper e riepilogo della tua quota: qui trovi solo ciò che riguarda te.',
     activity: 'Il tuo percorso',
     activityDetail: 'Quello che hai già completato.',
     activityTimelineEyebrow: 'Stato del viaggio',
     activityTimelineTitle: 'Quello che hai già fatto',
     board: 'Regole e avvisi',
     boardDetail: 'Briefing di sicurezza, orari e messaggi dello skipper.',
-    money: 'Costi e richieste',
-    moneyDetail: 'Solo costi e richieste che riguardano te.',
+    money: 'La tua quota',
+    moneyDetail: 'Il riepilogo dell’invito, i contanti a bordo e le conferme successive.',
     profile: 'Dati per il charter',
     profileDetail: 'Dati personali richiesti prima dell’imbarco.',
     nextStep: 'Prossimo passo',
     nextButton: 'Apri',
-    noPayments: 'Nessuna richiesta al momento',
+    noPayments: 'Quota da definire',
     paymentsPending: '{count} richiest{suffix} da regolare',
     paymentsVerified: '{count} contribut{suffix} confermat{suffixVerified}',
     briefingReady: 'Briefing di sicurezza accettato',
@@ -360,7 +373,22 @@ function paymentActivitySummary(pendingPayments, verifiedPayments, pendingPaymen
     const amount = verifiedPaymentCents ? ` · ${formatCurrency(verifiedPaymentCents / 100)}` : '';
     return { tone: 'complete', label: localized('Richieste personali', 'Personal requests'), detail: `${countLabel}${amount}` };
   }
-  return { tone: 'waiting', label: localized('Richieste personali', 'Personal requests'), detail: localized('Nessuna richiesta personale al momento.', 'No personal requests at the moment.') };
+  const contribution = onlineContributionBalance();
+  if (contribution.hasTarget && !contribution.isExempt) {
+    return {
+      tone: 'waiting',
+      label: localized('Quota del tuo invito', 'Your invitation contribution'),
+      detail: localized(
+        `${formatCurrency(contribution.remainingCents / 100)} da versare: consulta il riepilogo costi ricevuto con l’invito.`,
+        `${formatCurrency(contribution.remainingCents / 100)} to pay: see the cost summary received with your invitation.`,
+      ),
+    };
+  }
+  return {
+    tone: 'waiting',
+    label: localized('Aggiornamenti sulla quota', 'Contribution updates'),
+    detail: localized('Non ci sono promemoria o richieste aggiuntive.', 'There are no reminders or additional requests.'),
+  };
 }
 
 function renderCrewActivityTimeline({ profileReady, briefingReady, pendingPayments, verifiedPayments, pendingPaymentCents, verifiedPaymentCents }) {
@@ -513,6 +541,13 @@ function renderCrewDashboardOverview() {
   } else if (pendingPayments) {
     nextActionText.textContent = copy.pendingAction;
     nextActionButton.textContent = copy.openPayments;
+    nextActionButton.dataset.crewView = 'money';
+  } else if (onlineContribution.hasTarget && !onlineContribution.isExempt && onlineContribution.remainingCents > 0) {
+    nextActionText.textContent = localized(
+      'Rileggi il riepilogo ricevuto con l’invito: quota da versare, Starter Pack e cauzione sono indicati separatamente.',
+      'Check the summary received with your invitation: the contribution to pay, Starter Pack and refundable deposit are listed separately.',
+    );
+    nextActionButton.textContent = localized('Apri la mia quota', 'Open my contribution');
     nextActionButton.dataset.crewView = 'money';
   } else {
     nextActionText.textContent = copy.allReady;
@@ -704,7 +739,7 @@ function projectedContributionSummary(fieldName) {
   }
   return {
     value: `${formatCurrency(amountCents / 100)} ${localized('previsti', 'planned')}`,
-    detail: localized('Quota prevista dallo skipper; non è ancora una richiesta di pagamento.', 'Planned by the skipper; this is not a payment request yet.'),
+    detail: localized('Quota fissata nel tuo invito. Resta separata da Starter Pack e cauzione; per il versamento segui le indicazioni concordate con lo skipper.', 'Contribution set in your invitation. It stays separate from the Starter Pack and refundable deposit; use the payment instructions agreed with your skipper.'),
   };
 }
 
@@ -758,7 +793,10 @@ function starterPackCashSummary() {
     : projectionHasFrozenPricing()
       ? localized('Non previsto nella quota fissata', 'Not included in the agreed contribution')
       : localized('Da definire · contanti a bordo', 'To be confirmed · cash on board');
-  const description = String(plannedItem?.description || '').trim();
+  const hasSnapshot = Array.isArray(activeProjection?.starterPackItemsSnapshot);
+  const description = hasSnapshot
+    ? starterPackItemsDescription(starterPackItemsForActiveProjection())
+    : String(plannedItem?.description || '').trim();
   return {
     value,
     detail: legacyIncludedInCharter
@@ -1014,13 +1052,13 @@ function renderParticipantFinanceSummary() {
   const sentRequests = {
     value: onlineContribution.pendingCents > 0
       ? `${formatCurrency(onlineContribution.pendingCents / 100)} ${localized('in attesa', 'pending')}`
-      : localized('Nessuna richiesta aperta', 'No open request'),
+      : localized('Nessun promemoria aperto', 'No open reminder'),
     detail: onlineContribution.pendingCents > 0
       ? localized(
         'Queste richieste sono già state preparate o inviate, ma non vengono sottratte dal saldo finché l’accredito non è verificato.',
         'These requests have already been prepared or sent, but are not deducted from the balance until the payment is verified.',
       )
-      : localized('Le eventuali voci extra restano nell’elenco delle richieste personali.', 'Any separate extras remain in the personal requests list.'),
+      : localized('La quota iniziale è già riepilogata qui sopra; qui compaiono solo eventuali extra o promemoria dello skipper.', 'Your original contribution is already summarised above; only possible extras or skipper reminders appear here.'),
   };
   const cashAction = {
     value: cashAtBoardCents > 0
@@ -1144,7 +1182,7 @@ function renderPayments(snapshot) {
   const list = document.querySelector('#participantPaymentList');
   activeCrewPayments = snapshot.docs.map((item) => item.data());
   if (snapshot.empty) {
-    list.innerHTML = `<p class="empty-state">${escapeHtml(translate('crew.flow.noPayments', 'Nessuna richiesta al momento. Lo skipper può aggiungerne altre anche in seguito.'))}</p>`;
+    list.innerHTML = `<p class="empty-state">${escapeHtml(translate('crew.flow.noPayments', 'Il riepilogo ricevuto con l’invito è qui sopra. Qui compariranno solo eventuali promemoria, extra o conferme dello skipper.'))}</p>`;
     renderParticipantFinanceSummary();
     renderCrewDashboardOverview();
     return;
@@ -1179,12 +1217,15 @@ function contributionAmountCents(item) {
   return Number.isInteger(amountCents) && amountCents >= 0 ? amountCents : 0;
 }
 
-function contributionPlanItems(plan = activeContributionPlan) {
+function contributionPlanItems(plan = activeContributionPlan, starterPackItemsOverride = null) {
   const sourceItems = plan?.items && typeof plan.items === 'object' ? plan.items : {};
   const isV4 = Array.isArray(plan?.starterPackItems);
-  const starterPackItems = normalizeStarterPackItems(plan?.starterPackItems, {
-    fallbackToDefault: !isV4,
-  });
+  const hasStarterPackOverride = Array.isArray(starterPackItemsOverride);
+  const starterPackItems = hasStarterPackOverride
+    ? normalizeStarterPackItems(starterPackItemsOverride)
+    : normalizeStarterPackItems(plan?.starterPackItems, {
+      fallbackToDefault: !isV4,
+    });
   return CONTRIBUTION_ITEMS.map((item) => {
     const source = sourceItems[item.id] || {};
     const state = item.id === 'starter_pack'
@@ -1196,10 +1237,10 @@ function contributionPlanItems(plan = activeContributionPlan) {
       ...item,
       state,
       amountCents: item.id === 'linen_towels' ? 0 : contributionAmountCents(source),
-      description: isV4
+      description: isV4 || hasStarterPackOverride
         ? staticContributionDescription(item.id, starterPackItems)
         : String(source.description || '').trim().slice(0, 320) || staticContributionDescription(item.id, starterPackItems),
-      hideFromCrew: isV4 && item.id === 'linen_towels',
+      hideFromCrew: (isV4 || hasStarterPackOverride) && item.id === 'linen_towels',
     };
   });
 }
@@ -1245,7 +1286,11 @@ function renderContributionPlan() {
   }
 
   const notApplicable = contributionNotApplicableContainer(plan);
-  const items = contributionPlanItems().filter((item) => !item.hideFromCrew);
+  const starterPackItemsSnapshot = Array.isArray(activeProjection?.starterPackItemsSnapshot)
+    ? activeProjection.starterPackItemsSnapshot
+    : null;
+  const items = contributionPlanItems(activeContributionPlan, starterPackItemsSnapshot)
+    .filter((item) => !item.hideFromCrew);
   const includedItems = items.filter((item) => item.state === 'included');
   const separateItems = items.filter((item) => ['extra', 'local', 'to_define'].includes(item.state));
   const notApplicableItems = items.filter((item) => item.state === 'not_applicable');

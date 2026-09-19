@@ -28,7 +28,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 ## Accesso dell'equipaggio: flusso concordato
 
 1. Lo skipper crea prima una **proiezione equipaggio privata**: nome, cognome, WhatsApp internazionale, consenso a essere contattata, ruolo e sistemazione previsti, lingua e voci di costo previste. La proiezione riserva un posto, ma non crea né un accesso, né una richiesta di pagamento, né una riga nel PDF charter.
-2. Quando decide di coinvolgere quella persona, lo skipper trasforma la stessa proiezione in un invito: il sito mantiene il medesimo identificativo e genera un link personale casuale, valido 14 giorni. Lo skipper lo invia direttamente su WhatsApp: il primo messaggio riepiloga la sistemazione e le voci previste (quota, Starter Pack e cauzione) ma non è una richiesta di denaro. Messaggio, Privacy e primo accesso usano la lingua selezionata.
+2. Quando decide di coinvolgere quella persona, lo skipper trasforma la stessa proiezione in un invito: il sito mantiene il medesimo identificativo e genera un link personale casuale, valido 14 giorni. Lo skipper lo invia direttamente su WhatsApp: è l’unico invito e riepiloga sistemazione, quota da versare (posto + assicurazione), Starter Pack cash con le voci comprese e cauzione rimborsabile cash. Importi e voci del Pack vengono congelati nell’invito; dopo briefing e registrazione, la dashboard personale ripete lo stesso riepilogo. L’invito non crea un incasso, una richiesta formale o un pagamento verificato: il metodo di versamento viene concordato con lo skipper. Messaggio, Privacy e primo accesso usano la lingua selezionata.
 3. Al primo accesso la persona apre quel link, conferma il numero WhatsApp e sceglie il proprio codice personale di **esattamente 6 cifre**. Non è il PIN di sblocco del telefono.
 4. Prima della Crew List la persona legge una sintesi, scorre il regolamento completo della propria barca e conferma esplicitamente la versione pubblicata dallo skipper. La sintesi non sostituisce il testo integrale né il briefing pratico a bordo. In inglese la conferma è possibile soltanto quando lo skipper ha pubblicato anche la versione inglese ufficiale completa.
 5. Dopo il briefing, la persona può salvare una **bozza privata** della propria anagrafica anche se non ha ancora un documento sotto mano. La bozza non è una Crew List, non occupa un posto, non attiva pagamenti e non entra nel PDF. È leggibile soltanto dalla stessa persona e resta legata alla versione del suo invito.
@@ -83,7 +83,8 @@ boats/{skipperUid}
     firstName, lastName, displayName, whatsappNumber, contactConsent
     plannedRole, berthType, preferredLocale
     berthCents, starterPackCents, protectionInsuranceCents, refundableDepositCents
-    pricingMode: dashboard | custom
+    pricingMode: dashboard | custom, pricingSnapshotAt
+    starterPackItemsSnapshot (solo dopo invito; lista chiusa delle voci concordate)
     status: projected | invited, inviteId, invitedAt, createdAt, createdBy, updatedAt, updatedBy
   members/{inviteId}
     firstName, lastName, birthDate, birthPlace, nationality, gender
@@ -191,7 +192,7 @@ Per le sistemazioni in cabina doppia, la proiezione può indicare una cabina num
 
 La **cauzione rimborsabile** resta sempre una voce distinta, da portare o regolare in loco secondo charter e skipper. Non entra nel totale da chiedere via WhatsApp, non viene classificata come contributo, non entra nella Cassa skipper e non può diventare un pagamento remoto dal sito.
 
-Solo dopo una scelta esplicita dello skipper la proiezione diventa un invito WhatsApp e, in un secondo momento, una richiesta personale può essere creata con importo, causale e metodi. Nessuna di queste tre azioni crea le altre automaticamente. Se la persona modifica dati o ruolo nella propria scheda, la Crew List conserva la sua dichiarazione aggiornata; la proiezione resta il piano iniziale dello skipper e non sostituisce i dati richiesti dal charter.
+Solo dopo una scelta esplicita dello skipper la proiezione diventa un invito WhatsApp. La successiva richiesta personale è facoltativa: serve solo per un promemoria, un saldo aggiornato o un extra, non per ripetere l’invito iniziale. Nessuna di queste azioni crea automaticamente un incasso o un pagamento verificato. Se la persona modifica dati o ruolo nella propria scheda, la Crew List conserva la sua dichiarazione aggiornata; la proiezione resta il piano iniziale dello skipper e non sostituisce i dati richiesti dal charter.
 
 ## Bacheca e contributi
 
