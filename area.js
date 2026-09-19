@@ -3257,7 +3257,7 @@ function whatsappActionIconMarkup({ external = false } = {}) {
   return `<span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${external ? '<span class="whatsapp-action-external" aria-hidden="true">↗</span>' : ''}`;
 }
 
-function whatsappUrl(invite, { mode = 'preferred' } = {}) {
+function whatsappUrl(invite, { mode = 'web' } = {}) {
   const number = normalizeWhatsAppNumber(invite.whatsappNumber);
   const personalUrl = participantUrl(invite);
   if (!number || !personalUrl) return '';
@@ -3367,46 +3367,55 @@ function invitationTripBreakdownMessage(invite, locale) {
   const euro = (cents) => formatCurrency(cents / 100, locale);
   const starterPackItems = starterPackItemsForProjection(normalized);
   const starterPackContents = starterPackContentsForPaymentMessage(starterPackItems, locale);
-  const rows = [];
+  const reservationRows = [];
   if (accommodation) {
-    rows.push(locale === 'en'
+    reservationRows.push(locale === 'en'
       ? `• Reserved accommodation: ${accommodation}`
       : `• Sistemazione prevista: ${accommodation}`);
   }
   if (berthCents > 0) {
-    rows.push(locale === 'en'
+    reservationRows.push(locale === 'en'
       ? `• Berth: ${euro(berthCents)}`
       : `• Posto/cabina: ${euro(berthCents)}`);
   }
   if (insuranceCents > 0) {
-    rows.push(locale === 'en'
+    reservationRows.push(locale === 'en'
       ? `• Deposit-protection insurance: ${euro(insuranceCents)}`
       : `• Assicurazione sulla cauzione: ${euro(insuranceCents)}`);
   }
+  const participationCents = payableCents + starterPackCents;
+  const paymentRows = [];
   if (payableCents > 0) {
-    rows.push(locale === 'en'
-      ? `• Agreed contribution to pay to the skipper: ${euro(payableCents)} (berth + deposit-protection insurance)`
-      : `• Quota concordata da versare allo skipper: ${euro(payableCents)} (posto/cabina + assicurazione cauzione)`);
+    paymentRows.push(locale === 'en'
+      ? `• Pay to the skipper now: ${euro(payableCents)} (berth + deposit-protection insurance)`
+      : `• Da versare ora allo skipper: ${euro(payableCents)} (posto/cabina + assicurazione cauzione)`);
   }
   if (starterPackCents > 0) {
-    rows.push(locale === 'en'
-      ? `• Starter Pack: ${euro(starterPackCents)} · cash on board${starterPackContents ? ` (${starterPackContents})` : ''}`
-      : `• Starter Pack: ${euro(starterPackCents)} · contanti a bordo${starterPackContents ? ` (${starterPackContents})` : ''}`);
+    paymentRows.push(locale === 'en'
+      ? `• Starter Pack, cash on board: ${euro(starterPackCents)}${starterPackContents ? ` (${starterPackContents})` : ''}`
+      : `• Starter Pack, contanti a bordo: ${euro(starterPackCents)}${starterPackContents ? ` (${starterPackContents})` : ''}`);
   }
+  const depositRows = [];
   if (refundableDepositCents > 0) {
-    rows.push(locale === 'en'
-      ? `• Refundable security deposit: ${euro(refundableDepositCents)} · cash at boarding (not a final cost)`
-      : `• Cauzione rimborsabile: ${euro(refundableDepositCents)} · contanti all’imbarco (non è un costo finale)`);
-  }
-  if (starterPackCents + refundableDepositCents > 0) {
-    rows.push(locale === 'en'
-      ? `• Cash to bring on board: ${euro(starterPackCents + refundableDepositCents)}`
-      : `• Contanti da portare a bordo: ${euro(starterPackCents + refundableDepositCents)}`);
+    depositRows.push(locale === 'en'
+      ? `• Cash at boarding. It is separate from the participation total and is not a final cost.`
+      : `• Contanti all’imbarco. È separata dal totale della partecipazione e non è un costo finale.`);
   }
   const heading = locale === 'en'
     ? 'Your participation summary:'
     : 'Riepilogo della tua partecipazione:';
-  return `\n\n${[heading, ...rows].join('\n')}`;
+  const participationHeading = participationCents > 0
+    ? (locale === 'en' ? `*Total participation: ${euro(participationCents)}*` : `*Totale partecipazione: ${euro(participationCents)}*`)
+    : '';
+  const depositHeading = refundableDepositCents > 0
+    ? (locale === 'en' ? `*Refundable security deposit: ${euro(refundableDepositCents)}*` : `*Cauzione rimborsabile: ${euro(refundableDepositCents)}*`)
+    : '';
+  const blocks = [
+    [heading, ...reservationRows].join('\n'),
+    participationHeading ? [participationHeading, ...paymentRows].join('\n') : '',
+    depositHeading ? [depositHeading, ...depositRows].join('\n') : '',
+  ].filter(Boolean);
+  return `\n\n${blocks.join('\n\n')}`;
 }
 
 function paymentTripBreakdownMessage(payment, locale) {
