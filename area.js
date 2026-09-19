@@ -3243,9 +3243,15 @@ function prefersNativeMacWhatsapp() {
   return /Macintosh/i.test(navigator.userAgent || '') && Number(navigator.maxTouchPoints || 0) === 0;
 }
 
+function isMobileWhatsAppDevice() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+}
+
 function selectWhatsappUrl(links, mode = 'preferred') {
   if (mode === 'native') return links.nativeUrl;
   if (mode === 'web') return links.webUrl;
+  // iPhone e Android ricevono il link universale wa.me da un tocco reale
+  // dell'utente; se WhatsApp non è installata, rimane un fallback web.
   return prefersNativeMacWhatsapp() ? links.nativeUrl : links.webUrl;
 }
 
@@ -3268,17 +3274,6 @@ function whatsappUrl(invite, { mode = 'preferred' } = {}) {
     ? `Hi ${invite.displayName} 🌊\n\nI have reserved your place for Egadi Sailing Experience, from 8 to 11 October 2026.${tripSummary}\n\nOpen your personal area: ${personalUrl}\n\nConfirm the WhatsApp number that received this invitation, choose a six-digit personal code and read the onboard rules. Once inside, you will find this same summary again, clearly split between your agreed contribution and the cash to bring on board. You do not need a second invitation.\n\nThe website does not collect money. For the transfer, use the method you agree with the skipper; if you have already paid, let them know so they can confirm it.\n\nBefore activating access, please read Privacy & data: ${privacyUrl}`
     : `Ciao ${invite.displayName} 🌊\n\nTi ho riservato il tuo posto per Egadi Sailing Experience, dall’8 all’11 ottobre 2026.${tripSummary}\n\nApri la tua area personale: ${personalUrl}\n\nConferma il numero WhatsApp che ha ricevuto l’invito, scegli un codice personale di 6 cifre e leggi le regole di bordo. Una volta dentro ritroverai questo stesso riepilogo, con la distinzione chiara tra quota concordata e contanti da portare a bordo. Non serve un secondo invito.\n\nIl sito non riceve denaro: per il versamento usa il metodo che concorderai con lo skipper; se hai già versato, avvisalo così potrà confermarlo.\n\nPrima di attivarlo puoi leggere Privacy e dati: ${privacyUrl}`;
   return selectWhatsappUrl(whatsappLinks(number, message), mode);
-}
-
-function openInviteWhatsApp(invite, { mode = 'preferred' } = {}) {
-  const url = whatsappUrl(invite, { mode });
-  if (!url) return false;
-  // Su iPhone il link universale wa.me viene consegnato all'app WhatsApp se
-  // installata. Su macOS il percorso preferito resta invece whatsapp://.
-  // Usiamo la stessa scheda per non perdere il gesto diretto dell'utente.
-  if (mode === 'web') window.open(url, '_blank', 'noopener');
-  else window.location.assign(url);
-  return true;
 }
 
 function inviteForRecipient(recipientId) {
@@ -5145,6 +5140,14 @@ function projectionActionTextButton(attribute, id, label, icon, tone = '') {
   return `<button class="${classes.join(' ')}" type="button" data-${attribute}="${escapeHtml(id)}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></button>`;
 }
 
+function projectionActionLink(url, label, icon, tone = '', { newTab = false } = {}) {
+  if (!url) return '';
+  const classes = ['projection-action'];
+  if (tone) classes.push(`projection-action-${tone}`);
+  const target = newTab ? ' target="_blank" rel="noopener"' : '';
+  return `<a class="${classes.join(' ')}" href="${escapeHtml(url)}"${target} aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></a>`;
+}
+
 function projectionCabinControl(projection) {
   if (projection.berthType !== 'double_cabin') return '';
   const cabinGroupId = projectionCabinGroupId(projection);
@@ -5177,8 +5180,8 @@ function projectionCardActions(projection, invite) {
   }
   if (invite.status === 'pending' && invite.accessKey) {
     actions.push(projectionActionButton('copy-invite', invite.id, `Copia il link personale di ${projection.displayName}`, '⧉'));
-    actions.push(projectionActionTextButton('whatsapp-invite', invite.id, 'WhatsApp app', whatsappIconSvg(), 'primary'));
-    actions.push(projectionActionTextButton('whatsapp-invite-web', invite.id, 'WhatsApp Web', '↗'));
+    actions.push(projectionActionLink(whatsappUrl(invite), 'WhatsApp app', whatsappIconSvg(), 'primary'));
+    if (!isMobileWhatsAppDevice()) actions.push(projectionActionLink(whatsappUrl(invite, { mode: 'web' }), 'WhatsApp Web', '↗', '', { newTab: true }));
   }
   actions.push(projectionActionButton('reissue-invite', invite.id, `Revoca e genera un nuovo link per ${projection.displayName}`, '↻', 'release'));
   return actions.join('');
@@ -5272,8 +5275,8 @@ function renderLegacyInviteCard(invite, { isOpen = false } = {}) {
   if (linkable) actions.push(projectionActionButton('link-legacy-invite', invite.id, `Completa la scheda di ${invite.displayName}`, '✎', 'primary'));
   if (linkReady) {
     actions.push(projectionActionButton('copy-invite', invite.id, `Copia il link personale di ${invite.displayName}`, '⧉'));
-    actions.push(projectionActionTextButton('whatsapp-invite', invite.id, 'WhatsApp app', whatsappIconSvg(), 'primary'));
-    actions.push(projectionActionTextButton('whatsapp-invite-web', invite.id, 'WhatsApp Web', '↗'));
+    actions.push(projectionActionLink(whatsappUrl(invite), 'WhatsApp app', whatsappIconSvg(), 'primary'));
+    if (!isMobileWhatsAppDevice()) actions.push(projectionActionLink(whatsappUrl(invite, { mode: 'web' }), 'WhatsApp Web', '↗', '', { newTab: true }));
   }
   if (invite.status !== 'revoked') actions.push(projectionActionButton('reissue-invite', invite.id, `Revoca e genera un nuovo link per ${invite.displayName}`, '↻', 'release'));
   const instruction = linkable
@@ -5409,8 +5412,9 @@ function renderPayments(snapshot) {
     const statusActions = canUpdateStatus
       ? `<button class="text-button" type="button" data-verify-payment="${escapeHtml(payment.id)}">Conferma accredito</button><button class="text-button" type="button" data-cancel-payment="${escapeHtml(payment.id)}">Annulla richiesta</button>`
       : '';
-    const inviteAction = activeInvites.some((invite) => invite.id === recipientId && invite.status === 'pending' && invite.accessKey)
-      ? `<button class="text-button payment-action-control" type="button" data-whatsapp-invite="${escapeHtml(recipientId)}" title="Apri una bozza WhatsApp con l’invito">${whatsappActionIconMarkup()}<span>Invia invito WhatsApp</span></button>`
+    const pendingInvite = activeInvites.find((invite) => invite.id === recipientId && invite.status === 'pending' && invite.accessKey);
+    const inviteAction = pendingInvite
+      ? `<a class="text-button payment-action-control" href="${escapeHtml(whatsappUrl(pendingInvite))}" title="Apri una bozza WhatsApp con l’invito">${whatsappActionIconMarkup()}<span>Invia invito WhatsApp</span></a>`
       : '';
     const paymentMessageAction = !manualReceipt && paymentRecipientWhatsappNumber(recipientId)
       ? `<button class="text-button payment-action-control" type="button" data-whatsapp-payment="${escapeHtml(payment.id)}" title="Apri una bozza nell’app WhatsApp">${whatsappActionIconMarkup()}<span>Apri nell’app WhatsApp</span></button>`
@@ -6438,13 +6442,10 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     }
     return;
   }
-  const inviteAction = event.target.closest('[data-copy-invite], [data-whatsapp-invite], [data-whatsapp-invite-web]');
-  const inviteId = inviteAction?.dataset.copyInvite
-    || inviteAction?.dataset.whatsappInvite
-    || inviteAction?.dataset.whatsappInviteWeb;
-  const invite = activeInvites.find((candidate) => candidate.id === inviteId);
   const copyButton = event.target.closest('[data-copy-invite]');
-  if (copyButton && invite) {
+  if (copyButton) {
+    const invite = activeInvites.find((candidate) => candidate.id === copyButton.dataset.copyInvite);
+    if (!invite) return;
     try {
       await navigator.clipboard.writeText(participantUrl(invite));
       setMessage(message, 'Link personale copiato.');
@@ -6452,15 +6453,6 @@ document.querySelector('#projectionList').addEventListener('click', async (event
       setMessage(message, 'Non riesco a copiare il link. Verifica i permessi del browser.', true);
     }
     return;
-  }
-  const whatsappButton = event.target.closest('[data-whatsapp-invite]');
-  if (whatsappButton && invite) {
-    if (!openInviteWhatsApp(invite)) setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
-    return;
-  }
-  const whatsappWebButton = event.target.closest('[data-whatsapp-invite-web]');
-  if (whatsappWebButton && invite) {
-    if (!openInviteWhatsApp(invite, { mode: 'web' })) setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
   }
 });
 
@@ -7401,12 +7393,6 @@ paymentForm.addEventListener('submit', async (event) => {
 document.querySelector('#paymentList').addEventListener('click', async (event) => {
   const message = paymentReviewMessageTarget();
   if (blockPrivateAction(message)) return;
-  const whatsappButton = event.target.closest('[data-whatsapp-invite]');
-  if (whatsappButton) {
-    const invite = activeInvites.find((candidate) => candidate.id === whatsappButton.dataset.whatsappInvite);
-    if (!invite || !openInviteWhatsApp(invite)) setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
-    return;
-  }
   const paymentWhatsappButton = event.target.closest('[data-whatsapp-payment]');
   if (paymentWhatsappButton) {
     const payment = activePayments.find((candidate) => candidate.id === paymentWhatsappButton.dataset.whatsappPayment);

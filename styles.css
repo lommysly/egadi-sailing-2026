@@ -218,7 +218,7 @@ body.menu-open { overflow:hidden; }
 .projection-payment-balance .projection-payment-balance-open b { color:#087b8a; }
 .projection-payment-balance .projection-payment-balance-warning { grid-column:1 / -1; color:#986914 !important; }
 .projection-actions { grid-area:actions; display:flex; flex-wrap:wrap; gap:7px; padding-top:2px; }
-.projection-action { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:6px 10px; border:1px solid rgba(8,123,138,.24); border-radius:999px; background:white; color:#16494f; cursor:pointer; font:700 .69rem "DM Sans",sans-serif; transition:transform .18s ease,background .18s ease,border-color .18s ease; }
+.projection-action { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:6px 10px; border:1px solid rgba(8,123,138,.24); border-radius:999px; background:white; color:#16494f; cursor:pointer; font:700 .69rem "DM Sans",sans-serif; text-decoration:none; transition:transform .18s ease,background .18s ease,border-color .18s ease; }
 .projection-action:hover { transform:translateY(-1px); border-color:#087b8a; background:#eafbfa; }
 .projection-action:focus-visible { outline:3px solid rgba(8,123,138,.28); outline-offset:2px; }
 .projection-action:disabled { cursor:wait; opacity:.6; transform:none; }
