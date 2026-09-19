@@ -108,11 +108,6 @@ body.menu-open { overflow:hidden; }
 .payment-profile-details { display:grid; gap:10px; }
 .payment-bank-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 @media (max-width:640px) { .payment-bank-fields { grid-template-columns:1fr; } }
-@media (max-width:640px) {
-  .projection-editor-toolbar,.projection-editor-heading { display:grid; gap:12px; }
-  .projection-editor-toolbar .button { width:100%; margin-top:0; }
-  .projection-editor-heading .text-button { justify-self:start; margin-top:0; }
-}
 .payment-method-choice,.payment-method-selector > label { display:inline-flex !important; width:auto !important; grid-template-columns:none !important; align-items:center; gap:7px; min-height:34px; padding:7px 10px; border:1px solid rgba(7,59,76,.2); border-radius:999px; background:#eaf8f6; color:var(--ink); font-size:.78rem !important; font-weight:700; cursor:pointer; }
 .payment-method-choice input,.payment-method-selector > label input { width:15px !important; min-height:15px; margin:0; accent-color:#087b8a; }
 .payment-method-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
@@ -587,6 +582,7 @@ body.menu-open { overflow:hidden; }
 @media (max-width:430px) { .finance-overview-grid,.participant-finance-grid,.cost-result-grid,.cost-result-actions { grid-template-columns:1fr; }.projection-action { min-height:44px; }.projection-action-icon-only { width:44px; min-width:44px; } }
 @media (max-width:430px) { .projection-card > summary { padding:14px 15px; }.projection-card-summary-finance { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:8px; align-items:baseline; width:100%; }.projection-card-summary-finance > span { grid-column:1; }.projection-card-summary-finance > strong { grid-column:2; grid-row:1; margin:0; white-space:nowrap; }.projection-card-summary-finance > small { grid-column:1 / -1; } }
 @media (max-width:800px) { .charter-export { display:grid; align-items:start; } }
+@media (max-width:640px) { .projection-editor-toolbar,.projection-editor-heading { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }.projection-editor-toolbar .button { width:100%; margin-top:0; }.projection-editor-heading .text-button { justify-self:start; margin-top:0; } }
 
 /* Arrivi e partenze: la pagina pubblica spiega il flusso, senza raccogliere dati o contatti. */
 .transfer-main { padding-bottom:90px; }
