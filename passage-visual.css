@@ -81,6 +81,8 @@
 .passage-day-story { min-width:0; }
 .passage-day-story .passage-day-heading { min-height:96px; }
 .passage-day-plan { max-width:760px; margin:20px 0 0; line-height:1.6; }
+.passage-navigation { max-width:760px; margin:16px 0 0; padding:13px 15px; border-left:3px solid #1397a1; border-radius:0 11px 11px 0; background:#e2f6f3; color:#24565d; line-height:1.5; }
+.passage-navigation strong { display:block; margin-bottom:4px; color:#087b8a; font:500 .65rem "DM Mono",monospace; letter-spacing:.07em; text-transform:uppercase; }
 .passage-day-story .passage-overnight { margin:18px 0; }
 .passage-day-story .passage-alternative { margin:0; line-height:1.5; }
 

@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css?v=20260914-starter-pack-v4" />
-  <link rel="stylesheet" href="home-visual.css?v=20260911-homevisual1" />
+  <link rel="stylesheet" href="home-visual.css?v=20260919-countdown" />
 </head>
 <body class="home-page">
   <a class="skip-link" href="#main-content" data-i18n="page.shared.skipToContent">Vai al contenuto principale</a>
@@ -54,6 +54,16 @@
         <div class="hero-actions">
           <a class="button button-primary" href="passage-plan.html" data-i18n="page.index.heroAction">Come funziona il viaggio</a>
         </div>
+        <aside class="home-countdown" data-departure-countdown aria-live="polite" aria-atomic="true">
+          <span class="home-countdown-kicker" data-countdown-kicker>Partenza tra</span>
+          <div class="home-countdown-values" data-countdown-values role="timer" aria-label="Conto alla rovescia alla partenza">
+            <span><strong data-countdown-days>—</strong><small data-countdown-days-label>giorni</small></span>
+            <span><strong data-countdown-hours>—</strong><small data-countdown-hours-label>ore</small></span>
+            <span><strong data-countdown-minutes>—</strong><small data-countdown-minutes-label>minuti</small></span>
+          </div>
+          <p data-countdown-note>Giovedì 8 ottobre · ore 15:00 · Porto di Marsala</p>
+          <span class="visually-hidden" data-countdown-accessible></span>
+        </aside>
       </div>
       <div class="home-hero-mosaic" aria-label="Le acque e le isole della rotta Egadi" data-i18n-attr="aria-label:page.index.heroMosaicLabel">
         <figure class="home-photo home-photo-primary home-video-frame" aria-label="Mare e vela in movimento" data-i18n-attr="aria-label:page.index.heroVideoLabel">
@@ -189,8 +199,9 @@
   </footer>
   <script src="home-motion.js?v=20260911-motion1"></script>
   <script src="i18n.js?v=20260914-en2"></script>
-  <script src="i18n-public-core.js?v=20260914-editorial3"></script>
+  <script src="i18n-public-core.js?v=20260919-passage-t19b"></script>
   <script src="i18n-public-support.js?v=20260914-editorial3"></script>
   <script src="app.js?v=20260914-en2"></script>
+  <script src="countdown.js?v=20260919-departure2"></script>
 </body>
 </html>

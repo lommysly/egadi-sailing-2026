@@ -26,6 +26,7 @@
       operationalWeather: 'Meteo operativo',
       awaitingWindow: 'In attesa della finestra utile.',
       awaitingWindowText: 'Vento, mare, temperature e correnti arriveranno con fonte, ora di emissione e validità.',
+      navigation: 'Come si naviga oggi',
       sun: 'Sole',
       moon: 'Luna',
       wind: 'Vento',
@@ -64,6 +65,7 @@
       operationalWeather: 'Operational weather',
       awaitingWindow: 'Waiting for the useful weather window.',
       awaitingWindowText: 'Wind, sea state, temperatures and currents will be published with source, issue time and validity.',
+      navigation: 'How we sail today',
       sun: 'Sun',
       moon: 'Moon',
       wind: 'Wind',
@@ -198,11 +200,13 @@
   }
 
   const planningMode = data.dataMode === 'planning';
+  const weatherNoticeTitle = data.weatherNoticeTitle || copy.awaitingWindow;
+  const weatherNoticeText = data.weatherNoticeText || copy.awaitingWindowText;
   const operationalData = (day) => planningMode ? `
     <section class="passage-weather-pending" aria-label="${escapeHtml(copy.operationalWeatherLabel)}">
       <span>${escapeHtml(copy.operationalWeather)}</span>
-      <strong>${escapeHtml(copy.awaitingWindow)}</strong>
-      <p>${escapeHtml(copy.awaitingWindowText)}</p>
+      <strong>${escapeHtml(weatherNoticeTitle)}</strong>
+      <p>${escapeHtml(weatherNoticeText)}</p>
     </section>
     <dl class="passage-data-grid passage-astronomy-grid">
       <div><dt>${escapeHtml(copy.sun)}</dt><dd>${escapeHtml(day.sun)}</dd></div>
@@ -250,6 +254,7 @@
               <h2>${escapeHtml(day.route)}</h2>
             </div>
             <p class="passage-day-plan">${escapeHtml(day.plan)}</p>
+            ${day.navigation ? `<p class="passage-navigation"><strong>${escapeHtml(copy.navigation)}</strong>${escapeHtml(day.navigation)}</p>` : ''}
             <p class="passage-overnight"><span class="passage-overnight-meta">${escapeHtml(day.overnightType || copy.overnightUndefined)} · ${escapeHtml(day.overnightStatus || copy.overnightStatus)}</span><strong>${escapeHtml(copy.indicativeOvernight)}</strong> ${escapeHtml(day.overnight)}</p>
             <p class="passage-alternative"><strong>${escapeHtml(copy.alternative)}</strong> ${escapeHtml(day.alternative)}</p>
           </div>

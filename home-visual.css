@@ -27,6 +27,60 @@
   font-size: clamp(1.02rem, 1.35vw, 1.18rem);
 }
 
+.home-countdown {
+  display: inline-grid;
+  gap: 9px;
+  margin-top: 25px;
+  padding: 14px 16px;
+  border: 1px solid rgba(7, 91, 108, .18);
+  border-radius: 16px;
+  background: rgba(232, 251, 249, .82);
+  box-shadow: 0 14px 32px rgba(7, 59, 76, .08);
+}
+
+.home-countdown-kicker {
+  color: #087b8a;
+  font: 500 .64rem/1.2 "DM Mono", monospace;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.home-countdown-values {
+  display: flex;
+  gap: 14px;
+}
+
+.home-countdown-values > span {
+  display: grid;
+  min-width: 48px;
+  gap: 2px;
+}
+
+.home-countdown-values strong {
+  color: #073b4c;
+  font: 600 clamp(1.65rem, 3vw, 2.25rem)/.95 "Fraunces", serif;
+  letter-spacing: -.055em;
+}
+
+.home-countdown-values small {
+  color: #416b6d;
+  font: 500 .59rem/1.1 "DM Mono", monospace;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.home-countdown p {
+  margin: 0;
+  color: #315e61;
+  font-size: .76rem;
+  line-height: 1.4;
+}
+
+.home-countdown[data-state="sailing"],
+.home-countdown[data-state="finished"] {
+  max-width: 320px;
+}
+
 .home-hero-mosaic {
   position: relative;
   min-height: 570px;
@@ -502,6 +556,10 @@
   .home-page .home-hero {
     min-height: 0;
     padding-bottom: 48px;
+  }
+
+  .home-countdown {
+    margin-top: 22px;
   }
 
   .home-hero-mosaic {
