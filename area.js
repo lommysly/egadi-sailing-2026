@@ -3207,6 +3207,13 @@ function participantPrivacyUrl(invite) {
   return url.toString();
 }
 
+function publicJourneyUrl() {
+  const url = new URL('index.html', window.location.href);
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+}
+
 function participantUrl(invite) {
   if (!invite?.accessKey) return '';
   const url = new URL('participant.html', window.location.href);
@@ -3255,9 +3262,11 @@ function whatsappUrl(invite, { mode = 'preferred' } = {}) {
   const personalUrl = participantUrl(invite);
   if (!number || !personalUrl) return '';
   const privacyUrl = participantPrivacyUrl(invite);
-  const message = inviteLocale(invite) === 'en'
-    ? `Hi ${invite.displayName}, here is your personal test invitation to the Egadi private area. Open the link, confirm your WhatsApp number and choose a six-digit personal code: ${personalUrl}\n\nBefore activating access, please read Privacy & data: ${privacyUrl}\n\nThe private area is still being tested. Until the final privacy notice is published, please use fictitious data only.`
-    : `Ciao ${invite.displayName}, ecco il tuo invito personale di prova per l’area Egadi. Apri il link, conferma il numero WhatsApp e scegli un codice personale di 6 cifre: ${personalUrl}\n\nPrima di attivarlo puoi leggere Privacy e dati: ${privacyUrl}\n\nL’area è in test: fino alla pubblicazione dell’informativa finale inserisci esclusivamente dati fittizi.`;
+  const locale = inviteLocale(invite);
+  const tripSummary = invitationTripBreakdownMessage(invite, locale);
+  const message = locale === 'en'
+    ? `Hi ${invite.displayName} 🌊\n\nI have reserved your place for Egadi Sailing Experience, from 8 to 11 October 2026.${tripSummary}\n\nOpen your personal area: ${personalUrl}\n\nConfirm the WhatsApp number that received this invitation, choose a six-digit personal code and read the onboard rules. In your area you will find this summary again, the boat updates and your personal requests.\n\nBefore activating access, please read Privacy & data: ${privacyUrl}\n\nThe private area is still being tested. Until the final privacy notice is published, please use fictitious data only.`
+    : `Ciao ${invite.displayName} 🌊\n\nTi ho riservato il tuo posto per Egadi Sailing Experience, dall’8 all’11 ottobre 2026.${tripSummary}\n\nApri la tua area personale: ${personalUrl}\n\nConferma il numero WhatsApp che ha ricevuto l’invito, scegli un codice personale di 6 cifre e leggi le regole di bordo. Nella tua area ritroverai questo riepilogo, le comunicazioni della barca e le tue richieste personali.\n\nPrima di attivarlo puoi leggere Privacy e dati: ${privacyUrl}\n\nL’area è in test: fino alla pubblicazione dell’informativa finale inserisci esclusivamente dati fittizi.`;
   return selectWhatsappUrl(whatsappLinks(number, message), mode);
 }
 
@@ -3311,6 +3320,82 @@ function starterPackContentsForPaymentMessage(value, locale) {
     .filter(Boolean);
   if (!labels.length) return '';
   return locale === 'en' ? `includes ${labels.join(', ')}` : `include ${labels.join(', ')}`;
+}
+
+function invitationAccommodationLabel(projection, locale) {
+  const labels = locale === 'en'
+    ? {
+      double_cabin: 'double cabin berth',
+      single_cabin: 'single cabin berth',
+      dinette: 'convertible dinette berth',
+      other: 'other berth',
+    }
+    : {
+      double_cabin: 'posto in cabina doppia',
+      single_cabin: 'posto in cabina singola',
+      dinette: 'posto in dinette trasformabile',
+      other: 'altro posto letto',
+    };
+  return labels[projection?.berthType] || '';
+}
+
+function invitationTripBreakdownMessage(invite, locale) {
+  const projection = projectionForPaymentRecipient(invite?.id);
+  if (!projection) return '';
+
+  const summary = projectionCostBreakdown(projection);
+  const { normalized, payableCents, starterPackCents, refundableDepositCents } = summary;
+  const berthCents = normalized.berthCents;
+  const insuranceCents = normalized.protectionInsuranceCents;
+  const hasAnyAmount = berthCents > 0 || insuranceCents > 0 || starterPackCents > 0 || refundableDepositCents > 0;
+  const accommodation = invitationAccommodationLabel(projection, locale);
+  if (!hasAnyAmount && !accommodation) return '';
+
+  const euro = (cents) => formatCurrency(cents / 100, locale);
+  const starterPackItems = normalizeStarterPackItems(activeContributionPlan?.starterPackItems, {
+    fallbackToDefault: !Array.isArray(activeContributionPlan?.starterPackItems),
+  });
+  const starterPackContents = starterPackContentsForPaymentMessage(starterPackItems, locale);
+  const rows = [];
+  if (accommodation) {
+    rows.push(locale === 'en'
+      ? `• Reserved accommodation: ${accommodation}`
+      : `• Sistemazione prevista: ${accommodation}`);
+  }
+  if (berthCents > 0) {
+    rows.push(locale === 'en'
+      ? `• Berth: ${euro(berthCents)}`
+      : `• Posto/cabina: ${euro(berthCents)}`);
+  }
+  if (insuranceCents > 0) {
+    rows.push(locale === 'en'
+      ? `• Deposit-protection insurance: ${euro(insuranceCents)}`
+      : `• Assicurazione sulla cauzione: ${euro(insuranceCents)}`);
+  }
+  if (payableCents > 0) {
+    rows.push(locale === 'en'
+      ? `• Expected contribution to be requested separately: ${euro(payableCents)}`
+      : `• Quota prevista, richiesta con messaggio separato: ${euro(payableCents)}`);
+  }
+  if (starterPackCents > 0) {
+    rows.push(locale === 'en'
+      ? `• Starter Pack: ${euro(starterPackCents)} · cash on board${starterPackContents ? ` (${starterPackContents})` : ''}`
+      : `• Starter Pack: ${euro(starterPackCents)} · contanti a bordo${starterPackContents ? ` (${starterPackContents})` : ''}`);
+  }
+  if (refundableDepositCents > 0) {
+    rows.push(locale === 'en'
+      ? `• Refundable security deposit: ${euro(refundableDepositCents)} · cash at boarding (not a final cost)`
+      : `• Cauzione rimborsabile: ${euro(refundableDepositCents)} · contanti all’imbarco (non è un costo finale)`);
+  }
+  if (starterPackCents + refundableDepositCents > 0) {
+    rows.push(locale === 'en'
+      ? `• Cash to bring on board: ${euro(starterPackCents + refundableDepositCents)}`
+      : `• Contanti da portare a bordo: ${euro(starterPackCents + refundableDepositCents)}`);
+  }
+  const heading = locale === 'en'
+    ? 'Your expected participation summary:'
+    : 'Riepilogo previsto della tua partecipazione:';
+  return `\n\n${[heading, ...rows].join('\n')}`;
 }
 
 function paymentTripBreakdownMessage(payment, locale) {
@@ -3407,9 +3492,12 @@ function paymentWhatsappMessage(payment, { messageDetails = '', profile = active
   const detailsText = details.length
     ? (locale === 'en' ? `\n\nPayment details:\n${details.join('\n\n')}` : `\n\nDettagli per il pagamento:\n${details.join('\n\n')}`)
     : (locale === 'en' ? '\n\nFor details of the method you choose, reply to me here on WhatsApp.' : '\n\nPer i dettagli del metodo scelto, rispondimi qui su WhatsApp.');
+  const journeyLink = locale === 'en'
+    ? `\n\nJourney information: ${publicJourneyUrl()}`
+    : `\n\nInformazioni sul viaggio: ${publicJourneyUrl()}`;
   return locale === 'en'
-    ? `Hi ${recipientName(recipientId)} 🌊\n\nFor ${reason}, pay now: ${amount}.${dueDate}${methodText}${detailsText}${tripBreakdown}\n\nThe website does not receive payments. Once you have paid, please message me here so I can check the actual transfer. Thank you! ⛵`
-    : `Ciao ${recipientName(recipientId)} 🌊\n\nPer ${reason}, da versare ora: ${amount}.${dueDate}${methodText}${detailsText}${tripBreakdown}\n\nIl sito non riceve denaro: dopo il contributo avvisami qui, così controllo l’accredito reale. Grazie! ⛵`;
+    ? `Hi ${recipientName(recipientId)} 🌊\n\nFor ${reason}, pay now: ${amount}.${dueDate}${methodText}${detailsText}${tripBreakdown}${journeyLink}\n\nThe website does not receive payments. Once you have paid, please message me here so I can check the actual transfer. Thank you! ⛵`
+    : `Ciao ${recipientName(recipientId)} 🌊\n\nPer ${reason}, da versare ora: ${amount}.${dueDate}${methodText}${detailsText}${tripBreakdown}${journeyLink}\n\nIl sito non riceve denaro: dopo il contributo avvisami qui, così controllo l’accredito reale. Grazie! ⛵`;
 }
 
 function paymentWhatsappUrl(payment, { mode = 'preferred', ...messageOptions } = {}) {
@@ -5003,7 +5091,7 @@ function projectionCardActions(projection, invite) {
   }
   if (!invite) {
     actions.push(projectionActionButton('edit-projection-pricing', projection.id, `Imposta la quota prevista di ${projection.displayName}`, '€'));
-    actions.push(projectionActionButton('send-projection', projection.id, `Crea invito WhatsApp per ${projection.displayName}`, whatsappIconSvg(), 'primary'));
+    actions.push(projectionActionButton('send-projection', projection.id, `Crea invito WhatsApp con riepilogo previsto per ${projection.displayName}`, whatsappIconSvg(), 'primary'));
     actions.push(projectionActionButton('release-projection', projection.id, `Libera il posto di ${projection.displayName}`, '×', 'release'));
     return actions.join('');
   }
@@ -5016,7 +5104,7 @@ function projectionCardActions(projection, invite) {
   }
   if (invite.status === 'pending' && invite.accessKey) {
     actions.push(projectionActionButton('copy-invite', invite.id, `Copia il link personale di ${projection.displayName}`, '⧉'));
-    actions.push(projectionActionButton('whatsapp-invite', invite.id, `Apri WhatsApp per ${projection.displayName}`, whatsappIconSvg(), 'primary'));
+    actions.push(projectionActionButton('whatsapp-invite', invite.id, `Apri l’invito WhatsApp con riepilogo previsto per ${projection.displayName}`, whatsappIconSvg(), 'primary'));
   }
   actions.push(projectionActionButton('reissue-invite', invite.id, `Revoca e genera un nuovo link per ${projection.displayName}`, '↻', 'release'));
   return actions.join('');
@@ -6144,10 +6232,10 @@ document.querySelector('#projectionList').addEventListener('click', async (event
       const url = whatsappUrl(invite);
       if (whatsappWindow && url) {
         whatsappWindow.location.replace(url);
-        setMessage(message, `Invito pronto per ${projection.displayName}: WhatsApp è aperto con il messaggio già preparato. La scheda resta collegata allo stesso posto, ruolo, sistemazione e importo previsto.`);
+        setMessage(message, `Invito con riepilogo previsto pronto per ${projection.displayName}: WhatsApp è aperto con il messaggio già preparato. La scheda resta collegata allo stesso posto, ruolo, sistemazione e importo previsto.`);
       } else {
         whatsappWindow?.close();
-        setMessage(message, `Invito pronto per ${projection.displayName}: copia il link dalla sua card. La scheda resta collegata allo stesso posto, ruolo, sistemazione e importo previsto.`);
+        setMessage(message, `Invito con riepilogo previsto pronto per ${projection.displayName}: copia il link dalla sua card. La scheda resta collegata allo stesso posto, ruolo, sistemazione e importo previsto.`);
       }
     } catch (error) {
       whatsappWindow?.close();
