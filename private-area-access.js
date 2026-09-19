@@ -24,5 +24,5 @@ export function privateAreaBlockMessage() {
   if (!hasSecureTransport()) {
     return translate('crew.errors.httpsRequired', 'L’area privata è temporaneamente chiusa: per proteggere i dati personali serve prima un collegamento HTTPS valido. Non inserire dati qui.');
   }
-  return translate('crew.errors.privateAreaUnavailable', 'L’area privata è in preparazione: l’informativa privacy definitiva deve essere completata prima di raccogliere dati personali.');
+  return translate('crew.errors.privateAreaUnavailable', 'L’area privata non è disponibile in questo momento. Riprova tra poco oppure contatta lo skipper.');
 }

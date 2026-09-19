@@ -5,7 +5,7 @@ import { getBlob, getMetadata, getStorage, ref as storageRef, uploadBytesResumab
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, getMissingSkipperProfileFields, isBoatReadyForPdf, isCharterReady, isSkipperProfileCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260915-skipper-documents-v1';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
-import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260914-en2';
+import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260915-travel-card-v3';
@@ -3257,7 +3257,7 @@ function whatsappActionIconMarkup({ external = false } = {}) {
   return `<span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${external ? '<span class="whatsapp-action-external" aria-hidden="true">↗</span>' : ''}`;
 }
 
-function whatsappUrl(invite, { mode = 'web' } = {}) {
+function whatsappUrl(invite, { mode = 'native' } = {}) {
   const number = normalizeWhatsAppNumber(invite.whatsappNumber);
   const personalUrl = participantUrl(invite);
   if (!number || !personalUrl) return '';
@@ -3265,8 +3265,8 @@ function whatsappUrl(invite, { mode = 'web' } = {}) {
   const locale = inviteLocale(invite);
   const tripSummary = invitationTripBreakdownMessage(invite, locale);
   const message = locale === 'en'
-    ? `Hi ${invite.displayName} 🌊\n\nI have reserved your place for Egadi Sailing Experience, from 8 to 11 October 2026.${tripSummary}\n\nOpen your personal area: ${personalUrl}\n\nConfirm the WhatsApp number that received this invitation, choose a six-digit personal code and read the onboard rules. Once inside, you will find this same summary again, clearly split between your agreed contribution and the cash to bring on board. You do not need a second invitation.\n\nThe website does not collect money. For the transfer, use the method you agree with the skipper; if you have already paid, let them know so they can confirm it.\n\nBefore activating access, please read Privacy & data: ${privacyUrl}\n\nThe private area is still being tested. Until the final privacy notice is published, please use fictitious data only.`
-    : `Ciao ${invite.displayName} 🌊\n\nTi ho riservato il tuo posto per Egadi Sailing Experience, dall’8 all’11 ottobre 2026.${tripSummary}\n\nApri la tua area personale: ${personalUrl}\n\nConferma il numero WhatsApp che ha ricevuto l’invito, scegli un codice personale di 6 cifre e leggi le regole di bordo. Una volta dentro ritroverai questo stesso riepilogo, con la distinzione chiara tra quota concordata e contanti da portare a bordo. Non serve un secondo invito.\n\nIl sito non riceve denaro: per il versamento usa il metodo che concorderai con lo skipper; se hai già versato, avvisalo così potrà confermarlo.\n\nPrima di attivarlo puoi leggere Privacy e dati: ${privacyUrl}\n\nL’area è in test: fino alla pubblicazione dell’informativa finale inserisci esclusivamente dati fittizi.`;
+    ? `Hi ${invite.displayName} 🌊\n\nI have reserved your place for Egadi Sailing Experience, from 8 to 11 October 2026.${tripSummary}\n\nOpen your personal area: ${personalUrl}\n\nConfirm the WhatsApp number that received this invitation, choose a six-digit personal code and read the onboard rules. Once inside, you will find this same summary again, clearly split between your agreed contribution and the cash to bring on board. You do not need a second invitation.\n\nThe website does not collect money. For the transfer, use the method you agree with the skipper; if you have already paid, let them know so they can confirm it.\n\nBefore activating access, please read Privacy & data: ${privacyUrl}`
+    : `Ciao ${invite.displayName} 🌊\n\nTi ho riservato il tuo posto per Egadi Sailing Experience, dall’8 all’11 ottobre 2026.${tripSummary}\n\nApri la tua area personale: ${personalUrl}\n\nConferma il numero WhatsApp che ha ricevuto l’invito, scegli un codice personale di 6 cifre e leggi le regole di bordo. Una volta dentro ritroverai questo stesso riepilogo, con la distinzione chiara tra quota concordata e contanti da portare a bordo. Non serve un secondo invito.\n\nIl sito non riceve denaro: per il versamento usa il metodo che concorderai con lo skipper; se hai già versato, avvisalo così potrà confermarlo.\n\nPrima di attivarlo puoi leggere Privacy e dati: ${privacyUrl}`;
   return selectWhatsappUrl(whatsappLinks(number, message), mode);
 }
 
