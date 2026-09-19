@@ -3301,7 +3301,7 @@ function isBerthOrInsurancePayment(payment) {
     || payment?.contributionItemId === 'protection_insurance';
 }
 
-function starterPackContentsForPaymentMessage(value, locale) {
+function starterPackMessageItems(value, locale) {
   const englishLabels = {
     bed_linen: 'bed linen',
     bath_towels: 'bath towels',
@@ -3313,13 +3313,30 @@ function starterPackContentsForPaymentMessage(value, locale) {
     egadi_navigation_permit: 'Egadi navigation permit',
     tender: 'tender, if included by charter',
   };
-  const labels = normalizeStarterPackItems(value)
-    .map((itemId) => locale === 'en'
-      ? englishLabels[itemId]
-      : STARTER_PACK_ITEMS.find((item) => item.id === itemId)?.label)
-    .filter(Boolean);
-  if (!labels.length) return '';
-  return locale === 'en' ? `includes ${labels.join(', ')}` : `include ${labels.join(', ')}`;
+  return normalizeStarterPackItems(value)
+    .map((itemId) => ({
+      id: itemId,
+      label: locale === 'en'
+        ? englishLabels[itemId]
+        : STARTER_PACK_ITEMS.find((item) => item.id === itemId)?.label,
+    }))
+    .filter((item) => item.label);
+}
+
+function starterPackBulletRowsForPaymentMessage(value, locale) {
+  const icons = {
+    bed_linen: '🛏️',
+    bath_towels: '🧺',
+    bath_kit: '🧼',
+    beach_towel: '🏖️',
+    outboard: '🚤',
+    final_cleaning: '✨',
+    sup: '🏄',
+    egadi_navigation_permit: '🗺️',
+    tender: '🛟',
+  };
+  return starterPackMessageItems(value, locale)
+    .map((item) => `• ${icons[item.id] || '🎒'} ${item.label}`);
 }
 
 // Al momento dell'invito l'elenco del Pack viene fotografato insieme agli
@@ -3366,54 +3383,70 @@ function invitationTripBreakdownMessage(invite, locale) {
 
   const euro = (cents) => formatCurrency(cents / 100, locale);
   const starterPackItems = starterPackItemsForProjection(normalized);
-  const starterPackContents = starterPackContentsForPaymentMessage(starterPackItems, locale);
+  const starterPackBullets = starterPackBulletRowsForPaymentMessage(starterPackItems, locale);
   const reservationRows = [];
   if (accommodation) {
-    reservationRows.push(locale === 'en'
-      ? `• Reserved accommodation: ${accommodation}`
-      : `• Sistemazione prevista: ${accommodation}`);
+    reservationRows.push(`• ${accommodation}`);
   }
+  const costRows = [];
   if (berthCents > 0) {
-    reservationRows.push(locale === 'en'
+    costRows.push(locale === 'en'
       ? `• Berth: ${euro(berthCents)}`
       : `• Posto/cabina: ${euro(berthCents)}`);
   }
   if (insuranceCents > 0) {
-    reservationRows.push(locale === 'en'
+    costRows.push(locale === 'en'
       ? `• Deposit-protection insurance: ${euro(insuranceCents)}`
       : `• Assicurazione sulla cauzione: ${euro(insuranceCents)}`);
   }
   const participationCents = payableCents + starterPackCents;
-  const paymentRows = [];
-  if (payableCents > 0) {
-    paymentRows.push(locale === 'en'
-      ? `• Pay to the skipper now: ${euro(payableCents)} (berth + deposit-protection insurance)`
-      : `• Da versare ora allo skipper: ${euro(payableCents)} (posto/cabina + assicurazione cauzione)`);
-  }
+  const cashAtBoardCents = starterPackCents + refundableDepositCents;
   if (starterPackCents > 0) {
-    paymentRows.push(locale === 'en'
-      ? `• Starter Pack, cash on board: ${euro(starterPackCents)}${starterPackContents ? ` (${starterPackContents})` : ''}`
-      : `• Starter Pack, contanti a bordo: ${euro(starterPackCents)}${starterPackContents ? ` (${starterPackContents})` : ''}`);
+    costRows.push(locale === 'en'
+      ? `• Starter Pack: ${euro(starterPackCents)} · cash at boarding`
+      : `• Starter Pack: ${euro(starterPackCents)} · contanti all’imbarco`);
   }
-  const depositRows = [];
+  const starterPackRows = starterPackCents > 0
+    ? [
+      locale === 'en'
+        ? `*🎒 STARTER PACK: ${euro(starterPackCents)}*`
+        : `*🎒 STARTER PACK: ${euro(starterPackCents)}*`,
+      locale === 'en' ? 'Cash at boarding. It includes:' : 'Contanti all’imbarco. Comprende:',
+      ...starterPackBullets,
+    ]
+    : [];
+  const cashRows = [];
+  if (starterPackCents > 0) {
+    cashRows.push(locale === 'en'
+      ? `• 🎒 Starter Pack: ${euro(starterPackCents)} · already included in the weekend cost`
+      : `• 🎒 Starter Pack: ${euro(starterPackCents)} · già compreso nel costo del weekend`);
+  }
   if (refundableDepositCents > 0) {
-    depositRows.push(locale === 'en'
-      ? `• Cash at boarding. It is separate from the participation total and is not a final cost.`
-      : `• Contanti all’imbarco. È separata dal totale della partecipazione e non è un costo finale.`);
+    cashRows.push(locale === 'en'
+      ? `• 🔐 Refundable security deposit: ${euro(refundableDepositCents)}`
+      : `• 🔐 Cauzione rimborsabile: ${euro(refundableDepositCents)}`);
+    cashRows.push(locale === 'en'
+      ? 'The security deposit is a guarantee, not a final cost: the charter handles its return after check-out.'
+      : 'La cauzione è una garanzia, non una spesa finale: il charter ne gestisce la restituzione dopo il check-out.');
   }
   const heading = locale === 'en'
     ? 'Your participation summary:'
     : 'Riepilogo della tua partecipazione:';
   const participationHeading = participationCents > 0
-    ? (locale === 'en' ? `*Total participation: ${euro(participationCents)}*` : `*Totale partecipazione: ${euro(participationCents)}*`)
+    ? (locale === 'en' ? `*✨ COST OF YOUR WEEKEND: ${euro(participationCents)}*` : `*✨ COSTO DEL TUO WEEKEND: ${euro(participationCents)}*`)
     : '';
-  const depositHeading = refundableDepositCents > 0
-    ? (locale === 'en' ? `*Refundable security deposit: ${euro(refundableDepositCents)}*` : `*Cauzione rimborsabile: ${euro(refundableDepositCents)}*`)
+  const paymentHeading = payableCents > 0
+    ? (locale === 'en' ? `*💳 PAY THE SKIPPER NOW: ${euro(payableCents)}*` : `*💳 DA VERSARE ORA ALLO SKIPPER: ${euro(payableCents)}*`)
+    : '';
+  const cashHeading = cashAtBoardCents > 0
+    ? (locale === 'en' ? `*💶 CASH TO BRING AT BOARDING: ${euro(cashAtBoardCents)}*` : `*💶 CONTANTI DA PORTARE ALL’IMBARCO: ${euro(cashAtBoardCents)}*`)
     : '';
   const blocks = [
-    [heading, ...reservationRows].join('\n'),
-    participationHeading ? [participationHeading, ...paymentRows].join('\n') : '',
-    depositHeading ? [depositHeading, ...depositRows].join('\n') : '',
+    [heading, reservationRows.length ? (locale === 'en' ? '*🛏️ YOUR ACCOMMODATION*' : '*🛏️ LA TUA SISTEMAZIONE*') : '', ...reservationRows].filter(Boolean).join('\n'),
+    participationHeading ? [participationHeading, ...costRows, locale === 'en' ? 'The refundable security deposit is not included in this total.' : 'La cauzione rimborsabile non è compresa in questo totale.'].join('\n') : '',
+    paymentHeading ? [paymentHeading, locale === 'en' ? 'This covers the berth and deposit-protection insurance. The payment method is agreed directly with the skipper.' : 'Comprende posto/cabina e assicurazione sulla cauzione. Il metodo di pagamento viene concordato direttamente con lo skipper.'].join('\n') : '',
+    starterPackRows.join('\n'),
+    cashHeading ? [cashHeading, ...cashRows].join('\n') : '',
   ].filter(Boolean);
   return `\n\n${blocks.join('\n\n')}`;
 }
@@ -3435,7 +3468,7 @@ function paymentTripBreakdownMessage(payment, locale) {
 
   const euro = (cents) => formatCurrency(cents / 100, locale);
   const starterPackItems = starterPackItemsForProjection(normalized);
-  const starterPackContents = starterPackContentsForPaymentMessage(starterPackItems, locale);
+  const starterPackBullets = starterPackBulletRowsForPaymentMessage(starterPackItems, locale);
   const quoteRows = [];
   if (berthCents > 0) {
     quoteRows.push(locale === 'en'
@@ -3449,8 +3482,9 @@ function paymentTripBreakdownMessage(payment, locale) {
   }
   if (starterPackCents > 0) {
     quoteRows.push(locale === 'en'
-      ? `• Starter Pack: ${euro(starterPackCents)} · cash on board${starterPackContents ? ` (${starterPackContents})` : ''}`
-      : `• Starter Pack: ${euro(starterPackCents)} · contanti a bordo${starterPackContents ? ` (${starterPackContents})` : ''}`);
+      ? `• 🎒 Starter Pack: ${euro(starterPackCents)} · cash at boarding`
+      : `• 🎒 Starter Pack: ${euro(starterPackCents)} · contanti all’imbarco`);
+    quoteRows.push(...starterPackBullets);
   }
 
   const balanceRows = payableCents > 0
@@ -3471,17 +3505,19 @@ function paymentTripBreakdownMessage(payment, locale) {
       ? `• Requests already sent: ${euro(balance.pendingCents)} · they do not reduce the balance until verified.`
       : `• Richieste già inviate: ${euro(balance.pendingCents)} · non riducono il saldo finché non sono verificate.`);
   }
-  const depositLines = refundableDepositCents > 0
+  const depositLines = cashAtBoardCents > 0
     ? (locale === 'en'
       ? [
-        `• Refundable security deposit: ${euro(refundableDepositCents)} · cash at boarding`,
-        `Cash at boarding: ${euro(cashAtBoardCents)} in total${starterPackCents > 0 ? ` (${euro(starterPackCents)} Starter Pack + ${euro(refundableDepositCents)} refundable deposit)` : ''}.`,
-        'The refundable deposit is not a cost: it remains separate and is handled by the charter according to the onboard rules.',
+        `*💶 CASH TO BRING AT BOARDING: ${euro(cashAtBoardCents)}*`,
+        starterPackCents > 0 ? `• 🎒 Starter Pack: ${euro(starterPackCents)} · already included in the weekend cost` : '',
+        refundableDepositCents > 0 ? `• 🔐 Refundable security deposit: ${euro(refundableDepositCents)}` : '',
+        refundableDepositCents > 0 ? 'The security deposit is a guarantee, not a final cost: the charter handles its return after check-out.' : '',
       ]
       : [
-        `• Cauzione rimborsabile: ${euro(refundableDepositCents)} · contanti all’imbarco`,
-        `Contanti all’imbarco: ${euro(cashAtBoardCents)} in totale${starterPackCents > 0 ? ` (${euro(starterPackCents)} Starter Pack + ${euro(refundableDepositCents)} cauzione rimborsabile)` : ''}.`,
-        'La cauzione rimborsabile non è un costo: resta separata ed è gestita dal charter secondo le regole di bordo.',
+        `*💶 CONTANTI DA PORTARE ALL’IMBARCO: ${euro(cashAtBoardCents)}*`,
+        starterPackCents > 0 ? `• 🎒 Starter Pack: ${euro(starterPackCents)} · già compreso nel costo del weekend` : '',
+        refundableDepositCents > 0 ? `• 🔐 Cauzione rimborsabile: ${euro(refundableDepositCents)}` : '',
+        refundableDepositCents > 0 ? 'La cauzione è una garanzia, non una spesa finale: il charter ne gestisce la restituzione dopo il check-out.' : '',
       ])
     : [];
   const heading = locale === 'en'
