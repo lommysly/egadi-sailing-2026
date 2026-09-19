@@ -5148,10 +5148,10 @@ function projectionActionLink(url, label, icon, tone = '', { newTab = false } = 
   return `<a class="${classes.join(' ')}" href="${escapeHtml(url)}"${target} aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></a>`;
 }
 
-function inviteDeliveryActions(invite, displayName) {
+function inviteDeliveryActions(invite) {
   if (!isInvitationLinkReady(invite)) return [];
   return [
-    projectionActionTextButton('copy-invite', invite.id, `Copia il link personale di ${displayName}`, '⧉'),
+    projectionActionTextButton('copy-invite', invite.id, 'Copia link', '⧉'),
     projectionActionLink(whatsappUrl(invite), 'Apri WhatsApp', whatsappIconSvg(), 'primary'),
     projectionActionLink(whatsappUrl(invite, { mode: 'web' }), 'WhatsApp Web', '↗', '', { newTab: true }),
   ];
@@ -5197,7 +5197,7 @@ function projectionCardActions(projection, invite) {
   if (projection.pricingMode === 'dashboard') {
     actions.push(projectionActionButton('refresh-projection-pricing', projection.id, `Aggiorna gli importi di ${projection.displayName} dalla dashboard attuale`, '⟳'));
   }
-  const deliveryActions = inviteDeliveryActions(invite, projection.displayName);
+  const deliveryActions = inviteDeliveryActions(invite);
   if (deliveryActions.length) {
     actions.push(...deliveryActions);
     actions.push(inviteRenewalAction(invite, projection.displayName, { compact: true }));
@@ -5291,7 +5291,7 @@ function renderLegacyInviteCard(invite, { isOpen = false } = {}) {
       ? 'Invito scaduto · rinnova il link prima di completare la scheda'
       : 'Invito già creato · completa la scheda persona';
   const actions = [];
-  const deliveryActions = inviteDeliveryActions(invite, invite.displayName);
+  const deliveryActions = inviteDeliveryActions(invite);
   if (deliveryActions.length) {
     actions.push(...deliveryActions);
     actions.push(inviteRenewalAction(invite, invite.displayName, { compact: true }));
