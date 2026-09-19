@@ -3257,7 +3257,7 @@ function whatsappActionIconMarkup({ external = false } = {}) {
   return `<span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${external ? '<span class="whatsapp-action-external" aria-hidden="true">↗</span>' : ''}`;
 }
 
-function whatsappUrl(invite, { mode = 'native' } = {}) {
+function whatsappUrl(invite, { mode = 'preferred' } = {}) {
   const number = normalizeWhatsAppNumber(invite.whatsappNumber);
   const personalUrl = participantUrl(invite);
   if (!number || !personalUrl) return '';
@@ -3268,6 +3268,17 @@ function whatsappUrl(invite, { mode = 'native' } = {}) {
     ? `Hi ${invite.displayName} 🌊\n\nI have reserved your place for Egadi Sailing Experience, from 8 to 11 October 2026.${tripSummary}\n\nOpen your personal area: ${personalUrl}\n\nConfirm the WhatsApp number that received this invitation, choose a six-digit personal code and read the onboard rules. Once inside, you will find this same summary again, clearly split between your agreed contribution and the cash to bring on board. You do not need a second invitation.\n\nThe website does not collect money. For the transfer, use the method you agree with the skipper; if you have already paid, let them know so they can confirm it.\n\nBefore activating access, please read Privacy & data: ${privacyUrl}`
     : `Ciao ${invite.displayName} 🌊\n\nTi ho riservato il tuo posto per Egadi Sailing Experience, dall’8 all’11 ottobre 2026.${tripSummary}\n\nApri la tua area personale: ${personalUrl}\n\nConferma il numero WhatsApp che ha ricevuto l’invito, scegli un codice personale di 6 cifre e leggi le regole di bordo. Una volta dentro ritroverai questo stesso riepilogo, con la distinzione chiara tra quota concordata e contanti da portare a bordo. Non serve un secondo invito.\n\nIl sito non riceve denaro: per il versamento usa il metodo che concorderai con lo skipper; se hai già versato, avvisalo così potrà confermarlo.\n\nPrima di attivarlo puoi leggere Privacy e dati: ${privacyUrl}`;
   return selectWhatsappUrl(whatsappLinks(number, message), mode);
+}
+
+function openInviteWhatsApp(invite, { mode = 'preferred' } = {}) {
+  const url = whatsappUrl(invite, { mode });
+  if (!url) return false;
+  // Su iPhone il link universale wa.me viene consegnato all'app WhatsApp se
+  // installata. Su macOS il percorso preferito resta invece whatsapp://.
+  // Usiamo la stessa scheda per non perdere il gesto diretto dell'utente.
+  if (mode === 'web') window.open(url, '_blank', 'noopener');
+  else window.location.assign(url);
+  return true;
 }
 
 function inviteForRecipient(recipientId) {
@@ -6444,16 +6455,12 @@ document.querySelector('#projectionList').addEventListener('click', async (event
   }
   const whatsappButton = event.target.closest('[data-whatsapp-invite]');
   if (whatsappButton && invite) {
-    const url = whatsappUrl(invite);
-    if (url) window.open(url, '_blank', 'noopener');
-    else setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
+    if (!openInviteWhatsApp(invite)) setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
     return;
   }
   const whatsappWebButton = event.target.closest('[data-whatsapp-invite-web]');
   if (whatsappWebButton && invite) {
-    const url = whatsappUrl(invite, { mode: 'web' });
-    if (url) window.open(url, '_blank', 'noopener');
-    else setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
+    if (!openInviteWhatsApp(invite, { mode: 'web' })) setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
   }
 });
 
@@ -7397,9 +7404,7 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
   const whatsappButton = event.target.closest('[data-whatsapp-invite]');
   if (whatsappButton) {
     const invite = activeInvites.find((candidate) => candidate.id === whatsappButton.dataset.whatsappInvite);
-    const url = invite && whatsappUrl(invite);
-    if (url) window.open(url, '_blank', 'noopener');
-    else setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
+    if (!invite || !openInviteWhatsApp(invite)) setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
     return;
   }
   const paymentWhatsappButton = event.target.closest('[data-whatsapp-payment]');
