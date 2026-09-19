@@ -3243,10 +3243,6 @@ function prefersNativeMacWhatsapp() {
   return /Macintosh/i.test(navigator.userAgent || '') && Number(navigator.maxTouchPoints || 0) === 0;
 }
 
-function isMobileWhatsAppDevice() {
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-}
-
 function selectWhatsappUrl(links, mode = 'preferred') {
   if (mode === 'native') return links.nativeUrl;
   if (mode === 'web') return links.webUrl;
@@ -4413,14 +4409,18 @@ function projectionMatchesInvite(projection, inviteId) {
     && projection.inviteId === inviteId;
 }
 
+function isInvitationLinkReady(invite) {
+  return invite?.status === 'pending'
+    && typeof invite.accessKey === 'string'
+    && invite.accessKey.length === 48
+    && Boolean(invite.expiresAt?.toDate)
+    && invite.expiresAt.toDate() > new Date();
+}
+
 function isLegacyInviteLinkable(invite) {
   if (!invite?.createdAt?.toDate) return false;
   if (invite.status === 'active') return true;
-  return invite.status === 'pending'
-    && Boolean(invite.expiresAt?.toDate)
-    && invite.expiresAt.toDate() > new Date()
-    && typeof invite.accessKey === 'string'
-    && invite.accessKey.length === 48;
+  return isInvitationLinkReady(invite);
 }
 
 function projectionInvite(projection) {
@@ -5148,6 +5148,25 @@ function projectionActionLink(url, label, icon, tone = '', { newTab = false } = 
   return `<a class="${classes.join(' ')}" href="${escapeHtml(url)}"${target} aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></a>`;
 }
 
+function inviteDeliveryActions(invite, displayName) {
+  if (!isInvitationLinkReady(invite)) return [];
+  return [
+    projectionActionTextButton('copy-invite', invite.id, `Copia il link personale di ${displayName}`, '⧉'),
+    projectionActionLink(whatsappUrl(invite), 'Apri WhatsApp', whatsappIconSvg(), 'primary'),
+    projectionActionLink(whatsappUrl(invite, { mode: 'web' }), 'WhatsApp Web', '↗', '', { newTab: true }),
+  ];
+}
+
+function inviteRenewalAction(invite, displayName, { compact = false } = {}) {
+  const activeAccess = invite.status === 'active';
+  const label = activeAccess
+    ? `Genera un nuovo link WhatsApp per ${displayName}: revoca l’accesso attuale`
+    : `Genera un nuovo link WhatsApp per ${displayName}`;
+  return compact
+    ? projectionActionButton('reissue-invite', invite.id, label, '↻', 'release')
+    : projectionActionTextButton('reissue-invite', invite.id, activeAccess ? 'Nuovo link · revoca il precedente' : 'Crea nuovo link WhatsApp', '↻', 'primary');
+}
+
 function projectionCabinControl(projection) {
   if (projection.berthType !== 'double_cabin') return '';
   const cabinGroupId = projectionCabinGroupId(projection);
@@ -5167,7 +5186,7 @@ function projectionCardActions(projection, invite) {
   }
   if (!invite) {
     actions.push(projectionActionButton('edit-projection-pricing', projection.id, `Imposta la quota prevista di ${projection.displayName}`, '€'));
-    actions.push(projectionActionTextButton('send-projection', projection.id, 'Crea link personale', '🔗', 'primary'));
+    actions.push(projectionActionTextButton('send-projection', projection.id, 'Crea link WhatsApp', '🔗', 'primary'));
     actions.push(projectionActionButton('release-projection', projection.id, `Libera il posto di ${projection.displayName}`, '×', 'release'));
     return actions.join('');
   }
@@ -5178,12 +5197,13 @@ function projectionCardActions(projection, invite) {
   if (projection.pricingMode === 'dashboard') {
     actions.push(projectionActionButton('refresh-projection-pricing', projection.id, `Aggiorna gli importi di ${projection.displayName} dalla dashboard attuale`, '⟳'));
   }
-  if (invite.status === 'pending' && invite.accessKey) {
-    actions.push(projectionActionButton('copy-invite', invite.id, `Copia il link personale di ${projection.displayName}`, '⧉'));
-    actions.push(projectionActionLink(whatsappUrl(invite), 'WhatsApp app', whatsappIconSvg(), 'primary'));
-    if (!isMobileWhatsAppDevice()) actions.push(projectionActionLink(whatsappUrl(invite, { mode: 'web' }), 'WhatsApp Web', '↗', '', { newTab: true }));
+  const deliveryActions = inviteDeliveryActions(invite, projection.displayName);
+  if (deliveryActions.length) {
+    actions.push(...deliveryActions);
+    actions.push(inviteRenewalAction(invite, projection.displayName, { compact: true }));
+  } else if (invite.status !== 'revoked') {
+    actions.push(inviteRenewalAction(invite, projection.displayName));
   }
-  actions.push(projectionActionButton('reissue-invite', invite.id, `Revoca e genera un nuovo link per ${projection.displayName}`, '↻', 'release'));
   return actions.join('');
 }
 
@@ -5264,7 +5284,6 @@ function renderProjectionCard(projection, { isOpen = false } = {}) {
 
 function renderLegacyInviteCard(invite, { isOpen = false } = {}) {
   const expired = invite.expiresAt?.toDate && invite.expiresAt.toDate() < new Date();
-  const linkReady = invite.status === 'pending' && !expired && invite.accessKey;
   const linkable = isLegacyInviteLinkable(invite);
   const status = invite.status === 'active'
     ? 'Accesso attivo · completa comunque la scheda equipaggio'
@@ -5272,16 +5291,19 @@ function renderLegacyInviteCard(invite, { isOpen = false } = {}) {
       ? 'Invito scaduto · rinnova il link prima di completare la scheda'
       : 'Invito già creato · completa la scheda persona';
   const actions = [];
-  if (linkable) actions.push(projectionActionButton('link-legacy-invite', invite.id, `Completa la scheda di ${invite.displayName}`, '✎', 'primary'));
-  if (linkReady) {
-    actions.push(projectionActionButton('copy-invite', invite.id, `Copia il link personale di ${invite.displayName}`, '⧉'));
-    actions.push(projectionActionLink(whatsappUrl(invite), 'WhatsApp app', whatsappIconSvg(), 'primary'));
-    if (!isMobileWhatsAppDevice()) actions.push(projectionActionLink(whatsappUrl(invite, { mode: 'web' }), 'WhatsApp Web', '↗', '', { newTab: true }));
+  const deliveryActions = inviteDeliveryActions(invite, invite.displayName);
+  if (deliveryActions.length) {
+    actions.push(...deliveryActions);
+    actions.push(inviteRenewalAction(invite, invite.displayName, { compact: true }));
+  } else if (invite.status !== 'revoked') {
+    actions.push(inviteRenewalAction(invite, invite.displayName));
   }
-  if (invite.status !== 'revoked') actions.push(projectionActionButton('reissue-invite', invite.id, `Revoca e genera un nuovo link per ${invite.displayName}`, '↻', 'release'));
+  if (linkable) actions.push(projectionActionButton('link-legacy-invite', invite.id, `Completa la scheda di ${invite.displayName}`, '✎', 'primary'));
   const instruction = linkable
     ? 'Aggiungi cognome, ruolo, sistemazione, cabina e importo previsto: il link personale resta identico.'
-    : 'Questo invito storico non è più collegabile: il suo accesso resta invariato.';
+    : invite.status === 'revoked'
+      ? 'Questo invito è stato revocato: crea una nuova scheda equipaggio se vuoi riservare di nuovo un posto.'
+      : 'Il link precedente non è più utilizzabile: scegli “Crea nuovo link WhatsApp”. Non serve modificare o salvare questa scheda.';
   return `<details class="projection-row projection-card projection-card-legacy" data-projection-card="${escapeHtml(legacyInviteCardKey(invite.id))}"${isOpen ? ' open' : ''}><summary class="projection-card-summary"><span class="projection-card-summary-person"><strong>${escapeHtml(invite.displayName)}</strong><span class="projection-row-assignment"><b>Ruolo:</b> da definire · <b>Sistemazione:</b> da definire</span><small>${escapeHtml(status)}</small></span><span class="projection-card-summary-finance"><span>Scheda da completare</span><strong>Importo da definire</strong><small>Apri la scheda</small></span><span class="projection-card-summary-toggle" aria-hidden="true">⌄</span></summary><div class="projection-card-body"><div class="projection-row-cost"><span class="projection-row-cost-label">Prima di inviare</span><span class="projection-row-cost-breakdown">${escapeHtml(instruction)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(invite.displayName)}">${actions.join('')}</div></div></details>`;
 }
 
@@ -6387,14 +6409,14 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     try {
       const invite = await createInviteFromProjection(projection);
       reflectCreatedProjectionInvite(projection, invite);
-      setMessage(message, `Link personale creato per ${projection.displayName}. La card è pronta: scegli “WhatsApp app” per l’app nativa oppure “WhatsApp Web” come alternativa.`);
+      setMessage(message, `Link WhatsApp creato per ${projection.displayName}. Ora scegli “Copia link”, “Apri WhatsApp” oppure “WhatsApp Web”.`);
     } catch (error) {
       sendButton.disabled = false;
       const fallback = error.code === 'phone-already-assigned'
         ? 'Questo numero è già associato a una barca dell’evento. Verifica prima con l’organizzatore.'
         : error.code === 'english-briefing-required'
           ? 'Prima di creare un invito in inglese, pubblica dalla bacheca la versione inglese ufficiale del briefing di sicurezza.'
-          : 'Non riesco a creare l’invito personale.';
+          : 'Non riesco a creare il link WhatsApp.';
       setMessage(message, getFirestoreErrorMessage(error, fallback), true);
     }
     return;
@@ -6426,7 +6448,7 @@ document.querySelector('#projectionList').addEventListener('click', async (event
   if (reissueButton) {
     const reissueInviteRecord = activeInvites.find((candidate) => candidate.id === reissueButton.dataset.reissueInvite);
     if (!reissueInviteRecord) return;
-    const confirmed = window.confirm(`Revocare l’accesso attuale di ${reissueInviteRecord.displayName} e inviare un nuovo link? Il vecchio codice personale smetterà di funzionare.`);
+    const confirmed = window.confirm(`Generare un nuovo link WhatsApp per ${reissueInviteRecord.displayName}? Il precedente accesso e il suo codice personale smetteranno di funzionare.`);
     if (!confirmed) return;
     reissueButton.disabled = true;
     try {
@@ -6435,10 +6457,10 @@ document.querySelector('#projectionList').addEventListener('click', async (event
       renderProjections({ syncFleet: false });
       const projection = activeProjections.find((candidate) => projectionMatchesInvite(candidate, renewedInvite.id));
       if (projection) openProjectionCard(projection.id);
-      setMessage(message, 'Il vecchio accesso è stato revocato e il nuovo link è pronto. Scegli “WhatsApp app” per inviarlo oppure “WhatsApp Web” come alternativa.');
+      setMessage(message, 'Il link precedente è stato revocato e il nuovo è pronto. Ora scegli “Copia link”, “Apri WhatsApp” oppure “WhatsApp Web”.');
     } catch (error) {
       reissueButton.disabled = false;
-      setMessage(message, 'Non riesco a revocare e generare il nuovo link. Se era aperta un’altra scheda, aggiorna l’area e usa il link più recente.', true);
+      setMessage(message, 'Non riesco a generare il nuovo link WhatsApp. Se era aperta un’altra scheda, aggiorna l’area e usa il link più recente.', true);
     }
     return;
   }
@@ -6448,7 +6470,7 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     if (!invite) return;
     try {
       await navigator.clipboard.writeText(participantUrl(invite));
-      setMessage(message, 'Link personale copiato.');
+      setMessage(message, 'Link copiato: puoi incollarlo e inviarlo manualmente dove preferisci.');
     } catch (error) {
       setMessage(message, 'Non riesco a copiare il link. Verifica i permessi del browser.', true);
     }
