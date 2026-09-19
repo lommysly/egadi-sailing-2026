@@ -5128,6 +5128,12 @@ function projectionActionButton(attribute, id, label, icon, tone = '') {
   return `<button class="${classes.join(' ')}" type="button" data-${attribute}="${escapeHtml(id)}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span></button>`;
 }
 
+function projectionActionTextButton(attribute, id, label, icon, tone = '') {
+  const classes = ['projection-action'];
+  if (tone) classes.push(`projection-action-${tone}`);
+  return `<button class="${classes.join(' ')}" type="button" data-${attribute}="${escapeHtml(id)}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></button>`;
+}
+
 function projectionCabinControl(projection) {
   if (projection.berthType !== 'double_cabin') return '';
   const cabinGroupId = projectionCabinGroupId(projection);
@@ -5147,7 +5153,7 @@ function projectionCardActions(projection, invite) {
   }
   if (!invite) {
     actions.push(projectionActionButton('edit-projection-pricing', projection.id, `Imposta la quota prevista di ${projection.displayName}`, '€'));
-    actions.push(projectionActionButton('send-projection', projection.id, `Crea invito WhatsApp con riepilogo previsto per ${projection.displayName}`, whatsappIconSvg(), 'primary'));
+    actions.push(projectionActionTextButton('send-projection', projection.id, 'Crea link personale', '🔗', 'primary'));
     actions.push(projectionActionButton('release-projection', projection.id, `Libera il posto di ${projection.displayName}`, '×', 'release'));
     return actions.join('');
   }
@@ -5160,16 +5166,28 @@ function projectionCardActions(projection, invite) {
   }
   if (invite.status === 'pending' && invite.accessKey) {
     actions.push(projectionActionButton('copy-invite', invite.id, `Copia il link personale di ${projection.displayName}`, '⧉'));
-    actions.push(projectionActionButton('whatsapp-invite', invite.id, `Apri l’invito WhatsApp con riepilogo previsto per ${projection.displayName}`, whatsappIconSvg(), 'primary'));
+    actions.push(projectionActionTextButton('whatsapp-invite', invite.id, 'WhatsApp app', whatsappIconSvg(), 'primary'));
+    actions.push(projectionActionTextButton('whatsapp-invite-web', invite.id, 'WhatsApp Web', '↗'));
   }
   actions.push(projectionActionButton('reissue-invite', invite.id, `Revoca e genera un nuovo link per ${projection.displayName}`, '↻', 'release'));
   return actions.join('');
 }
 
-function renderProjectionCard(projection) {
+function projectionInvoiceLine(label, value) {
+  return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
+}
+
+function projectionCardKey(projectionId) {
+  return `projection:${projectionId}`;
+}
+
+function legacyInviteCardKey(inviteId) {
+  return `legacy:${inviteId}`;
+}
+
+function renderProjectionCard(projection, { isOpen = false } = {}) {
   const invite = projectionInvite(projection);
   const cost = projectionCostBreakdown(projection);
-  const quote = projectionQuoteSummary(projection);
   const isExemptFromCosts = projection.contributesToCosts === false;
   const currentCostModel = costPlanQuoteModel();
   const dashboardPricingReady = Boolean(currentCostModel && !automaticCostPlanPricingMessage(currentCostModel));
@@ -5190,17 +5208,47 @@ function renderProjectionCard(projection) {
   const starterPack = isExemptFromCosts
     ? 'Non previsto per il ruolo gratuito'
     : cost.starterPackCents > 0
-      ? `${formatCurrency(cost.starterPackCents / 100)} · solo contanti a bordo`
-      : 'Da definire · solo contanti a bordo';
+      ? formatCurrency(cost.starterPackCents / 100)
+      : 'Da definire';
   const deposit = cost.refundableDepositCents > 0
-    ? `${formatCurrency(cost.refundableDepositCents / 100)} · separata, a bordo`
-    : 'Da definire · separata, a bordo';
+    ? formatCurrency(cost.refundableDepositCents / 100)
+    : 'Da definire';
+  const cashOnBoardCents = cost.starterPackCents + cost.refundableDepositCents;
+  const cashOnBoard = cashOnBoardCents > 0
+    ? formatCurrency(cashOnBoardCents / 100)
+    : 'Da definire';
+  const weekendCostCents = cost.payableCents + (isExemptFromCosts ? 0 : cost.starterPackCents);
+  const weekendCost = isExemptFromCosts
+    ? 'Esente'
+    : cost.hasPayableEstimate
+      ? formatCurrency(weekendCostCents / 100)
+      : 'Da definire';
   const cabinAssignment = projectionCabinAssignmentText(projection);
   const assignment = `<b>Ruolo previsto:</b> ${escapeHtml(projection.plannedRole)} · <b>Sistemazione:</b> ${escapeHtml(projectionBerthLabel(projection.berthType))}${cabinAssignment ? ` · <b>Cabina:</b> ${escapeHtml(cabinAssignment)}` : ''}`;
-  return `<article class="projection-row projection-card"><div class="projection-row-person"><strong>${escapeHtml(projection.displayName)}</strong><span class="projection-row-assignment">${assignment}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small>${projectionCabinControl(projection)}</div><div class="projection-row-cost"><span class="projection-row-cost-label">Importo previsto · non è un pagamento</span><strong>${escapeHtml(total)}</strong><span class="projection-row-cost-breakdown">${escapeHtml(quote)}</span>${projectionPaymentBalanceMarkup(projection)}<span class="projection-row-deposit"><b>${escapeHtml(pricingSource)}</b></span><span class="projection-row-deposit"><b>Starter Pack:</b> ${escapeHtml(starterPack)}</span><span class="projection-row-deposit"><b>Cauzione rimborsabile:</b> ${escapeHtml(deposit)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(projection.displayName)}">${projectionCardActions(projection, invite)}</div></article>`;
+  const cabin = projectionCabinControl(projection);
+  const summaryLabel = isExemptFromCosts
+    ? 'Partecipazione gratuita'
+    : weekendCost === 'Da definire'
+      ? 'Totale partecipazione da definire'
+      : 'Totale partecipazione';
+  const summaryNote = isExemptFromCosts
+    ? 'Apri la scheda'
+    : 'Cauzione rimborsabile esclusa';
+  const transferAmount = isExemptFromCosts ? 'Non previsto' : total;
+  const starterPackAmount = isExemptFromCosts ? 'Non previsto' : starterPack;
+  const invoiceLines = [
+    projectionInvoiceLine('Posto / cabina', isExemptFromCosts ? 'Non previsto' : formatCurrency(cost.normalized.berthCents / 100)),
+    projectionInvoiceLine('Assicurazione cauzione', isExemptFromCosts ? 'Non prevista' : formatCurrency(cost.normalized.protectionInsuranceCents / 100)),
+    projectionInvoiceLine('Starter Pack · contanti a bordo', starterPackAmount),
+  ].join('');
+  const cashLines = [
+    projectionInvoiceLine('Starter Pack · contanti a bordo', starterPackAmount),
+    projectionInvoiceLine('Cauzione rimborsabile · contanti all’imbarco', deposit),
+  ].join('');
+  return `<details class="projection-row projection-card" data-projection-card="${escapeHtml(projectionCardKey(projection.id))}"${isOpen ? ' open' : ''}><summary class="projection-card-summary"><span class="projection-card-summary-person"><strong>${escapeHtml(projection.displayName)}</strong><span class="projection-row-assignment">${assignment}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small></span><span class="projection-card-summary-finance"><span>${escapeHtml(summaryLabel)}</span><strong>${escapeHtml(weekendCost)}</strong><small>${escapeHtml(summaryNote)}</small></span><span class="projection-card-summary-toggle" aria-hidden="true">⌄</span></summary><div class="projection-card-body"><div class="projection-row-person projection-card-person-detail">${cabin}</div><section class="projection-row-cost projection-invoice" aria-label="Riepilogo quote per ${escapeHtml(projection.displayName)}"><span class="projection-row-cost-label">Riepilogo della partecipazione</span><dl class="projection-invoice-lines">${invoiceLines}</dl><div class="projection-invoice-total"><span>Totale del weekend</span><strong>${escapeHtml(weekendCost)}</strong><small>Posto/cabina + assicurazione + Starter Pack</small></div><div class="projection-invoice-total projection-invoice-total-transfer"><span>Da versare allo skipper</span><strong>${escapeHtml(transferAmount)}</strong><small>Posto/cabina + assicurazione cauzione</small></div><dl class="projection-invoice-lines projection-invoice-cash-lines">${cashLines}</dl><div class="projection-invoice-total projection-invoice-total-cash"><span>Contanti da portare all’imbarco</span><strong>${escapeHtml(cashOnBoard)}</strong><small>Starter Pack + cauzione rimborsabile</small></div>${projectionPaymentBalanceMarkup(projection)}<span class="projection-row-deposit"><b>${escapeHtml(pricingSource)}</b></span></section><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(projection.displayName)}">${projectionCardActions(projection, invite)}</div></div></details>`;
 }
 
-function renderLegacyInviteCard(invite) {
+function renderLegacyInviteCard(invite, { isOpen = false } = {}) {
   const expired = invite.expiresAt?.toDate && invite.expiresAt.toDate() < new Date();
   const linkReady = invite.status === 'pending' && !expired && invite.accessKey;
   const linkable = isLegacyInviteLinkable(invite);
@@ -5213,24 +5261,33 @@ function renderLegacyInviteCard(invite) {
   if (linkable) actions.push(projectionActionButton('link-legacy-invite', invite.id, `Completa la scheda di ${invite.displayName}`, '✎', 'primary'));
   if (linkReady) {
     actions.push(projectionActionButton('copy-invite', invite.id, `Copia il link personale di ${invite.displayName}`, '⧉'));
-    actions.push(projectionActionButton('whatsapp-invite', invite.id, `Apri WhatsApp per ${invite.displayName}`, whatsappIconSvg()));
+    actions.push(projectionActionTextButton('whatsapp-invite', invite.id, 'WhatsApp app', whatsappIconSvg(), 'primary'));
+    actions.push(projectionActionTextButton('whatsapp-invite-web', invite.id, 'WhatsApp Web', '↗'));
   }
   if (invite.status !== 'revoked') actions.push(projectionActionButton('reissue-invite', invite.id, `Revoca e genera un nuovo link per ${invite.displayName}`, '↻', 'release'));
   const instruction = linkable
     ? 'Aggiungi cognome, ruolo, sistemazione, cabina e importo previsto: il link personale resta identico.'
     : 'Questo invito storico non è più collegabile: il suo accesso resta invariato.';
-  return `<article class="projection-row projection-card projection-card-legacy"><div class="projection-row-person"><strong>${escapeHtml(invite.displayName)}</strong><span class="projection-row-assignment"><b>Ruolo:</b> da definire · <b>Sistemazione:</b> da definire</span><small>${escapeHtml(status)}</small></div><div class="projection-row-cost"><span class="projection-row-cost-label">Scheda da completare</span><strong>Importo da definire</strong><span class="projection-row-cost-breakdown">${escapeHtml(instruction)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(invite.displayName)}">${actions.join('')}</div></article>`;
+  return `<details class="projection-row projection-card projection-card-legacy" data-projection-card="${escapeHtml(legacyInviteCardKey(invite.id))}"${isOpen ? ' open' : ''}><summary class="projection-card-summary"><span class="projection-card-summary-person"><strong>${escapeHtml(invite.displayName)}</strong><span class="projection-row-assignment"><b>Ruolo:</b> da definire · <b>Sistemazione:</b> da definire</span><small>${escapeHtml(status)}</small></span><span class="projection-card-summary-finance"><span>Scheda da completare</span><strong>Importo da definire</strong><small>Apri la scheda</small></span><span class="projection-card-summary-toggle" aria-hidden="true">⌄</span></summary><div class="projection-card-body"><div class="projection-row-cost"><span class="projection-row-cost-label">Prima di inviare</span><span class="projection-row-cost-breakdown">${escapeHtml(instruction)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(invite.displayName)}">${actions.join('')}</div></div></details>`;
 }
 
 function renderProjections({ syncFleet = true } = {}) {
   const list = document.querySelector('#projectionList');
   if (!list) return;
+  const openCards = new Set(
+    Array.from(list.querySelectorAll('details[open][data-projection-card]'))
+      .map((card) => card.dataset.projectionCard),
+  );
   renderProjectionSummary();
   const legacyInvites = activeInvites.filter((invite) => invite.status !== 'revoked'
     && !activeProjections.some((projection) => projectionMatchesInvite(projection, invite.id)));
   const cards = [
-    ...activeProjections.map(renderProjectionCard),
-    ...legacyInvites.map(renderLegacyInviteCard),
+    ...activeProjections.map((projection) => renderProjectionCard(projection, {
+      isOpen: openCards.has(projectionCardKey(projection.id)),
+    })),
+    ...legacyInvites.map((invite) => renderLegacyInviteCard(invite, {
+      isOpen: openCards.has(legacyInviteCardKey(invite.id)),
+    })),
   ];
   list.innerHTML = cards.length
     ? cards.join('')
@@ -5239,6 +5296,37 @@ function renderProjections({ syncFleet = true } = {}) {
   renderCapacityStatus();
   renderSkipperDashboardOverview();
   if (syncFleet) void syncPublicFleetAvailabilityFromCrew();
+}
+
+function openProjectionCard(projectionId) {
+  const key = projectionCardKey(projectionId);
+  const card = Array.from(document.querySelectorAll('details[data-projection-card]'))
+    .find((candidate) => candidate.dataset.projectionCard === key);
+  if (!card) return;
+  card.open = true;
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function reflectCreatedProjectionInvite(projection, invite) {
+  const normalizedProjection = normalizeProjection(projection.id, projection);
+  const currentPricing = effectiveProjectionPricing(normalizedProjection);
+  activeInvites = [
+    ...activeInvites.filter((candidate) => candidate.id !== invite.id),
+    invite,
+  ];
+  activeProjections = activeProjections.map((candidate) => candidate.id === projection.id
+    ? {
+      ...candidate,
+      ...currentPricing,
+      starterPackItemsSnapshot: starterPackItemsForProjection(normalizedProjection),
+      status: 'invited',
+      inviteId: invite.id,
+      invitedAt: new Date(),
+      pricingSnapshotAt: new Date(),
+    }
+    : candidate);
+  renderProjections({ syncFleet: false });
+  openProjectionCard(projection.id);
 }
 
 function renderMembers() {
@@ -6281,20 +6369,11 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     const projection = activeProjections.find((candidate) => candidate.id === sendButton.dataset.sendProjection);
     if (!projection || projectionInvite(projection)) return;
     sendButton.disabled = true;
-    const whatsappWindow = window.open('', '_blank');
-    if (whatsappWindow) whatsappWindow.opener = null;
     try {
       const invite = await createInviteFromProjection(projection);
-      const url = whatsappUrl(invite);
-      if (whatsappWindow && url) {
-        whatsappWindow.location.replace(url);
-        setMessage(message, `Invito con riepilogo previsto pronto per ${projection.displayName}: WhatsApp è aperto con il messaggio già preparato. La scheda resta collegata allo stesso posto, ruolo, sistemazione e importo previsto.`);
-      } else {
-        whatsappWindow?.close();
-        setMessage(message, `Invito con riepilogo previsto pronto per ${projection.displayName}: copia il link dalla sua card. La scheda resta collegata allo stesso posto, ruolo, sistemazione e importo previsto.`);
-      }
+      reflectCreatedProjectionInvite(projection, invite);
+      setMessage(message, `Link personale creato per ${projection.displayName}. La card è pronta: scegli “WhatsApp app” per l’app nativa oppure “WhatsApp Web” come alternativa.`);
     } catch (error) {
-      whatsappWindow?.close();
       sendButton.disabled = false;
       const fallback = error.code === 'phone-already-assigned'
         ? 'Questo numero è già associato a una barca dell’evento. Verifica prima con l’organizzatore.'
@@ -6335,25 +6414,24 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     const confirmed = window.confirm(`Revocare l’accesso attuale di ${reissueInviteRecord.displayName} e inviare un nuovo link? Il vecchio codice personale smetterà di funzionare.`);
     if (!confirmed) return;
     reissueButton.disabled = true;
-    const whatsappWindow = window.open('', '_blank');
-    if (whatsappWindow) whatsappWindow.opener = null;
     try {
       const renewedInvite = await reissueInvite(reissueInviteRecord);
-      const url = whatsappUrl(renewedInvite);
-      if (whatsappWindow && url) whatsappWindow.location.replace(url);
-      else whatsappWindow?.close();
-      setMessage(message, whatsappWindow && url
-        ? 'Il vecchio accesso è stato revocato: WhatsApp è aperto con il nuovo link.'
-        : 'Il vecchio accesso è stato revocato. Copia il nuovo link dalla card della persona.', !url);
+      activeInvites = activeInvites.map((candidate) => candidate.id === renewedInvite.id ? renewedInvite : candidate);
+      renderProjections({ syncFleet: false });
+      const projection = activeProjections.find((candidate) => projectionMatchesInvite(candidate, renewedInvite.id));
+      if (projection) openProjectionCard(projection.id);
+      setMessage(message, 'Il vecchio accesso è stato revocato e il nuovo link è pronto. Scegli “WhatsApp app” per inviarlo oppure “WhatsApp Web” come alternativa.');
     } catch (error) {
-      whatsappWindow?.close();
       reissueButton.disabled = false;
       setMessage(message, 'Non riesco a revocare e generare il nuovo link. Se era aperta un’altra scheda, aggiorna l’area e usa il link più recente.', true);
     }
     return;
   }
-  const invite = activeInvites.find((candidate) => candidate.id === event.target.closest('[data-copy-invite]')?.dataset.copyInvite
-    || candidate.id === event.target.closest('[data-whatsapp-invite]')?.dataset.whatsappInvite);
+  const inviteAction = event.target.closest('[data-copy-invite], [data-whatsapp-invite], [data-whatsapp-invite-web]');
+  const inviteId = inviteAction?.dataset.copyInvite
+    || inviteAction?.dataset.whatsappInvite
+    || inviteAction?.dataset.whatsappInviteWeb;
+  const invite = activeInvites.find((candidate) => candidate.id === inviteId);
   const copyButton = event.target.closest('[data-copy-invite]');
   if (copyButton && invite) {
     try {
@@ -6367,6 +6445,13 @@ document.querySelector('#projectionList').addEventListener('click', async (event
   const whatsappButton = event.target.closest('[data-whatsapp-invite]');
   if (whatsappButton && invite) {
     const url = whatsappUrl(invite);
+    if (url) window.open(url, '_blank', 'noopener');
+    else setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
+    return;
+  }
+  const whatsappWebButton = event.target.closest('[data-whatsapp-invite-web]');
+  if (whatsappWebButton && invite) {
+    const url = whatsappUrl(invite, { mode: 'web' });
     if (url) window.open(url, '_blank', 'noopener');
     else setMessage(message, 'Il numero WhatsApp dell’invito non è nel formato internazionale richiesto.', true);
   }
