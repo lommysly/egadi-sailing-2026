@@ -451,23 +451,24 @@ service cloud.firestore {
         ));
     }
 
-    // Accesso operativo separato dalla Crew List: Google identifica il
-    // referente, l'organizzatore abilita il suo UID, non un link pubblico.
-    function isTransferGoogleAccount() {
+    // Accesso operativo separato dalla Crew List: il referente usa un
+    // account Google oppure le credenziali email/password create dalla
+    // regia. L'organizzatore abilita sempre il suo UID, non un link pubblico.
+    function isTransferOperatorAccount() {
       return signedIn()
-        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.firebase.sign_in_provider in ['google.com', 'password']
         && request.auth.token.email is string;
     }
 
     function isActiveTransferOperator() {
-      return isTransferGoogleAccount()
+      return isTransferOperatorAccount()
         && exists(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid))
         && get(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid)).data.role == 'transfer_operator'
         && get(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid)).data.active == true;
     }
 
     function hasValidTransferAccessRequest(userId) {
-      return isTransferGoogleAccount()
+      return isTransferOperatorAccount()
         && userId == request.auth.uid
         && request.resource.data.keys().hasAll(['name', 'email', 'updatedAt'])
         && request.resource.data.keys().hasOnly(['name', 'email', 'updatedAt'])
@@ -2074,7 +2075,7 @@ service cloud.firestore {
     // e puo' concedere o revocare l'accesso alla coda transfer.
     match /events/egadi-2026/transferAccessRequests/{userId} {
       allow get: if isPrivateAreaOpen()
-        && (isOrganizer() || (isTransferGoogleAccount() && userId == request.auth.uid));
+        && (isOrganizer() || (isTransferOperatorAccount() && userId == request.auth.uid));
       allow list: if isPrivateAreaOpen() && isOrganizer();
       allow create, update: if isPrivateAreaOpen() && hasValidTransferAccessRequest(userId);
       allow delete: if isPrivateAreaOpen() && isOrganizer();
@@ -2082,7 +2083,7 @@ service cloud.firestore {
 
     match /events/egadi-2026/transferOperators/{userId} {
       allow get: if isPrivateAreaOpen()
-        && (isOrganizer() || (isTransferGoogleAccount() && userId == request.auth.uid));
+        && (isOrganizer() || (isTransferOperatorAccount() && userId == request.auth.uid));
       allow list: if isPrivateAreaOpen() && isOrganizer();
       allow create, update: if isPrivateAreaOpen()
         && isOrganizer()

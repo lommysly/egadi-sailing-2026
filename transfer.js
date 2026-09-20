@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
-import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import {
   collection,
   deleteDoc,
@@ -29,17 +29,20 @@ const COPY = {
     heroTitle: 'Arrivi e partenze,<br /><em>ordinati e leggibili.</em>',
     heroText: 'Questa area è riservata alla società transfer incaricata e agli organizzatori. Mostra soltanto i movimenti per i quali la persona ha dato il consenso al servizio.',
     signInEyebrow: 'Accesso protetto',
-    signInTitle: 'Entra con il tuo account Google.',
-    signInText: 'L’accesso non è pubblico: un organizzatore abilita prima il referente della società transfer.',
+    signInTitle: 'Accedi alla gestione transfer.',
+    signInText: 'Usa l’account Google già approvato oppure l’email operativa e la password ricevute dalla regia. L’accesso non è pubblico: un organizzatore abilita prima il referente della società transfer.',
     signInAction: 'Continua con Google',
+    emailSignInAction: 'Accedi con email e password',
+    emailLabel: 'Nome utente / email operativa',
+    passwordLabel: 'Password dedicata',
     requestEyebrow: 'Richiedi l’accesso',
     requestTitle: 'Invia la richiesta alla regia del viaggio.',
-    requestText: 'L’organizzatore vedrà nome ed email del tuo account Google e potrà abilitarti alla gestione dei transfer. Fino all’approvazione non vedrai alcun movimento.',
+    requestText: 'L’organizzatore vedrà il nome e l’email del tuo account di accesso e potrà abilitarti alla gestione dei transfer. Fino all’approvazione non vedrai alcun movimento.',
     requestAction: 'Invia richiesta di accesso',
     refreshRequest: 'Aggiorna richiesta',
     requestPendingTitle: 'Richiesta inviata.',
-    requestPendingText: 'L’accesso sarà attivo solo quando un organizzatore lo approverà. Puoi lasciare questa pagina e rientrare con lo stesso account Google.',
-    signedInAs: 'Account Google',
+    requestPendingText: 'L’accesso sarà attivo solo quando un organizzatore lo approverà. Puoi lasciare questa pagina e rientrare con lo stesso account di accesso.',
+    signedInAs: 'Account di accesso',
     signOut: 'Esci',
     waiting: 'Caricamento dell’area transfer…',
     organizationEyebrow: 'Regia del viaggio',
@@ -88,6 +91,7 @@ const COPY = {
     approvalError: 'Impossibile aggiornare l’abilitazione. Riprova tra poco.',
     loadError: 'L’area transfer non è disponibile in questo momento. Riprova tra poco.',
     signInError: 'Non è stato possibile completare l’accesso Google. Riprova scegliendo l’account corretto.',
+    emailSignInError: 'Email o password non corrette. Usa le credenziali dedicate ricevute dalla regia.',
     unknownRoute: 'Tratta da confermare',
     unknownDateTime: 'Orario da definire',
     sheet: 'Apri il foglio operativo',
@@ -99,17 +103,20 @@ const COPY = {
     heroTitle: 'Arrivals and departures,<br /><em>clear and organised.</em>',
     heroText: 'This private area is for the appointed transfer company and organisers. It shows only journeys for which the traveller has consented to the service.',
     signInEyebrow: 'Protected access',
-    signInTitle: 'Sign in with your Google account.',
-    signInText: 'Access is not public. An organiser must first approve the transfer contact.',
+    signInTitle: 'Sign in to transfer operations.',
+    signInText: 'Use the approved Google account or the operations email and password supplied by the trip coordinators. Access is not public: an organiser must first approve the transfer contact.',
     signInAction: 'Continue with Google',
+    emailSignInAction: 'Sign in with email and password',
+    emailLabel: 'Username / operations email',
+    passwordLabel: 'Dedicated password',
     requestEyebrow: 'Request access',
     requestTitle: 'Send a request to the trip organisers.',
-    requestText: 'The organiser will see the name and email on your Google account and can enable access to transfer operations. You cannot see journeys before approval.',
+    requestText: 'The organiser will see the name and email on your access account and can enable access to transfer operations. You cannot see journeys before approval.',
     requestAction: 'Send access request',
     refreshRequest: 'Update request',
     requestPendingTitle: 'Request sent.',
-    requestPendingText: 'Access becomes active only after organiser approval. You can return with the same Google account.',
-    signedInAs: 'Google account',
+    requestPendingText: 'Access becomes active only after organiser approval. You can return with the same access account.',
+    signedInAs: 'Access account',
     signOut: 'Sign out',
     waiting: 'Loading the transfer area…',
     organizationEyebrow: 'Trip coordination',
@@ -158,6 +165,7 @@ const COPY = {
     approvalError: 'The access setting could not be updated. Please try again shortly.',
     loadError: 'The transfer area is not available right now. Please try again shortly.',
     signInError: 'Google sign-in could not be completed. Please choose the correct account and try again.',
+    emailSignInError: 'The email or password is incorrect. Use the dedicated credentials provided by the trip coordinators.',
     unknownRoute: 'Route to be confirmed',
     unknownDateTime: 'Time to be defined',
     sheet: 'Open operations sheet',
@@ -342,7 +350,7 @@ function renderSignedInAccount() {
 }
 
 function renderSignIn() {
-  root.innerHTML = `<article class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('signInEyebrow'))}</p><h2>${escapeHtml(t('signInTitle'))}</h2><p>${escapeHtml(t('signInText'))}</p><div class="transfer-operator-actions"><button class="button button-primary" type="button" data-action="sign-in">${escapeHtml(t('signInAction'))}</button></div><p class="form-message" data-message="main" role="status"></p></article>`;
+  root.innerHTML = `<article class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('signInEyebrow'))}</p><h2>${escapeHtml(t('signInTitle'))}</h2><p>${escapeHtml(t('signInText'))}</p><form class="compact-form" data-transfer-email-login><label><span>${escapeHtml(t('emailLabel'))}</span><input name="email" type="email" required autocomplete="username" inputmode="email" maxlength="160" /></label><label><span>${escapeHtml(t('passwordLabel'))}</span><input name="password" type="password" required autocomplete="current-password" minlength="6" /></label><button class="button button-primary" type="submit">${escapeHtml(t('emailSignInAction'))}</button></form><div class="transfer-operator-actions"><button class="button button-ghost" type="button" data-action="sign-in">${escapeHtml(t('signInAction'))}</button></div><p class="form-message" data-message="main" role="status"></p></article>`;
 }
 
 function renderAccessRequest() {
@@ -580,7 +588,7 @@ async function requestAccess() {
   displayMessage('main', '');
   try {
     await setDoc(doc(db, 'events', EVENT_ID, 'transferAccessRequests', state.user.uid), {
-      name: text(state.user.displayName || 'Referente transfer', 120),
+      name: text(state.user.displayName || state.user.email?.split('@')[0] || 'Referente transfer', 120),
       email: text(state.user.email, 160),
       updatedAt: serverTimestamp(),
     });
@@ -690,6 +698,19 @@ document.addEventListener('input', (event) => {
 });
 
 document.addEventListener('submit', (event) => {
+  const emailLoginForm = event.target.closest('[data-transfer-email-login]');
+  if (emailLoginForm) {
+    event.preventDefault();
+    const values = new FormData(emailLoginForm);
+    const email = text(values.get('email'), 160).toLowerCase();
+    const password = String(values.get('password') || '');
+    displayMessage('main', '');
+    signInWithEmailAndPassword(auth, email, password).catch((error) => {
+      console.error('Impossibile completare l’accesso email transfer.', error);
+      displayMessage('main', t('emailSignInError'), true);
+    });
+    return;
+  }
   const filterForm = event.target.closest('[data-filter-form]');
   if (filterForm) {
     event.preventDefault();
