@@ -78,15 +78,16 @@ function safeStatus(value) {
 }
 
 function safeOperationalFields(source = {}) {
+  const record = source && typeof source === 'object' ? source : {};
   return {
-    status: safeStatus(source.status),
-    assignedOperatorUid: asText(source.assignedOperatorUid, 128),
-    groupName: asText(source.groupName, 120),
-    vehicleName: asText(source.vehicleName, 120),
-    meetingPoint: asText(source.meetingPoint, 180),
-    meetingDate: asText(source.meetingDate, 10),
-    meetingTime: asText(source.meetingTime, 5),
-    operatorNotes: asText(source.operatorNotes, 500),
+    status: safeStatus(record.status),
+    assignedOperatorUid: asText(record.assignedOperatorUid, 128),
+    groupName: asText(record.groupName, 120),
+    vehicleName: asText(record.vehicleName, 120),
+    meetingPoint: asText(record.meetingPoint, 180),
+    meetingDate: asText(record.meetingDate, 10),
+    meetingTime: asText(record.meetingTime, 5),
+    operatorNotes: asText(record.operatorNotes, 500),
   };
 }
 
