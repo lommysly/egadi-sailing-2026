@@ -2347,14 +2347,16 @@ service cloud.firestore {
       }
 
       // Le coordinate già abilitate dallo skipper non sono pubbliche e non
-      // compaiono nella Crew List. Dopo il briefing, però, la persona può
-      // ritrovarle nella propria area senza dover recuperare WhatsApp.
+      // compaiono nella Crew List. La persona con un accesso equipaggio
+      // attivo alla stessa barca le ritrova nella propria area: il briefing
+      // resta indispensabile per partecipare, ma non deve trasformarsi in un
+      // secondo ostacolo tecnico per consultare come versare la quota.
       match /paymentInstructions/{instructionId} {
         allow get: if isPrivateAreaOpen()
           && instructionId == 'default'
           && (isOrganizer()
             || isSkipper(boatId)
-            || hasCurrentParticipantBriefingAcceptance(boatId));
+            || isBoatParticipant(boatId));
         allow list: if false;
         allow create, update: if isPrivateAreaOpen()
           && instructionId == 'default'
