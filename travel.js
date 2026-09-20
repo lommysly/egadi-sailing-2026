@@ -1,5 +1,5 @@
 import { doc, getDoc, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { crewAccessErrorMessage, crewAccessUrl, db, personalAreaUrl, profileUrl, startCrewAreaSession } from './crew-session.js?v=20260919-live-privacy-v1';
+import { crewAccessErrorMessage, crewAccessUrl, db, personalAreaUrl, profileUrl, startCrewAreaSession } from './crew-session.js?v=20260920-payment-instructions-v1';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260920-travel-private-v1';
 
 const DIRECTIONS = Object.freeze(['outbound', 'return']);

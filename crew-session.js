@@ -58,7 +58,11 @@ export function profileUrl({ edit = false } = {}) {
 }
 
 export function personalAreaUrl() {
-  return linkFor('my-area.html');
+  // Mantiene il rientro nell'area personale allineato alla versione che
+  // contiene le coordinate di versamento protette, anche da un vecchio link.
+  const url = new URL(linkFor('my-area.html'));
+  url.searchParams.set('release', '20260920-payment-instructions-v1');
+  return url.toString();
 }
 
 export function crewAccessUrl() {
