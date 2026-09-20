@@ -1,12 +1,15 @@
 const { initializeApp } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
 const { FieldValue, getFirestore } = require('firebase-admin/firestore');
 const { logger } = require('firebase-functions');
+const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { google } = require('googleapis');
 
 initializeApp();
 
 const db = getFirestore();
+const auth = getAuth();
 const REGION = 'europe-west8';
 const RUNTIME_SERVICE_ACCOUNT = 'egadi-transfer-sheet-writer@egadi-sailing-2026.iam.gserviceaccount.com';
 const EVENT_ID = 'egadi-2026';
@@ -25,6 +28,299 @@ function asAirport(value) {
 function asInteger(value, minimum, maximum) {
   return Number.isInteger(value) && value >= minimum && value <= maximum ? value : 0;
 }
+
+function asUid(value) {
+  const uid = asText(value, 128);
+  return /^[A-Za-z0-9_-]{1,128}$/.test(uid) ? uid : '';
+}
+
+function normalizedEmail(value) {
+  const email = asText(value, 160).toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '';
+}
+
+function asTemporaryPassword(value) {
+  if (typeof value !== 'string') return '';
+  const password = value.trim();
+  return password.length >= 12 && password.length <= 128 ? password : '';
+}
+
+function isManagedPasswordTransferOperator(operator) {
+  return operator
+    && operator.role === 'transfer_operator'
+    && operator.accessMode === 'managed_password';
+}
+
+function hasPasswordOnlyProvider(user) {
+  const providerIds = Array.isArray(user?.providerData)
+    ? user.providerData.map((provider) => provider.providerId).filter(Boolean)
+    : [];
+  return providerIds.length > 0 && providerIds.every((providerId) => providerId === 'password');
+}
+
+async function authenticatedOrganizerUid(request) {
+  const uid = asUid(request?.auth?.uid);
+  if (!uid) {
+    throw new HttpsError('unauthenticated', 'Accedi con l’account organizzatore per gestire gli accessi transfer.');
+  }
+  const eventSnapshot = await db.doc(`events/${EVENT_ID}`).get();
+  const organizerIds = eventSnapshot.exists ? eventSnapshot.data()?.organizerIds : null;
+  if (!Array.isArray(organizerIds) || !organizerIds.includes(uid)) {
+    throw new HttpsError('permission-denied', 'Solo un organizzatore del viaggio può gestire gli account transfer.');
+  }
+  return uid;
+}
+
+async function authUserByEmailOrNull(email) {
+  try {
+    return await auth.getUserByEmail(email);
+  } catch (error) {
+    if (error?.code === 'auth/user-not-found') return null;
+    throw error;
+  }
+}
+
+async function authUserByUidOrNull(uid) {
+  try {
+    return await auth.getUser(uid);
+  } catch (error) {
+    if (error?.code === 'auth/user-not-found') return null;
+    throw error;
+  }
+}
+
+function activeManagedRolePayload({ name, email, organizerUid, reactivated = false }) {
+  const payload = {
+    schemaVersion: 1,
+    role: 'transfer_operator',
+    name,
+    email,
+    active: true,
+    accessMode: 'managed_password',
+    authProvider: 'password',
+    approvedAt: FieldValue.serverTimestamp(),
+    approvedBy: organizerUid,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  if (reactivated) {
+    return {
+      ...payload,
+      reactivatedAt: FieldValue.serverTimestamp(),
+      reactivatedBy: organizerUid,
+      revokedAt: FieldValue.delete(),
+      revokedBy: FieldValue.delete(),
+    };
+  }
+  return {
+    ...payload,
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: organizerUid,
+  };
+}
+
+function addActiveManagedTransferAccess(batch, { uid, name, email, organizerUid, reactivated = false }) {
+  const operatorRef = db.doc(`events/${EVENT_ID}/transferOperators/${uid}`);
+  const requestRef = db.doc(`events/${EVENT_ID}/transferAccessRequests/${uid}`);
+  batch.set(operatorRef, activeManagedRolePayload({ name, email, organizerUid, reactivated }), { merge: reactivated });
+  // Un account creato dalla regia ha già il ruolo: non gli serve una richiesta
+  // utente. Eliminiamo comunque una vecchia richiesta dello stesso UID.
+  batch.delete(requestRef);
+}
+
+function asProvisioningData(data) {
+  const email = normalizedEmail(data?.email);
+  const name = asText(data?.name, 120);
+  const temporaryPassword = asTemporaryPassword(data?.temporaryPassword);
+  if (!email) {
+    throw new HttpsError('invalid-argument', 'Inserisci un indirizzo email operativo valido.');
+  }
+  if (!name) {
+    throw new HttpsError('invalid-argument', 'Inserisci il nome del referente transfer.');
+  }
+  if (!temporaryPassword) {
+    throw new HttpsError('invalid-argument', 'La password temporanea deve contenere da 12 a 128 caratteri.');
+  }
+  return { email, name, temporaryPassword };
+}
+
+exports.provisionTransferOperator = onCall({
+  region: REGION,
+  serviceAccount: RUNTIME_SERVICE_ACCOUNT,
+  timeoutSeconds: 60,
+  memory: '256MiB',
+}, async (request) => {
+  const organizerUid = await authenticatedOrganizerUid(request);
+  const { email, name, temporaryPassword } = asProvisioningData(request.data);
+  const existingUser = await authUserByEmailOrNull(email);
+
+  if (existingUser) {
+    const operatorRef = db.doc(`events/${EVENT_ID}/transferOperators/${existingUser.uid}`);
+    const operatorSnapshot = await operatorRef.get();
+    const operator = operatorSnapshot.exists ? operatorSnapshot.data() : null;
+    if (!isManagedPasswordTransferOperator(operator) || !hasPasswordOnlyProvider(existingUser)) {
+      throw new HttpsError('already-exists', 'Esiste già un account non gestito con questa email. Usa un’altra email operativa.');
+    }
+
+    try {
+      await auth.updateUser(existingUser.uid, {
+        displayName: name,
+        password: temporaryPassword,
+        disabled: false,
+      });
+      const batch = db.batch();
+      addActiveManagedTransferAccess(batch, {
+        uid: existingUser.uid,
+        name,
+        email,
+        organizerUid,
+        reactivated: true,
+      });
+      await batch.commit();
+    } catch (error) {
+      // Se la scrittura Firestore non riesce, l'account resta bloccato: non
+      // esiste quindi una finestra in cui possa vedere dati di viaggio.
+      try {
+        await auth.updateUser(existingUser.uid, { disabled: true });
+        await auth.revokeRefreshTokens(existingUser.uid);
+      } catch (rollbackError) {
+        logger.error('Rollback account transfer non riuscito.', { uid: existingUser.uid, code: rollbackError?.code || 'unknown' });
+      }
+      throw new HttpsError('internal', 'Non è stato possibile riattivare l’account transfer. Riprova tra poco.');
+    }
+
+    return {
+      uid: existingUser.uid,
+      email,
+      active: true,
+      created: false,
+      reactivated: existingUser.disabled === true,
+      passwordReset: true,
+    };
+  }
+
+  let createdUser = null;
+  try {
+    createdUser = await auth.createUser({
+      email,
+      displayName: name,
+      password: temporaryPassword,
+      disabled: false,
+      emailVerified: false,
+    });
+    const batch = db.batch();
+    addActiveManagedTransferAccess(batch, {
+      uid: createdUser.uid,
+      name,
+      email,
+      organizerUid,
+    });
+    await batch.commit();
+  } catch (error) {
+    if (createdUser?.uid) {
+      try {
+        await auth.deleteUser(createdUser.uid);
+      } catch (rollbackError) {
+        logger.error('Cleanup account transfer non riuscito.', { uid: createdUser.uid, code: rollbackError?.code || 'unknown' });
+      }
+    }
+    if (error?.code === 'auth/email-already-exists') {
+      throw new HttpsError('already-exists', 'Esiste già un account con questa email. Usa un’altra email operativa.');
+    }
+    throw new HttpsError('internal', 'Non è stato possibile creare l’account transfer. Riprova tra poco.');
+  }
+
+  return {
+    uid: createdUser.uid,
+    email,
+    active: true,
+    created: true,
+    reactivated: false,
+  };
+});
+
+exports.revokeTransferOperator = onCall({
+  region: REGION,
+  serviceAccount: RUNTIME_SERVICE_ACCOUNT,
+  timeoutSeconds: 60,
+  memory: '256MiB',
+}, async (request) => {
+  const organizerUid = await authenticatedOrganizerUid(request);
+  const uid = asUid(request.data?.uid);
+  if (!uid) {
+    throw new HttpsError('invalid-argument', 'Identificativo account transfer non valido.');
+  }
+  const operatorRef = db.doc(`events/${EVENT_ID}/transferOperators/${uid}`);
+  const requestRef = db.doc(`events/${EVENT_ID}/transferAccessRequests/${uid}`);
+  const operatorSnapshot = await operatorRef.get();
+  const operator = operatorSnapshot.exists ? operatorSnapshot.data() : null;
+  if (!isManagedPasswordTransferOperator(operator)) {
+    throw new HttpsError('failed-precondition', 'Questo non è un account transfer gestito dalla regia.');
+  }
+
+  const targetUser = await authUserByUidOrNull(uid);
+  if (targetUser && !hasPasswordOnlyProvider(targetUser)) {
+    throw new HttpsError('failed-precondition', 'L’account transfer non usa più le credenziali dedicate e non può essere revocato qui.');
+  }
+  try {
+    // Prima viene revocato il ruolo: anche un token eventualmente già aperto
+    // non può più leggere la coda mentre Firebase Auth completa il blocco.
+    const batch = db.batch();
+    batch.set(operatorRef, {
+      active: false,
+      revokedAt: FieldValue.serverTimestamp(),
+      revokedBy: organizerUid,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    batch.delete(requestRef);
+    await batch.commit();
+    if (targetUser) {
+      await auth.updateUser(uid, { disabled: true });
+      await auth.revokeRefreshTokens(uid);
+    }
+  } catch (error) {
+    throw new HttpsError('internal', 'Non è stato possibile revocare l’account transfer. Riprova tra poco.');
+  }
+
+  return { uid, active: false, authDisabled: Boolean(targetUser) };
+});
+
+exports.deleteTransferOperator = onCall({
+  region: REGION,
+  serviceAccount: RUNTIME_SERVICE_ACCOUNT,
+  timeoutSeconds: 60,
+  memory: '256MiB',
+}, async (request) => {
+  await authenticatedOrganizerUid(request);
+  const uid = asUid(request.data?.uid);
+  if (!uid) {
+    throw new HttpsError('invalid-argument', 'Identificativo account transfer non valido.');
+  }
+  const operatorRef = db.doc(`events/${EVENT_ID}/transferOperators/${uid}`);
+  const requestRef = db.doc(`events/${EVENT_ID}/transferAccessRequests/${uid}`);
+  const operatorSnapshot = await operatorRef.get();
+  const operator = operatorSnapshot.exists ? operatorSnapshot.data() : null;
+  if (!isManagedPasswordTransferOperator(operator)) {
+    throw new HttpsError('failed-precondition', 'Questo non è un account transfer gestito dalla regia.');
+  }
+
+  const targetUser = await authUserByUidOrNull(uid);
+  if (targetUser && !hasPasswordOnlyProvider(targetUser)) {
+    throw new HttpsError('failed-precondition', 'L’account transfer non usa più le credenziali dedicate e non può essere eliminato qui.');
+  }
+  try {
+    // Prima si elimina Firebase Auth: anche in caso di errore successivo nella
+    // pulizia dei documenti, nessun token può più accedere ai movimenti.
+    if (targetUser) await auth.deleteUser(uid);
+    const batch = db.batch();
+    batch.delete(operatorRef);
+    batch.delete(requestRef);
+    await batch.commit();
+  } catch (error) {
+    throw new HttpsError('internal', 'Non è stato possibile eliminare l’account transfer. Riprova tra poco.');
+  }
+
+  return { uid, deleted: true, authDeleted: Boolean(targetUser) };
+});
 
 function sourceRevision(snapshot, eventTime) {
   const timestamp = snapshot?.updateTime;

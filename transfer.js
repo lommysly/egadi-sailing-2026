@@ -1,5 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 import {
   collection,
   deleteDoc,
@@ -17,6 +18,7 @@ const EVENT_ID = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const functions = getFunctions(app, 'europe-west8');
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
 
@@ -47,8 +49,30 @@ const COPY = {
     waiting: 'Caricamento dell’area transfer…',
     organizationEyebrow: 'Regia del viaggio',
     organizationTitle: 'Gestisci gli accessi della società transfer.',
-    organizationText: 'Approva soltanto i referenti che devono davvero consultare e organizzare gli spostamenti. La revoca interrompe subito la loro visualizzazione dei movimenti.',
-    requestsTitle: 'Richieste di accesso',
+    organizationText: 'Qui crei, sospendi o elimini gli account della società transfer. Ogni referente vede soltanto i movimenti per i quali i partecipanti hanno chiesto il servizio.',
+    createOperatorTitle: 'Crea o riattiva un referente transfer',
+    createOperatorText: 'Scegli email e password iniziale o nuova da comunicare al referente con un canale separato. La password non verrà più mostrata qui.',
+    operatorNameLabel: 'Nome del referente',
+    operatorEmailLabel: 'Email operativa',
+    temporaryPasswordLabel: 'Password iniziale o nuova',
+    temporaryPasswordHelp: 'Almeno 12 caratteri. Per riattivare un account sospeso, usa la stessa email e imposta una nuova password provvisoria.',
+    createOperator: 'Crea o riattiva accesso',
+    createOperatorSuccess: 'Accesso creato o riattivato. Comunica al referente email e password con un messaggio separato.',
+    createOperatorError: 'Non è stato possibile creare o riattivare l’accesso. Verifica email e password, poi riprova.',
+    operatorsTitle: 'Referenti creati',
+    noOperators: 'Non hai ancora creato alcun accesso transfer.',
+    activeOperator: 'Accesso attivo',
+    suspendedOperator: 'Accesso sospeso',
+    suspend: 'Sospendi',
+    suspendConfirm: 'Sospendere l’accesso di {name}? Il referente non vedrà più i movimenti, ma l’account resterà disponibile per una futura riattivazione.',
+    suspendSuccess: 'Accesso sospeso. Il referente non può più vedere i movimenti.',
+    revokeGoogleConfirm: 'Revocare l’accesso transfer di {name}? Il suo account Google non verrà eliminato, ma non potrà più vedere i movimenti.',
+    revokeGoogleSuccess: 'Accesso Google revocato. Il referente non può più vedere i movimenti.',
+    deleteOperator: 'Elimina definitivamente',
+    deleteOperatorConfirm: 'Eliminare definitivamente l’account di {name}? Questa azione non può essere annullata.',
+    deleteOperatorSuccess: 'Account eliminato definitivamente.',
+    manageOperatorError: 'Non è stato possibile aggiornare questo accesso. Riprova tra poco.',
+    requestsTitle: 'Richieste Google da approvare',
     noRequests: 'Non ci sono richieste da approvare.',
     approve: 'Approva accesso',
     revoke: 'Revoca',
@@ -121,8 +145,30 @@ const COPY = {
     waiting: 'Loading the transfer area…',
     organizationEyebrow: 'Trip coordination',
     organizationTitle: 'Manage transfer company access.',
-    organizationText: 'Approve only the contacts who need to consult and arrange journeys. Revoking access immediately stops their view of the movements.',
-    requestsTitle: 'Access requests',
+    organizationText: 'Create, suspend or delete transfer-company accounts here. Each contact sees only journeys for which travellers requested the service.',
+    createOperatorTitle: 'Create or reactivate a transfer contact',
+    createOperatorText: 'Choose the email and initial or new password to send to the contact through a separate channel. The password will not be shown here again.',
+    operatorNameLabel: 'Contact name',
+    operatorEmailLabel: 'Operations email',
+    temporaryPasswordLabel: 'Initial or new password',
+    temporaryPasswordHelp: 'At least 12 characters. To reactivate a suspended account, use the same email and set a new temporary password.',
+    createOperator: 'Create or reactivate access',
+    createOperatorSuccess: 'Access created or reactivated. Send the contact the email and password through a separate message.',
+    createOperatorError: 'The access could not be created or reactivated. Check the email and password, then try again.',
+    operatorsTitle: 'Created contacts',
+    noOperators: 'You have not created any transfer access yet.',
+    activeOperator: 'Access active',
+    suspendedOperator: 'Access suspended',
+    suspend: 'Suspend',
+    suspendConfirm: 'Suspend {name}’s access? The contact will no longer see journeys, but the account will remain available for future reactivation.',
+    suspendSuccess: 'Access suspended. The contact can no longer see journeys.',
+    revokeGoogleConfirm: 'Revoke {name}’s transfer access? Their Google account will not be deleted, but they will no longer see journeys.',
+    revokeGoogleSuccess: 'Google access revoked. The contact can no longer see journeys.',
+    deleteOperator: 'Delete permanently',
+    deleteOperatorConfirm: 'Permanently delete {name}’s account? This action cannot be undone.',
+    deleteOperatorSuccess: 'Account deleted permanently.',
+    manageOperatorError: 'This access could not be updated. Please try again shortly.',
+    requestsTitle: 'Google access requests',
     noRequests: 'There are no access requests to approve.',
     approve: 'Approve access',
     revoke: 'Revoke',
@@ -362,21 +408,56 @@ function requestRole(request) {
   return state.transferOperators.find((operator) => operator.id === request.id) || null;
 }
 
+function operatorName(operator) {
+  return text(operator?.name, 120)
+    || text(operator?.email, 160).split('@')[0]
+    || '—';
+}
+
+function operatorEmail(operator) {
+  return text(operator?.email, 160) || '—';
+}
+
+function managedOperators() {
+  return [...state.transferOperators]
+    .filter((operator) => operator?.role === 'transfer_operator' && operator.accessMode === 'managed_password')
+    .sort((left, right) => (dateValue(right.updatedAt)?.getTime() || 0) - (dateValue(left.updatedAt)?.getTime() || 0));
+}
+
 function renderAccessRequestRow(request) {
   const role = requestRole(request);
   const updated = formatDateTime(request.updatedAt);
   const name = text(request.name, 120) || '—';
   const email = text(request.email, 160) || '—';
   const active = role?.active === true;
-  const action = role && active
-    ? `<button class="button button-ghost" type="button" data-action="revoke-access" data-request-id="${escapeHtml(request.id)}">${escapeHtml(t('revoke'))}</button>`
+  const action = active
+    ? `<button class="button button-ghost" type="button" data-action="revoke-google-access" data-request-id="${escapeHtml(request.id)}" data-operator-name="${escapeHtml(name)}">${escapeHtml(t('revoke'))}</button>`
     : `<button class="button button-primary" type="button" data-action="approve-access" data-request-id="${escapeHtml(request.id)}">${escapeHtml(t('approve'))}</button>`;
-  return `<article class="transfer-access-request"><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(email)}${updated ? ` · ${escapeHtml(t('lastUpdated'))}: ${escapeHtml(updated)}` : ''}${role && active ? ` · ${escapeHtml(t('approved'))}` : ''}</span></div><div class="transfer-access-request-actions">${action}</div></article>`;
+  return `<article class="transfer-access-request"><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(email)}${updated ? ` · ${escapeHtml(t('lastUpdated'))}: ${escapeHtml(updated)}` : ''}${active ? ` · ${escapeHtml(t('approved'))}` : ''}</span></div><div class="transfer-access-request-actions">${action}</div></article>`;
+}
+
+function renderManagedOperatorRow(operator) {
+  const name = operatorName(operator);
+  const email = operatorEmail(operator);
+  const active = operator.active === true;
+  const updated = formatDateTime(operator.updatedAt || operator.approvedAt);
+  const status = active ? t('activeOperator') : t('suspendedOperator');
+  const actions = active
+    ? `<button class="button button-ghost" type="button" data-action="suspend-operator" data-operator-id="${escapeHtml(operator.id)}" data-operator-name="${escapeHtml(name)}">${escapeHtml(t('suspend'))}</button>`
+    : '';
+  return `<article class="transfer-access-request"><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(email)} · ${escapeHtml(status)}${updated ? ` · ${escapeHtml(t('lastUpdated'))}: ${escapeHtml(updated)}` : ''}</span></div><div class="transfer-access-request-actions">${actions}<button class="button button-ghost" type="button" data-action="delete-operator" data-operator-id="${escapeHtml(operator.id)}" data-operator-name="${escapeHtml(name)}">${escapeHtml(t('deleteOperator'))}</button></div></article>`;
+}
+
+function renderOperatorCreationForm() {
+  return `<form class="transfer-operator-create-form" data-create-transfer-operator><label><span>${escapeHtml(t('operatorNameLabel'))}</span><input name="name" type="text" required autocomplete="name" maxlength="120" /></label><label><span>${escapeHtml(t('operatorEmailLabel'))}</span><input name="email" type="email" required autocomplete="username" inputmode="email" maxlength="160" /></label><label data-wide><span>${escapeHtml(t('temporaryPasswordLabel'))}</span><input name="temporaryPassword" type="password" required autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="temporary-password-help" /><small id="temporary-password-help">${escapeHtml(t('temporaryPasswordHelp'))}</small></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('createOperator'))}</button><p class="form-message" data-message="operator-create" role="status"></p></div></form>`;
 }
 
 function renderAccessManagement() {
-  const requests = [...state.accessRequests].sort((a, b) => (dateValue(b.updatedAt)?.getTime() || 0) - (dateValue(a.updatedAt)?.getTime() || 0));
-  return `<section class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('organizationEyebrow'))}</p><h2>${escapeHtml(t('organizationTitle'))}</h2><p>${escapeHtml(t('organizationText'))}</p><h3>${escapeHtml(t('requestsTitle'))}</h3><div class="transfer-request-list">${requests.length ? requests.map(renderAccessRequestRow).join('') : `<p class="transfer-empty">${escapeHtml(t('noRequests'))}</p>`}</div><p class="form-message" data-message="access-management" role="status"></p></section>`;
+  const operators = managedOperators();
+  const requests = [...state.accessRequests]
+    .filter((request) => requestRole(request)?.accessMode !== 'managed_password')
+    .sort((a, b) => (dateValue(b.updatedAt)?.getTime() || 0) - (dateValue(a.updatedAt)?.getTime() || 0));
+  return `<section class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('organizationEyebrow'))}</p><h2>${escapeHtml(t('organizationTitle'))}</h2><p>${escapeHtml(t('organizationText'))}</p><div class="transfer-operator-management-section"><h3>${escapeHtml(t('createOperatorTitle'))}</h3><p>${escapeHtml(t('createOperatorText'))}</p>${renderOperatorCreationForm()}</div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('operatorsTitle'))}</h3><div class="transfer-request-list">${operators.length ? operators.map(renderManagedOperatorRow).join('') : `<p class="transfer-empty">${escapeHtml(t('noOperators'))}</p>`}</div></div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('requestsTitle'))}</h3><div class="transfer-request-list">${requests.length ? requests.map(renderAccessRequestRow).join('') : `<p class="transfer-empty">${escapeHtml(t('noRequests'))}</p>`}</div></div><p class="form-message" data-message="access-management" role="status"></p></section>`;
 }
 
 function recordMatchesFilters(record) {
@@ -621,15 +702,86 @@ async function approveAccess(requestId) {
   }
 }
 
-async function revokeAccess(requestId) {
+function messageForOperator(key, name) {
+  return t(key).replace('{name}', name || '—');
+}
+
+async function revokeGoogleAccess(requestId, name, button) {
   if (!state.user || !state.isOrganizer || !requestId) return;
+  if (!window.confirm(messageForOperator('revokeGoogleConfirm', name))) return;
   displayMessage('access-management', '');
+  if (button) button.disabled = true;
   try {
     await deleteDoc(doc(db, 'events', EVENT_ID, 'transferOperators', requestId));
-    displayMessage('access-management', t('accountPending'));
+    displayMessage('access-management', t('revokeGoogleSuccess'));
   } catch (error) {
-    console.error('Impossibile revocare l’operatore transfer.', error);
+    console.error('Impossibile revocare l’accesso Google transfer.', error?.code || error);
     displayMessage('access-management', t('approvalError'), true);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function createTransferOperator(form) {
+  if (!state.user || !state.isOrganizer) return;
+  const values = new FormData(form);
+  const name = text(values.get('name'), 120);
+  const email = text(values.get('email'), 160).toLowerCase();
+  const temporaryPassword = String(values.get('temporaryPassword') || '');
+  const submit = form.querySelector('button[type="submit"]');
+  if (!name || !email || temporaryPassword.length < 12) {
+    displayMessage('operator-create', t('createOperatorError'), true);
+    return;
+  }
+
+  displayMessage('operator-create', '');
+  if (submit) submit.disabled = true;
+  try {
+    await httpsCallable(functions, 'provisionTransferOperator')({
+      name,
+      email,
+      temporaryPassword,
+    });
+    form.reset();
+    displayMessage('operator-create', t('createOperatorSuccess'));
+  } catch (error) {
+    // Non registriamo mai la password provvisoria né i dati inseriti nel form.
+    console.error('Impossibile creare l’accesso transfer.', error?.code || error);
+    displayMessage('operator-create', t('createOperatorError'), true);
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
+async function suspendOperator(operatorId, name, button) {
+  if (!state.user || !state.isOrganizer || !operatorId) return;
+  if (!window.confirm(messageForOperator('suspendConfirm', name))) return;
+  displayMessage('access-management', '');
+  if (button) button.disabled = true;
+  try {
+    await httpsCallable(functions, 'revokeTransferOperator')({ uid: operatorId });
+    displayMessage('access-management', t('suspendSuccess'));
+  } catch (error) {
+    console.error('Impossibile sospendere l’accesso transfer.', error?.code || error);
+    displayMessage('access-management', t('manageOperatorError'), true);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function deleteOperator(operatorId, name, button) {
+  if (!state.user || !state.isOrganizer || !operatorId) return;
+  if (!window.confirm(messageForOperator('deleteOperatorConfirm', name))) return;
+  displayMessage('access-management', '');
+  if (button) button.disabled = true;
+  try {
+    await httpsCallable(functions, 'deleteTransferOperator')({ uid: operatorId });
+    displayMessage('access-management', t('deleteOperatorSuccess'));
+  } catch (error) {
+    console.error('Impossibile eliminare l’accesso transfer.', error?.code || error);
+    displayMessage('access-management', t('manageOperatorError'), true);
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
@@ -678,7 +830,9 @@ document.addEventListener('click', async (event) => {
   }
   if (action === 'request-access') await requestAccess();
   if (action === 'approve-access') await approveAccess(button.dataset.requestId);
-  if (action === 'revoke-access') await revokeAccess(button.dataset.requestId);
+  if (action === 'revoke-google-access') await revokeGoogleAccess(button.dataset.requestId, button.dataset.operatorName, button);
+  if (action === 'suspend-operator') await suspendOperator(button.dataset.operatorId, button.dataset.operatorName, button);
+  if (action === 'delete-operator') await deleteOperator(button.dataset.operatorId, button.dataset.operatorName, button);
 });
 
 document.addEventListener('change', (event) => {
@@ -714,6 +868,12 @@ document.addEventListener('submit', (event) => {
   const filterForm = event.target.closest('[data-filter-form]');
   if (filterForm) {
     event.preventDefault();
+    return;
+  }
+  const createOperatorForm = event.target.closest('[data-create-transfer-operator]');
+  if (createOperatorForm) {
+    event.preventDefault();
+    createTransferOperator(createOperatorForm);
     return;
   }
   const form = event.target.closest('[data-record-form]');
