@@ -6,6 +6,7 @@ const LOCALE = 'it-IT';
 let catalogPromise = null;
 let travelCatalog = null;
 let outsideListenerInstalled = false;
+let autocompleteInstanceId = 0;
 const instances = new WeakMap();
 const activeInstances = new Set();
 
@@ -141,6 +142,7 @@ function getNamedField(form, name) {
 class TravelAutocomplete {
   constructor(input) {
     this.input = input;
+    if (!input.id) input.id = `travel-autocomplete-${++autocompleteInstanceId}`;
     this.kind = input.dataset.travelAutocomplete || 'city';
     this.wrapper = input.closest('[data-travel-combobox]') || input.parentElement;
     this.options = [];
@@ -214,7 +216,7 @@ class TravelAutocomplete {
     const description = entry ? airportDescription(entry) : city;
     const kicker = document.createElement('span');
     kicker.className = 'travel-airport-selection-kicker';
-    kicker.textContent = 'Aeroporto selezionato';
+    kicker.textContent = document.documentElement.lang === 'en' ? 'Airport selected' : 'Aeroporto selezionato';
     const name = document.createElement('strong');
     name.textContent = title;
     this.selectionCard.replaceChildren(kicker, name);
@@ -246,9 +248,7 @@ class TravelAutocomplete {
 
   clearAirportTargets() {
     const form = this.input.closest('form');
-    const cityField = getNamedField(form, this.input.dataset.travelCityTarget);
     const airportField = getNamedField(form, this.input.dataset.travelAirportTarget);
-    if (cityField) cityField.value = '';
     if (airportField) airportField.value = '';
     this.input.dataset.travelAirportCode = '';
     this.input.dataset.travelAirportCity = '';
@@ -329,7 +329,7 @@ class TravelAutocomplete {
       this.input.dataset.travelAirportCode = entry.code;
       this.input.dataset.travelAirportCity = entry.city;
       this.input.dataset.travelSelectedValue = entry.code;
-      if (cityField) cityField.value = entry.city;
+      if (cityField && !asText(cityField.value)) cityField.value = entry.city;
       if (airportField) airportField.value = entry.code;
       this.renderAirportSelection(entry);
     } else {

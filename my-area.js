@@ -17,10 +17,12 @@ let activeMember = null;
 let activeProjection = null;
 let activeCrewPayments = [];
 let activeCrewAnnouncements = [];
+let activePaymentInstructions = null;
 let stopPaymentSubscription = null;
 let stopAnnouncementSubscription = null;
 let stopContributionPlanSubscription = null;
 let stopProjectionSubscription = null;
+let stopPaymentInstructionsSubscription = null;
 const CREW_DASHBOARD_HASHES = Object.freeze({
   overview: 'crew-panorama',
   profile: 'crew-profilo',
@@ -141,6 +143,7 @@ function crewDashboardIcon(kind) {
     money: '<rect x="3.5" y="5.25" width="17" height="13.5" rx="2"/><path d="M3.5 9.5h17M15.5 14.25h2.25"/>',
     board: '<path d="M3 14.5h18l-2.25 4.25H5.25L3 14.5Z"/><path d="M12 3.5v11M12 4l5.25 7H12M11.75 6.25 7 11h4.75"/>',
     activity: '<path d="M4 12h3l2-5 3 10 2-5h6"/>',
+    travel: '<path d="m3 13 18-8-8 18-2.4-7.6L3 13Z"/><path d="m10.6 15.4 4.1-4.1"/>',
   };
   return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths[kind] || paths.activity}</svg>`;
 }
@@ -161,6 +164,9 @@ function crewDashboardCopy() {
       moneyDetail: 'The invitation summary, cash on board and later confirmations.',
       profile: 'Charter details',
       profileDetail: 'Personal details requested before boarding.',
+      travel: 'Arrivals and departures',
+      travelStatus: 'Plan your journey',
+      travelDetail: 'Flight, transfer or car ride: save it here.',
       nextStep: 'Next step',
       nextButton: 'Open',
       noPayments: 'Contribution to be confirmed',
@@ -195,6 +201,9 @@ function crewDashboardCopy() {
     moneyDetail: 'Il riepilogo dell’invito, i contanti a bordo e le conferme successive.',
     profile: 'Dati per il charter',
     profileDetail: 'Dati personali richiesti prima dell’imbarco.',
+    travel: 'Arrivi e partenze',
+    travelStatus: 'Organizza il viaggio',
+    travelDetail: 'Volo, transfer o passaggio auto: salvalo qui.',
     nextStep: 'Prossimo passo',
     nextButton: 'Apri',
     noPayments: 'Quota da definire',
@@ -247,6 +256,10 @@ function renderCrewDashboardShell() {
         <span class="dashboard-hub-icon">${crewDashboardIcon('profile')}</span><span class="dashboard-hub-label">${escapeHtml(copy.profile)}</span>
         <strong data-crew-summary="profile">${escapeHtml(copy.profileReady)}</strong><small data-crew-detail="profile">${escapeHtml(copy.profileDetail)}</small>
       </button>
+      <a class="dashboard-hub-card dashboard-hub-card-travel" href="${escapeHtml(i18n?.preserveLocaleUrl?.('travel.html') || 'travel.html')}">
+        <span class="dashboard-hub-icon">${crewDashboardIcon('travel')}</span><span class="dashboard-hub-label">${escapeHtml(copy.travel)}</span>
+        <strong>${escapeHtml(copy.travelStatus)}</strong><small>${escapeHtml(copy.travelDetail)}</small>
+      </a>
       <article class="dashboard-hub-card dashboard-hub-card-activity crew-dashboard-activity-card">
         <span class="dashboard-hub-icon">${crewDashboardIcon('activity')}</span><span class="dashboard-hub-label">${escapeHtml(copy.activity)}</span>
         <strong data-crew-summary="activity">${escapeHtml(copy.briefingReady)}</strong><small data-crew-detail="activity">${escapeHtml(copy.activityDetail)}</small>
@@ -287,6 +300,11 @@ function setupCrewDashboard() {
   navigation.setAttribute('aria-label', 'Sezioni area equipaggio');
   grid.before(overview, navigation);
   dashboard.addEventListener('click', (event) => {
+    const copyPaymentButton = event.target.closest('[data-copy-payment-instruction]');
+    if (copyPaymentButton && dashboard.contains(copyPaymentButton)) {
+      copyPaymentInstruction(copyPaymentButton.dataset.copyPaymentInstruction);
+      return;
+    }
     const rulesReference = event.target.closest('[data-rules-reference="deposit"]');
     if (rulesReference && dashboard.contains(rulesReference)) {
       window.setTimeout(() => {
@@ -312,6 +330,7 @@ function setupCrewDashboard() {
   window.addEventListener('hashchange', () => setCrewDashboardView(crewDashboardViewFromHash()));
   document.addEventListener('egadi:localechange', () => {
     renderCrewDashboardShell();
+    renderParticipantFinanceSummary();
     renderCrewDashboardOverview();
     setCrewDashboardView(crewDashboardView);
   });
@@ -378,10 +397,15 @@ function paymentActivitySummary(pendingPayments, verifiedPayments, pendingPaymen
     return {
       tone: 'waiting',
       label: localized('Quota del tuo invito', 'Your invitation contribution'),
-      detail: localized(
-        `${formatCurrency(contribution.remainingCents / 100)} da versare: consulta il riepilogo costi ricevuto con l’invito.`,
-        `${formatCurrency(contribution.remainingCents / 100)} to pay: see the cost summary received with your invitation.`,
-      ),
+      detail: paymentInstructionsAreReady()
+        ? localized(
+          `${formatCurrency(contribution.remainingCents / 100)} da versare: apri la tua quota per scegliere il metodo e copiare la causale.`,
+          `${formatCurrency(contribution.remainingCents / 100)} to pay: open your contribution to choose a method and copy the payment reference.`,
+        )
+        : localized(
+          `${formatCurrency(contribution.remainingCents / 100)} da versare: lo skipper pubblicherà qui i metodi di versamento.`,
+          `${formatCurrency(contribution.remainingCents / 100)} to pay: the skipper will publish payment methods here.`,
+        ),
     };
   }
   return {
@@ -490,6 +514,9 @@ function renderCrewDashboardOverview() {
         onlineContribution.overpaidCents > 0
           ? localized('Non inviare altri versamenti: verifica prima l’eccedenza con lo skipper.', 'Do not make further payments: check the excess with the skipper first.')
           : '',
+        onlineContribution.remainingCents > 0 && paymentInstructionsAreReady()
+          ? localized('Apri questa card per scegliere il metodo di versamento e copiare la causale.', 'Open this card to choose a payment method and copy the payment reference.')
+          : '',
         localized('Starter Pack e cauzione rimborsabile restano separati.', 'Starter Pack and refundable deposit remain separate.'),
       ].filter(Boolean).join(' ')
       : `${copy.moneyDetail} · ${localized('La cauzione rimborsabile è sempre separata.', 'The refundable deposit is always separate.')}`;
@@ -543,11 +570,18 @@ function renderCrewDashboardOverview() {
     nextActionButton.textContent = copy.openPayments;
     nextActionButton.dataset.crewView = 'money';
   } else if (onlineContribution.hasTarget && !onlineContribution.isExempt && onlineContribution.remainingCents > 0) {
-    nextActionText.textContent = localized(
-      'Rileggi il riepilogo ricevuto con l’invito: quota da versare, Starter Pack e cauzione sono indicati separatamente.',
-      'Check the summary received with your invitation: the contribution to pay, Starter Pack and refundable deposit are listed separately.',
-    );
-    nextActionButton.textContent = localized('Apri la mia quota', 'Open my contribution');
+    nextActionText.textContent = paymentInstructionsAreReady()
+      ? localized(
+        'Apri la tua quota: trovi i metodi disponibili, la causale da copiare e la distinzione dai contanti di bordo.',
+        'Open your contribution: you will find available methods, the payment reference to copy and the separate cash-on-board amounts.',
+      )
+      : localized(
+        'La quota è pronta; lo skipper deve ancora pubblicare qui i metodi di versamento.',
+        'Your contribution is ready; the skipper still needs to publish payment methods here.',
+      );
+    nextActionButton.textContent = paymentInstructionsAreReady()
+      ? localized('Scegli come versare', 'Choose how to pay')
+      : localized('Apri la mia quota', 'Open my contribution');
     nextActionButton.dataset.crewView = 'money';
   } else {
     nextActionText.textContent = copy.allReady;
@@ -585,6 +619,72 @@ function paymentMethodTags(payment) {
   const methods = PAYMENT_METHODS.filter((method) => selectedMethods[method.id] === true);
   if (!methods.length) return '';
   return `<div class="payment-method-tags">${methods.map((method) => `<span class="payment-method-tag">${method.label}</span>`).join('')}</div>`;
+}
+
+function paymentMethodLabel(methodId) {
+  const labels = {
+    paypal: 'PayPal',
+    satispay: 'Satispay',
+    revolut: 'Revolut',
+    bankTransfer: localized('Bonifico', 'Bank transfer'),
+  };
+  return labels[methodId] || methodId;
+}
+
+function safeHttpsPaymentUrl(value) {
+  try {
+    const parsed = new URL(String(value || '').trim());
+    return parsed.protocol === 'https:' ? parsed.href : '';
+  } catch (error) {
+    return '';
+  }
+}
+
+function safeRevolutRevtag(value) {
+  const tag = String(value || '').trim();
+  return /^@[a-zA-Z0-9._-]{3,50}$/.test(tag) ? tag : '';
+}
+
+function paymentInstructionsAreReady(instructions = activePaymentInstructions) {
+  if (!instructions || typeof instructions !== 'object') return false;
+  const methods = instructions.paymentMethods || {};
+  const details = instructions.paymentDetails || {};
+  const bankTransfer = details.bankTransfer || {};
+  return (methods.paypal === true && Boolean(safeHttpsPaymentUrl(details.paypal)))
+    || (methods.satispay === true && Boolean(safeHttpsPaymentUrl(details.satispay)))
+    || (methods.revolut === true && Boolean(safeHttpsPaymentUrl(details.revolut) || safeRevolutRevtag(details.revolut)))
+    || (methods.bankTransfer === true
+      && /^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/.test(String(bankTransfer.iban || '').trim())
+      && String(bankTransfer.accountHolder || '').trim().length >= 2);
+}
+
+function copyTextFallback(value) {
+  const field = document.createElement('textarea');
+  field.value = value;
+  field.setAttribute('readonly', '');
+  field.style.position = 'fixed';
+  field.style.opacity = '0';
+  document.body.append(field);
+  field.select();
+  const copied = document.execCommand('copy');
+  field.remove();
+  return copied;
+}
+
+async function copyPaymentInstruction(value) {
+  const text = String(value || '').trim();
+  if (!text) return;
+  const status = document.querySelector('[data-payment-instruction-status]');
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else if (!copyTextFallback(text)) {
+      throw new Error('copy-not-supported');
+    }
+    if (status) status.textContent = localized('Copiato. Incollalo nell’app che preferisci.', 'Copied. Paste it in the app you prefer.');
+  } catch (error) {
+    if (status) status.textContent = localized('Non riesco a copiare automaticamente: seleziona e copia il testo.', 'I could not copy it automatically: select and copy the text.');
+  }
 }
 
 function paymentStatusLabel(payment) {
@@ -856,6 +956,64 @@ function onlineContributionBalance() {
   };
 }
 
+function participantPaymentCausale() {
+  const recipient = String(activeMember?.displayName || activeInvite?.displayName || '').trim();
+  return ['Egadi Sailing Experience', localized('quota equipaggio', 'crew contribution'), recipient]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function paymentInstructionCopyControl(value, label) {
+  return `<button class="participant-payment-copy" type="button" data-copy-payment-instruction="${escapeHtml(value)}">${escapeHtml(label)}</button>`;
+}
+
+function participantPaymentInstructionsMarkup(onlineContribution) {
+  if (onlineContribution.isExempt || !onlineContribution.hasTarget || onlineContribution.remainingCents <= 0) return '';
+  if (!paymentInstructionsAreReady()) {
+    return `<section class="participant-payment-instructions participant-payment-instructions-waiting">
+      <p class="eyebrow">${escapeHtml(localized('Come versare', 'How to pay'))}</p>
+      <h5>${escapeHtml(localized('Coordinate in aggiornamento', 'Payment details being updated'))}</h5>
+      <p>${escapeHtml(localized('Lo skipper non ha ancora pubblicato qui i metodi di versamento. Non serve un nuovo invito: torna in questa sezione tra poco oppure chiedi allo skipper di completare il profilo di incasso.', 'The skipper has not published payment details here yet. You do not need a new invitation: return to this section shortly or ask the skipper to complete the payment profile.'))}</p>
+    </section>`;
+  }
+  const instructions = activePaymentInstructions;
+  const methods = instructions.paymentMethods || {};
+  const details = instructions.paymentDetails || {};
+  const bankTransfer = details.bankTransfer || {};
+  const collectorName = String(instructions.collectorName || '').trim() || localized('lo skipper', 'the skipper');
+  const remaining = formatCurrency(onlineContribution.remainingCents / 100);
+  const causale = participantPaymentCausale();
+  const methodCards = [];
+  const paypalUrl = methods.paypal === true ? safeHttpsPaymentUrl(details.paypal) : '';
+  const satispayUrl = methods.satispay === true ? safeHttpsPaymentUrl(details.satispay) : '';
+  const revolutUrl = methods.revolut === true ? safeHttpsPaymentUrl(details.revolut) : '';
+  const revolutTag = methods.revolut === true ? safeRevolutRevtag(details.revolut) : '';
+  const iban = methods.bankTransfer === true ? String(bankTransfer.iban || '').trim() : '';
+  const accountHolder = methods.bankTransfer === true ? String(bankTransfer.accountHolder || '').trim() : '';
+  if (paypalUrl) {
+    methodCards.push(`<article class="participant-payment-method"><span>${escapeHtml(paymentMethodLabel('paypal'))}</span><a class="button button-ghost" href="${escapeHtml(paypalUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(localized('Apri PayPal', 'Open PayPal'))}</a></article>`);
+  }
+  if (satispayUrl) {
+    methodCards.push(`<article class="participant-payment-method"><span>${escapeHtml(paymentMethodLabel('satispay'))}</span><a class="button button-ghost" href="${escapeHtml(satispayUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(localized('Apri Satispay', 'Open Satispay'))}</a></article>`);
+  }
+  if (revolutUrl) {
+    methodCards.push(`<article class="participant-payment-method"><span>${escapeHtml(paymentMethodLabel('revolut'))}</span><a class="button button-ghost" href="${escapeHtml(revolutUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(localized('Apri Revolut', 'Open Revolut'))}</a></article>`);
+  } else if (revolutTag) {
+    methodCards.push(`<article class="participant-payment-method"><span>${escapeHtml(paymentMethodLabel('revolut'))}</span><strong>${escapeHtml(revolutTag)}</strong>${paymentInstructionCopyControl(revolutTag, localized('Copia Revtag', 'Copy Revtag'))}</article>`);
+  }
+  if (iban && accountHolder) {
+    methodCards.push(`<article class="participant-payment-method participant-payment-method-bank"><span>${escapeHtml(paymentMethodLabel('bankTransfer'))}</span><strong>${escapeHtml(accountHolder)}</strong><code>${escapeHtml(iban)}</code>${paymentInstructionCopyControl(iban, localized('Copia IBAN', 'Copy IBAN'))}</article>`);
+  }
+  return `<section class="participant-payment-instructions">
+    <div><p class="eyebrow">${escapeHtml(localized('Come versare', 'How to pay'))}</p><h5>${escapeHtml(localized(`Da versare ora: ${remaining}`, `Amount to pay now: ${remaining}`))}</h5></div>
+    <p>${escapeHtml(localized(`Il sito non riceve denaro. Scegli uno dei metodi indicati da ${collectorName}; dopo il versamento avvisalo così potrà verificare manualmente l’accredito.`, `The site does not receive money. Choose one of the methods provided by ${collectorName}; after paying, let them know so they can manually verify the payment.`))}</p>
+    <div class="participant-payment-methods">${methodCards.join('')}</div>
+    <div class="participant-payment-causale"><span>${escapeHtml(localized('Causale consigliata', 'Suggested payment reference'))}</span><code>${escapeHtml(causale)}</code>${paymentInstructionCopyControl(causale, localized('Copia causale', 'Copy reference'))}</div>
+    <p class="participant-payment-note">${escapeHtml(localized('Starter Pack e cauzione rimborsabile restano separati: controlla le rispettive card qui sotto per sapere cosa portare in contanti a bordo.', 'The Starter Pack and refundable deposit remain separate: check their cards below to see what to bring in cash on board.'))}</p>
+    <p class="participant-payment-status" data-payment-instruction-status role="status" aria-live="polite"></p>
+  </section>`;
+}
+
 function verifiedContributionDetail(totals) {
   const parts = [];
   if (totals.verifiedAdvanceCents > 0) {
@@ -952,7 +1110,9 @@ function personalContributionSummary(groupId, planItemId, projectionField) {
   if (totals.pendingCents) {
     return {
       value: `${formatCurrency(totals.pendingCents / 100)} ${localized('da regolare', 'to settle')}`,
-      detail: localized('I dettagli del metodo scelto sono nel messaggio WhatsApp dello skipper.', 'The chosen payment method details are in the skipper’s WhatsApp message.'),
+      detail: paymentInstructionsAreReady()
+        ? localized('Apri il riquadro “Come versare” qui sopra per scegliere il metodo.', 'Open the “How to pay” panel above to choose a method.')
+        : localized('Lo skipper pubblicherà qui i metodi di versamento: non serve un nuovo invito.', 'The skipper will publish payment methods here: you do not need a new invitation.'),
     };
   }
   return {
@@ -1088,6 +1248,7 @@ function renderParticipantFinanceSummary() {
     <p class="eyebrow">${escapeHtml(localized('Il tuo riepilogo dei costi', 'Your cost summary'))}</p>
     <h4>${escapeHtml(localized('Cosa pagare e cosa portare a bordo', 'What to pay and what to bring on board'))}</h4>
     <p>${escapeHtml(localized('La quota concordata si confronta con gli accrediti che lo skipper ha realmente verificato: così acconti, saldo e richieste aperte non si confondono. Starter Pack e cauzione restano sempre separati.', 'Your agreed contribution is compared only with payments the skipper has actually verified, so advances, balance and open requests do not get mixed up. Starter Pack and refundable deposit always remain separate.'))}</p>
+    ${participantPaymentInstructionsMarkup(onlineContribution)}
     <div class="participant-finance-grid">
       ${participantFinanceRow(localized('Quota concordata da versare', 'Agreed contribution to pay'), agreedContribution, 'participant-finance-row-action')}
       ${participantFinanceRow(localized('Già versato e verificato', 'Already paid and verified'), verifiedContribution, 'participant-finance-row-action')}
@@ -1135,10 +1296,12 @@ function clearPersonalDashboard() {
   stopAnnouncementSubscription?.();
   stopContributionPlanSubscription?.();
   stopProjectionSubscription?.();
+  stopPaymentInstructionsSubscription?.();
   stopPaymentSubscription = null;
   stopAnnouncementSubscription = null;
   stopContributionPlanSubscription = null;
   stopProjectionSubscription = null;
+  stopPaymentInstructionsSubscription = null;
   activeInvite = null;
   activeBriefing = null;
   activeRuleAcceptance = null;
@@ -1147,6 +1310,7 @@ function clearPersonalDashboard() {
   activeProjection = null;
   activeCrewPayments = [];
   activeCrewAnnouncements = [];
+  activePaymentInstructions = null;
   ['#participantProfileSummary', '#participantPaymentList', '#participantFinanceSummary', '#boardingSchedule', '#participantSchedule', '#boardingRulesSummary', '#boardingRulesText', '#participantRulesSummary', '#participantRulesText', '#participantAnnouncementList', '#participantContributionIncluded', '#participantContributionSeparate'].forEach((selector) => {
     document.querySelector(selector).replaceChildren();
   });
@@ -1208,7 +1372,9 @@ function renderPayments(snapshot) {
         'Registrato dallo skipper come accredito già ricevuto: non è una nuova richiesta e non richiede WhatsApp.',
         'Recorded by the skipper as a payment already received: this is not a new request and does not require WhatsApp.',
       )
-      : translate('crew.flow.paymentDetailsInWhatsApp', 'I dettagli del pagamento sono nel messaggio WhatsApp dello skipper.');
+      : paymentInstructionsAreReady()
+        ? localized('Apri il riquadro “Come versare” nel riepilogo della tua quota.', 'Open the “How to pay” panel in your contribution summary.')
+        : localized('Lo skipper pubblicherà qui i metodi di versamento: non serve un nuovo invito.', 'The skipper will publish payment methods here: you do not need a new invitation.');
     return `<article class="payment-row"><div><strong>${formatCurrency(paymentAmount(payment))} · ${escapeHtml(reason)}</strong><span>${escapeHtml(dueDate)}</span>${installment}${methods}${legacyInstructions}<span class="payment-detail-note">${escapeHtml(detail)}</span></div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span></div></article>`;
   }).join('');
   renderParticipantFinanceSummary();
@@ -1565,10 +1731,13 @@ function stopDashboardSubscriptions() {
   stopAnnouncementSubscription?.();
   stopContributionPlanSubscription?.();
   stopProjectionSubscription?.();
+  stopPaymentInstructionsSubscription?.();
   stopPaymentSubscription = null;
   stopAnnouncementSubscription = null;
   stopContributionPlanSubscription = null;
   stopProjectionSubscription = null;
+  stopPaymentInstructionsSubscription = null;
+  activePaymentInstructions = null;
 }
 
 function startDashboardSubscriptions() {
@@ -1608,6 +1777,23 @@ function startDashboardSubscriptions() {
       () => {
         // Gli inviti legacy non hanno una proiezione; non devono perdere l'accesso alla dashboard.
         activeProjection = null;
+        renderParticipantFinanceSummary();
+        renderCrewDashboardOverview();
+      },
+    );
+  }
+  if (!stopPaymentInstructionsSubscription) {
+    stopPaymentInstructionsSubscription = onSnapshot(
+      doc(db, 'boats', activeInvite.boatId, 'paymentInstructions', 'default'),
+      (snapshot) => {
+        activePaymentInstructions = snapshot.exists() ? snapshot.data() : null;
+        renderParticipantFinanceSummary();
+        renderCrewDashboardOverview();
+      },
+      () => {
+        // Una card di pagamento non deve mai disconnettere la persona: se lo
+        // skipper non ha ancora pubblicato le coordinate, il riepilogo resta.
+        activePaymentInstructions = null;
         renderParticipantFinanceSummary();
         renderCrewDashboardOverview();
       },

@@ -362,6 +362,151 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid;
     }
 
+    // Arrivi e partenze dell'equipaggio: una persona salva soltanto le due
+    // proprie tratte dopo avere accettato il briefing. Il referente transfer
+    // non legge mai questo percorso: riceve solo una copia server-side quando
+    // la persona richiede il collegamento aeroporto ↔ Marsala e acconsente.
+    function isCrewTravelOwner(boatId, inviteId) {
+      return isPasswordCrew()
+        && exists(/databases/$(database)/documents/crewAccess/$(request.auth.uid))
+        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.userId == request.auth.uid
+        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.loginEmail == request.auth.token.email
+        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.boatId == boatId
+        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.inviteId == inviteId
+        && isInviteHolder(boatId, inviteId);
+    }
+
+    function hasValidCrewTravelPayload(inviteId, legId) {
+      let transferAirport = legId == 'outbound'
+        ? request.resource.data.destinationAirport
+        : request.resource.data.originAirport;
+      let ready = request.resource.data.state == 'ready';
+      return (legId == 'outbound' || legId == 'return')
+        && request.resource.data.keys().hasAll(['schemaVersion', 'ownerUid', 'inviteId', 'direction', 'state', 'transportMode', 'originCity', 'originAirport', 'destinationCity', 'destinationAirport', 'departureDate', 'departureTime', 'arrivalDate', 'arrivalTime', 'carrier', 'serviceNumber', 'luggageCount', 'bulkyLuggage', 'airportMarsalaChoice', 'transferOperatorConsent', 'carpoolRole', 'carpoolSeats', 'carpoolMatchConsent', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['schemaVersion', 'ownerUid', 'inviteId', 'direction', 'state', 'transportMode', 'originCity', 'originAirport', 'destinationCity', 'destinationAirport', 'departureDate', 'departureTime', 'arrivalDate', 'arrivalTime', 'carrier', 'serviceNumber', 'luggageCount', 'bulkyLuggage', 'airportMarsalaChoice', 'transferOperatorConsent', 'carpoolRole', 'carpoolSeats', 'carpoolMatchConsent', 'updatedAt', 'updatedBy'])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.inviteId == inviteId
+        && request.resource.data.direction == legId
+        && request.resource.data.state in ['draft', 'ready']
+        && request.resource.data.transportMode in ['', 'flight', 'train', 'car', 'ferry', 'other']
+        && isBoundedText(request.resource.data.originCity, 100)
+        && isOptionalIataAirport(request.resource.data.originAirport)
+        && isBoundedText(request.resource.data.destinationCity, 100)
+        && isOptionalIataAirport(request.resource.data.destinationAirport)
+        && isOptionalIsoDate(request.resource.data.departureDate)
+        && isOptionalIsoTime(request.resource.data.departureTime)
+        && isOptionalIsoDate(request.resource.data.arrivalDate)
+        && isOptionalIsoTime(request.resource.data.arrivalTime)
+        && isBoundedText(request.resource.data.carrier, 100)
+        && isBoundedText(request.resource.data.serviceNumber, 40)
+        && request.resource.data.luggageCount is int
+        && request.resource.data.luggageCount >= 0
+        && request.resource.data.luggageCount <= 12
+        && request.resource.data.bulkyLuggage is bool
+        && request.resource.data.airportMarsalaChoice in ['', 'transfer', 'independent', 'ride_offer']
+        && request.resource.data.transferOperatorConsent is bool
+        && (request.resource.data.airportMarsalaChoice == 'transfer'
+          || request.resource.data.transferOperatorConsent == false)
+        && request.resource.data.carpoolRole in ['', 'need_ride', 'offer_ride']
+        && request.resource.data.carpoolSeats is int
+        && request.resource.data.carpoolSeats >= 0
+        && request.resource.data.carpoolSeats <= 8
+        && request.resource.data.carpoolMatchConsent is bool
+        && (request.resource.data.carpoolRole != ''
+          || (request.resource.data.carpoolSeats == 0
+            && request.resource.data.carpoolMatchConsent == false))
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid
+        && (!ready || (
+          request.resource.data.transportMode != ''
+          && request.resource.data.originCity.size() > 0
+          && request.resource.data.destinationCity.size() > 0
+          && request.resource.data.departureDate.size() > 0
+          && request.resource.data.departureTime.size() > 0
+          && request.resource.data.arrivalDate.size() > 0
+          && request.resource.data.arrivalTime.size() > 0
+          && (request.resource.data.transportMode != 'flight'
+            || (request.resource.data.originAirport.size() > 0
+              && request.resource.data.destinationAirport.size() > 0))
+          && (request.resource.data.airportMarsalaChoice != 'transfer'
+            || ((transferAirport == 'TPS' || transferAirport == 'PMO')
+              && request.resource.data.transferOperatorConsent == true))
+          && (request.resource.data.airportMarsalaChoice != 'ride_offer'
+            || ((transferAirport == 'TPS' || transferAirport == 'PMO')
+              && request.resource.data.transportMode == 'car'
+              && request.resource.data.carpoolRole == 'offer_ride'
+              && request.resource.data.carpoolSeats >= 1
+              && request.resource.data.carpoolMatchConsent == true))
+          && ((request.resource.data.carpoolRole == ''
+              && request.resource.data.carpoolSeats == 0
+              && request.resource.data.carpoolMatchConsent == false)
+            || (request.resource.data.carpoolRole == 'need_ride'
+              && request.resource.data.carpoolSeats == 0
+              && request.resource.data.carpoolMatchConsent == true)
+            || (request.resource.data.carpoolRole == 'offer_ride'
+              && request.resource.data.transportMode == 'car'
+              && request.resource.data.carpoolSeats >= 1
+              && request.resource.data.carpoolMatchConsent == true))
+        ));
+    }
+
+    // Accesso operativo separato dalla Crew List: Google identifica il
+    // referente, l'organizzatore abilita il suo UID, non un link pubblico.
+    function isTransferGoogleAccount() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email is string;
+    }
+
+    function isActiveTransferOperator() {
+      return isTransferGoogleAccount()
+        && exists(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid))
+        && get(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid)).data.role == 'transfer_operator'
+        && get(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid)).data.active == true;
+    }
+
+    function hasValidTransferAccessRequest(userId) {
+      return isTransferGoogleAccount()
+        && userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['name', 'email', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['name', 'email', 'updatedAt'])
+        && isRequiredText(request.resource.data.name, 120)
+        && isRequiredText(request.resource.data.email, 160)
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function hasValidTransferOperatorRole(userId) {
+      return request.resource.data.keys().hasAll(['role', 'name', 'email', 'active', 'approvedAt', 'approvedBy', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['role', 'name', 'email', 'active', 'approvedAt', 'approvedBy', 'updatedAt'])
+        && request.resource.data.role == 'transfer_operator'
+        && request.resource.data.active == true
+        && isRequiredText(request.resource.data.name, 120)
+        && isRequiredText(request.resource.data.email, 160)
+        && exists(/databases/$(database)/documents/events/egadi-2026/transferAccessRequests/$(userId))
+        && request.resource.data.name == get(/databases/$(database)/documents/events/egadi-2026/transferAccessRequests/$(userId)).data.name
+        && request.resource.data.email == get(/databases/$(database)/documents/events/egadi-2026/transferAccessRequests/$(userId)).data.email
+        && request.resource.data.approvedAt == request.time
+        && request.resource.data.approvedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function hasSafeTransferOperationUpdate() {
+      return resource.data.recordState == 'active'
+        && request.resource.data.recordState == 'active'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'assignedOperatorUid', 'groupName', 'meetingPoint', 'meetingTime', 'vehicleName', 'operatorNotes', 'updatedAt', 'updatedBy'])
+        && request.resource.data.status in ['new', 'planned', 'confirmed', 'completed', 'cancelled']
+        && request.resource.data.assignedOperatorUid == request.auth.uid
+        && isBoundedText(request.resource.data.groupName, 120)
+        && isBoundedText(request.resource.data.meetingPoint, 160)
+        && isOptionalIsoTime(request.resource.data.meetingTime)
+        && isBoundedText(request.resource.data.vehicleName, 120)
+        && isBoundedText(request.resource.data.operatorNotes, 500)
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
     function isValidNewInvite(boatId, inviteId) {
       return request.resource.data.keys().hasAll(['id', 'boatId', 'displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'createdAt', 'createdBy'])
         && request.resource.data.keys().hasOnly(['id', 'boatId', 'displayName', 'whatsappNumber', 'phoneFingerprint', 'loginEmail', 'accessKey', 'participantUid', 'status', 'accessVersion', 'expiresAt', 'preferredLocale', 'createdAt', 'createdBy'])
@@ -1508,7 +1653,7 @@ service cloud.firestore {
           get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.inviteId);
     }
 
-    function hasValidCollectionProfile() {
+    function hasValidCollectionProfile(boatId) {
       return request.resource.data.keys().hasAll(['collectorId', 'collectorName', 'paypalEnabled', 'satispayEnabled', 'revolutEnabled', 'bankTransferEnabled', 'paymentDetails', 'updatedAt', 'updatedBy'])
         && request.resource.data.keys().hasOnly(['collectorId', 'collectorName', 'paypalEnabled', 'satispayEnabled', 'revolutEnabled', 'bankTransferEnabled', 'paymentDetails', 'updatedAt', 'updatedBy'])
         && request.resource.data.collectorId == request.auth.uid
@@ -1533,11 +1678,94 @@ service cloud.firestore {
           || (request.resource.data.paymentDetails.bankTransfer.iban != ''
             && request.resource.data.paymentDetails.bankTransfer.accountHolder != ''))
         && request.resource.data.updatedAt == request.time
-        && request.resource.data.updatedBy == request.auth.uid;
+        && request.resource.data.updatedBy == request.auth.uid
+        && hasMatchingCrewPaymentInstructions(boatId);
     }
 
     function collectionProfileExists(boatId) {
       return exists(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default);
+    }
+
+    // Copia ridotta del profilo di incasso, leggibile soltanto da skipper,
+    // organizzatore e partecipanti che hanno accettato il briefing corrente.
+    // Deve riflettere esattamente i dati abilitati del profilo privato: così
+    // non può diventare un secondo punto in cui inserire coordinate diverse.
+    function hasValidCrewPaymentInstructionMethods(methods) {
+      return methods is map
+        && methods.keys().hasAll(['paypal', 'satispay', 'revolut', 'bankTransfer'])
+        && methods.keys().hasOnly(['paypal', 'satispay', 'revolut', 'bankTransfer'])
+        && methods.paypal is bool
+        && methods.satispay is bool
+        && methods.revolut is bool
+        && methods.bankTransfer is bool
+        && (methods.paypal == true
+          || methods.satispay == true
+          || methods.revolut == true
+          || methods.bankTransfer == true);
+    }
+
+    function hasMatchingCrewPaymentInstructions(boatId) {
+      return existsAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default)
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.keys().hasAll(['schemaVersion', 'collectorName', 'paymentMethods', 'paymentDetails', 'updatedAt'])
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.keys().hasOnly(['schemaVersion', 'collectorName', 'paymentMethods', 'paymentDetails', 'updatedAt'])
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.schemaVersion == 1
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.collectorName == request.resource.data.collectorName
+        && hasValidCrewPaymentInstructionMethods(getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentMethods)
+        && hasValidPaymentDetails(getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails)
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentMethods.paypal == request.resource.data.paypalEnabled
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentMethods.satispay == request.resource.data.satispayEnabled
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentMethods.revolut == request.resource.data.revolutEnabled
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentMethods.bankTransfer == request.resource.data.bankTransferEnabled
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails.paypal
+          == (request.resource.data.paypalEnabled ? request.resource.data.paymentDetails.paypal : '')
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails.satispay
+          == (request.resource.data.satispayEnabled ? request.resource.data.paymentDetails.satispay : '')
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails.revolut
+          == (request.resource.data.revolutEnabled ? request.resource.data.paymentDetails.revolut : '')
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails.bankTransfer.iban
+          == (request.resource.data.bankTransferEnabled ? request.resource.data.paymentDetails.bankTransfer.iban : '')
+        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails.bankTransfer.accountHolder
+          == (request.resource.data.bankTransferEnabled ? request.resource.data.paymentDetails.bankTransfer.accountHolder : '');
+    }
+
+    function hasValidCrewPaymentInstructions(boatId) {
+      return existsAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default)
+        && request.resource.data.keys().hasAll(['schemaVersion', 'collectorName', 'paymentMethods', 'paymentDetails', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['schemaVersion', 'collectorName', 'paymentMethods', 'paymentDetails', 'updatedAt'])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.collectorName
+          == getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.collectorName
+        && hasValidCrewPaymentInstructionMethods(request.resource.data.paymentMethods)
+        && hasValidPaymentDetails(request.resource.data.paymentDetails)
+        && request.resource.data.paymentMethods.paypal
+          == getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paypalEnabled
+        && request.resource.data.paymentMethods.satispay
+          == getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.satispayEnabled
+        && request.resource.data.paymentMethods.revolut
+          == getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.revolutEnabled
+        && request.resource.data.paymentMethods.bankTransfer
+          == getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.bankTransferEnabled
+        && request.resource.data.paymentDetails.paypal
+          == (getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paypalEnabled
+            ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paymentDetails.paypal
+            : '')
+        && request.resource.data.paymentDetails.satispay
+          == (getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.satispayEnabled
+            ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paymentDetails.satispay
+            : '')
+        && request.resource.data.paymentDetails.revolut
+          == (getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.revolutEnabled
+            ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paymentDetails.revolut
+            : '')
+        && request.resource.data.paymentDetails.bankTransfer.iban
+          == (getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.bankTransferEnabled
+            ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paymentDetails.bankTransfer.iban
+            : '')
+        && request.resource.data.paymentDetails.bankTransfer.accountHolder
+          == (getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.bankTransferEnabled
+            ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paymentDetails.bankTransfer.accountHolder
+            : '')
+        && request.resource.data.updatedAt == request.time;
     }
 
     function inviteExists(boatId, inviteId) {
@@ -1841,6 +2069,52 @@ service cloud.firestore {
       allow write: if isOrganizer();
     }
 
+    // Richiesta e abilitazione sono separate: il referente conosce solo la
+    // propria richiesta e il proprio ruolo; l'organizzatore vede le richieste
+    // e puo' concedere o revocare l'accesso alla coda transfer.
+    match /events/egadi-2026/transferAccessRequests/{userId} {
+      allow get: if isPrivateAreaOpen()
+        && (isOrganizer() || (isTransferGoogleAccount() && userId == request.auth.uid));
+      allow list: if isPrivateAreaOpen() && isOrganizer();
+      allow create, update: if isPrivateAreaOpen() && hasValidTransferAccessRequest(userId);
+      allow delete: if isPrivateAreaOpen() && isOrganizer();
+    }
+
+    match /events/egadi-2026/transferOperators/{userId} {
+      allow get: if isPrivateAreaOpen()
+        && (isOrganizer() || (isTransferGoogleAccount() && userId == request.auth.uid));
+      allow list: if isPrivateAreaOpen() && isOrganizer();
+      allow create, update: if isPrivateAreaOpen()
+        && isOrganizer()
+        && hasValidTransferOperatorRole(userId);
+      allow delete: if isPrivateAreaOpen() && isOrganizer();
+    }
+
+    // Questa e' l'unica coda letta dalla societa incaricata. Viene popolata
+    // dal server dopo il consenso esplicito: la societa non vede barche,
+    // Crew List, pagamenti, documenti ne' spostamenti privati non richiesti.
+    match /events/egadi-2026/transferOpsRecords/{recordId} {
+      allow get, list: if isPrivateAreaOpen() && (isOrganizer() || isActiveTransferOperator());
+      allow update: if isPrivateAreaOpen()
+        && (isOrganizer() || isActiveTransferOperator())
+        && hasSafeTransferOperationUpdate();
+      allow create, delete: if false;
+    }
+
+    // Backup, mappa righe e configurazione del Google Sheet sono esclusivi
+    // della funzione server e non vengono mai esposti al browser.
+    match /events/egadi-2026/travelBackupRecords/{recordId} {
+      allow read, write: if false;
+    }
+
+    match /events/egadi-2026/transferSheetRows/{recordId} {
+      allow read, write: if false;
+    }
+
+    match /events/egadi-2026/integrations/{integrationId} {
+      allow read, write: if false;
+    }
+
     match /events/egadi-2026/publicFleet/{publicId} {
       // Dati dichiarati dallo skipper per la sola vetrina: nessun contatto,
       // UID, ID barca, invito, Crew List o pagamento è presente qui.
@@ -2036,6 +2310,24 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // Le due tratte personali dell'equipaggio restano separate dalla
+      // scheda charter. La lettura e la scrittura sono puntuali e owner-only:
+      // niente lista e niente visibilita' per skipper o altri partecipanti.
+      match /crewTravel/{inviteId}/legs/{legId} {
+        allow get: if isPrivateAreaOpen()
+          && (legId == 'outbound' || legId == 'return')
+          && isCrewTravelOwner(boatId, inviteId)
+          && exists(/databases/$(database)/documents/boats/$(boatId)/members/$(inviteId))
+          && hasCurrentBriefingAcceptance(boatId, inviteId);
+        allow list: if false;
+        allow create, update: if isPrivateAreaOpen()
+          && isCrewTravelOwner(boatId, inviteId)
+          && exists(/databases/$(database)/documents/boats/$(boatId)/members/$(inviteId))
+          && hasCurrentBriefingAcceptance(boatId, inviteId)
+          && hasValidCrewTravelPayload(inviteId, legId);
+        allow delete: if false;
+      }
+
       // Percorso legacy: il nuovo accesso usa soltanto /crewAccess/{uid}.
       match /participantAccess/{userId} {
         allow read, write: if false;
@@ -2046,7 +2338,24 @@ service cloud.firestore {
       match /collectionProfile/{profileId} {
         allow get: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId);
         allow list: if false;
-        allow create, update: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId) && hasValidCollectionProfile();
+        allow create, update: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId) && hasValidCollectionProfile(boatId);
+        allow delete: if false;
+      }
+
+      // Le coordinate già abilitate dallo skipper non sono pubbliche e non
+      // compaiono nella Crew List. Dopo il briefing, però, la persona può
+      // ritrovarle nella propria area senza dover recuperare WhatsApp.
+      match /paymentInstructions/{instructionId} {
+        allow get: if isPrivateAreaOpen()
+          && instructionId == 'default'
+          && (isOrganizer()
+            || isSkipper(boatId)
+            || hasCurrentParticipantBriefingAcceptance(boatId));
+        allow list: if false;
+        allow create, update: if isPrivateAreaOpen()
+          && instructionId == 'default'
+          && isSkipper(boatId)
+          && hasValidCrewPaymentInstructions(boatId);
         allow delete: if false;
       }
 

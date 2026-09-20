@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Arrivi e partenze personali per Egadi Sailing Experience." />
+  <title>Arrivi &amp; partenze · Egadi Sailing Experience</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=20260920-travel-private-v1" />
+</head>
+<body class="area-page">
+  <a class="skip-link" href="#main-content" data-i18n="page.shared.skipToMain">Vai al contenuto principale</a>
+  <header class="site-header">
+    <a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-menu" aria-label="Apri menu" data-i18n-aria-label="common.openMenu"><span class="menu-toggle-label" data-i18n="common.menu">Menu</span><span class="menu-toggle-icon" aria-hidden="true"></span></button>
+    <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale" data-i18n-aria-label="common.mainNavigation"><a href="index.html" data-i18n="nav.journey">Il viaggio</a><a href="flotta.html" data-i18n="nav.fleet">Flottiglia</a><a href="passage-plan.html" data-i18n="nav.passagePlan">Passage Plan</a><a href="arrivi-partenze.html" data-i18n="nav.arrivalsDepartures">Arrivi &amp; partenze</a><a href="film.html" data-i18n="nav.film">Il film</a><a href="accesso.html" data-i18n="nav.privateArea">Area riservata</a></nav>
+  </header>
+  <button class="menu-backdrop" type="button" aria-label="Chiudi menu" data-i18n-aria-label="common.closeMenu" hidden></button>
+  <main id="main-content" class="area-main participant-main">
+    <section class="area-hero participant-hero">
+      <p class="eyebrow" id="travelHeroEyebrow">La tua logistica</p>
+      <h1 id="travelHeroTitle">Arrivi e partenze,<br /><em>senza rincorrere messaggi.</em></h1>
+      <p id="travelHeroDescription">Salva quello che sai già, anche se non hai ancora tutti i biglietti. La società transfer vedrà i dati solo dopo il tuo consenso.</p>
+    </section>
+
+    <section id="travelOpening" class="access-cards access-cards-single">
+      <article>
+        <p class="eyebrow" id="travelOpeningEyebrow">Area personale</p>
+        <h2 id="travelOpeningTitle">Apro i tuoi spostamenti.</h2>
+        <p id="travelOpeningMessage" class="form-message" role="status" aria-live="polite">Controllo il tuo accesso…</p>
+      </article>
+    </section>
+
+    <section id="travelBlocked" class="access-cards access-cards-single" hidden>
+      <article>
+        <p class="eyebrow" id="travelBlockedEyebrow">Prima il briefing</p>
+        <h2 id="travelBlockedTitle">Completa l’ingresso a bordo.</h2>
+        <p id="travelBlockedMessage" class="form-message" role="status" aria-live="polite"></p>
+        <a id="travelBlockedLink" class="button button-primary" href="my-area.html">Torna alla mia area</a>
+      </article>
+    </section>
+
+    <section id="travelWorkspace" class="section dashboard" hidden>
+      <div class="dashboard-heading">
+        <div>
+          <p class="eyebrow" id="travelWorkspaceEyebrow">Arrivi &amp; partenze</p>
+          <h2 id="travelWorkspaceTitle">Il tuo viaggio verso Marsala</h2>
+          <p id="travelWorkspaceLead" class="panel-lead">Le due card sono indipendenti: puoi salvare una bozza e completarla quando hai gli orari definitivi.</p>
+        </div>
+        <a id="backToMyArea" class="button button-ghost" href="my-area.html">La mia area</a>
+      </div>
+      <article class="dashboard-panel" aria-labelledby="travelFlowTitle">
+        <p class="eyebrow" id="travelFlowEyebrow">Come funziona</p>
+        <h3 id="travelFlowTitle">Pochi dati, nel posto giusto.</h3>
+        <div id="travelFlowSteps" class="schedule-list"></div>
+      </article>
+      <div id="travelForms" class="skipper-travel-grid" aria-live="polite"></div>
+    </section>
+  </main>
+  <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html" data-i18n="nav.journey">Il viaggio</a><a href="flotta.html" data-i18n="nav.fleet">Flottiglia</a><a href="passage-plan.html" data-i18n="nav.passagePlan">Passage Plan</a><a href="arrivi-partenze.html" data-i18n="nav.arrivalsDepartures">Arrivi &amp; partenze</a><a href="film.html" data-i18n="nav.film">Il film</a><a href="accesso.html" data-i18n="nav.privateArea">Area riservata</a><a href="privacy.html" data-i18n="nav.privacy">Privacy e dati</a></div></footer>
+  <script src="i18n.js?v=20260914-en2"></script>
+  <script src="i18n-crew.js?v=20260919-live-privacy-v1"></script>
+  <script src="app.js?v=20260914-en2"></script>
+  <script type="module" src="travel.js?v=20260920-travel-private-v2"></script>
+</body>
+</html>

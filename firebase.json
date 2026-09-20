@@ -1,4 +1,10 @@
 {
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "egadi-transfer"
+    }
+  ],
   "firestore": {
     "rules": "firestore.rules"
   },

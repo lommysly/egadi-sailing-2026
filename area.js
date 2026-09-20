@@ -26,6 +26,7 @@ const dashboard = document.querySelector('#dashboard');
 const signInButton = document.querySelector('#signInButton');
 const authMessage = document.querySelector('#authMessage');
 const PAYMENT_PROFILE_ID = 'default';
+const CREW_PAYMENT_INSTRUCTIONS_ID = 'default';
 const COST_PLAN_ID = 'default';
 const SKIPPER_PROFILE_ID = 'default';
 const PAYMENT_PRIVATE_MESSAGE_ID = 'message';
@@ -2689,6 +2690,33 @@ function availablePaymentMethods() {
   const profile = activePaymentProfile || defaultPaymentProfile();
   return PAYMENT_METHODS.filter((method) => profile[method.profileField] === true
     && isValidPaymentDetail(method, profile.paymentDetails));
+}
+
+// Questa copia è intenzionalmente più piccola del profilo skipper: serve
+// soltanto a far ritrovare all'equipaggio già confermato gli stessi metodi
+// scelti dallo skipper. Non contiene credenziali, dati della carta o note
+// private di una singola richiesta.
+function crewPaymentInstructionsFromProfile(profile = activePaymentProfile) {
+  const source = profile || defaultPaymentProfile();
+  const details = normalizePaymentDetails(source.paymentDetails);
+  const paymentMethods = Object.fromEntries(PAYMENT_METHODS.map((method) => [
+    method.id,
+    source[method.profileField] === true && isValidPaymentDetail(method, details),
+  ]));
+  return {
+    schemaVersion: 1,
+    collectorName: normalizePaymentText(source.collectorName, 100),
+    paymentMethods,
+    paymentDetails: {
+      paypal: paymentMethods.paypal ? details.paypal : '',
+      satispay: paymentMethods.satispay ? details.satispay : '',
+      revolut: paymentMethods.revolut ? details.revolut : '',
+      bankTransfer: paymentMethods.bankTransfer
+        ? details.bankTransfer
+        : { iban: '', accountHolder: '' },
+    },
+    updatedAt: serverTimestamp(),
+  };
 }
 
 function paymentMethodsFor(payment) {
@@ -7043,10 +7071,15 @@ paymentProfileForm.addEventListener('submit', async (event) => {
       updatedAt: serverTimestamp(),
       updatedBy: auth.currentUser.uid,
     };
-    await setDoc(doc(db, 'boats', activeBoat.id, 'collectionProfile', PAYMENT_PROFILE_ID), profile);
+    const profileRef = doc(db, 'boats', activeBoat.id, 'collectionProfile', PAYMENT_PROFILE_ID);
+    const crewInstructionsRef = doc(db, 'boats', activeBoat.id, 'paymentInstructions', CREW_PAYMENT_INSTRUCTIONS_ID);
+    const batch = writeBatch(db);
+    batch.set(profileRef, profile);
+    batch.set(crewInstructionsRef, crewPaymentInstructionsFromProfile(profile));
+    await batch.commit();
     activePaymentProfile = { ...defaultPaymentProfile(), ...profile };
     renderPaymentMethodOptions();
-    setMessage(document.querySelector('#paymentProfileMessage'), 'Profilo di incasso salvato. I dettagli saranno aggiunti automaticamente alle richieste WhatsApp.');
+    setMessage(document.querySelector('#paymentProfileMessage'), 'Profilo di incasso salvato. Dopo il briefing, l’equipaggio trova qui nella propria area metodi e causale; WhatsApp resta un promemoria facoltativo.');
   } catch (error) {
     setMessage(document.querySelector('#paymentProfileMessage'), 'Non riesco a salvare i metodi di incasso.', true);
   } finally {

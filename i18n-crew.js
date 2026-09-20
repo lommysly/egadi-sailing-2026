@@ -139,7 +139,7 @@
           contributionHint: 'Questo è lo stesso riepilogo che hai ricevuto con l’invito. La quota da versare, lo Starter Pack e la cauzione restano sempre separati.',
           paymentsEyebrow: 'Versamenti e conferme',
           paymentsTitle: 'Aggiornamenti sulla mia quota',
-          paymentsHint: 'Il sito non riceve denaro. Qui compaiono solo promemoria, eventuali extra o conferme dello skipper; il riepilogo iniziale è qui sopra.',
+          paymentsHint: 'Il sito non riceve denaro. Nel riepilogo costi qui sopra trovi metodi disponibili e causale; qui compaiono conferme, promemoria o eventuali extra dello skipper.',
         },
       },
       crew: {
@@ -370,7 +370,7 @@
           contributionHint: 'This is the same summary you received in your invitation. The contribution to pay, Starter Pack and refundable deposit always remain separate.',
           paymentsEyebrow: 'Payments and confirmations',
           paymentsTitle: 'Updates about my contribution',
-          paymentsHint: 'The website does not collect money. This section only shows reminders, possible extras or skipper confirmations; your original summary is above.',
+          paymentsHint: 'The website does not collect money. Your cost summary above shows available payment methods and a payment reference; this section shows confirmations, reminders and any extras from the skipper.',
         },
       },
       crew: {

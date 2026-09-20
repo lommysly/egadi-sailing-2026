@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="it" data-i18n-attr="lang:page.shared.locale">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Area riservata per la gestione dei transfer di Egadi Sailing Experience." />
+  <title>Area transfer · Egadi Sailing Experience</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=20260914-starter-pack-v4" />
+  <style>
+    .transfer-operator-main { padding-bottom:90px; }
+    .transfer-operator-hero { max-width:940px; }
+    .transfer-operator-app { display:grid; gap:18px; }
+    .transfer-operator-card { padding:clamp(24px,4vw,38px); border-radius:18px; background:var(--paper); }
+    .transfer-operator-card h2 { margin:0; font:600 clamp(2.15rem,4vw,3.8rem)/.94 "Fraunces",serif; letter-spacing:-.055em; }
+    .transfer-operator-card h3 { margin:0; font:600 1.65rem/.98 "Fraunces",serif; letter-spacing:-.04em; }
+    .transfer-operator-card p { max-width:720px; line-height:1.58; }
+    .transfer-operator-notice { display:grid; grid-template-columns:auto minmax(0,1fr); gap:14px; align-items:start; padding:18px; border:1px solid rgba(8,123,138,.24); border-radius:14px; background:#e8f8f6; }
+    .transfer-operator-notice-icon { display:grid; width:35px; height:35px; place-items:center; border-radius:50%; background:#087b8a; color:white; font-weight:700; }
+    .transfer-operator-notice strong,.transfer-operator-notice span { display:block; }
+    .transfer-operator-notice span { margin-top:4px; color:#416b6d; font-size:.88rem; line-height:1.45; }
+    .transfer-operator-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; }
+    .transfer-operator-toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:end; padding:22px; border-radius:16px; background:#063644; color:white; }
+    .transfer-operator-toolbar .eyebrow { margin-bottom:8px; color:#9ff5ed; }
+    .transfer-operator-toolbar h2 { margin:0; color:white; font:600 clamp(1.9rem,3vw,3rem)/.98 "Fraunces",serif; letter-spacing:-.045em; }
+    .transfer-operator-toolbar p:last-child { max-width:650px; margin:8px 0 0; color:rgba(255,255,255,.82); line-height:1.45; }
+    .transfer-operator-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .transfer-operator-summary article { padding:17px; border-radius:13px; background:rgba(255,255,255,.1); color:white; }
+    .transfer-operator-summary span { display:block; color:#9ff5ed; font:.64rem "DM Mono",monospace; letter-spacing:.07em; text-transform:uppercase; }
+    .transfer-operator-summary strong { display:block; margin-top:8px; font:600 1.48rem/1 "Fraunces",serif; }
+    .transfer-operator-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:0; padding:18px; border-radius:14px; background:#f7fffe; }
+    .transfer-operator-filters label { display:grid; gap:7px; color:#416b6d; font-size:.73rem; font-weight:700; }
+    .transfer-operator-filters select,.transfer-operator-filters input,.transfer-record-form input,.transfer-record-form textarea,.transfer-record-form select { width:100%; border:1px solid rgba(17,45,56,.24); border-radius:8px; padding:10px 11px; color:var(--ink); background:white; font:400 .95rem "DM Sans",sans-serif; }
+    .transfer-operator-list { display:grid; gap:12px; }
+    .transfer-record { border:1px solid rgba(8,123,138,.19); border-radius:15px; overflow:hidden; background:var(--paper); }
+    .transfer-record > summary { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; align-items:center; padding:18px; cursor:pointer; list-style:none; }
+    .transfer-record > summary::-webkit-details-marker { display:none; }
+    .transfer-record-summary-copy { display:grid; gap:5px; min-width:0; }
+    .transfer-record-summary-copy strong { overflow-wrap:anywhere; font:600 1.25rem/1.04 "Fraunces",serif; }
+    .transfer-record-summary-copy span { color:#416b6d; font-size:.85rem; line-height:1.38; }
+    .transfer-record-badges { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+    .transfer-badge { display:inline-flex; align-items:center; min-height:27px; border-radius:999px; padding:0 10px; background:#e8f8f6; color:#063644; font:700 .66rem "DM Mono",monospace; letter-spacing:.035em; text-transform:uppercase; white-space:nowrap; }
+    .transfer-badge--confirmed,.transfer-badge--completed { background:#dff6df; color:#21643a; }
+    .transfer-badge--cancelled { background:#fde7e2; color:#9c3d2a; }
+    .transfer-record-body { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:20px; padding:0 18px 18px; border-top:1px solid var(--line); }
+    .transfer-record-details { display:grid; gap:10px; align-content:start; padding-top:18px; }
+    .transfer-record-details div { display:grid; gap:3px; padding-bottom:9px; border-bottom:1px solid rgba(17,45,56,.1); }
+    .transfer-record-details dt { color:#416b6d; font:.66rem "DM Mono",monospace; letter-spacing:.06em; text-transform:uppercase; }
+    .transfer-record-details dd { margin:0; overflow-wrap:anywhere; font-size:.91rem; line-height:1.4; }
+    .transfer-record-contact a { color:#087b8a; text-underline-offset:3px; }
+    .transfer-record-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding-top:18px; }
+    .transfer-record-form label { display:grid; gap:7px; font-size:.73rem; font-weight:700; }
+    .transfer-record-form label[data-wide] { grid-column:1 / -1; }
+    .transfer-record-form textarea { min-height:90px; resize:vertical; }
+    .transfer-record-form .form-actions { grid-column:1 / -1; margin:4px 0 0; }
+    .transfer-request-list { display:grid; gap:10px; margin-top:18px; }
+    .transfer-access-request { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; align-items:center; padding:16px; border:1px solid var(--line); border-radius:13px; background:#f7fffe; }
+    .transfer-access-request strong,.transfer-access-request span { display:block; }
+    .transfer-access-request span { margin-top:4px; color:#416b6d; font-size:.83rem; overflow-wrap:anywhere; }
+    .transfer-access-request-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+    .transfer-empty { margin:0; padding:30px; border:1px dashed rgba(8,123,138,.34); border-radius:14px; color:#416b6d; text-align:center; }
+    .transfer-sheet-link { color:#9ff5ed; text-underline-offset:3px; }
+    @media (max-width:800px) {
+      .transfer-operator-toolbar,.transfer-record-body { grid-template-columns:1fr; }
+      .transfer-operator-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .transfer-operator-filters,.transfer-record-form { grid-template-columns:1fr; }
+      .transfer-record-form label[data-wide],.transfer-record-form .form-actions { grid-column:auto; }
+      .transfer-access-request { grid-template-columns:1fr; }
+      .transfer-access-request-actions { justify-content:flex-start; }
+    }
+    @media (max-width:430px) {
+      .transfer-operator-summary { grid-template-columns:1fr; }
+      .transfer-record > summary { grid-template-columns:1fr; }
+      .transfer-record-badges { justify-content:flex-start; }
+      .transfer-operator-notice { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body class="area-page">
+  <a class="skip-link" href="#main-content" data-i18n="page.shared.skipToContent">Vai al contenuto principale</a>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Egadi Sailing Experience, home" data-i18n-attr="aria-label:page.shared.homeLink"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-menu" aria-label="Apri menu" data-i18n-attr="aria-label:page.shared.openMenu"><span class="menu-toggle-label" data-i18n="page.shared.menu">Menu</span><span class="menu-toggle-icon" aria-hidden="true"></span></button>
+    <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale" data-i18n-attr="aria-label:page.shared.primaryNavigation"><a href="index.html" data-i18n="page.shared.navJourney">Il viaggio</a><a href="flotta.html" data-i18n="page.shared.navFleet">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html" data-i18n="page.shared.navArrivalsDepartures">Arrivi &amp; partenze</a><a href="film.html" data-i18n="page.shared.navFilm">Il film</a><a href="accesso.html" data-i18n="page.shared.navPrivateArea">Area riservata</a></nav>
+  </header>
+  <button class="menu-backdrop" type="button" aria-label="Chiudi menu" data-i18n-attr="aria-label:page.shared.closeMenu" hidden></button>
+
+  <main id="main-content" class="area-main transfer-operator-main">
+    <section id="transferHero" class="area-hero transfer-operator-hero"></section>
+    <section id="transferApp" class="transfer-operator-app" aria-live="polite"></section>
+  </main>
+
+  <footer class="site-footer">
+    <div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><p data-i18n="page.shared.footerDates">8—11 ottobre 2026 · Marsala</p></div>
+    <div><a href="index.html" data-i18n="page.shared.navJourney">Il viaggio</a><a href="flotta.html" data-i18n="page.shared.navFleet">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html" data-i18n="page.shared.navArrivalsDepartures">Arrivi &amp; partenze</a><a href="film.html" data-i18n="page.shared.navFilm">Il film</a><a href="accesso.html" data-i18n="page.shared.navPrivateArea">Area riservata</a><a href="privacy.html" data-i18n="page.shared.navPrivacy">Privacy e dati</a></div>
+  </footer>
+  <script src="i18n.js?v=20260914-en2"></script>
+  <script src="i18n-public-core.js?v=20260914-editorial3"></script>
+  <script src="i18n-public-support.js?v=20260920-travel-live-v1"></script>
+  <script src="app.js?v=20260914-en2"></script>
+  <script type="module" src="transfer.js?v=20260920-transfer-operator-v1"></script>
+</body>
+</html>
