@@ -21,6 +21,7 @@ installInputNormalization();
 installTravelAutocomplete();
 const signInCard = document.querySelector('#signInCard');
 const accountCard = document.querySelector('#accountCard');
+const transferManagementLink = document.querySelector('#transferManagementLink');
 const registerSection = document.querySelector('#registra-barca');
 const dashboard = document.querySelector('#dashboard');
 const signInButton = document.querySelector('#signInButton');
@@ -2504,6 +2505,7 @@ async function publishExistingBoatToFleet(boat) {
 }
 
 function resetPrivateView() {
+  if (transferManagementLink) transferManagementLink.hidden = true;
   resetSkipperDocumentCopies('idle');
   activeBoat = null;
   activeMembers = [];
@@ -5174,16 +5176,10 @@ function charterWhatsAppDraft() {
   return 'Ciao, invio in allegato la Crew List di ' + boatName + ' per Egadi Sailing Experience 8-11 ottobre 2026, insieme alle copie di patente nautica e certificato radio di ' + skipperName + '. Rimango disponibile se servono integrazioni o un formato diverso. Grazie.';
 }
 
-function projectionActionButton(attribute, id, label, icon, tone = '') {
-  const classes = ['projection-action', 'projection-action-icon-only'];
-  if (tone) classes.push(`projection-action-${tone}`);
-  return `<button class="${classes.join(' ')}" type="button" data-${attribute}="${escapeHtml(id)}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span></button>`;
-}
-
-function projectionActionTextButton(attribute, id, label, icon, tone = '') {
+function projectionActionTextButton(attribute, id, label, icon, tone = '', accessibleLabel = label) {
   const classes = ['projection-action'];
   if (tone) classes.push(`projection-action-${tone}`);
-  return `<button class="${classes.join(' ')}" type="button" data-${attribute}="${escapeHtml(id)}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></button>`;
+  return `<button class="${classes.join(' ')}" type="button" data-${attribute}="${escapeHtml(id)}" aria-label="${escapeHtml(accessibleLabel)}" title="${escapeHtml(accessibleLabel)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></button>`;
 }
 
 function projectionActionLink(url, label, icon, tone = '', { newTab = false } = {}) {
@@ -5194,23 +5190,31 @@ function projectionActionLink(url, label, icon, tone = '', { newTab = false } = 
   return `<a class="${classes.join(' ')}" href="${escapeHtml(url)}"${target} aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></a>`;
 }
 
-function inviteDeliveryActions(invite) {
+function projectionMoreActions(actions) {
+  const availableActions = actions.filter(Boolean);
+  if (!availableActions.length) return '';
+  return `<details class="projection-more-actions"><summary>Altre opzioni</summary><div class="projection-more-actions-list">${availableActions.join('')}</div></details>`;
+}
+
+function invitePrimaryAction(invite) {
+  if (!isInvitationLinkReady(invite)) return '';
+  return projectionActionLink(whatsappUrl(invite), 'Invia su WhatsApp', whatsappIconSvg(), 'primary');
+}
+
+function inviteDeliveryAlternatives(invite) {
   if (!isInvitationLinkReady(invite)) return [];
   return [
     projectionActionTextButton('copy-invite', invite.id, 'Copia link', '⧉'),
-    projectionActionLink(whatsappUrl(invite), 'Apri WhatsApp', whatsappIconSvg(), 'primary'),
-    projectionActionLink(whatsappUrl(invite, { mode: 'web' }), 'WhatsApp Web', '↗', '', { newTab: true }),
+    projectionActionLink(whatsappUrl(invite, { mode: 'web' }), 'Apri nel browser', '↗', '', { newTab: true }),
   ];
 }
 
-function inviteRenewalAction(invite, displayName, { compact = false } = {}) {
+function inviteRenewalAction(invite, displayName) {
   const activeAccess = invite.status === 'active';
-  const label = activeAccess
+  const accessibleLabel = activeAccess
     ? `Genera un nuovo link WhatsApp per ${displayName}: revoca l’accesso attuale`
     : `Genera un nuovo link WhatsApp per ${displayName}`;
-  return compact
-    ? projectionActionButton('reissue-invite', invite.id, label, '↻', 'release')
-    : projectionActionTextButton('reissue-invite', invite.id, activeAccess ? 'Nuovo link · revoca il precedente' : 'Crea nuovo link WhatsApp', '↻', 'primary');
+  return projectionActionTextButton('reissue-invite', invite.id, activeAccess ? 'Nuovo invito' : 'Crea nuovo invito', '↻', 'release', accessibleLabel);
 }
 
 function projectionCabinControl(projection) {
@@ -5223,34 +5227,39 @@ function projectionCabinControl(projection) {
 }
 
 function projectionCardActions(projection, invite) {
-  const actions = [
-    projectionActionButton('edit-projection', projection.id, `Modifica piano di ${projection.displayName}`, '✎'),
-  ];
+  const actions = [];
+  const secondaryActions = [];
   const balance = projectionPaymentBalance(projection);
+  const editAction = projectionActionTextButton('edit-projection', projection.id, 'Modifica persona e quota', '✎');
   if (balance.expectedCents > 0) {
-    actions.push(projectionActionButton('register-manual-receipt', projection.id, `Registra un acconto già ricevuto per ${projection.displayName}`, '+'));
+    actions.push(projectionActionTextButton('register-manual-receipt', projection.id, 'Registra acconto', '+'));
   }
   if (!invite) {
-    actions.push(projectionActionButton('edit-projection-pricing', projection.id, `Imposta la quota prevista di ${projection.displayName}`, '€'));
-    actions.push(projectionActionTextButton('send-projection', projection.id, 'Crea link WhatsApp', '🔗', 'primary'));
-    actions.push(projectionActionButton('release-projection', projection.id, `Libera il posto di ${projection.displayName}`, '×', 'release'));
-    return actions.join('');
+    actions.unshift(projectionActionTextButton('send-projection', projection.id, 'Crea invito WhatsApp', '🔗', 'primary'));
+    actions.push(editAction);
+    secondaryActions.push(
+      projectionActionTextButton('edit-projection-pricing', projection.id, 'Modifica solo quota', '€'),
+      projectionActionTextButton('release-projection', projection.id, 'Libera posto', '×', 'release'),
+    );
+    return [...actions, projectionMoreActions(secondaryActions)].join('');
   }
-  actions.push(projectionActionButton('edit-projection-pricing', projection.id, `Rivedi la quota concordata di ${projection.displayName}`, '€'));
+  const primaryInviteAction = invitePrimaryAction(invite);
+  if (primaryInviteAction) actions.unshift(primaryInviteAction);
+  actions.push(editAction);
   if (balance.remainingCents > 0) {
-    actions.push(projectionActionButton('request-projection-balance', projection.id, `Prepara un promemoria di saldo per ${projection.displayName}, solo se serve`, '€', 'primary'));
+    actions.push(projectionActionTextButton('request-projection-balance', projection.id, 'Chiedi saldo', '€'));
   }
+  secondaryActions.push(projectionActionTextButton('edit-projection-pricing', projection.id, 'Modifica solo quota', '€'));
   if (projection.pricingMode === 'dashboard') {
-    actions.push(projectionActionButton('refresh-projection-pricing', projection.id, `Aggiorna gli importi di ${projection.displayName} dalla dashboard attuale`, '⟳'));
+    secondaryActions.push(projectionActionTextButton('refresh-projection-pricing', projection.id, 'Aggiorna dalla dashboard', '⟳'));
   }
-  const deliveryActions = inviteDeliveryActions(invite);
-  if (deliveryActions.length) {
-    actions.push(...deliveryActions);
-    actions.push(inviteRenewalAction(invite, projection.displayName, { compact: true }));
-  } else if (invite.status !== 'revoked') {
-    actions.push(inviteRenewalAction(invite, projection.displayName));
+  secondaryActions.push(...inviteDeliveryAlternatives(invite));
+  if (invite.status !== 'revoked') {
+    secondaryActions.push(inviteRenewalAction(invite, projection.displayName));
+  } else {
+    actions.unshift(inviteRenewalAction(invite, projection.displayName));
   }
-  return actions.join('');
+  return [...actions, projectionMoreActions(secondaryActions)].join('');
 }
 
 function projectionInvoiceLine(label, value) {
@@ -5337,20 +5346,19 @@ function renderLegacyInviteCard(invite, { isOpen = false } = {}) {
       ? 'Invito scaduto · rinnova il link prima di completare la scheda'
       : 'Invito già creato · completa la scheda persona';
   const actions = [];
-  const deliveryActions = inviteDeliveryActions(invite);
-  if (deliveryActions.length) {
-    actions.push(...deliveryActions);
-    actions.push(inviteRenewalAction(invite, invite.displayName, { compact: true }));
-  } else if (invite.status !== 'revoked') {
-    actions.push(inviteRenewalAction(invite, invite.displayName));
-  }
-  if (linkable) actions.push(projectionActionButton('link-legacy-invite', invite.id, `Completa la scheda di ${invite.displayName}`, '✎', 'primary'));
+  const secondaryActions = [];
+  const primaryInviteAction = invitePrimaryAction(invite);
+  if (primaryInviteAction) actions.push(primaryInviteAction);
+  if (linkable) actions.push(projectionActionTextButton('link-legacy-invite', invite.id, 'Completa persona e quota', '✎'));
+  secondaryActions.push(...inviteDeliveryAlternatives(invite));
+  if (invite.status !== 'revoked') secondaryActions.push(inviteRenewalAction(invite, invite.displayName));
+  if (!primaryInviteAction && invite.status === 'revoked') actions.unshift(inviteRenewalAction(invite, invite.displayName));
   const instruction = linkable
     ? 'Aggiungi cognome, ruolo, sistemazione, cabina e importo previsto: il link personale resta identico.'
     : invite.status === 'revoked'
       ? 'Questo invito è stato revocato: crea una nuova scheda equipaggio se vuoi riservare di nuovo un posto.'
       : 'Il link precedente non è più utilizzabile: scegli “Crea nuovo link WhatsApp”. Non serve modificare o salvare questa scheda.';
-  return `<details class="projection-row projection-card projection-card-legacy" data-projection-card="${escapeHtml(legacyInviteCardKey(invite.id))}"${isOpen ? ' open' : ''}><summary class="projection-card-summary"><span class="projection-card-summary-person"><strong>${escapeHtml(invite.displayName)}</strong><span class="projection-row-assignment"><b>Ruolo:</b> da definire · <b>Sistemazione:</b> da definire</span><small>${escapeHtml(status)}</small></span><span class="projection-card-summary-finance"><span>Scheda da completare</span><strong>Importo da definire</strong><small>Apri la scheda</small></span><span class="projection-card-summary-toggle" aria-hidden="true">⌄</span></summary><div class="projection-card-body"><div class="projection-row-cost"><span class="projection-row-cost-label">Prima di inviare</span><span class="projection-row-cost-breakdown">${escapeHtml(instruction)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(invite.displayName)}">${actions.join('')}</div></div></details>`;
+  return `<details class="projection-row projection-card projection-card-legacy" data-projection-card="${escapeHtml(legacyInviteCardKey(invite.id))}"${isOpen ? ' open' : ''}><summary class="projection-card-summary"><span class="projection-card-summary-person"><strong>${escapeHtml(invite.displayName)}</strong><span class="projection-row-assignment"><b>Ruolo:</b> da definire · <b>Sistemazione:</b> da definire</span><small>${escapeHtml(status)}</small></span><span class="projection-card-summary-finance"><span>Scheda da completare</span><strong>Importo da definire</strong><small>Apri la scheda</small></span><span class="projection-card-summary-toggle" aria-hidden="true">⌄</span></summary><div class="projection-card-body"><div class="projection-row-cost"><span class="projection-row-cost-label">Prima di inviare</span><span class="projection-row-cost-breakdown">${escapeHtml(instruction)}</span></div><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(invite.displayName)}">${[...actions, projectionMoreActions(secondaryActions)].join('')}</div></div></details>`;
 }
 
 function renderProjections({ syncFleet = true } = {}) {
@@ -5481,15 +5489,12 @@ function renderPayments(snapshot) {
       ? `<button class="text-button" type="button" data-verify-payment="${escapeHtml(payment.id)}">Conferma accredito</button><button class="text-button" type="button" data-cancel-payment="${escapeHtml(payment.id)}">Annulla richiesta</button>`
       : '';
     const pendingInvite = activeInvites.find((invite) => invite.id === recipientId && invite.status === 'pending' && invite.accessKey);
-    const inviteAction = pendingInvite
-      ? `<a class="text-button payment-action-control" href="${escapeHtml(whatsappUrl(pendingInvite))}" title="Apri una bozza WhatsApp con l’invito">${whatsappActionIconMarkup()}<span>Invia invito WhatsApp</span></a>`
-      : '';
-    const paymentMessageAction = !manualReceipt && paymentRecipientWhatsappNumber(recipientId)
-      ? `<button class="text-button payment-action-control" type="button" data-whatsapp-payment="${escapeHtml(payment.id)}" title="Apri una bozza nell’app WhatsApp">${whatsappActionIconMarkup()}<span>Apri nell’app WhatsApp</span></button>`
-      : '';
-    const paymentWebMessageAction = !manualReceipt && paymentRecipientWhatsappNumber(recipientId)
-      ? `<button class="text-button payment-action-control" type="button" data-whatsapp-payment-web="${escapeHtml(payment.id)}" title="Apri la bozza in WhatsApp Web">${whatsappActionIconMarkup({ external: true })}<span>Apri in WhatsApp Web</span></button>`
-      : '';
+    const hasWhatsappRecipient = !manualReceipt && Boolean(paymentRecipientWhatsappNumber(recipientId));
+    const primaryDeliveryAction = pendingInvite
+      ? `<a class="text-button payment-action-control payment-action-primary" href="${escapeHtml(whatsappUrl(pendingInvite))}" title="Apri WhatsApp con l’invito personale">${whatsappActionIconMarkup()}<span>Invia invito su WhatsApp</span></a>`
+      : hasWhatsappRecipient
+        ? `<button class="text-button payment-action-control payment-action-primary" type="button" data-whatsapp-payment="${escapeHtml(payment.id)}" title="Apri WhatsApp con la richiesta di quota">${whatsappActionIconMarkup()}<span>Invia richiesta su WhatsApp</span></button>`
+        : '';
     const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
     const methods = manualReceipt
       ? '<span>Registrazione manuale verificata dallo skipper: non contiene link o coordinate di pagamento.</span>'
@@ -5501,8 +5506,19 @@ function renderPayments(snapshot) {
     const contributionTag = contributionLabel
       ? `<span class="payment-contribution-tag">${escapeHtml(contributionLabel)}</span>`
       : '';
-    const copyAction = manualReceipt ? '' : `<button class="text-button payment-action-control" type="button" data-copy-payment="${escapeHtml(payment.id)}" title="Copia il testo della richiesta"><span class="payment-copy-icon" aria-hidden="true">⧉</span><span>Copia messaggio</span></button>`;
-    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${contributionTag}${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${paymentMessageAction}${paymentWebMessageAction}${copyAction}${inviteAction}${statusActions}</div></article>`;
+    const moreDeliveryActions = [];
+    if (pendingInvite) {
+      moreDeliveryActions.push(`<button class="text-button payment-action-control" type="button" data-copy-invite="${escapeHtml(pendingInvite.id)}" title="Copia il link personale dell’invito"><span class="payment-copy-icon" aria-hidden="true">⧉</span><span>Copia link invito</span></button>`);
+      moreDeliveryActions.push(`<a class="text-button payment-action-control" href="${escapeHtml(whatsappUrl(pendingInvite, { mode: 'web' }))}" target="_blank" rel="noopener" title="Apri l’invito in WhatsApp Web">${whatsappActionIconMarkup({ external: true })}<span>Apri nel browser</span></a>`);
+    }
+    if (hasWhatsappRecipient) {
+      moreDeliveryActions.push(`<button class="text-button payment-action-control" type="button" data-whatsapp-payment-web="${escapeHtml(payment.id)}" title="Apri la richiesta in WhatsApp Web">${whatsappActionIconMarkup({ external: true })}<span>Apri nel browser</span></button>`);
+      moreDeliveryActions.push(`<button class="text-button payment-action-control" type="button" data-copy-payment="${escapeHtml(payment.id)}" title="Copia il testo della richiesta"><span class="payment-copy-icon" aria-hidden="true">⧉</span><span>Copia messaggio</span></button>`);
+    }
+    const moreDeliveryOptions = moreDeliveryActions.length
+      ? `<details class="payment-more-actions"><summary>Altre opzioni</summary><div class="payment-more-actions-list">${moreDeliveryActions.join('')}</div></details>`
+      : '';
+    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${contributionTag}${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${primaryDeliveryAction}${moreDeliveryOptions}${statusActions}</div></article>`;
   }).join('');
   renderCostPlanSummary();
   renderProjections({ syncFleet: false });
@@ -6455,7 +6471,7 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     try {
       const invite = await createInviteFromProjection(projection);
       reflectCreatedProjectionInvite(projection, invite);
-      setMessage(message, `Link WhatsApp creato per ${projection.displayName}. Ora scegli “Copia link”, “Apri WhatsApp” oppure “WhatsApp Web”.`);
+      setMessage(message, `Invito creato per ${projection.displayName}. Usa “Invia su WhatsApp”; in “Altre opzioni” trovi copia link e apertura nel browser.`);
     } catch (error) {
       sendButton.disabled = false;
       const fallback = error.code === 'phone-already-assigned'
@@ -6503,7 +6519,7 @@ document.querySelector('#projectionList').addEventListener('click', async (event
       renderProjections({ syncFleet: false });
       const projection = activeProjections.find((candidate) => projectionMatchesInvite(candidate, renewedInvite.id));
       if (projection) openProjectionCard(projection.id);
-      setMessage(message, 'Il link precedente è stato revocato e il nuovo è pronto. Ora scegli “Copia link”, “Apri WhatsApp” oppure “WhatsApp Web”.');
+      setMessage(message, 'Il link precedente è stato revocato e il nuovo è pronto. Usa “Invia su WhatsApp”; in “Altre opzioni” trovi copia link e apertura nel browser.');
     } catch (error) {
       reissueButton.disabled = false;
       setMessage(message, 'Non riesco a generare il nuovo link WhatsApp. Se era aperta un’altra scheda, aggiorna l’area e usa il link più recente.', true);
@@ -7464,11 +7480,11 @@ paymentForm.addEventListener('submit', async (event) => {
     renderPaymentMethodOptions();
     if (whatsappWindow) whatsappWindow.location.replace(whatsappUrl);
     const nativeMessage = prefersNativeMacWhatsapp()
-      ? 'Richiesta preparata: WhatsApp dovrebbe aprirsi nell’app. Se non accade, usa “Apri WhatsApp nel browser” o “Copia messaggio” dalla richiesta.'
+      ? 'Richiesta preparata: WhatsApp dovrebbe aprirsi nell’app. Se non accade, apri “Altre opzioni” e scegli “Apri nel browser” oppure “Copia messaggio”.'
       : 'Richiesta preparata: WhatsApp è aperto con il messaggio da inviare personalmente.';
     setMessage(document.querySelector('#paymentFormMessage'), whatsappWindow
       ? nativeMessage
-      : 'Richiesta preparata. Il browser ha bloccato la nuova finestra: usa “Apri WhatsApp” o “Apri WhatsApp nel browser” dalla richiesta.');
+      : 'Richiesta preparata. Il browser ha bloccato la nuova finestra: usa “Invia richiesta su WhatsApp” oppure “Altre opzioni” nella richiesta.');
   } catch (error) {
     whatsappWindow?.close();
     setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco a preparare la richiesta.', true);
@@ -7486,7 +7502,7 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
     try {
       const result = await openPaymentWhatsApp(payment);
       if (result.invalidNumber) setMessage(message, 'Non trovo un numero WhatsApp valido per questa richiesta.', true);
-      else if (!result.opened) setMessage(message, 'Il browser ha bloccato WhatsApp. Usa “Apri WhatsApp nel browser” o “Copia messaggio”.', true);
+      else if (!result.opened) setMessage(message, 'Il browser ha bloccato WhatsApp. Apri “Altre opzioni” e scegli “Apri nel browser” o “Copia messaggio”.', true);
     } catch (error) {
       setMessage(message, 'Non riesco a recuperare la nota privata della richiesta. Riprova tra poco.', true);
     }
@@ -7498,7 +7514,7 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
     try {
       const result = await openPaymentWhatsApp(payment, { mode: 'web' });
       if (result.invalidNumber) setMessage(message, 'Non trovo un numero WhatsApp valido per questa richiesta.', true);
-      else if (!result.opened) setMessage(message, 'Il browser ha bloccato WhatsApp Web. Usa “Copia messaggio”.', true);
+      else if (!result.opened) setMessage(message, 'Il browser ha bloccato WhatsApp nel browser. Usa “Copia messaggio”.', true);
     } catch (error) {
       setMessage(message, 'Non riesco a recuperare la nota privata della richiesta. Riprova tra poco.', true);
     }
@@ -7591,9 +7607,13 @@ onAuthStateChanged(auth, async (user) => {
     const eventSnapshot = await getDoc(doc(db, 'events', eventId));
     if (auth.currentUser?.uid !== user.uid) return;
     const isOrganizer = eventSnapshot.exists() && (eventSnapshot.data().organizerIds || []).includes(user.uid);
-    document.querySelector('#accountStatus').textContent = isOrganizer ? 'Organizzatore configurato.' : 'Accesso skipper attivo. Per l’organizzatore: completa il documento iniziale nel README usando questo identificativo.';
+    if (transferManagementLink) transferManagementLink.hidden = !isOrganizer;
+    document.querySelector('#accountStatus').textContent = isOrganizer
+      ? 'Organizzatore configurato: qui sotto trovi anche la gestione degli accessi transfer.'
+      : 'Accesso skipper attivo.';
   } catch (error) {
     if (auth.currentUser?.uid !== user.uid) return;
+    if (transferManagementLink) transferManagementLink.hidden = true;
     document.querySelector('#accountStatus').textContent = 'Accesso skipper attivo.';
   }
   if (auth.currentUser?.uid !== user.uid) return;
