@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { auth, crewAccessErrorMessage, crewAccessUrl, db, profileUrl, signOutCrew, startCrewAreaSession } from './crew-session.js?v=20260919-live-privacy-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 
@@ -1777,13 +1777,17 @@ document.querySelector('#acceptRulesButton').addEventListener('click', async () 
       acceptedLocale: activeLocale(),
       acceptedAt: serverTimestamp(),
     };
-    const batch = writeBatch(db);
-    batch.set(doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id), acceptance, { merge: true });
+    const acceptanceRef = doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id);
     const historyId = `${rulesVersion}-${auth.currentUser.uid}`;
-    batch.create(doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id, 'history', historyId), acceptance);
-    await batch.commit();
+    const historyRef = doc(acceptanceRef, 'history', historyId);
+    await runTransaction(db, async (transaction) => {
+      const historySnapshot = await transaction.get(historyRef);
+      transaction.set(acceptanceRef, acceptance);
+      if (!historySnapshot.exists()) transaction.set(historyRef, acceptance);
+    });
     setMessage(document.querySelector('#participantRulesMessage'), translate('crew.flow.briefingConfirmedOpenArea', 'Briefing confermato. Apro la tua area di bordo…'));
   } catch (error) {
+    console.error('Impossibile salvare la conferma del briefing.', error);
     setMessage(document.querySelector('#participantRulesMessage'), translate('crew.flow.cannotConfirmRules', 'Non riesco a confermare le regole. Riprova tra poco.'), true);
     button.disabled = false;
   }

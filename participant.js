@@ -779,7 +779,7 @@ document.querySelector('#preRegistrationAcceptButton').addEventListener('click',
       transaction.set(acceptanceRef, acceptance);
       // Lo storico è immutabile. Se il browser sta riprendendo un tentativo già
       // registrato, riusiamo quella traccia senza far fallire la transazione.
-      if (!historySnapshot.exists()) transaction.create(historyRef, acceptance);
+      if (!historySnapshot.exists()) transaction.set(historyRef, acceptance);
     });
   } catch (error) {
     console.error('Impossibile salvare la conferma del briefing.', error);
