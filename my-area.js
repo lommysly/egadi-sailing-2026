@@ -1162,8 +1162,11 @@ function clearPersonalDashboard() {
   renderCrewDashboardOverview();
 }
 
-function handlePrivateReadError(error, messageElement, fallbackMessage) {
-  if (error?.code === 'permission-denied') {
+function handlePrivateReadError(error, messageElement, fallbackMessage, { invalidatesSession = false } = {}) {
+  // Una card secondaria non deve mai simulare la revoca dell'accesso: la
+  // sessione è già stata verificata da startCrewAreaSession. Solo i due dati
+  // che compongono il gate del briefing possono invalidare la vista corrente.
+  if (invalidatesSession && error?.code === 'permission-denied') {
     clearPersonalDashboard();
     showOpening(translate('crew.flow.accessNoLongerActive', 'Questo accesso non è più attivo. Accedi di nuovo con numero e codice personale oppure chiedi allo skipper un nuovo invito.'), true);
     return;
@@ -1811,10 +1814,10 @@ startCrewAreaSession({
     onSnapshot(doc(db, 'boats', invite.boatId, 'briefing', 'board'), (snapshot) => {
       activeBriefing = snapshot.exists() ? snapshot.data() : null;
       renderBoardingGate();
-    }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), translate('crew.flow.cannotReadBriefing', 'Non riesco a leggere il briefing di sicurezza. Riprova tra poco.')));
+    }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), translate('crew.flow.cannotReadBriefing', 'Non riesco a leggere il briefing di sicurezza. Riprova tra poco.'), { invalidatesSession: true }));
     onSnapshot(doc(db, 'boats', invite.boatId, 'ruleAcceptances', invite.id), (snapshot) => {
       activeRuleAcceptance = snapshot.exists() ? snapshot.data() : null;
       renderBoardingGate();
-    }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), translate('crew.flow.cannotReadAcceptance', 'Non riesco a leggere la conferma del briefing. Riprova tra poco.')));
+    }, (error) => handlePrivateReadError(error, document.querySelector('#participantRulesMessage'), translate('crew.flow.cannotReadAcceptance', 'Non riesco a leggere la conferma del briefing. Riprova tra poco.'), { invalidatesSession: true }));
   },
 });

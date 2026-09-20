@@ -2057,8 +2057,8 @@ service cloud.firestore {
         allow get: if isPrivateAreaOpen()
           && planId == 'default'
           && (isOrganizer()
-            || isSkipper(boatId)
-            || hasCurrentParticipantBriefingAcceptance(boatId));
+            || hasCurrentParticipantBriefingAcceptance(boatId)
+            || isSkipper(boatId));
         allow list: if false;
         allow create: if isPrivateAreaOpen()
           && planId == 'default'
@@ -2156,7 +2156,7 @@ service cloud.firestore {
 
       match /announcements/{announcementId} {
         allow read: if isPrivateAreaOpen()
-          && (isOrganizer() || isSkipper(boatId) || hasCurrentParticipantBriefingAcceptance(boatId));
+          && (isOrganizer() || hasCurrentParticipantBriefingAcceptance(boatId) || isSkipper(boatId));
         allow create, update, delete: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
       }
 
