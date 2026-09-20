@@ -3,24 +3,24 @@
  * briefing: nessun dato personale o informazione di Crew List va inserito qui.
  */
 window.PASSAGE_PLAN_DATA = {
-  updatedAt: "19 settembre 2026 · rotta e alternative riviste",
-  phase: "Pianificazione · prima della finestra meteo",
-  confidence: "Rotta definita · astronomia confermata · meteo: finestra ancora lontana",
-  status: "Rotta e alternative aggiornate",
-  publishedAt: "19 settembre 2026 · 23:00 CEST",
-  validFrom: "Valido come piano di navigazione e preparazione dell’equipaggio",
+  updatedAt: "20 settembre 2026 · piano di rotta aggiornato",
+  phase: "Conto alla rovescia in aggiornamento",
+  confidence: "Rotta definita · astronomia verificata · meteo: prima tendenza dal 28 settembre",
+  status: "Pianificazione aggiornata · meteo in attesa della finestra utile",
+  publishedAt: "20 settembre 2026 · aggiornamento di pianificazione",
+  validFrom: "Valido come piano di navigazione e preparazione dell’equipaggio fino al prossimo aggiornamento meteo",
   validUntil: "Non è un bollettino di bordo: non conferma vento, onda, porto, boe o rada.",
   nextUpdateAt: "28 settembre · prima tendenza a 10 giorni",
   dataMode: "planning",
   weatherNoticeTitle: "Per vento e onda aspettiamo la finestra utile.",
-  weatherNoticeText: "Fuori dalla finestra utile una previsione puntuale sarebbe poco seria. Il 28 settembre arriverà una prima tendenza; dal 3 ottobre pubblicheremo i dati per giornata, poi le conferme quotidiane dello skipper.",
-  summary: "La rotta desiderata resta Marsala → Levanzo → Marettimo → Favignana → Marsala. Ora il piano chiarisce dove si cerca luce, riparo e margine di navigazione; il meteo vero entrerà solo quando potrà aiutare davvero a decidere.",
-  sourceNote: "Controllo del 19 settembre: l’Area Marina Protetta richiede di verificare zonazione, autorizzazioni e campi boe prima della sosta. Le calette qui raccontano possibilità di giornata, non posti assegnati né promesse di rada. Ogni scelta serale resta allo skipper della singola barca, dopo aver letto il mare reale.",
+  weatherNoticeText: "Siamo ancora fuori dalla finestra utile: una previsione puntuale sarebbe poco seria. Il 28 settembre arriverà una prima tendenza; dal 3 ottobre pubblicheremo i dati per giornata, poi le conferme quotidiane dello skipper.",
+  summary: "La rotta desiderata resta Marsala → Levanzo → Marettimo → Favignana → Marsala. In questa fase il lavoro utile è fissare ripari, margini e alternative; il meteo vero entrerà nel piano soltanto quando potrà aiutare davvero a decidere.",
+  sourceNote: "Controllo del 20 settembre: l’Area Marina Protetta richiede di verificare zonazione, autorizzazioni e campi boe prima della sosta. Le calette qui raccontano possibilità di giornata, non posti assegnati né promesse di rada. Ogni scelta serale resta allo skipper della singola barca, dopo aver letto il mare reale.",
   sources: [
     { label: "Fonte astronomica", url: "https://aa.usno.navy.mil/data/api", scope: "alba, tramonto e luna · fuso Europe/Rome", checkedAt: "calcolo del piano: 11 settembre 2026" },
-    { label: "Meteo Aeronautica Militare · Sicilia", url: "https://www.meteoam.it/it/sicilia", scope: "previsioni e mare nella finestra utile", checkedAt: "19 settembre 2026 · 23:00 CEST" },
-    { label: "AMP Egadi · moduli e autorizzazioni", url: "https://www.ampisoleegadi.it/index.php/moduli-e-istanze/", scope: "permessi, ancoraggio e ormeggio", checkedAt: "19 settembre 2026 · 23:00 CEST" },
-    { label: "AMP Egadi · campi boe", url: "https://redirect.ampisoleegadi.it/1497.html", scope: "aree e disponibilità da verificare", checkedAt: "19 settembre 2026 · 23:00 CEST" }
+    { label: "Meteo Aeronautica Militare · Sicilia", url: "https://www.meteoam.it/it/sicilia", scope: "previsioni e mare nella finestra utile", checkedAt: "20 settembre 2026" },
+    { label: "AMP Egadi · moduli e autorizzazioni", url: "https://www.ampisoleegadi.it/index.php/moduli-e-istanze/", scope: "permessi, ancoraggio e ormeggio", checkedAt: "20 settembre 2026" },
+    { label: "AMP Egadi · campi boe", url: "https://redirect.ampisoleegadi.it/1497.html", scope: "aree e disponibilità da verificare", checkedAt: "20 settembre 2026" }
   ],
   stopsNote: "Per una notte in rada non basta che una cala sia bella: servono ridosso, fondo adatto, spazio di manovra, regole AMP e autorizzazioni effettive. Se uno di questi elementi manca, il piano cambia senza rimpianti: porto o altro riparo sono parte della navigazione, non un ripiego.",
   mooringGuide: {
@@ -56,7 +56,7 @@ window.PASSAGE_PLAN_DATA = {
           check: "La notte non è garantita: ogni barca segue la decisione del proprio skipper, non la lista delle calette."
         }
       ],
-      wind: "A 19 giorni non pubblichiamo una direzione o un’intensità: sarebbe una falsa precisione.",
+      wind: "Finché non entra la finestra utile non pubblichiamo una direzione o un’intensità: sarebbe una falsa precisione.",
       sea: "Onda e periodo saranno indicati solo nel briefing operativo, con fonte e ora di emissione.",
       air: "Temperatura, nuvolosità e percezione del vento arriveranno con la previsione per giornata.",
       water: "La temperatura dell’acqua sarà aggiornata vicino alla partenza con una fonte marina e l’osservazione a bordo.",

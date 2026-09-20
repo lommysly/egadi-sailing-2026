@@ -159,7 +159,7 @@
           heroText: 'The Passage Plan is the shared sailing plan: it shows likely stops, approximate sailing times and what may change with wind and sea. The skipper, responsible for navigation and safety on each boat, makes the final decision on board.',
           statusLabel: 'Briefing status',
           statusField: 'Status',
-          phaseField: 'Window',
+          phaseField: 'Departure in',
           confidenceField: 'What is confirmed',
           nextUpdateField: 'Next update',
           routeEyebrow: 'Possible route',

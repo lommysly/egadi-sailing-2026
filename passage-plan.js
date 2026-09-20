@@ -18,6 +18,14 @@
       unavailableSources: 'Nessun dato meteo o di navigazione deve essere dedotto da questa pagina finché il briefing non è disponibile.',
       updating: 'Aggiornamento in corso',
       nextUpdateUnknown: 'Da comunicare dallo skipper',
+      departureLabel: 'Partenza tra',
+      travelLabel: 'Viaggio',
+      daySingular: 'giorno',
+      dayPlural: 'giorni',
+      hourSingular: 'ora',
+      hourPlural: 'ore',
+      sailingNow: 'Siamo in navigazione',
+      tripFinished: 'Viaggio concluso',
       openSource: 'Apri la fonte',
       updated: 'Aggiornato il',
       noOperationalBulletin: 'Nessun bollettino meteo operativo ancora pubblicato.',
@@ -57,6 +65,14 @@
       unavailableSources: 'Do not infer weather or navigation information from this page while the briefing is unavailable.',
       updating: 'Update in progress',
       nextUpdateUnknown: 'To be confirmed by the skipper',
+      departureLabel: 'Departure in',
+      travelLabel: 'Trip',
+      daySingular: 'day',
+      dayPlural: 'days',
+      hourSingular: 'hour',
+      hourPlural: 'hours',
+      sailingNow: 'We are sailing',
+      tripFinished: 'Trip completed',
       openSource: 'Open source',
       updated: 'Updated',
       noOperationalBulletin: 'No operational weather bulletin has been published yet.',
@@ -85,6 +101,8 @@
   };
   const copy = COPY[locale];
   const $ = (selector) => document.querySelector(selector);
+  const departureAt = new Date('2026-10-08T15:00:00+02:00').getTime();
+  const returnAt = new Date('2026-10-11T18:00:00+02:00').getTime();
   const escapeHtml = (value) => String(value || "—")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -150,6 +168,32 @@
     `;
   };
 
+  const updateDeparturePhase = () => {
+    const now = Date.now();
+    const phaseLabel = $("[data-passage-phase-label]");
+    if (now >= returnAt) {
+      phaseLabel.textContent = copy.travelLabel;
+      $("#planPhase").textContent = copy.tripFinished;
+      return;
+    }
+    if (now >= departureAt) {
+      phaseLabel.textContent = copy.travelLabel;
+      $("#planPhase").textContent = copy.sailingNow;
+      return;
+    }
+    const remaining = departureAt - now;
+    const days = Math.floor(remaining / 86400000);
+    const hours = Math.floor((remaining % 86400000) / 3600000);
+    phaseLabel.textContent = copy.departureLabel;
+    $("#planPhase").textContent = `${days} ${days === 1 ? copy.daySingular : copy.dayPlural} · ${hours} ${hours === 1 ? copy.hourSingular : copy.hourPlural}`;
+  };
+
+  updateDeparturePhase();
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) updateDeparturePhase();
+  });
+  window.setInterval(updateDeparturePhase, 60000);
+
   if (!data) {
     $("#planStatus").textContent = copy.updateUnavailable;
     $("#planSummary").textContent = copy.unavailableSummary;
@@ -158,7 +202,6 @@
   }
 
   $("#planStatus").textContent = data.status || copy.updating;
-  $("#planPhase").textContent = data.phase || "—";
   $("#planConfidence").textContent = data.confidence || "—";
   $("#planNextUpdate").textContent = data.nextUpdateAt || copy.nextUpdateUnknown;
   $("#planSummary").textContent = data.summary || "—";
@@ -265,4 +308,5 @@
       </article>
     `;
   }).join("");
+
 })();
