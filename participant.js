@@ -1,4 +1,4 @@
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { doc, getDoc, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import {
   activateCrewInvite,
   auth,
@@ -770,11 +770,19 @@ document.querySelector('#preRegistrationAcceptButton').addEventListener('click',
       acceptedLocale: activeLocale(),
       acceptedAt: serverTimestamp(),
     };
-    const batch = writeBatch(db);
-    batch.set(doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id), acceptance, { merge: true });
-    batch.create(doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id, 'history', `${rulesVersion}-${auth.currentUser.uid}`), acceptance);
-    await batch.commit();
+    const acceptanceRef = doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id);
+    const historyRef = doc(acceptanceRef, 'history', `${rulesVersion}-${auth.currentUser.uid}`);
+    await runTransaction(db, async (transaction) => {
+      const historySnapshot = await transaction.get(historyRef);
+      // La conferma corrente deve essere sempre nel formato canonico: un record
+      // precedente non può conservare campi legacy che le regole non accettano.
+      transaction.set(acceptanceRef, acceptance);
+      // Lo storico è immutabile. Se il browser sta riprendendo un tentativo già
+      // registrato, riusiamo quella traccia senza far fallire la transazione.
+      if (!historySnapshot.exists()) transaction.create(historyRef, acceptance);
+    });
   } catch (error) {
+    console.error('Impossibile salvare la conferma del briefing.', error);
     setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.cannotConfirmRules', 'Non riesco a confermare le regole. Riprova tra poco.'), true);
     button.disabled = false;
   }
