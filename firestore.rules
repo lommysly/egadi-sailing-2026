@@ -320,9 +320,9 @@ service cloud.firestore {
         ? request.resource.data.destinationAirport
         : request.resource.data.originAirport;
       return (legId == 'outbound' || legId == 'return')
-        && request.resource.data.keys().hasAll(['schemaVersion', 'transportMode', 'originCity', 'originAirport', 'destinationCity', 'destinationAirport', 'departureDate', 'departureTime', 'arrivalDate', 'arrivalTime', 'carrier', 'serviceNumber', 'luggageCount', 'bulkyLuggage', 'needsAirportMarsalaTransfer', 'airportMarsalaPlan', 'rideOfferSeats', 'rideOfferConsent', 'updatedAt', 'updatedBy'])
-        && request.resource.data.keys().hasOnly(['schemaVersion', 'transportMode', 'originCity', 'originAirport', 'destinationCity', 'destinationAirport', 'departureDate', 'departureTime', 'arrivalDate', 'arrivalTime', 'carrier', 'serviceNumber', 'luggageCount', 'bulkyLuggage', 'needsAirportMarsalaTransfer', 'airportMarsalaPlan', 'rideOfferSeats', 'rideOfferConsent', 'updatedAt', 'updatedBy'])
-        && request.resource.data.schemaVersion == 2
+        && request.resource.data.keys().hasAll(['schemaVersion', 'transportMode', 'originCity', 'originAirport', 'destinationCity', 'destinationAirport', 'departureDate', 'departureTime', 'arrivalDate', 'arrivalTime', 'carrier', 'serviceNumber', 'luggageCount', 'bulkyLuggage', 'needsAirportMarsalaTransfer', 'airportMarsalaPlan', 'transferOperatorConsent', 'rideOfferSeats', 'rideOfferConsent', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['schemaVersion', 'transportMode', 'originCity', 'originAirport', 'destinationCity', 'destinationAirport', 'departureDate', 'departureTime', 'arrivalDate', 'arrivalTime', 'carrier', 'serviceNumber', 'luggageCount', 'bulkyLuggage', 'needsAirportMarsalaTransfer', 'airportMarsalaPlan', 'transferOperatorConsent', 'rideOfferSeats', 'rideOfferConsent', 'updatedAt', 'updatedBy'])
+        && request.resource.data.schemaVersion == 3
         && request.resource.data.transportMode in ['', 'flight', 'train', 'car', 'ferry', 'other']
         && isBoundedText(request.resource.data.originCity, 100)
         && isOptionalIataAirport(request.resource.data.originAirport)
@@ -340,6 +340,7 @@ service cloud.firestore {
         && request.resource.data.bulkyLuggage is bool
         && request.resource.data.needsAirportMarsalaTransfer is bool
         && request.resource.data.airportMarsalaPlan in ['', 'transfer', 'independent', 'ride_offer']
+        && request.resource.data.transferOperatorConsent is bool
         && request.resource.data.rideOfferSeats is int
         && request.resource.data.rideOfferSeats >= 0
         && request.resource.data.rideOfferSeats <= 8
@@ -358,6 +359,8 @@ service cloud.firestore {
         && (request.resource.data.airportMarsalaPlan == 'ride_offer'
           || (request.resource.data.rideOfferSeats == 0
             && request.resource.data.rideOfferConsent == false))
+        && (request.resource.data.airportMarsalaPlan == 'transfer'
+          || request.resource.data.transferOperatorConsent == false)
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
     }
@@ -2297,9 +2300,9 @@ service cloud.firestore {
         allow delete: if isPrivateAreaOpen() && profileId == 'default' && isSkipper(boatId);
       }
 
-      // Due tratte private dello skipper: andata e ritorno. Sono bozze
-      // salvabili anche incomplete; non sono una lista transfer e non danno
-      // alcun accesso diretto alla società che lo gestirà.
+      // Due tratte personali dello skipper: andata e ritorno. Restano private
+      // finché lo skipper non chiede il transfer e ne autorizza esplicitamente
+      // la condivisione con la società incaricata.
       match /skipperTravel/{legId} {
         allow get: if isPrivateAreaOpen()
           && (legId == 'outbound' || legId == 'return')

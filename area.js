@@ -31,7 +31,7 @@ const COST_PLAN_ID = 'default';
 const SKIPPER_PROFILE_ID = 'default';
 const PAYMENT_PRIVATE_MESSAGE_ID = 'message';
 const SKIPPER_TRAVEL_LEG_IDS = Object.freeze(['outbound', 'return']);
-const SKIPPER_TRAVEL_SCHEMA_VERSION = 2;
+const SKIPPER_TRAVEL_SCHEMA_VERSION = 3;
 const SKIPPER_TRAVEL_MODES = new Set(['', 'flight', 'train', 'car', 'ferry', 'other']);
 const SKIPPER_TRAVEL_TRANSFER_AIRPORTS = new Set(['TPS', 'PMO']);
 const SKIPPER_TRAVEL_AIRPORT_MARSALA_PLANS = new Set(['', 'transfer', 'independent', 'ride_offer']);
@@ -4829,6 +4829,7 @@ function emptySkipperTravelLeg() {
     bulkyLuggage: false,
     needsAirportMarsalaTransfer: false,
     airportMarsalaPlan: '',
+    transferOperatorConsent: false,
     rideOfferSeats: 0,
     rideOfferConsent: false,
   };
@@ -4862,6 +4863,7 @@ function normalizeSkipperTravelLeg(value) {
     bulkyLuggage: source.bulkyLuggage === true,
     needsAirportMarsalaTransfer: airportMarsalaPlan === 'transfer',
     airportMarsalaPlan,
+    transferOperatorConsent: airportMarsalaPlan === 'transfer' && source.transferOperatorConsent === true,
     rideOfferSeats: rideOfferActive && Number.isInteger(rideOfferSeats) ? Math.min(Math.max(rideOfferSeats, 1), 8) : 0,
     rideOfferConsent: rideOfferActive && source.rideOfferConsent === true,
   };
@@ -4897,10 +4899,16 @@ function skipperTravelDashboardSummary() {
   const returnSaved = Boolean(activeSkipperTravel.return);
   const outboundDetailed = skipperTravelLegHasDetails(activeSkipperTravel.outbound);
   const returnDetailed = skipperTravelLegHasDetails(activeSkipperTravel.return);
-  const transfers = SKIPPER_TRAVEL_LEG_IDS.filter((legId) => activeSkipperTravel[legId]?.needsAirportMarsalaTransfer === true);
+  const transfers = SKIPPER_TRAVEL_LEG_IDS.filter((legId) => normalizeSkipperTravelLeg(activeSkipperTravel[legId]).airportMarsalaPlan === 'transfer');
+  const sharedTransfers = transfers.filter((legId) => normalizeSkipperTravelLeg(activeSkipperTravel[legId]).transferOperatorConsent === true);
   const offers = SKIPPER_TRAVEL_LEG_IDS.filter((legId) => activeSkipperTravel[legId]?.airportMarsalaPlan === 'ride_offer');
   const details = [];
-  if (transfers.length) details.push('Transfer richiesto ' + (transfers.length === 2 ? 'per andata e ritorno' : transfers[0] === 'outbound' ? 'all’andata' : 'al ritorno') + ' · resta privato.');
+  if (transfers.length) {
+    const when = transfers.length === 2 ? 'per andata e ritorno' : transfers[0] === 'outbound' ? 'all’andata' : 'al ritorno';
+    details.push(sharedTransfers.length === transfers.length
+      ? 'Transfer richiesto ' + when + ' · la società incaricata riceve i dati necessari.'
+      : 'Transfer da confermare ' + when + ' · manca il consenso alla società incaricata.');
+  }
   if (offers.length) details.push('Passaggio auto preparato ' + (offers.length === 2 ? 'per andata e ritorno' : offers[0] === 'outbound' ? 'all’andata' : 'al ritorno') + ' · il sito non ha pubblicato contatti.');
   const travelDetail = details.join(' ');
   if (!outboundSaved && !returnSaved) {
@@ -4964,7 +4972,15 @@ function updateSkipperTravelTransferHint(form) {
   const airport = String(airportInput?.value || '').toUpperCase();
   const airportReady = SKIPPER_TRAVEL_TRANSFER_AIRPORTS.has(airport);
   const offer = form?.querySelector('[data-travel-ride-offer]');
+  const transferConsentField = form?.querySelector('[data-travel-transfer-consent]');
+  const transferConsent = form?.elements.namedItem('transferOperatorConsent');
   const isRideOffer = isFlight && plan === 'ride_offer';
+  const isTransfer = isFlight && plan === 'transfer';
+  if (transferConsentField) {
+    transferConsentField.hidden = !isTransfer;
+    setTravelControlsEnabled(transferConsentField, isTransfer);
+  }
+  if (!isTransfer && transferConsent) transferConsent.checked = false;
   if (offer) {
     offer.hidden = !isRideOffer;
     setTravelControlsEnabled(offer, isRideOffer);
@@ -4980,8 +4996,10 @@ function updateSkipperTravelTransferHint(form) {
     hint.textContent = 'Il collegamento aeroporto ↔ Marsala compare soltanto quando scegli “Aereo”.';
   } else if (plan === 'transfer' && !airportReady) {
     hint.textContent = 'Per il transfer scegli prima l’aeroporto reale: Trapani · TPS oppure Palermo · PMO.';
+  } else if (plan === 'transfer' && transferConsent?.checked !== true) {
+    hint.textContent = 'Conferma il consenso: al salvataggio la società incaricata riceverà solo i dati necessari a organizzare il transfer.';
   } else if (plan === 'transfer') {
-    hint.textContent = 'Richiesta preparata solo per te: non è stata ancora inviata alla società transfer.';
+    hint.textContent = 'Al salvataggio la richiesta entrerà nella coda della società transfer, con i soli dati necessari a contattarti e organizzare il mezzo.';
   } else if (plan === 'independent') {
     hint.textContent = 'Hai segnato che ti organizzi autonomamente: nessun contatto viene condiviso.';
   } else if (plan === 'ride_offer' && !airportReady) {
@@ -6908,6 +6926,7 @@ function skipperTravelPayloadFromForm(form, legId, userId) {
     bulkyLuggage: fields.get('bulkyLuggage') === 'on',
     needsAirportMarsalaTransfer: airportMarsalaPlan === 'transfer',
     airportMarsalaPlan,
+    transferOperatorConsent: airportMarsalaPlan === 'transfer' && fields.get('transferOperatorConsent') === 'on',
     rideOfferSeats: airportMarsalaPlan === 'ride_offer' && Number.isInteger(rideOfferSeats) ? rideOfferSeats : 0,
     rideOfferConsent: airportMarsalaPlan === 'ride_offer' && fields.get('rideOfferConsent') === 'on',
     updatedAt: serverTimestamp(),
@@ -6999,6 +7018,19 @@ document.querySelectorAll('[data-skipper-travel-leg]').forEach((travelForm) => {
     if (travel.airportMarsalaPlan === 'transfer' || travel.airportMarsalaPlan === 'ride_offer') {
       if (!SKIPPER_TRAVEL_TRANSFER_AIRPORTS.has(airportMarsala)) {
         setMessage(message, 'Per questa tratta scegli Trapani · TPS oppure Palermo · PMO prima di richiedere o proporre il collegamento con Marsala.', true);
+        return;
+      }
+    }
+    if (travel.airportMarsalaPlan === 'transfer' && !travel.transferOperatorConsent) {
+      setMessage(message, 'Per inviare la richiesta alla società transfer, conferma prima il consenso alla condivisione dei dati necessari.', true);
+      return;
+    }
+    if (travel.airportMarsalaPlan === 'transfer') {
+      const contactProfile = activeSkipperProfile || activeSkipperProfileDraft || {};
+      const hasName = String(contactProfile.firstName || '').trim() && String(contactProfile.lastName || '').trim();
+      const hasPhone = String(contactProfile.phone || '').trim();
+      if (!hasName || !hasPhone) {
+        setMessage(message, 'Per richiedere il transfer completa prima nome, cognome e telefono nel tuo dossier skipper: sono necessari alla società incaricata per contattarti.', true);
         return;
       }
     }

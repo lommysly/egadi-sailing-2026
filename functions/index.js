@@ -369,6 +369,20 @@ function validSourceLeg(leg, direction, invite) {
   return TRANSFER_AIRPORTS.has(airportForTransfer(direction, leg));
 }
 
+function skipperDisplayName(profile, boat) {
+  const name = [asText(profile?.firstName, 80), asText(profile?.lastName, 80)].filter(Boolean).join(' ');
+  return name || asText(boat?.skipperName, 160) || 'Skipper';
+}
+
+function validSkipperSourceLeg(leg, direction, profile) {
+  if (!leg || !profile) return false;
+  if (asText(leg.transportMode, 20) !== 'flight') return false;
+  if (asText(leg.airportMarsalaPlan, 20) !== 'transfer' || leg.transferOperatorConsent !== true) return false;
+  const name = [asText(profile.firstName, 80), asText(profile.lastName, 80)].filter(Boolean).join(' ');
+  if (!name || !asText(profile.phone, 40)) return false;
+  return TRANSFER_AIRPORTS.has(airportForTransfer(direction, leg));
+}
+
 function safeStatus(value) {
   return TRANSFER_RECORD_STATUSES.has(value) && value !== 'revoked' ? value : 'new';
 }
@@ -416,6 +430,38 @@ function backupPayload({ recordId, boatId, boat, inviteId, invite, member, direc
     airportMarsalaChoice: asText(leg.airportMarsalaChoice, 20),
     carpoolRole: asText(leg.carpoolRole, 20),
     carpoolSeats: asInteger(leg.carpoolSeats, 0, 8),
+    ...operator,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
+
+function skipperBackupPayload({ recordId, boatId, boat, direction, leg, profile, existing }) {
+  const transferConsent = leg.transferOperatorConsent === true;
+  const airport = airportForTransfer(direction, leg);
+  const timing = timeForTransfer(direction, leg);
+  const operator = safeOperationalFields(existing);
+  return {
+    schemaVersion: 1,
+    recordId,
+    boatId,
+    inviteId: 'skipper',
+    direction,
+    recordState: 'active',
+    boatName: asText(boat?.name, 70),
+    participantName: transferConsent ? skipperDisplayName(profile, boat) : 'Dati non condivisi',
+    participantRole: 'skipper',
+    contactConsent: transferConsent,
+    phone: transferConsent ? asText(profile?.phone, 40) : '',
+    email: transferConsent ? asText(profile?.email, 160) : '',
+    airport,
+    date: timing.date,
+    time: timing.time,
+    transport: transportLabel(leg),
+    luggageCount: asInteger(leg.luggageCount, 0, 12),
+    bulkyLuggage: leg.bulkyLuggage === true,
+    airportMarsalaChoice: asText(leg.airportMarsalaPlan, 20),
+    carpoolRole: asText(leg.airportMarsalaPlan, 20) === 'ride_offer' ? 'offer_ride' : '',
+    carpoolSeats: asInteger(leg.rideOfferSeats, 0, 8),
     ...operator,
     updatedAt: FieldValue.serverTimestamp(),
   };
@@ -541,6 +587,86 @@ exports.materializeCrewTravel = onDocumentWritten({
       contactConsent: true,
       phone: asText(member?.phone || invite?.phone, 40),
       email: asText(member?.email, 160),
+      airport: airportForTransfer(direction, leg),
+      date: timing.date,
+      time: timing.time,
+      transport: transportLabel(leg),
+      luggageCount: asInteger(leg.luggageCount, 0, 12),
+      bulkyLuggage: leg.bulkyLuggage === true,
+      ...safeOperationalFields(existing.exists ? existing.data() : {}),
+      sourceRevision: revision,
+      updatedAt: FieldValue.serverTimestamp(),
+      ...(existing.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
+    };
+    transaction.set(transferRef, payload, { merge: true });
+  });
+});
+
+// Le tratte dello skipper seguono lo stesso flusso dell'equipaggio soltanto
+// dopo un consenso esplicito. Prima restano nel suo spazio privato.
+exports.materializeSkipperTravel = onDocumentWritten({
+  document: 'boats/{boatId}/skipperTravel/{direction}',
+  region: REGION,
+  serviceAccount: RUNTIME_SERVICE_ACCOUNT,
+  timeoutSeconds: 60,
+  memory: '256MiB',
+}, async (event) => {
+  const { boatId, direction } = event.params;
+  if (!['outbound', 'return'].includes(direction)) return;
+  const recordId = recordIdFor(boatId, 'skipper', direction);
+  const backupRef = db.doc(`events/${EVENT_ID}/travelBackupRecords/${recordId}`);
+  const transferRef = db.doc(`events/${EVENT_ID}/transferOpsRecords/${recordId}`);
+  const after = event.data?.after;
+  const revision = sourceRevision(after?.exists ? after : event.data?.before, event.time);
+  if (!after?.exists) {
+    await Promise.all([markBackupRevoked(backupRef, revision), markTransferRequestRevoked(transferRef, revision)]);
+    return;
+  }
+
+  const leg = after.data();
+  const boatRef = db.doc(`boats/${boatId}`);
+  const profileRef = db.doc(`boats/${boatId}/skipperProfile/default`);
+  const profileDraftRef = db.doc(`boats/${boatId}/skipperProfileDraft/default`);
+  const [boatSnapshot, profileSnapshot, profileDraftSnapshot, transferSnapshot] = await db.getAll(boatRef, profileRef, profileDraftRef, transferRef);
+  const boat = boatSnapshot.exists ? boatSnapshot.data() : null;
+  const profile = profileSnapshot.exists
+    ? profileSnapshot.data()
+    : profileDraftSnapshot.exists ? profileDraftSnapshot.data() : null;
+  const existingTransfer = transferSnapshot.exists ? transferSnapshot.data() : null;
+
+  await db.runTransaction(async (transaction) => {
+    const existingBackup = await transaction.get(backupRef);
+    if (existingBackup.exists && Number(existingBackup.data().sourceRevision || 0) > revision) return;
+    const payload = skipperBackupPayload({ recordId, boatId, boat, direction, leg, profile, existing: existingTransfer });
+    transaction.set(backupRef, {
+      ...payload,
+      sourceRevision: revision,
+      ...(existingBackup.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
+    }, { merge: true });
+  });
+
+  if (!validSkipperSourceLeg(leg, direction, profile)) {
+    await markTransferRequestRevoked(transferRef, revision);
+    return;
+  }
+
+  const timing = timeForTransfer(direction, leg);
+  await db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(transferRef);
+    if (existing.exists && Number(existing.data().sourceRevision || 0) > revision) return;
+    const payload = {
+      schemaVersion: 1,
+      recordId,
+      boatId,
+      inviteId: 'skipper',
+      direction,
+      recordState: 'active',
+      boatName: asText(boat?.name, 70),
+      participantName: skipperDisplayName(profile, boat),
+      participantRole: 'skipper',
+      contactConsent: true,
+      phone: asText(profile?.phone, 40),
+      email: asText(profile?.email, 160),
       airport: airportForTransfer(direction, leg),
       date: timing.date,
       time: timing.time,
