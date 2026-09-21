@@ -370,13 +370,21 @@ service cloud.firestore {
     // non legge mai questo percorso: riceve solo una copia server-side quando
     // la persona richiede il collegamento aeroporto ↔ Marsala e acconsente.
     function isCrewTravelOwner(boatId, inviteId) {
+      // Riusa le due letture necessarie invece di rieseguire i controlli
+      // dell'invito: sulle tratte il controllo completo del briefing usa gia'
+      // ulteriori documenti e Firestore altrimenti rifiuta l'operazione per
+      // complessita' prima di arrivare al modulo dell'equipaggio.
+      let access = get(/databases/$(database)/documents/crewAccess/$(request.auth.uid));
+      let invite = get(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId));
       return isPasswordCrew()
         && exists(/databases/$(database)/documents/crewAccess/$(request.auth.uid))
-        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.userId == request.auth.uid
-        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.loginEmail == request.auth.token.email
-        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.boatId == boatId
-        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.inviteId == inviteId
-        && isInviteHolder(boatId, inviteId);
+        && access.data.userId == request.auth.uid
+        && access.data.loginEmail == request.auth.token.email
+        && access.data.boatId == boatId
+        && access.data.inviteId == inviteId
+        && exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId))
+        && invite.data.status == 'active'
+        && invite.data.participantUid == request.auth.uid;
     }
 
     function hasValidCrewTravelPayload(inviteId, legId) {
