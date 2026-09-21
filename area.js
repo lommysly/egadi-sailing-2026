@@ -1390,6 +1390,17 @@ function getFirestoreErrorMessage(error, fallbackMessage) {
   return fallbackMessage;
 }
 
+function getProjectionSaveErrorMessage(error, fallbackMessage) {
+  console.error('Egadi crew projection:', error);
+  if (error?.code === 'permission-denied') {
+    return 'La quota non è stata salvata. Ricarica l’area e riprova: non serve uscire, rientrare o creare un nuovo invito.';
+  }
+  if (error?.code === 'unavailable') {
+    return 'Connessione non disponibile. La quota non è stata modificata: controlla la rete e riprova.';
+  }
+  return fallbackMessage;
+}
+
 function getCostPlanSaveErrorMessage(error) {
   if (error?.code === 'permission-denied') {
     return 'Non riesco a salvare il preventivo. Controlla di essere nell’area della tua barca e riprova; se il problema resta, non modificare altri importi e avvisa lo skipper o l’organizzatore.';
@@ -4559,6 +4570,7 @@ function renderProjectionCostPreview() {
   const preview = document.querySelector('#projectionCostPreview');
   if (!form || !preview) return;
   const usesCustomPricing = projectionFormUsesCustomPricing(form);
+  const editingPricing = isEditingInvitedProjectionPricing();
   const keepsInvitationPricing = !usesCustomPricing && isEditingInvitedDashboardProjection();
   const dashboardPricing = dashboardProjectionPreset(form.elements.berthType?.value, {
     contributesToCosts: form.elements.contributesToCosts?.checked === true,
@@ -4573,7 +4585,9 @@ function renderProjectionCostPreview() {
     const depositText = deposit.defined
       ? ` Cauzione rimborsabile: ${formatCurrency(deposit.cents / 100)}, separata e da regolare all’imbarco.`
       : ' Cauzione rimborsabile: da definire, separata e da regolare all’imbarco.';
-    const source = usesCustomPricing
+    const source = editingPricing
+      ? 'Stai aggiornando gli importi già concordati.'
+      : usesCustomPricing
       ? 'Stai impostando un’eccezione personale.'
       : keepsInvitationPricing
         ? 'La cauzione è quella già fissata con l’invito.'
@@ -4598,7 +4612,9 @@ function renderProjectionCostPreview() {
   const missingText = missing.length ? ` · Da definire: ${missing.join(', ')}.` : '.';
   const cashAtBoardCents = starterPack.cents + deposit.cents;
   const cashAtBoardText = ` Totale da portare in contanti: ${cashAtBoardCents > 0 ? formatCurrency(cashAtBoardCents / 100) : 'da definire'} (Starter Pack ${starterPackQuoteText(starterPack.cents, { fallback: 'da definire' })} + cauzione rimborsabile ${deposit.defined ? formatCurrency(deposit.cents / 100) : 'da definire'}).`;
-  const source = usesCustomPricing
+  const source = editingPricing
+    ? 'Importi concordati per questa persona.'
+    : usesCustomPricing
     ? 'Eccezione personale: questi importi restano fissi finché non li modifichi.'
     : keepsInvitationPricing
       ? 'Quota della dashboard fissata con l’invito: non cambia da sola se modifichi i conti.'
@@ -6067,6 +6083,32 @@ function projectionFormUsesCustomPricing(form = document.querySelector('#project
   return form?.elements.useCustomPricing?.checked === true;
 }
 
+function syncProjectionPricingEditorCopy() {
+  const form = document.querySelector('#projectionForm');
+  if (!form) return;
+  const editingPricing = isEditingInvitedProjectionPricing();
+  const projection = editingProjection();
+  const editorLead = document.querySelector('#projectionEditorLead');
+  const costLegend = document.querySelector('#projectionCostLegend');
+  const costHint = document.querySelector('#projectionCostHint');
+  const pricingSummary = document.querySelector('#projectionPricingSummary');
+  form.classList.toggle('is-editing-invited-pricing', editingPricing);
+  if (editorLead) {
+    editorLead.textContent = editingPricing
+      ? `Aggiorna solo gli importi concordati per ${projection?.displayName || 'questa persona'}. Link, dati e accesso personale restano invariati.`
+      : 'Questa è una scheda organizzativa: scegli persona, ruolo e sistemazione. Il sito prende gli importi dalla Dashboard economica; se non è ancora compilata, usa il listino base della barca. Non parte nessun messaggio e non viene registrato alcun pagamento.';
+  }
+  if (costLegend) costLegend.textContent = editingPricing
+    ? 'Importi concordati · nessun pagamento viene creato'
+    : 'Importo proposto dalla dashboard · non è una richiesta di pagamento';
+  if (costHint) costHint.textContent = editingPricing
+    ? 'Modifica qui la quota, lo Starter Pack, l’assicurazione e la cauzione concordati. Il link personale non cambia.'
+    : 'Il posto usa la Dashboard economica; se non è ancora compilata, usa il listino base della barca. Starter Pack, assicurazione e cauzione arrivano dal preventivo. Lo Starter Pack può essere già compreso nel charter oppure esterno: in entrambi i casi si regola in contanti a bordo. La cauzione resta sempre separata.';
+  if (pricingSummary) pricingSummary.textContent = editingPricing
+    ? 'Importi concordati per questa persona'
+    : 'Eccezione per questa persona · facoltativa';
+}
+
 function editingProjection() {
   return editingProjectionId
     ? activeProjections.find((projection) => projection.id === editingProjectionId) || null
@@ -6085,6 +6127,7 @@ function isEditingInvitedProjectionPricing() {
 function syncProjectionCostParticipation() {
   const form = document.querySelector('#projectionForm');
   if (!form) return;
+  syncProjectionPricingEditorCopy();
   const contributesToCosts = form.elements.contributesToCosts?.checked === true;
   const usesCustomPricing = projectionFormUsesCustomPricing(form);
   const keepsInvitationPricing = !usesCustomPricing && isEditingInvitedDashboardProjection();
@@ -6232,7 +6275,7 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
       });
       completeProjectionSave(`Quota aggiornata per ${editingProjection.displayName}. La card e la sua area personale mostrano ora lo stesso accordo; nessuna richiesta di pagamento è stata creata.`);
     } catch (error) {
-      setMessage(message, getFirestoreErrorMessage(error, 'Non riesco ad aggiornare la quota concordata.'), true);
+      setMessage(message, getProjectionSaveErrorMessage(error, 'Non riesco ad aggiornare la quota concordata.'), true);
     } finally {
       submitButton.disabled = false;
     }
@@ -6319,7 +6362,7 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
     }
     completeProjectionSave(savedMessage);
   } catch (error) {
-    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare la scheda dell’equipaggio.'), true);
+    setMessage(message, getProjectionSaveErrorMessage(error, 'Non riesco a salvare la scheda dell’equipaggio.'), true);
   } finally {
     submitButton.disabled = false;
   }

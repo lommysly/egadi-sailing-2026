@@ -134,6 +134,9 @@ body.menu-open { overflow:hidden; }
 .projection-pricing-exception summary { cursor:pointer; color:#0b6673; font-weight:700; font-size:.82rem; }
 .projection-pricing-exception > .field-hint { margin:11px 0; }
 .projection-pricing-exception .form-grid { margin-top:11px; }
+.is-editing-invited-pricing .projection-pricing-exception { border-style:solid; }
+.is-editing-invited-pricing .projection-pricing-exception > .field-hint,
+.is-editing-invited-pricing .projection-custom-pricing-toggle { display:none; }
 .projection-summary { display:grid; gap:5px; margin-top:18px; padding:15px; border:1px solid rgba(8,123,138,.22); border-radius:11px; background:white; }
 .projection-summary-title { color:#063644; font:600 1.05rem/1.15 "Fraunces",serif; }
 .projection-summary-detail { color:#16494f; font-size:.82rem; line-height:1.45; }

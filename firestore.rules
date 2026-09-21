@@ -696,9 +696,8 @@ service cloud.firestore {
 
     function isValidCrewProjectionCreate(boatId, projectionId) {
       return !exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId))
-        && (hasValidLegacyCrewProjectionPayload(projectionId)
-          || (hasValidCrewProjectionPayload(projectionId)
-            && hasCrewProjectionCabinGroupWithinBoat(boatId)))
+        && hasValidCrewProjectionPayloadV3(projectionId)
+        && hasCrewProjectionCabinGroupWithinBoat(boatId)
         && request.resource.data.status == 'projected'
         && request.resource.data.inviteId == null
         && request.resource.data.invitedAt == null
@@ -707,17 +706,10 @@ service cloud.firestore {
     }
 
     function isValidCrewProjectionDraftUpdate(boatId, projectionId) {
-      // Un record V3 deve validare una sola volta lo schema V3. La formula
-      // precedente lo validava dapprima nel check V2-or-V3 e una seconda
-      // volta dopo il controllo versione, superando il budget di espressioni.
-      return ((isCrewProjectionV3(resource.data)
-          && hasValidCrewProjectionPayloadV3(projectionId)
-          && hasCrewProjectionCabinGroupWithinBoat(boatId))
-          || (!isCrewProjectionV3(resource.data)
-            && ((hasValidCrewProjectionPayload(projectionId)
-                && hasCrewProjectionCabinGroupWithinBoat(boatId))
-              || (!isCrewProjectionV2(resource.data)
-                && hasValidLegacyCrewProjectionPayload(projectionId)))))
+      // La scrittura nuova e' sempre V3. Così una scheda precedente viene
+      // allineata al primo salvataggio senza percorsi alternativi nelle Rules.
+      return hasValidCrewProjectionPayloadV3(projectionId)
+        && hasCrewProjectionCabinGroupWithinBoat(boatId)
         && resource.data.status == 'projected'
         && resource.data.inviteId == null
         && resource.data.invitedAt == null
@@ -821,10 +813,15 @@ service cloud.firestore {
     }
 
     function isValidCrewProjectionInvitedUpdate(boatId, projectionId) {
-      return isValidCrewProjectionInvitedPlanUpdate(boatId, projectionId)
-        || isValidCrewProjectionInvitedSnapshotMigration(boatId, projectionId)
-        || isValidCrewProjectionInvitedDashboardPricingRefresh(boatId, projectionId)
-        || isValidCrewProjectionInvitedCustomPricingUpdate(boatId, projectionId);
+      // Dopo l'invito lo skipper puo' aggiornare posto e importi concordati
+      // dalla stessa scheda. L'identita' del destinatario e il link restano
+      // invariati; una scheda V1/V2 viene allineata a V3 nello stesso gesto.
+      return hasValidInvitedCrewProjectionV3(boatId, projectionId)
+        && request.resource.data.keys().hasAll(['pricingSnapshotAt'])
+        && (request.resource.data.pricingSnapshotAt == request.time
+          || (resource.data.keys().hasAll(['pricingSnapshotAt'])
+            && request.resource.data.pricingSnapshotAt == resource.data.pricingSnapshotAt))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contactConsent', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'updatedAt', 'updatedBy']);
     }
 
     // Il collegamento diventa reale solo nel batch che crea l'invito con lo
@@ -888,9 +885,8 @@ service cloud.firestore {
     }
 
     function isValidCrewProjectionLegacyInviteCreate(boatId, projectionId) {
-      return (hasValidLegacyCrewProjectionPayload(projectionId)
-          || (hasValidCrewProjectionPayload(projectionId)
-            && hasCrewProjectionCabinGroupWithinBoat(boatId)))
+      return hasValidCrewProjectionPayloadV3(projectionId)
+        && hasCrewProjectionCabinGroupWithinBoat(boatId)
         && request.resource.data.status == 'invited'
         && request.resource.data.inviteId == projectionId
         && request.resource.data.createdAt == request.time
