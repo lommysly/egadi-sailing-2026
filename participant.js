@@ -233,17 +233,16 @@ function clearPreRegistrationRulesGate() {
   document.querySelector('#preRegistrationAcknowledgement').checked = false;
   document.querySelector('#preRegistrationAcknowledgement').disabled = true;
   document.querySelector('#preRegistrationAcceptButton').disabled = true;
-  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Scorri fino alla fine del regolamento per sbloccare la conferma.');
+  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Leggi il regolamento completo. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.');
 }
 
 function updatePreRegistrationAcceptState() {
-  const gate = document.querySelector('#preRegistrationBriefing');
   const acknowledgement = document.querySelector('#preRegistrationAcknowledgement');
   const acceptButton = document.querySelector('#preRegistrationAcceptButton');
-  const fullRulesRead = gate.dataset.fullRulesRead === 'true';
-  acknowledgement.disabled = !fullRulesRead;
-  if (!fullRulesRead) acknowledgement.checked = false;
-  acceptButton.disabled = !(hasPublishedBriefing() && !hasAcceptedCurrentBriefing() && fullRulesRead && acknowledgement.checked);
+  const canConfirm = hasPublishedBriefing() && !hasAcceptedCurrentBriefing();
+  acknowledgement.disabled = !canConfirm;
+  if (!canConfirm) acknowledgement.checked = false;
+  acceptButton.disabled = !(canConfirm && acknowledgement.checked);
 }
 
 function markPreRegistrationRulesRead() {
@@ -253,7 +252,7 @@ function markPreRegistrationRulesRead() {
   if (gate.dataset.fullRulesRead === 'true') return;
   gate.dataset.fullRulesRead = 'true';
   scrollRegion.classList.add('is-complete');
-  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.fullRulesSeen', 'Regolamento di bordo visualizzato. Ora puoi confermare la lettura.');
+  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.fullRulesSeen', 'Regolamento di bordo visualizzato. Se lo hai letto, puoi confermare la dichiarazione.');
   updatePreRegistrationAcceptState();
   if (document.activeElement === scrollRegion) acknowledgement.focus();
 }
@@ -264,7 +263,7 @@ function resetPreRegistrationRulesRead() {
   gate.dataset.fullRulesRead = '';
   scrollRegion.scrollTop = 0;
   scrollRegion.classList.remove('is-complete');
-  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Scorri fino alla fine del regolamento per sbloccare la conferma.');
+  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Leggi il regolamento completo. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.');
   updatePreRegistrationAcceptState();
   requestAnimationFrame(() => {
     if (isEntireRulesTextVisible(scrollRegion)) markPreRegistrationRulesRead();
@@ -753,10 +752,9 @@ document.querySelector('#preRegistrationBriefingStatus').setAttribute('aria-live
 document.querySelector('#preRegistrationAcceptButton').addEventListener('click', async () => {
   if (!hasPublishedBriefing() || !activeInvite || !auth.currentUser) return;
   if (!document.querySelector('#preRegistrationAcknowledgement').checked) {
-    setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.confirmReadFirst', 'Scorri il regolamento di bordo fino alla fine e conferma di averlo letto prima di proseguire.'), true);
+    setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.confirmReadFirst', 'Conferma di aver letto il regolamento di bordo prima di proseguire.'), true);
     return;
   }
-  if (document.querySelector('#preRegistrationBriefing').dataset.fullRulesRead !== 'true') return;
   const button = document.querySelector('#preRegistrationAcceptButton');
   button.disabled = true;
   setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.recordingAcceptance', 'Registro la conferma del briefing…'));
