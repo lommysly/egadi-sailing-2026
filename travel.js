@@ -85,7 +85,7 @@ function copyForLocale() {
       carpoolNeed: 'I am looking for a ride',
       carpoolOffer: 'I can offer a ride',
       carpoolSeats: 'Available seats',
-      carpoolConsent: 'I agree that my contact information may be shared only with a matched participant who has given the same consent.',
+      carpoolConsentNote: 'Choosing a carpool option means you agree that your name and WhatsApp number may be shared, but only with a matched participant who has made the same choice — never before that, never with anyone else.',
       matchesTitle: 'People in your time window',
       matchesHint: 'Only shown once you save this journey with the carpool consent above. Nobody sees your contact until you both accept the same match.',
       matchesLoading: 'Checking for compatible people…',
@@ -119,10 +119,9 @@ function copyForLocale() {
       validationFlightAirports: 'For a flight, select both airports from the suggestions.',
       validationTransferAirport: 'For an airport ↔ Marsala connection, select Trapani (TPS) or Palermo (PMO) as one of the airports.',
       validationTransferConsent: 'Confirm the consent for the transfer operator before confirming this connection.',
-      validationCarpoolConsent: 'Confirm the consent for the carpool match before confirming this request.',
       validationCarpoolSeats: 'Indicate at least one available seat for a ride offer.',
       validationRideOfferTransport: 'Select Car as the main transport to offer a ride.',
-      validationRideOffer: 'A ride offer must include the carpool consent and the number of available seats.',
+      validationRideOffer: 'A ride offer must include the number of available seats.',
       validationChronology: 'Arrival cannot be before departure.',
       airportSelected: 'Airport selected',
     };
@@ -191,7 +190,7 @@ function copyForLocale() {
     carpoolNeed: 'Cerco un passaggio',
     carpoolOffer: 'Posso offrire un passaggio',
     carpoolSeats: 'Posti disponibili',
-    carpoolConsent: 'Acconsento a condividere il mio contatto solo con una persona abbinata che abbia dato lo stesso consenso.',
+    carpoolConsentNote: 'Scegliendo un\'opzione di passaggio acconsenti a condividere nome e numero WhatsApp, ma solo con una persona abbinata che abbia fatto la stessa scelta — mai prima, mai con nessun altro.',
     matchesTitle: 'Persone nella tua fascia oraria',
     matchesHint: 'Compare solo dopo aver salvato questo viaggio con il consenso al matching sopra. Nessuno vede il tuo contatto finché non accettate entrambi lo stesso abbinamento.',
     matchesLoading: 'Controllo le persone compatibili…',
@@ -225,10 +224,9 @@ function copyForLocale() {
     validationFlightAirports: 'Per un volo, seleziona entrambi gli aeroporti dai suggerimenti.',
     validationTransferAirport: 'Per il collegamento aeroporto ↔ Marsala seleziona Trapani (TPS) o Palermo (PMO) in uno dei due aeroporti.',
     validationTransferConsent: 'Prima di confermare questo collegamento, dai il consenso alla società transfer.',
-    validationCarpoolConsent: 'Prima di confermare la richiesta di passaggio, dai il consenso al matching.',
     validationCarpoolSeats: 'Per offrire un passaggio indica almeno un posto disponibile.',
     validationRideOfferTransport: 'Per offrire un passaggio seleziona Auto come mezzo principale.',
-    validationRideOffer: 'Per offrire un passaggio servono il consenso al matching e il numero di posti disponibili.',
+    validationRideOffer: 'Per offrire un passaggio indica il numero di posti disponibili.',
     validationChronology: 'L’arrivo non può essere precedente alla partenza.',
     airportSelected: 'Aeroporto selezionato',
   };
@@ -434,7 +432,7 @@ function renderLegForm(direction, rawLeg) {
         <p class="field-hint">${copy.carpoolHint}</p>
         <label><select name="carpoolRole"><option value="">${copy.carpoolNone}</option><option value="need_ride">${copy.carpoolNeed}</option><option value="offer_ride">${copy.carpoolOffer}</option></select></label>
         <label data-carpool-seats hidden>${copy.carpoolSeats}<input name="carpoolSeats" type="number" min="0" max="8" inputmode="numeric" /></label>
-        <label class="consent-field" data-carpool-consent hidden><input name="carpoolMatchConsent" type="checkbox" /><span>${copy.carpoolConsent}</span></label>
+        <p class="field-hint" data-carpool-consent-note hidden>${copy.carpoolConsentNote}</p>
       </fieldset>
       <div class="form-actions"><button class="button button-ghost" type="submit" data-save-state="draft">${copy.saveDraft}</button><button class="button button-primary" type="submit" data-save-state="ready">${copy.confirm}</button><p class="form-message" data-travel-message role="status" aria-live="polite"></p></div>
     </form>
@@ -458,7 +456,6 @@ function populateLegForm(form, leg) {
   });
   field(form, 'bulkyLuggage').checked = leg.bulkyLuggage === true;
   field(form, 'transferOperatorConsent').checked = leg.transferOperatorConsent === true;
-  field(form, 'carpoolMatchConsent').checked = leg.carpoolMatchConsent === true;
   setTravelAirportLookup(field(form, 'originAirportLookup'), { city: leg.originCity, code: leg.originAirport });
   setTravelAirportLookup(field(form, 'destinationAirportLookup'), { city: leg.destinationCity, code: leg.destinationAirport });
   updateConditionalFields(form);
@@ -468,16 +465,17 @@ function updateConditionalFields(form) {
   const airportChoice = inputValue(form, 'airportMarsalaChoice');
   const carpoolRole = inputValue(form, 'carpoolRole');
   const transferConsent = form.querySelector('[data-transfer-consent]');
-  const carpoolConsent = form.querySelector('[data-carpool-consent]');
+  const carpoolConsentNote = form.querySelector('[data-carpool-consent-note]');
   const carpoolSeats = form.querySelector('[data-carpool-seats]');
   if (airportChoice === 'ride_offer' && carpoolRole !== 'offer_ride') field(form, 'carpoolRole').value = 'offer_ride';
   const resolvedCarpoolRole = inputValue(form, 'carpoolRole');
   const needsTransferConsent = airportChoice === 'transfer';
   transferConsent.hidden = !needsTransferConsent;
   if (!needsTransferConsent) field(form, 'transferOperatorConsent').checked = false;
-  carpoolConsent.hidden = !resolvedCarpoolRole;
+  // Scegliere un ruolo passaggio è già il consenso: niente casella separata
+  // (vedi ARRIVI_PARTENZE_SPEC.md), solo una nota informativa quando serve.
+  carpoolConsentNote.hidden = !resolvedCarpoolRole;
   carpoolSeats.hidden = resolvedCarpoolRole !== 'offer_ride';
-  if (!resolvedCarpoolRole) field(form, 'carpoolMatchConsent').checked = false;
   if (resolvedCarpoolRole !== 'offer_ride') field(form, 'carpoolSeats').value = '0';
 }
 
@@ -502,7 +500,9 @@ function formData(form, direction, state) {
     transferOperatorConsent: inputChecked(form, 'transferOperatorConsent'),
     carpoolRole: selectValue(form, 'carpoolRole', CARPOOL_ROLES),
     carpoolSeats: number(inputValue(form, 'carpoolSeats'), 0, 8),
-    carpoolMatchConsent: inputChecked(form, 'carpoolMatchConsent'),
+    // Scegliere un ruolo passaggio è già il consenso al matching: non esiste
+    // una casella separata (vedi ARRIVI_PARTENZE_SPEC.md e copy.carpoolConsentNote).
+    carpoolMatchConsent: selectValue(form, 'carpoolRole', CARPOOL_ROLES) !== '',
   };
 }
 
@@ -519,9 +519,8 @@ function validationMessage(leg, copy) {
     if (!hasTerminalAirport) return copy.validationTransferAirport;
     if (leg.airportMarsalaChoice === 'transfer' && !leg.transferOperatorConsent) return copy.validationTransferConsent;
   }
-  if (leg.carpoolRole && !leg.carpoolMatchConsent) return copy.validationCarpoolConsent;
   if (leg.carpoolRole === 'offer_ride' && leg.carpoolSeats < 1) return copy.validationCarpoolSeats;
-  if (leg.airportMarsalaChoice === 'ride_offer' && (leg.carpoolRole !== 'offer_ride' || !leg.carpoolMatchConsent || leg.carpoolSeats < 1)) return copy.validationRideOffer;
+  if (leg.airportMarsalaChoice === 'ride_offer' && (leg.carpoolRole !== 'offer_ride' || leg.carpoolSeats < 1)) return copy.validationRideOffer;
   if (`${leg.arrivalDate}T${leg.arrivalTime}` < `${leg.departureDate}T${leg.departureTime}`) return copy.validationChronology;
   return '';
 }

@@ -1,12 +1,15 @@
 {
-  "indexes": [
+  "indexes": [],
+  "fieldOverrides": [
     {
       "collectionGroup": "legs",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "carpoolMatchConsent", "order": "ASCENDING" }
+      "fieldPath": "carpoolMatchConsent",
+      "indexes": [
+        { "queryScope": "COLLECTION", "order": "ASCENDING" },
+        { "queryScope": "COLLECTION", "order": "DESCENDING" },
+        { "queryScope": "COLLECTION_GROUP", "order": "ASCENDING" },
+        { "queryScope": "COLLECTION_GROUP", "order": "DESCENDING" }
       ]
     }
-  ],
-  "fieldOverrides": []
+  ]
 }

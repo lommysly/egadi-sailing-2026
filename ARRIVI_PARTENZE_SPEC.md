@@ -44,7 +44,7 @@ L'area della società transfer richiede un accesso nominativo controllato; non s
 La gestione del transfer aeroportuale e la condivisione fra partecipanti sono due scelte separate.
 
 - Nella tratta aeroporto ↔ Marsala, la scheda informa chiaramente che organizzatore e società incaricata ricevono i dati necessari al servizio e possono contattare la persona.
-- Per i passaggi fra partecipanti, l'adesione al matching è facoltativa, per singola tratta e non preselezionata.
+- Per i passaggi fra partecipanti, l'adesione al matching è facoltativa, per singola tratta e non preselezionata: scegliere "cerco un passaggio" o "posso offrire un passaggio" per quella tratta **è** l'atto di consenso (decisione del 22/09/2026 — prima era prevista una casella di conferma separata, rimossa perché ridondante: la scelta del ruolo è già un'azione deliberata e non predefinita). La nota informativa accanto al selettore spiega cosa comporta prima di scegliere.
 - Prima che due partecipanti vedano i reciproci numeri WhatsApp, entrambi devono accettare lo specifico collegamento.
 - Una revoca interrompe nuove proposte e nuove letture; non può cancellare un numero già salvato fuori dal sito da chi lo ha già visto.
 

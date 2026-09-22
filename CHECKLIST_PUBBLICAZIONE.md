@@ -26,7 +26,8 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] Scheda privata `travel.html`/`travel.js` per raccogliere le tratte nell'area equipaggio: nessun modulo pubblico con contatti.
 - [ ] Creare l'area riservata della società transfer con identità nominative, gruppi, veicoli, orari e contatti limitati alle tratte aeroporto ↔ Marsala.
 - [x] Codice di matching tra partecipanti scritto e testato sull'emulatore Firestore + Functions (22/09/2026): Cloud Function `matchCarpoolLegs` + `respondToTravelMatch`, consenso per tratta (`carpoolMatchConsent`, già esistente) e doppia conferma prima di mostrare WhatsApp — vedi caso 12 in `FIRESTORE_RULES_TEST_MATRIX.md`.
-- [ ] Deployare `firestore.rules`, `firestore.indexes.json` (nuovo indice collection-group `legs.carpoolMatchConsent`) e le due Cloud Function in produzione, poi ripetere il test con account fittizi reali su HTTPS (l'emulatore non sostituisce questo passaggio).
+- [x] `firestore.rules`, `firestore.indexes.json` (field override collection-group `legs.carpoolMatchConsent`) e le due Cloud Function deployate in produzione (22/09/2026).
+- [ ] Ripetere il test del caso 12 con account fittizi reali su HTTPS (l'emulatore non sostituisce questo passaggio, anche se il deploy è già live).
 - [ ] Aggiornare l'informativa definitiva con società transfer, destinatari, finalità, revoca e tempi di conservazione, includendo ora anche la condivisione di nome/WhatsApp fra due partecipanti abbinati dopo doppia accettazione.
 
 ## Nuovo accesso equipaggio

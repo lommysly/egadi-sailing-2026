@@ -423,10 +423,10 @@ service cloud.firestore {
         && request.resource.data.carpoolSeats is int
         && request.resource.data.carpoolSeats >= 0
         && request.resource.data.carpoolSeats <= 8
-        && request.resource.data.carpoolMatchConsent is bool
-        && (request.resource.data.carpoolRole != ''
-          || (request.resource.data.carpoolSeats == 0
-            && request.resource.data.carpoolMatchConsent == false))
+        // Scegliere un ruolo passaggio è di per sé il consenso al matching:
+        // nessuna casella separata, nessuno stato intermedio possibile.
+        && request.resource.data.carpoolMatchConsent == (request.resource.data.carpoolRole != '')
+        && (request.resource.data.carpoolRole != '' || request.resource.data.carpoolSeats == 0)
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid
         && (!ready || (

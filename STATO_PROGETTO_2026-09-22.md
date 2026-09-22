@@ -77,7 +77,7 @@ Costruita e testata (emulatore Firestore + Functions, 26 casi automatici, tutti 
 - UI in `travel.js`: sezione "Persone nella tua fascia oraria" sotto ogni tratta con consenso attivo, pulsanti "Mi interessa"/"Non mi interessa", link WhatsApp diretto dopo la rivelazione.
 - Regole Firestore dedicate: `matchCandidates` leggibile solo dal proprietario della tratta (riusa `isCrewTravelOwner`), `travelMatchPairs` mai leggibile né scrivibile dal client (solo le Cloud Function, privilegi Admin).
 
-**Non ancora fatto**: deploy in produzione (`firebase deploy --only firestore:rules,firestore:indexes,functions`) e il test con account fittizi reali su HTTPS previsto da `FIRESTORE_RULES_TEST_MATRIX.md` (caso 12) — l'emulatore conferma la logica, non sostituisce quel passaggio.
+**Deployato in produzione il 22/09/2026** (`firebase deploy --only firestore:rules,firestore:indexes,functions`) — al primo tentativo l'indice collection-group è stato rifiutato ("this index is not necessary, configure using single field index controls"): corretto usando `fieldOverrides` invece di `indexes` in `firestore.indexes.json`, poi deploy riuscito. `matchCarpoolLegs` e `respondToTravelMatch` sono ora live insieme alle 7 funzioni preesistenti (ridistribuite senza modifiche di codice). **Ancora da fare**: il test con account fittizi reali su HTTPS previsto da `FIRESTORE_RULES_TEST_MATRIX.md` (caso 12) — l'emulatore conferma la logica, non sostituisce quel passaggio.
 
 ## 4. Prossimi passi possibili (da concordare, nessuno ancora eseguito)
 
