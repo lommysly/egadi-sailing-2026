@@ -2146,6 +2146,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Coppie di abbinamento passaggi tra partecipanti: gestite solo dalle
+    // Cloud Functions (matchCarpoolLegs, respondToTravelMatch) con privilegi
+    // Admin. Contengono i due riferimenti barca/invito ma mai un contatto:
+    // il client legge lo stato del proprio lato solo da matchCandidates,
+    // sotto la propria tratta in crewTravel.
+    match /events/egadi-2026/travelMatchPairs/{matchId} {
+      allow read, write: if false;
+    }
+
     match /events/egadi-2026/integrations/{integrationId} {
       allow read, write: if false;
     }
@@ -2361,6 +2370,18 @@ service cloud.firestore {
           && hasCurrentBriefingAcceptance(boatId, inviteId)
           && hasValidCrewTravelPayload(inviteId, legId);
         allow delete: if false;
+
+        // Il proprio lato di un abbinamento anonimo: niente identità della
+        // controparte finché respondToTravelMatch non rivela entrambi i
+        // lati. Solo la Cloud Function scrive qui (privilegi Admin); il
+        // client legge soltanto le proprie tratte, mai quelle altrui.
+        match /matchCandidates/{matchId} {
+          allow get, list: if isPrivateAreaOpen()
+            && isCrewTravelOwner(boatId, inviteId)
+            && exists(/databases/$(database)/documents/boats/$(boatId)/members/$(inviteId))
+            && hasCurrentBriefingAcceptance(boatId, inviteId);
+          allow write: if false;
+        }
       }
 
       // Percorso legacy: il nuovo accesso usa soltanto /crewAccess/{uid}.

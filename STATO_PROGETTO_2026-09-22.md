@@ -67,12 +67,22 @@ Stato di pubblicazione secondo `CHECKLIST_PUBBLICAZIONE.md`: sito pubblico e are
 
 C'è anche un **problema tecnico già individuato ma non risolto** nella specifica stessa: Firestore non può nascondere singoli campi di un documento leggibile dall'utente, quindi il matching fra persone diverse **deve** passare da una Cloud Function server-side (o usare solo segnali anonimi) — non si può implementare in modo sicuro solo con le Security Rules attuali. Questo è il punto tecnico da risolvere per primo prima di costruire la UI.
 
-**In sintesi su questo punto**: non manca l'idea né la specifica (c'è già, ed è precisa: ±2h, doppia conferma, niente numeri esposti prima del consenso reciproco) — manca l'implementazione, e serve una funzione server-side dedicata.
+**In sintesi su questo punto**: non mancava l'idea né la specifica (c'era già, ed è precisa: ±2h, doppia conferma, niente numeri esposti prima del consenso reciproco) — mancava l'implementazione.
+
+#### Aggiornamento 22/09/2026 — implementato
+
+Costruita e testata (emulatore Firestore + Functions, 26 casi automatici, tutti superati) la funzione server-side mancante:
+- `matchCarpoolLegs` (Cloud Function attivata da ogni scrittura su una tratta): trova le persone compatibili — stessa direzione, stesso aeroporto reale, stessa data, orario entro ±120 minuti, entrambe con `carpoolRole` e `carpoolMatchConsent: true` (campi già previsti nello schema, non ancora usati da nessuna funzione prima d'ora) — ed espone solo una scheda anonima (`matchCandidates`) a ciascun lato, mai una all'altra persona direttamente.
+- `respondToTravelMatch` (funzione callable): gestisce l'accettazione/rifiuto; il contatto (nome + WhatsApp) compare nella scheda di ciascun lato solo quando **entrambi** hanno accettato lo stesso abbinamento.
+- UI in `travel.js`: sezione "Persone nella tua fascia oraria" sotto ogni tratta con consenso attivo, pulsanti "Mi interessa"/"Non mi interessa", link WhatsApp diretto dopo la rivelazione.
+- Regole Firestore dedicate: `matchCandidates` leggibile solo dal proprietario della tratta (riusa `isCrewTravelOwner`), `travelMatchPairs` mai leggibile né scrivibile dal client (solo le Cloud Function, privilegi Admin).
+
+**Non ancora fatto**: deploy in produzione (`firebase deploy --only firestore:rules,firestore:indexes,functions`) e il test con account fittizi reali su HTTPS previsto da `FIRESTORE_RULES_TEST_MATRIX.md` (caso 12) — l'emulatore conferma la logica, non sostituisce quel passaggio.
 
 ## 4. Prossimi passi possibili (da concordare, nessuno ancora eseguito)
 
-1. Mettere in sicurezza il lavoro Git (sezione 1) — commit, push, pull, pulizia worktree.
-2. Costruire la Cloud Function di matching anonimo per la fascia ±2h (il pezzo mancante di 3.4).
+1. ✅ Mettere in sicurezza il lavoro Git (sezione 1) — fatto.
+2. ✅ Costruire la Cloud Function di matching anonimo per la fascia ±2h — fatto (vedi sopra); resta da deployare e testare su HTTPS con dati fittizi.
 3. Riorganizzare il form Arrivi/Partenze con il pattern hub-a-step già collaudato (3.1).
 4. Ridisegnare l'export verso il foglio esterno in due viste leggibili + un foglio tecnico separato (3.2).
 5. Applicare il pattern cognitivo alla vista proprietario per Arrivi/Partenze (3.3).

@@ -1,6 +1,10 @@
-import { doc, getDoc, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { getApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { crewAccessErrorMessage, crewAccessUrl, db, personalAreaUrl, profileUrl, startCrewAreaSession } from './crew-session.js?v=20260920-payment-instructions-v1';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260920-travel-private-v1';
+
+const functions = getFunctions(getApp(), 'europe-west8');
 
 const DIRECTIONS = Object.freeze(['outbound', 'return']);
 const TRANSPORT_MODES = new Set(['', 'flight', 'train', 'car', 'ferry', 'other']);
@@ -82,6 +86,22 @@ function copyForLocale() {
       carpoolOffer: 'I can offer a ride',
       carpoolSeats: 'Available seats',
       carpoolConsent: 'I agree that my contact information may be shared only with a matched participant who has given the same consent.',
+      matchesTitle: 'People in your time window',
+      matchesHint: 'Only shown once you save this journey with the carpool consent above. Nobody sees your contact until you both accept the same match.',
+      matchesLoading: 'Checking for compatible people…',
+      matchesError: 'I could not check for compatible people right now.',
+      matchesNone: 'No compatible person yet. This updates automatically as others add their journey.',
+      matchesFoundOne: 'You have 1 compatible person for this journey.',
+      matchesFoundMany: (count) => `You have ${count} compatible people for this journey.`,
+      matchProposed: 'Someone else is travelling around the same time.',
+      matchAccepted: 'You accepted. Waiting for the other person to accept too.',
+      matchRevealed: 'Both accepted — here is the contact.',
+      matchAcceptButton: 'I am interested',
+      matchDeclineButton: 'Not interested',
+      matchWhatsappButton: 'Open WhatsApp',
+      matchActing: 'Saving…',
+      matchActionError: 'I could not save your answer. Try again shortly.',
+      matchClosed: 'This match is no longer available.',
       saveDraft: 'Save draft',
       confirm: 'Confirm travel details',
       draftSaved: 'Draft saved. You can come back and complete it whenever you like.',
@@ -172,6 +192,22 @@ function copyForLocale() {
     carpoolOffer: 'Posso offrire un passaggio',
     carpoolSeats: 'Posti disponibili',
     carpoolConsent: 'Acconsento a condividere il mio contatto solo con una persona abbinata che abbia dato lo stesso consenso.',
+    matchesTitle: 'Persone nella tua fascia oraria',
+    matchesHint: 'Compare solo dopo aver salvato questo viaggio con il consenso al matching sopra. Nessuno vede il tuo contatto finché non accettate entrambi lo stesso abbinamento.',
+    matchesLoading: 'Controllo le persone compatibili…',
+    matchesError: 'Non riesco a controllare le persone compatibili in questo momento.',
+    matchesNone: 'Nessuna persona compatibile per ora. Si aggiorna da sola quando altri inseriscono il loro viaggio.',
+    matchesFoundOne: 'C’è 1 persona compatibile per questo viaggio.',
+    matchesFoundMany: (count) => `Ci sono ${count} persone compatibili per questo viaggio.`,
+    matchProposed: 'Un’altra persona viaggia in una fascia oraria simile alla tua.',
+    matchAccepted: 'Hai accettato. In attesa che accetti anche l’altra persona.',
+    matchRevealed: 'Avete accettato entrambi — ecco il contatto.',
+    matchAcceptButton: 'Mi interessa',
+    matchDeclineButton: 'Non mi interessa',
+    matchWhatsappButton: 'Apri WhatsApp',
+    matchActing: 'Salvataggio…',
+    matchActionError: 'Non riesco a salvare la tua risposta. Riprova tra poco.',
+    matchClosed: 'Questo abbinamento non è più disponibile.',
     saveDraft: 'Salva bozza',
     confirm: 'Conferma il viaggio',
     draftSaved: 'Bozza salvata. Puoi tornare qui e completarla quando vuoi.',
@@ -200,6 +236,10 @@ function copyForLocale() {
 
 function text(value) {
   return String(value || '').trim();
+}
+
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
 }
 
 function number(value, fallback = 0, maximum = 99) {
@@ -397,7 +437,12 @@ function renderLegForm(direction, rawLeg) {
         <label class="consent-field" data-carpool-consent hidden><input name="carpoolMatchConsent" type="checkbox" /><span>${copy.carpoolConsent}</span></label>
       </fieldset>
       <div class="form-actions"><button class="button button-ghost" type="submit" data-save-state="draft">${copy.saveDraft}</button><button class="button button-primary" type="submit" data-save-state="ready">${copy.confirm}</button><p class="form-message" data-travel-message role="status" aria-live="polite"></p></div>
-    </form>`;
+    </form>
+    <fieldset class="skipper-transfer-fieldset travel-matches" data-travel-matches hidden>
+      <legend>${copy.matchesTitle}</legend>
+      <p class="field-hint">${copy.matchesHint}</p>
+      <div data-travel-matches-list></div>
+    </fieldset>`;
   const form = card.querySelector('form');
   form.dataset.saveState = 'draft';
   populateLegForm(form, leg);
@@ -538,6 +583,7 @@ function bindLegForm(form, direction) {
       card.dataset.travelState = leg.state;
       card.querySelector('[data-travel-state]').textContent = leg.state === 'ready' ? copy.statusReady : copy.statusDraft;
       setMessage(message, leg.state === 'ready' ? copy.readySaved : copy.draftSaved);
+      await renderMatchesSection(card, direction, leg);
     } catch (error) {
       console.error('Impossibile salvare gli spostamenti dell’equipaggio.', error);
       setMessage(message, copy.saveError, true);
@@ -547,10 +593,94 @@ function bindLegForm(form, direction) {
   });
 }
 
+function canHaveMatches(leg) {
+  return leg.state === 'ready'
+    && (leg.carpoolRole === 'need_ride' || leg.carpoolRole === 'offer_ride')
+    && leg.carpoolMatchConsent === true;
+}
+
+function matchCandidateMarkup(candidate, copy) {
+  if (candidate.status === 'revealed') {
+    const digits = String(candidate.counterpartWhatsapp || '').replace(/\D/g, '');
+    const whatsapp = digits ? `<a class="button button-primary" href="https://wa.me/${digits}" target="_blank" rel="noopener noreferrer">${copy.matchWhatsappButton}</a>` : '';
+    return `<article class="travel-match travel-match-revealed" data-match-id="${candidate.id}">
+      <p>${copy.matchRevealed}</p>
+      <p class="travel-match-name">${escapeHtml(candidate.counterpartName || '')}</p>
+      ${whatsapp}
+    </article>`;
+  }
+  if (candidate.status === 'accepted') {
+    return `<article class="travel-match" data-match-id="${candidate.id}"><p>${copy.matchAccepted}</p></article>`;
+  }
+  return `<article class="travel-match" data-match-id="${candidate.id}">
+    <p>${copy.matchProposed}</p>
+    <div class="travel-match-actions">
+      <button class="button button-primary" type="button" data-match-respond="accept">${copy.matchAcceptButton}</button>
+      <button class="button button-ghost" type="button" data-match-respond="decline">${copy.matchDeclineButton}</button>
+    </div>
+    <p class="travel-match-message" data-match-message role="status" aria-live="polite"></p>
+  </article>`;
+}
+
+async function handleMatchResponse(event) {
+  const button = event.target.closest('[data-match-respond]');
+  if (!button) return;
+  const card = button.closest('[data-match-id]');
+  const matchId = card?.dataset.matchId;
+  if (!matchId) return;
+  const response = button.dataset.matchRespond;
+  const copy = copyForLocale();
+  const message = card.querySelector('[data-match-message]');
+  card.querySelectorAll('button').forEach((el) => { el.disabled = true; });
+  setMessage(message, copy.matchActing);
+  try {
+    await httpsCallable(functions, 'respondToTravelMatch')({ matchId, response });
+    const section = card.closest('[data-travel-matches]');
+    const direction = section.closest('[data-travel-direction]').dataset.travelDirection;
+    const legSnapshot = await getDoc(legReference(direction));
+    await renderMatchesSection(section.closest('details'), direction, normalizeLeg(legSnapshot.exists() ? legSnapshot.data() : null, direction));
+  } catch (error) {
+    console.error('Impossibile salvare la risposta all’abbinamento.', error);
+    setMessage(message, copy.matchActionError, true);
+    card.querySelectorAll('button').forEach((el) => { el.disabled = false; });
+  }
+}
+
+async function renderMatchesSection(card, direction, leg) {
+  const copy = copyForLocale();
+  const section = card.querySelector('[data-travel-matches]');
+  const list = section.querySelector('[data-travel-matches-list]');
+  if (!canHaveMatches(leg)) {
+    section.hidden = true;
+    list.innerHTML = '';
+    return;
+  }
+  section.hidden = false;
+  list.innerHTML = `<p>${copy.matchesLoading}</p>`;
+  try {
+    const snapshot = await getDocs(collection(legReference(direction), 'matchCandidates'));
+    if (snapshot.empty) {
+      list.innerHTML = `<p class="empty-state">${copy.matchesNone}</p>`;
+      return;
+    }
+    const candidates = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    const summary = candidates.length === 1 ? copy.matchesFoundOne : copy.matchesFoundMany(candidates.length);
+    list.innerHTML = `<p class="travel-matches-summary">${summary}</p>${candidates.map((candidate) => matchCandidateMarkup(candidate, copy)).join('')}`;
+    list.removeEventListener('click', handleMatchResponse);
+    list.addEventListener('click', handleMatchResponse);
+  } catch (error) {
+    console.error('Impossibile leggere le persone compatibili.', error);
+    list.innerHTML = `<p class="empty-state">${copy.matchesError}</p>`;
+  }
+}
+
 async function loadLegs() {
   const snapshots = await Promise.all(DIRECTIONS.map((direction) => getDoc(legReference(direction))));
   const target = document.querySelector('#travelForms');
-  target.replaceChildren(...DIRECTIONS.map((direction, index) => renderLegForm(direction, snapshots[index].exists() ? snapshots[index].data() : null)));
+  const legs = DIRECTIONS.map((direction, index) => normalizeLeg(snapshots[index].exists() ? snapshots[index].data() : null, direction));
+  const cards = DIRECTIONS.map((direction, index) => renderLegForm(direction, snapshots[index].exists() ? snapshots[index].data() : null));
+  target.replaceChildren(...cards);
+  await Promise.all(cards.map((card, index) => renderMatchesSection(card, DIRECTIONS[index], legs[index])));
 }
 
 async function openTravelWorkspace(session) {

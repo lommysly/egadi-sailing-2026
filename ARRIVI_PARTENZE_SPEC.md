@@ -52,10 +52,10 @@ Il numero di telefono non entra nei segnali di match, negli elenchi pubblici, ne
 
 ## Implementazione successiva
 
-1. Aggiungere una card privata `Arrivi e partenze` in `my-area.html`, con una tratta per documento e possibilità di modifica.
-2. Creare raccolte Firestore dedicate all'evento, separate da Crew List e inviti.
-3. Pubblicare Security Rules che consentano alla persona solo le proprie tratte, all'operatore solo i transfer aeroportuali assegnati e agli altri partecipanti soltanto un match accettato.
-4. Aggiungere un'area riservata della società transfer per raggruppare manualmente le persone, assegnare mezzo, punto/orario di ritrovo e inviare WhatsApp precompilati.
-5. Aggiornare l'informativa definitiva con titolare, canale per i diritti, destinatari, conservazione, cancellazione e revoca.
+1. ✅ Card privata `Arrivi e partenze` — realizzata come pagina dedicata `travel.html`/`travel.js` (non dentro `my-area.html` come originariamente previsto), una tratta per documento, bozza modificabile in qualsiasi momento.
+2. ✅ Raccolte Firestore dedicate: `boats/{boatId}/crewTravel/{inviteId}/legs/{outbound|return}` (equipaggio) e `boats/{boatId}/skipperTravel/{outbound|return}` (skipper), separate da Crew List e inviti.
+3. ✅ Security Rules pubblicate: la persona legge solo le proprie tratte (`isCrewTravelOwner`), l'operatore solo i transfer aeroportuali assegnati (`transferOpsRecords`). Il matching tra partecipanti è ora implementato (22/09/2026): Cloud Function `matchCarpoolLegs` (attivata da ogni scrittura su una tratta con `carpoolRole` e `carpoolMatchConsent: true`) confronta stessa direzione/aeroporto/data entro ±120 minuti e crea una coppia anonima in `events/egadi-2026/travelMatchPairs` (mai leggibile dal client) più una scheda anonima per lato in `.../legs/{legId}/matchCandidates/{matchId}` (leggibile solo dal proprietario, senza alcuna identità della controparte). La funzione callable `respondToTravelMatch` gestisce l'accettazione: il contatto (nome + WhatsApp) viene scritto nella scheda di ciascun lato solo quando **entrambi** hanno accettato lo stesso abbinamento. Codice verificato con test end-to-end sull'emulatore (matching, esclusione fuori finestra, rivelazione reciproca corretta, rifiuto, revoca) — **non ancora deployato né testato con dati fittizi in produzione**, vedi `FIRESTORE_RULES_TEST_MATRIX.md` e `CHECKLIST_PUBBLICAZIONE.md`.
+4. Area riservata della società transfer per raggruppare manualmente le persone, assegnare mezzo, punto/orario di ritrovo e inviare WhatsApp precompilati — non ancora costruita.
+5. Aggiornare l'informativa definitiva con titolare, canale per i diritti, destinatari, conservazione, cancellazione e revoca — non ancora completata, vedi `PRIVACY_DA_COMPLETARE.md`.
 
-Il matching automatico tra equipaggi deve avvenire lato server oppure usare esclusivamente segnali anonimi: Firestore non può nascondere singoli campi di un documento che un utente ha il diritto di leggere.
+~~Il matching automatico tra equipaggi deve avvenire lato server oppure usare esclusivamente segnali anonimi~~ — risolto: il matching gira interamente in una Cloud Function con privilegi Admin (mai nelle Security Rules), e la scheda che il client legge resta priva di qualunque identità della controparte finché non scatta la doppia accettazione.

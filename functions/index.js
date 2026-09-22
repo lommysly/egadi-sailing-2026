@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { FieldValue, getFirestore } = require('firebase-admin/firestore');
@@ -789,4 +790,302 @@ exports.syncTravelBackupToGoogleSheet = onDocumentWritten({
     requestBody: { values: [sheetRow({ ...record, recordId })] },
   });
   logger.info('Riga arrivi e partenze aggiornata.', { recordId, rowNumber: target.rowNumber });
+});
+
+// ── Abbinamento anonimo per passaggi tra partecipanti ───────────────────────
+// Il numero di telefono non entra mai nei segnali di abbinamento (vedi
+// ARRIVI_PARTENZE_SPEC.md): la ricerca dei compatibili gira solo qui, lato
+// server con privilegi Admin, e la scheda che il client legge
+// (matchCandidates) resta anonima finché entrambe le persone non accettano
+// lo stesso abbinamento tramite respondToTravelMatch.
+const MATCH_WINDOW_MINUTES = 120;
+
+function participantKey(side, direction) {
+  return `${side.boatId}/${side.inviteId}/${direction}`;
+}
+
+function computeMatchId(keyA, keyB) {
+  const sorted = [keyA, keyB].sort();
+  return crypto.createHash('sha256').update(sorted.join('|')).digest('hex').slice(0, 32);
+}
+
+function asMatchId(value) {
+  const id = asText(value, 64);
+  return /^[a-f0-9]{32}$/.test(id) ? id : '';
+}
+
+function minutesSinceEpoch(date, time) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
+  // Entrambi i lati leggono l'orario locale scritto dalla persona senza
+  // conversione: basta un riferimento comune coerente per calcolare la
+  // differenza relativa, non un istante assoluto reale.
+  const parsed = Date.parse(`${date}T${time}:00Z`);
+  return Number.isFinite(parsed) ? parsed / 60000 : null;
+}
+
+function isOptedInReadyLeg(leg) {
+  return Boolean(leg)
+    && leg.state === 'ready'
+    && (leg.carpoolRole === 'need_ride' || leg.carpoolRole === 'offer_ride')
+    && leg.carpoolMatchConsent === true;
+}
+
+function crewTravelLegRef(boatId, inviteId, direction) {
+  return db.doc(`boats/${boatId}/crewTravel/${inviteId}/legs/${direction}`);
+}
+
+function matchCandidateRef(side, direction, matchId) {
+  return crewTravelLegRef(side.boatId, side.inviteId, direction).collection('matchCandidates').doc(matchId);
+}
+
+async function setOrDeleteCandidate(side, direction, matchId, data) {
+  const ref = matchCandidateRef(side, direction, matchId);
+  if (data === null) {
+    await ref.delete();
+    return;
+  }
+  await ref.set(data, { merge: true });
+}
+
+async function deleteMatchPair(matchId, pair) {
+  const batch = db.batch();
+  batch.delete(db.doc(`events/${EVENT_ID}/travelMatchPairs/${matchId}`));
+  batch.delete(matchCandidateRef(pair.sideA, pair.direction, matchId));
+  batch.delete(matchCandidateRef(pair.sideB, pair.direction, matchId));
+  await batch.commit();
+}
+
+async function createMatchPair({ selfSide, otherSide, direction, airport, date, windowMinutes }) {
+  const selfKey = participantKey(selfSide, direction);
+  const otherKey = participantKey(otherSide, direction);
+  const matchId = computeMatchId(selfKey, otherKey);
+  const pairRef = db.doc(`events/${EVENT_ID}/travelMatchPairs/${matchId}`);
+  const asPlainSide = (side) => ({ boatId: side.boatId, inviteId: side.inviteId });
+  const [sideA, sideB] = [selfKey, otherKey].sort().map((key) => asPlainSide(key === selfKey ? selfSide : otherSide));
+  const batch = db.batch();
+  batch.set(pairRef, {
+    schemaVersion: 1,
+    direction,
+    airport,
+    date,
+    windowMinutes,
+    participantKeys: [selfKey, otherKey],
+    sideA,
+    sideB,
+    responseA: 'pending',
+    responseB: 'pending',
+    status: 'pending',
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  const candidatePayload = {
+    schemaVersion: 1,
+    matchId,
+    direction,
+    airport,
+    date,
+    windowMinutes,
+    status: 'proposed',
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  batch.set(matchCandidateRef(selfSide, direction, matchId), candidatePayload);
+  batch.set(matchCandidateRef(otherSide, direction, matchId), candidatePayload);
+  await batch.commit();
+}
+
+async function reconcileMatchesForLeg({ selfSide, direction, airport, date, compatibleSides }) {
+  const selfKey = participantKey(selfSide, direction);
+  const existingSnapshot = await db.collection(`events/${EVENT_ID}/travelMatchPairs`)
+    .where('participantKeys', 'array-contains', selfKey)
+    .get();
+  const existingByOtherKey = new Map();
+  existingSnapshot.forEach((docSnap) => {
+    const pair = docSnap.data();
+    const otherKey = (pair.participantKeys || []).find((key) => key !== selfKey);
+    if (otherKey) existingByOtherKey.set(otherKey, { id: docSnap.id, pair });
+  });
+
+  const newOtherKeys = new Set(compatibleSides.map((side) => participantKey(side, direction)));
+
+  await Promise.all([...existingByOtherKey.entries()].map(async ([otherKey, { id, pair }]) => {
+    // Un abbinamento già rivelato non si tocca più: il contatto è già stato
+    // condiviso fuori dal sito e una revoca successiva non può cancellarlo.
+    if (pair.status === 'revealed') return;
+    if (!newOtherKeys.has(otherKey)) await deleteMatchPair(id, pair);
+  }));
+
+  await Promise.all(compatibleSides.map(async (side) => {
+    const otherKey = participantKey(side, direction);
+    if (existingByOtherKey.has(otherKey)) return;
+    await createMatchPair({ selfSide, otherSide: side, direction, airport, date, windowMinutes: side.windowMinutes });
+  }));
+}
+
+async function closeMatchesForLeg(selfSide, direction) {
+  await reconcileMatchesForLeg({ selfSide, direction, airport: '', date: '', compatibleSides: [] });
+}
+
+exports.matchCarpoolLegs = onDocumentWritten({
+  document: 'boats/{boatId}/crewTravel/{inviteId}/legs/{direction}',
+  region: REGION,
+  serviceAccount: RUNTIME_SERVICE_ACCOUNT,
+  timeoutSeconds: 60,
+  memory: '256MiB',
+}, async (event) => {
+  const { boatId, inviteId, direction } = event.params;
+  if (!['outbound', 'return'].includes(direction)) return;
+  const selfSide = { boatId, inviteId };
+  const after = event.data?.after;
+  const leg = after?.exists ? after.data() : null;
+
+  if (!isOptedInReadyLeg(leg)) {
+    await closeMatchesForLeg(selfSide, direction);
+    return;
+  }
+  const airport = airportForTransfer(direction, leg);
+  const timing = timeForTransfer(direction, leg);
+  const selfMinutes = minutesSinceEpoch(timing.date, timing.time);
+  if (!airport || selfMinutes == null) {
+    await closeMatchesForLeg(selfSide, direction);
+    return;
+  }
+
+  // Dataset minuscolo (evento privato): un filtro in memoria dopo un'unica
+  // query sul solo consenso evita indici composti aggiuntivi.
+  const snapshot = await db.collectionGroup('legs').where('carpoolMatchConsent', '==', true).get();
+  const compatibleSides = [];
+  snapshot.forEach((docSnap) => {
+    const candidate = docSnap.data();
+    if (candidate.direction !== direction || !isOptedInReadyLeg(candidate)) return;
+    const inviteRef = docSnap.ref.parent.parent;
+    const candidateInviteId = inviteRef.id;
+    const candidateBoatId = inviteRef.parent.parent.id;
+    if (candidateBoatId === boatId && candidateInviteId === inviteId) return;
+    if (airportForTransfer(direction, candidate) !== airport) return;
+    const candidateTiming = timeForTransfer(direction, candidate);
+    const candidateMinutes = minutesSinceEpoch(candidateTiming.date, candidateTiming.time);
+    if (candidateMinutes == null || Math.abs(candidateMinutes - selfMinutes) > MATCH_WINDOW_MINUTES) return;
+    compatibleSides.push({
+      boatId: candidateBoatId,
+      inviteId: candidateInviteId,
+      windowMinutes: Math.round(Math.abs(candidateMinutes - selfMinutes)),
+    });
+  });
+
+  await reconcileMatchesForLeg({ selfSide, direction, airport, date: timing.date, compatibleSides });
+});
+
+async function authenticatedCrewInvite(request) {
+  const uid = asUid(request?.auth?.uid);
+  if (!uid) {
+    throw new HttpsError('unauthenticated', 'Accedi alla tua area personale per rispondere a un abbinamento.');
+  }
+  const accessSnapshot = await db.doc(`crewAccess/${uid}`).get();
+  const access = accessSnapshot.exists ? accessSnapshot.data() : null;
+  if (!access || access.userId !== uid) {
+    throw new HttpsError('permission-denied', 'Questo accesso personale non è più valido.');
+  }
+  const boatId = asText(access.boatId, 80);
+  const inviteId = asText(access.inviteId, 128);
+  if (!boatId || !inviteId) {
+    throw new HttpsError('permission-denied', 'Questo accesso personale non è più valido.');
+  }
+  const inviteSnapshot = await db.doc(`boats/${boatId}/invites/${inviteId}`).get();
+  const invite = inviteSnapshot.exists ? inviteSnapshot.data() : null;
+  if (!invite || invite.status !== 'active' || invite.participantUid !== uid) {
+    throw new HttpsError('permission-denied', 'Questo accesso personale non è più attivo.');
+  }
+  return { boatId, inviteId };
+}
+
+async function participantContact(side) {
+  const [memberSnapshot, inviteSnapshot] = await db.getAll(
+    db.doc(`boats/${side.boatId}/members/${side.inviteId}`),
+    db.doc(`boats/${side.boatId}/invites/${side.inviteId}`),
+  );
+  const member = memberSnapshot.exists ? memberSnapshot.data() : null;
+  const invite = inviteSnapshot.exists ? inviteSnapshot.data() : null;
+  return {
+    name: asText(member?.displayName || invite?.displayName, 161) || 'Partecipante',
+    phone: asText(member?.phone || invite?.phone, 40),
+  };
+}
+
+exports.respondToTravelMatch = onCall({
+  region: REGION,
+  serviceAccount: RUNTIME_SERVICE_ACCOUNT,
+  timeoutSeconds: 30,
+  memory: '256MiB',
+}, async (request) => {
+  const { boatId, inviteId } = await authenticatedCrewInvite(request);
+  const matchId = asMatchId(request.data?.matchId);
+  const wantsDecline = request.data?.response === 'decline';
+  const wantsAccept = request.data?.response === 'accept';
+  if (!matchId || (!wantsDecline && !wantsAccept)) {
+    throw new HttpsError('invalid-argument', 'Richiesta non valida.');
+  }
+  const pairRef = db.doc(`events/${EVENT_ID}/travelMatchPairs/${matchId}`);
+
+  const outcome = await db.runTransaction(async (transaction) => {
+    const pairSnapshot = await transaction.get(pairRef);
+    if (!pairSnapshot.exists) {
+      throw new HttpsError('not-found', 'Questo abbinamento non è più disponibile.');
+    }
+    const pair = pairSnapshot.data();
+    const isSideA = pair.sideA?.boatId === boatId && pair.sideA?.inviteId === inviteId;
+    const isSideB = pair.sideB?.boatId === boatId && pair.sideB?.inviteId === inviteId;
+    if (!isSideA && !isSideB) {
+      throw new HttpsError('permission-denied', 'Questo abbinamento non ti riguarda.');
+    }
+    if (pair.status === 'revealed') {
+      throw new HttpsError('failed-precondition', 'Questo abbinamento è già stato confermato in precedenza.');
+    }
+    if (wantsDecline) {
+      transaction.delete(pairRef);
+      return { action: 'closed', pair };
+    }
+    const selfField = isSideA ? 'responseA' : 'responseB';
+    const otherResponse = isSideA ? pair.responseB : pair.responseA;
+    const reveal = otherResponse === 'accepted';
+    transaction.update(pairRef, {
+      [selfField]: 'accepted',
+      ...(reveal ? { status: 'revealed', revealedAt: FieldValue.serverTimestamp() } : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return { action: reveal ? 'revealed' : 'accepted', pair, isSideA };
+  });
+
+  if (outcome.action === 'closed') {
+    await Promise.all([
+      setOrDeleteCandidate(outcome.pair.sideA, outcome.pair.direction, matchId, null),
+      setOrDeleteCandidate(outcome.pair.sideB, outcome.pair.direction, matchId, null),
+    ]);
+    return { status: 'closed' };
+  }
+
+  const selfSide = outcome.isSideA ? outcome.pair.sideA : outcome.pair.sideB;
+  const otherSide = outcome.isSideA ? outcome.pair.sideB : outcome.pair.sideA;
+
+  if (outcome.action === 'accepted') {
+    await setOrDeleteCandidate(selfSide, outcome.pair.direction, matchId, { status: 'accepted', updatedAt: FieldValue.serverTimestamp() });
+    return { status: 'accepted' };
+  }
+
+  const [selfContact, otherContact] = await Promise.all([participantContact(selfSide), participantContact(otherSide)]);
+  await Promise.all([
+    setOrDeleteCandidate(selfSide, outcome.pair.direction, matchId, {
+      status: 'revealed',
+      counterpartName: otherContact.name,
+      counterpartWhatsapp: otherContact.phone,
+      revealedAt: FieldValue.serverTimestamp(),
+    }),
+    setOrDeleteCandidate(otherSide, outcome.pair.direction, matchId, {
+      status: 'revealed',
+      counterpartName: selfContact.name,
+      counterpartWhatsapp: selfContact.phone,
+      revealedAt: FieldValue.serverTimestamp(),
+    }),
+  ]);
+  return { status: 'revealed' };
 });

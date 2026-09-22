@@ -356,6 +356,15 @@ body.menu-open { overflow:hidden; }
 .skipper-transfer-fieldset { background:#fffdf7 !important; border-color:rgba(180,116,42,.28) !important; }
 .skipper-transfer-fieldset .field-hint { margin:0; }
 .skipper-travel-main-fieldset { gap:16px !important; }
+.travel-matches-summary { margin:0; font:700 .78rem "DM Sans",sans-serif; color:#063644; }
+.travel-match { display:grid; gap:8px; padding:12px; border:1px solid rgba(8,123,138,.2); border-radius:10px; background:#fff; }
+.travel-match + .travel-match { margin-top:2px; }
+.travel-match p { margin:0; font-size:.8rem; line-height:1.4; }
+.travel-match-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.travel-match-name { font:700 .92rem "DM Sans",sans-serif !important; color:#063644 !important; }
+.travel-match-message { font-size:.74rem; color:#b3261e; }
+.travel-match-message:empty { display:none; }
+.travel-match-revealed { background:#eafbfa; border-color:rgba(8,123,138,.3); }
 .travel-mode-control { max-width:290px; }
 .travel-route { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:14px; align-items:stretch; padding:15px; border:1px solid rgba(37,211,102,.42); border-radius:13px; background:linear-gradient(145deg,#edfff5 0%,#fafffd 54%,#fff 100%); }
 .travel-route:focus-within { border-color:rgba(27,153,78,.72); box-shadow:0 0 0 3px rgba(37,211,102,.1); }

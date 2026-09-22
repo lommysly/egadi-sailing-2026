@@ -23,10 +23,11 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] Sezione pubblica online con le quattro tratte, città/aeroporti reali, orari, volo facoltativo, bagagli e finestra di match ±2 ore.
 - [x] Passage Plan separa scenari di luce da porto, campo boe o rada e dichiara stato, validità e prossimo aggiornamento.
 - [ ] Pubblicare e testare `skipperTravel/outbound` e `skipperTravel/return`: due bozze operative private, salvabili una alla volta anche incomplete, per viaggio e possibile transfer dello skipper. Devono restare accessibili soltanto allo skipper della propria barca; nessuna Crew List, PDF, flotta, pagamento, organizzatore, equipaggio o società transfer può leggerle.
-- [ ] Aggiungere la scheda privata per raccogliere le tratte nell'area equipaggio: nessun modulo pubblico con contatti.
+- [x] Scheda privata `travel.html`/`travel.js` per raccogliere le tratte nell'area equipaggio: nessun modulo pubblico con contatti.
 - [ ] Creare l'area riservata della società transfer con identità nominative, gruppi, veicoli, orari e contatti limitati alle tratte aeroporto ↔ Marsala.
-- [ ] Pubblicare Rules, indici e test: le tratte restano separate da Crew List e inviti; i passaggi fra partecipanti usano consenso per tratta e doppia conferma prima di mostrare WhatsApp.
-- [ ] Aggiornare l'informativa definitiva con società transfer, destinatari, finalità, revoca e tempi di conservazione.
+- [x] Codice di matching tra partecipanti scritto e testato sull'emulatore Firestore + Functions (22/09/2026): Cloud Function `matchCarpoolLegs` + `respondToTravelMatch`, consenso per tratta (`carpoolMatchConsent`, già esistente) e doppia conferma prima di mostrare WhatsApp — vedi caso 12 in `FIRESTORE_RULES_TEST_MATRIX.md`.
+- [ ] Deployare `firestore.rules`, `firestore.indexes.json` (nuovo indice collection-group `legs.carpoolMatchConsent`) e le due Cloud Function in produzione, poi ripetere il test con account fittizi reali su HTTPS (l'emulatore non sostituisce questo passaggio).
+- [ ] Aggiornare l'informativa definitiva con società transfer, destinatari, finalità, revoca e tempi di conservazione, includendo ora anche la condivisione di nome/WhatsApp fra due partecipanti abbinati dopo doppia accettazione.
 
 ## Nuovo accesso equipaggio
 

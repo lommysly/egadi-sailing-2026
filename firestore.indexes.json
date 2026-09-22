@@ -1,0 +1,12 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "legs",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "carpoolMatchConsent", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,6 +1,6 @@
 # Egadi Sailing Experience · 8–11 ottobre 2026
 
-Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il progetto usa Firebase Blaze soltanto per l’archivio privato delle due copie documentali dello skipper: nessun checkout, nessuna Cloud Function, nessun SMS e nessun pagamento automatico.
+Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il progetto usa Firebase Blaze per l'archivio privato delle due copie documentali dello skipper e per un piccolo insieme di Cloud Function in `functions/` (portale transfer, sincronizzazione verso il Google Sheet privato dell'organizzazione, abbinamento anonimo dei passaggi tra partecipanti): nessun checkout, nessun SMS e nessun pagamento automatico.
 
 ## Stato reale
 
