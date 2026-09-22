@@ -121,6 +121,15 @@ const COPY = {
     sheet: 'Apri il foglio operativo',
     lastUpdated: 'Aggiornato',
     accountPending: 'In attesa di approvazione',
+    panelOutboundTitle: 'Andata · verso Marsala',
+    panelOutboundHint: 'Persone che arrivano in aeroporto e devono raggiungere Marsala.',
+    panelReturnTitle: 'Ritorno · verso l’aeroporto',
+    panelReturnHint: 'Persone che partono da Marsala e devono raggiungere l’aeroporto.',
+    airportUnknown: 'Aeroporto da definire',
+    flightArrival: 'Orario di arrivo del volo',
+    flightDeparture: 'Orario di partenza del volo',
+    meetingPointPlaceholderOutbound: 'Es. Uscita Arrivi, Aeroporto di {airport}',
+    meetingPointPlaceholderReturn: 'Es. Molo imbarco, Porto di Marsala',
   },
   en: {
     heroEyebrow: 'Operations area · transfer company',
@@ -217,6 +226,15 @@ const COPY = {
     sheet: 'Open operations sheet',
     lastUpdated: 'Updated',
     accountPending: 'Waiting for approval',
+    panelOutboundTitle: 'Outbound · to Marsala',
+    panelOutboundHint: 'People landing at the airport who need to reach Marsala.',
+    panelReturnTitle: 'Return · to the airport',
+    panelReturnHint: 'People leaving Marsala who need to reach the airport.',
+    airportUnknown: 'Airport to be defined',
+    flightArrival: 'Flight arrival time',
+    flightDeparture: 'Flight departure time',
+    meetingPointPlaceholderOutbound: 'E.g. Arrivals exit, {airport} Airport',
+    meetingPointPlaceholderReturn: 'E.g. Boarding pontoon, Port of Marsala',
   },
 };
 
@@ -322,16 +340,30 @@ function statusLabel(value) {
   return t(keyByStatus[normalizedStatus(value)]);
 }
 
+// Nomi conosciuti per i due soli aeroporti del servizio: rende la tratta e i
+// raggruppamenti leggibili subito, invece del solo codice IATA (TPS/PMO).
+const AIRPORT_NAMES = { TPS: 'Trapani', PMO: 'Palermo' };
+
+function airportCode(record) {
+  return text(record.airport, 4).toUpperCase();
+}
+
+function airportLabel(code) {
+  const upper = text(code, 4).toUpperCase();
+  if (!upper) return t('airportUnknown');
+  return AIRPORT_NAMES[upper] ? `${AIRPORT_NAMES[upper]} (${upper})` : upper;
+}
+
 function routeLabel(record) {
   const declared = text(record.routeLabel || record.route || record.transferRoute, 180);
   if (declared) return declared;
   const origin = text(record.originLabel || record.origin || record.originAirportName || record.originAirport || record.from, 100);
   const destination = text(record.destinationLabel || record.destination || record.destinationAirportName || record.destinationAirport || record.to, 100);
   if (origin || destination) return [origin, destination].filter(Boolean).join(' → ');
-  const airport = text(record.airport, 20);
+  const airport = airportCode(record);
   const direction = normalizeDirection(record.direction || record.legDirection || record.travelDirection);
-  if (airport && direction === 'outbound') return `${airport} → Marsala`;
-  if (airport && direction === 'return') return `Marsala → ${airport}`;
+  if (airport && direction === 'outbound') return `${airportLabel(airport)} → Marsala`;
+  if (airport && direction === 'return') return `Marsala → ${airportLabel(airport)}`;
   return t('unknownRoute');
 }
 
@@ -512,15 +544,64 @@ function renderRecord(record) {
   const notes = text(record.operatorNotes || record.notes, 500);
   const recordId = escapeHtml(record.id);
   const directionClass = direction || 'unknown';
-  return `<details class="transfer-record" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(status)}">${escapeHtml(statusLabel(status))}</span></span></summary><div class="transfer-record-body"><dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(t('dateTime'), escapeHtml(formatSchedule(record)))}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(status)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details>`;
+  // L'orario salvato sul movimento è quello del volo (arrivo per l'andata,
+  // partenza per il ritorno): l'etichetta lo dice esplicitamente, altrimenti
+  // si presta a essere letta come l'orario di ritrovo del transfer.
+  const scheduleLabel = direction === 'return' ? t('flightDeparture') : t('flightArrival');
+  const meetingPointPlaceholder = direction === 'return'
+    ? t('meetingPointPlaceholderReturn')
+    : t('meetingPointPlaceholderOutbound').replace('{airport}', airportLabel(airportCode(record)));
+  return `<details class="transfer-record" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(status)}">${escapeHtml(statusLabel(status))}</span></span></summary><div class="transfer-record-body"><dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(status)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details>`;
+}
+
+// Un solo elenco misto (andata, ritorno, andata, ritorno...) obbliga a
+// leggere ogni riga per capire di cosa si tratta. Due pannelli fissi, ognuno
+// diviso per aeroporto, riflettono come si organizza davvero un transfer:
+// un furgone per Trapani, uno per Palermo, andata e ritorno separati.
+function groupByAirport(records) {
+  const groups = new Map();
+  records.forEach((record) => {
+    const code = airportCode(record) || 'UNKNOWN';
+    if (!groups.has(code)) groups.set(code, []);
+    groups.get(code).push(record);
+  });
+  const order = ['TPS', 'PMO'];
+  return [...groups.entries()].sort(([left], [right]) => {
+    const leftIndex = order.indexOf(left);
+    const rightIndex = order.indexOf(right);
+    if (leftIndex === -1 && rightIndex === -1) return left.localeCompare(right);
+    if (leftIndex === -1) return 1;
+    if (rightIndex === -1) return -1;
+    return leftIndex - rightIndex;
+  });
+}
+
+function renderDirectionPanel(direction, records) {
+  const title = direction === 'return' ? t('panelReturnTitle') : t('panelOutboundTitle');
+  const hint = direction === 'return' ? t('panelReturnHint') : t('panelOutboundHint');
+  const groups = groupByAirport(records);
+  const body = groups.length
+    ? groups.map(([code, groupRecords]) => `<div class="transfer-airport-group"><h3 class="transfer-airport-group-title">${escapeHtml(airportLabel(code))}<span>${groupRecords.length}</span></h3><div class="transfer-operator-list">${groupRecords.map(renderRecord).join('')}</div></div>`).join('')
+    : `<p class="transfer-empty">${escapeHtml(t('noRecords'))}</p>`;
+  return `<section class="transfer-direction-panel"><h2>${escapeHtml(title)}<span class="transfer-direction-panel-count">${records.length}</span></h2><p class="field-hint">${escapeHtml(hint)}</p>${body}</section>`;
+}
+
+function renderGroupedRecords(filtered) {
+  const outboundRecords = filtered.filter((record) => normalizeDirection(record.direction || record.legDirection || record.travelDirection) === 'outbound');
+  const returnRecords = filtered.filter((record) => normalizeDirection(record.direction || record.legDirection || record.travelDirection) === 'return');
+  return renderDirectionPanel('outbound', outboundRecords) + renderDirectionPanel('return', returnRecords);
 }
 
 function recordStats(records) {
+  // Stesso filtro di recordMatchesFilters per lo stato del record: un
+  // movimento revocato (bozza mai confermata) non deve gonfiare il totale,
+  // altrimenti il riepilogo non corrisponde a ciò che si vede sotto.
+  const active = records.filter((record) => !record.recordState || record.recordState === 'active');
   return {
-    total: records.length,
-    outbound: records.filter((record) => normalizeDirection(record.direction || record.legDirection || record.travelDirection) === 'outbound').length,
-    return: records.filter((record) => normalizeDirection(record.direction || record.legDirection || record.travelDirection) === 'return').length,
-    pending: records.filter((record) => ['new', 'planned'].includes(normalizedStatus(record.status))).length,
+    total: active.length,
+    outbound: active.filter((record) => normalizeDirection(record.direction || record.legDirection || record.travelDirection) === 'outbound').length,
+    return: active.filter((record) => normalizeDirection(record.direction || record.legDirection || record.travelDirection) === 'return').length,
+    pending: active.filter((record) => ['new', 'planned'].includes(normalizedStatus(record.status))).length,
   };
 }
 
@@ -528,19 +609,14 @@ function renderOperatorDashboard() {
   const filtered = state.records.filter(recordMatchesFilters);
   const stats = recordStats(state.records);
   const sheetUrl = state.isOrganizer ? safeSheetUrl(state.event?.transferSheetUrl) : '';
-  const recordList = filtered.length
-    ? filtered.map(renderRecord).join('')
-    : `<p class="transfer-empty">${escapeHtml(t('noRecords'))}</p>`;
-  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-light" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article></section><section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterDirection'))}</span><select name="direction"><option value="all">${escapeHtml(t('allDirections'))}</option><option value="outbound"${state.filters.direction === 'outbound' ? ' selected' : ''}>${escapeHtml(t('inbound'))}</option><option value="return"${state.filters.direction === 'return' ? ' selected' : ''}>${escapeHtml(t('outbound'))}</option></select></label><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status)}</select></label><label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form><div class="transfer-operator-list">${recordList}</div></section>${state.isOrganizer ? renderAccessManagement() : ''}`;
+  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-light" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article></section><section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status)}</select></label><label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
 }
 
 function renderRecordListOnly() {
-  const list = root.querySelector('.transfer-operator-list');
-  if (!list) return;
+  const groups = root.querySelector('.transfer-operator-groups');
+  if (!groups) return;
   const filtered = state.records.filter(recordMatchesFilters);
-  list.innerHTML = filtered.length
-    ? filtered.map(renderRecord).join('')
-    : `<p class="transfer-empty">${escapeHtml(t('noRecords'))}</p>`;
+  groups.innerHTML = renderGroupedRecords(filtered);
 }
 
 function render() {
