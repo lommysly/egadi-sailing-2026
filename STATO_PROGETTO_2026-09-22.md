@@ -11,12 +11,17 @@ Il repository locale ha 4 cartelle worktree (`2026-10-08-11-egadi`, `-deploy-bri
 - **L'unico branch con lavoro realmente non mergiato è `codex/partial-profile-saves`** (worktree `2026-10-08-11-egadi-visual-release`): 3 commit avanti rispetto a `origin/main`, e **mai pushati su GitHub** — quindi a rischio se questo Mac ha un problema.
 - **Il worktree principale (`2026-10-08-11-egadi`, branch `main`) ha inoltre lavoro non committato**: 20 file modificati (758 righe inserite) + 7 file nuovi non tracciati, mai salvati in un commit. Riguardano soprattutto `my-area.js` (+301 righe), `firestore.rules` (+111), `passage-plan.js` (+127), `flotta.html`, `index.html`, e modifiche a `ARRIVI_PARTENZE_SPEC.md`. Non è chiaro se questo lavoro sia già presente altrove (in `origin/main` o in `partial-profile-saves`) o sia unico — **va controllato prima di qualunque `pull`, per non perderlo**.
 
-### Cosa consiglio (nessuna azione eseguita, in attesa di tua conferma)
+### Aggiornamento 22/09/2026, pomeriggio — igiene Git completata
 
-1. Mettere in sicurezza le modifiche non committate nel worktree `main` (commit su un branch dedicato, es. `local-wip-22-09`), così non si perdono.
-2. Fare `git pull` sul `main` di `2026-10-08-11-egadi` (fast-forward pulito, verificato sicuro).
-3. Pushare `codex/partial-profile-saves` su GitHub subito (salvaguardia), poi valutare cosa tenerne: la parte "bozze viaggio partecipante + dichiarazione pagamento" è utile, la parte "countdown" è doppione di quello già in `origin/main` (stesso identico codice, sviluppato due volte in parallelo) e va scartata in fase di merge.
-4. Una volta allineato il `main` locale, i worktree `2026-10-08-11-egadi-deploy-briefing` e `2026-10-08-11-egadi-deploy-passage` diventano ridondanti (i loro branch sono già interamente contenuti in `origin/main`) e possono essere rimossi per tornare a una struttura pulita: `main` + un worktree per il lavoro attivo su `partial-profile-saves`.
+Tutti i punti sopra sono stati eseguiti, in quest'ordine:
+
+1. ✅ `codex/partial-profile-saves` pushato su GitHub per sicurezza (nulla più solo-locale).
+2. ✅ Lavoro non committato nel worktree `main` messo in sicurezza sul branch `local-wip-2026-09-22` (pushato), poi `main` allineato a `origin/main` con `git pull --ff-only` (fast-forward pulito, nessun conflitto).
+3. ✅ Worktree ridondanti `2026-10-08-11-egadi-deploy-briefing` e `2026-10-08-11-egadi-deploy-passage` rimossi (branch già interamente contenuti in `main`, nulla perso).
+4. ✅ `codex/partial-profile-saves` analizzato a fondo (vedi sezione 3.2 aggiornata sotto): la parte utile (dichiarazione di pagamento) riconciliata e portata su `main` con un'implementazione coerente con l'architettura esistente (commit `ed6efa0`); la parte "Arrivo e ritorno" scartata (superata da `travel.js`, già in main); il countdown scartato (doppione byte-per-byte).
+5. ✅ Worktree `2026-10-08-11-egadi-visual-release` rimosso; branch `codex/partial-profile-saves` eliminato sia in locale sia su GitHub (contenuto utile già in `main`, nessuna perdita).
+
+**Stato attuale**: `~/Sito per Week/` contiene un solo worktree, `2026-10-08-11-egadi`, sul branch `main`, aggiornato e pulito. Nessun branch pendente, nessun lavoro non committato, nessun worktree ridondante.
 
 Nessuno di questi passaggi è stato eseguito: toccano commit, push e worktree, quindi aspetto un tuo sì prima di procedere.
 
