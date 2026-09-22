@@ -781,23 +781,27 @@ async function ensureSheetTabs(sheets, sheetId) {
   if (sheetTabsEnsuredFor === sheetId) return;
   const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: sheetId, fields: 'sheets.properties.title' });
   const existingTitles = new Set((spreadsheet.data.sheets || []).map((sheet) => sheet.properties?.title));
-  const missing = [
+  const wanted = [
     { title: 'Arrivi', header: HUMAN_SHEET_HEADER },
     { title: 'Partenze', header: HUMAN_SHEET_HEADER },
     { title: TECHNICAL_SHEET_NAME, header: TECHNICAL_SHEET_HEADER },
-  ].filter((sheet) => !existingTitles.has(sheet.title));
+  ];
+  const missing = wanted.filter((sheet) => !existingTitles.has(sheet.title));
   if (missing.length) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: sheetId,
       requestBody: { requests: missing.map((sheet) => ({ addSheet: { properties: { title: sheet.title } } })) },
     });
-    await Promise.all(missing.map((sheet) => sheets.spreadsheets.values.update({
-      spreadsheetId: sheetId,
-      range: `${sheet.title}!A1:${String.fromCharCode(64 + sheet.header.length)}1`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [sheet.header] },
-    })));
   }
+  // Riscrive sempre la riga di intestazione (anche per i fogli già
+  // esistenti): se l'elenco delle colonne cambia in futuro, il foglio si
+  // corregge da solo invece di restare con un'intestazione superata.
+  await Promise.all(wanted.map((sheet) => sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: `${sheet.title}!A1:${String.fromCharCode(64 + sheet.header.length)}1`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [sheet.header] },
+  })));
   sheetTabsEnsuredFor = sheetId;
 }
 
