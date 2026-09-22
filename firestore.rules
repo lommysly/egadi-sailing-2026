@@ -1859,8 +1859,8 @@ service cloud.firestore {
     }
 
     function hasValidPaymentRequestCore(boatId, canUseProjectionRecipient) {
-      return request.resource.data.keys().hasAll(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
-        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'contributionItemId', 'entryType', 'installmentType', 'allocation', 'receivedOn', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy'])
+      return request.resource.data.keys().hasAll(['recipientId', 'memberId', 'payerInviteId', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy', 'declaredAt', 'declaredBy', 'declaredMethod'])
+        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'contributionItemId', 'entryType', 'installmentType', 'allocation', 'receivedOn', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'collectorId', 'collectorName', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy', 'declaredAt', 'declaredBy', 'declaredMethod'])
         && request.resource.data.recipientId is string
         && request.resource.data.recipientId.size() > 0
         && request.resource.data.memberId == request.resource.data.recipientId
@@ -1908,7 +1908,10 @@ service cloud.firestore {
         && request.resource.data.verifiedAt == null
         && request.resource.data.verifiedBy == null
         && request.resource.data.cancelledAt == null
-        && request.resource.data.cancelledBy == null;
+        && request.resource.data.cancelledBy == null
+        && request.resource.data.declaredAt == null
+        && request.resource.data.declaredBy == null
+        && request.resource.data.declaredMethod == null;
     }
 
     // La nota è rivolta alla persona nel messaggio WhatsApp, ma non deve
@@ -1954,7 +1957,12 @@ service cloud.firestore {
         && request.resource.data.verifiedAt == request.time
         && request.resource.data.verifiedBy == request.auth.uid
         && request.resource.data.cancelledAt == null
-        && request.resource.data.cancelledBy == null;
+        && request.resource.data.cancelledBy == null
+        // Un acconto registrato direttamente dallo skipper è già verificato:
+        // non esiste un momento in cui il partecipante possa dichiararlo.
+        && request.resource.data.declaredAt == null
+        && request.resource.data.declaredBy == null
+        && request.resource.data.declaredMethod == null;
     }
 
     function canVerifyPayment() {
@@ -2020,6 +2028,25 @@ service cloud.firestore {
           || board.data.fullRulesRequired != true
           || (acceptance.data.keys().hasAll(['fullRulesRead'])
             && acceptance.data.fullRulesRead == true));
+    }
+
+    // La persona può segnalare "ho pagato" una sola volta per richiesta, solo
+    // scegliendo uno dei metodi che lo skipper ha proposto in QUELLA
+    // richiesta. Non è una verifica: resta un promemoria per lo skipper, che
+    // deve comunque controllare l'accredito reale prima di confermarlo
+    // (vedi CONTRIBUTI_OPERATIVI.md). Riusa la stessa identità già validata
+    // per la lettura, per non duplicare i controlli su invito/briefing.
+    function canDeclarePayment(boatId) {
+      return canReadOwnPaymentRequest(boatId)
+        && (resource.data.status == 'prepared' || resource.data.status == 'requested')
+        && resource.data.declaredAt == null
+        && resource.data.declaredBy == null
+        && resource.data.declaredMethod == null
+        && request.resource.data.declaredAt == request.time
+        && request.resource.data.declaredBy == request.auth.uid
+        && request.resource.data.declaredMethod is string
+        && resource.data.paymentMethods[request.resource.data.declaredMethod] == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['declaredAt', 'declaredBy', 'declaredMethod']);
     }
 
     // La vetrina pubblica non riusa mai /boats: quel documento contiene
@@ -2444,10 +2471,11 @@ service cloud.firestore {
             : (collectionProfileExists(boatId)
               && isValidPaymentRequestCreate(boatId)));
         allow update: if isPrivateAreaOpen()
-          && isSkipper(boatId)
-          && (canVerifyPayment()
-            || canCancelPayment()
-            || canClassifyVerifiedLegacyPaymentInstallment());
+          && ((isSkipper(boatId)
+              && (canVerifyPayment()
+                || canCancelPayment()
+                || canClassifyVerifiedLegacyPaymentInstallment()))
+            || canDeclarePayment(boatId));
         allow delete: if false;
 
         match /private/{detailId} {

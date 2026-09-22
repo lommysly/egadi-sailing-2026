@@ -2819,7 +2819,17 @@ function paymentStatusLabel(payment) {
   if (isManualPaymentReceipt(payment)) return 'Registrato e verificato';
   if (payment.status === 'verified') return 'Accredito verificato';
   if (payment.status === 'cancelled') return 'Richiesta annullata';
+  if (payment.declaredAt) return 'Dichiarato dalla persona, da verificare';
   return 'In attesa di verifica';
+}
+
+// Promemoria, non prova: lo skipper deve sempre controllare l'accredito
+// reale prima di premere "Conferma accredito" (vedi CONTRIBUTI_OPERATIVI.md).
+function paymentDeclaredHint(payment) {
+  if (!payment.declaredAt || isManualPaymentReceipt(payment)) return '';
+  const method = PAYMENT_METHODS.find((candidate) => candidate.id === payment.declaredMethod)?.label || payment.declaredMethod;
+  const when = payment.declaredAt?.toDate ? formatDate(payment.declaredAt.toDate()) : '';
+  return `<span class="payment-declared-hint">La persona dichiara di aver pagato con ${escapeHtml(method)}${when ? ` il ${escapeHtml(when)}` : ''}. Controlla l'accredito reale prima di confermare.</span>`;
 }
 
 function isPendingPayment(payment) {
@@ -5534,7 +5544,8 @@ function renderPayments(snapshot) {
     const moreDeliveryOptions = moreDeliveryActions.length
       ? `<details class="payment-more-actions"><summary>Altre opzioni</summary><div class="payment-more-actions-list">${moreDeliveryActions.join('')}</div></details>`
       : '';
-    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${contributionTag}${accountingTag}${methods}${legacyInstructions}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${primaryDeliveryAction}${moreDeliveryOptions}${statusActions}</div></article>`;
+    const declaredHint = paymentDeclaredHint(payment);
+    return `<article class="payment-row"><div><strong>${escapeHtml(name)} · ${amount}</strong><span>${escapeHtml(reason)}${escapeHtml(dueDate)}</span>${contributionTag}${accountingTag}${methods}${legacyInstructions}${declaredHint}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span>${primaryDeliveryAction}${moreDeliveryOptions}${statusActions}</div></article>`;
   }).join('');
   renderCostPlanSummary();
   renderProjections({ syncFleet: false });
@@ -7388,6 +7399,9 @@ manualReceiptForm.addEventListener('submit', async (event) => {
     verifiedBy: auth.currentUser.uid,
     cancelledAt: null,
     cancelledBy: null,
+    declaredAt: null,
+    declaredBy: null,
+    declaredMethod: null,
   };
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
@@ -7490,6 +7504,9 @@ paymentForm.addEventListener('submit', async (event) => {
     verifiedBy: null,
     cancelledAt: null,
     cancelledBy: null,
+    declaredAt: null,
+    declaredBy: null,
+    declaredMethod: null,
   };
   const messageDetails = String(fields.get('messageDetails') || '').trim();
   const whatsappUrl = paymentWhatsappUrl(payment, { messageDetails });

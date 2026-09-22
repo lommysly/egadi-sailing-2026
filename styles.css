@@ -115,6 +115,12 @@ body.menu-open { overflow:hidden; }
 .payment-accounting-tag { display:inline-block !important; width:fit-content; margin-top:8px !important; padding:4px 7px; border:1px solid rgba(8,123,138,.24); border-radius:999px; background:#eaf8f6; color:#087b8a !important; font:700 .62rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
 .payment-contribution-tag { display:inline-block !important; width:fit-content; margin-top:8px !important; padding:4px 7px; border:1px solid rgba(17,45,56,.16); border-radius:999px; background:#f3f6f5; color:#416b6d !important; font:700 .62rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
 .payment-detail-note { font-size:.76rem; line-height:1.4; }
+.payment-declare-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px; padding-top:10px; border-top:1px dashed rgba(8,123,138,.28); }
+.payment-declare-controls label { display:flex; flex-direction:column; gap:4px; font-size:.76rem; font-weight:600; color:var(--ink); }
+.payment-declare-controls select { min-height:36px; padding:4px 8px; border:1px solid rgba(7,59,76,.2); border-radius:8px; background:#fff; font-size:.8rem; }
+.payment-declare-message { width:100%; margin:0; font-size:.74rem; color:#b3261e; }
+.payment-declare-message:empty { display:none; }
+.payment-declared-hint { display:block; margin-top:8px; padding:8px 10px; border-radius:10px; background:#fff6e5; color:#7a5b00 !important; font-size:.76rem; line-height:1.4; }
 .invite-panel { margin-top:28px; padding:22px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .invite-panel h4 { margin:0 0 10px; font:600 1.45rem "Fraunces",serif; letter-spacing:-.03em; }
 .crew-projection-panel { margin-top:22px; padding:20px; border:1px solid rgba(8,123,138,.22); border-radius:14px; background:linear-gradient(140deg,#eafbfa 0%,#f8fffe 100%); }

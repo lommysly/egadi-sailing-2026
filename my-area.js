@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { auth, crewAccessErrorMessage, crewAccessUrl, db, profileUrl, signOutCrew, startCrewAreaSession } from './crew-session.js?v=20260920-payment-instructions-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 
@@ -303,6 +303,11 @@ function setupCrewDashboard() {
     const copyPaymentButton = event.target.closest('[data-copy-payment-instruction]');
     if (copyPaymentButton && dashboard.contains(copyPaymentButton)) {
       copyPaymentInstruction(copyPaymentButton.dataset.copyPaymentInstruction);
+      return;
+    }
+    const declareButton = event.target.closest('[data-declare-payment]');
+    if (declareButton && dashboard.contains(declareButton)) {
+      declareCrewPayment(declareButton.dataset.declarePayment, declareButton.closest('[data-payment-declare-id]'));
       return;
     }
     const rulesReference = event.target.closest('[data-rules-reference="deposit"]');
@@ -691,7 +696,62 @@ function paymentStatusLabel(payment) {
   if (payment?.entryType === 'manual_receipt') return localized('Registrato e verificato', 'Recorded and verified');
   if (payment.status === 'verified') return localized('Accredito confermato', 'Payment confirmed');
   if (payment.status === 'cancelled') return localized('Richiesta annullata', 'Request cancelled');
+  if (payment.declaredAt) return localized('Dichiarato, in attesa di conferma', 'Reported as paid, awaiting confirmation');
   return localized('Da regolare', 'To be settled');
+}
+
+function canDeclareCrewPayment(payment) {
+  return isPendingCrewPayment(payment)
+    && !isManualCrewReceipt(payment)
+    && !payment.declaredAt
+    && Object.keys(payment.paymentMethods || {}).some((methodId) => payment.paymentMethods[methodId] === true);
+}
+
+// Un solo controllo alla volta: la persona sceglie il metodo appena prima di
+// dichiarare, non lo prepara in anticipo. Evita di dover salvare uno stato
+// intermedio "metodo scelto" solo per la UI.
+function paymentDeclareMarkup(payment, paymentId) {
+  if (!canDeclareCrewPayment(payment)) return '';
+  const methods = PAYMENT_METHODS.filter((method) => payment.paymentMethods?.[method.id] === true);
+  const options = methods.map((method) => `<option value="${escapeHtml(method.id)}">${escapeHtml(method.label)}</option>`).join('');
+  return `<div class="payment-declare-controls" data-payment-declare-id="${escapeHtml(paymentId)}">
+    <label>
+      <span>${escapeHtml(localized('Con quale metodo hai pagato?', 'Which method did you pay with?'))}</span>
+      <select data-declare-method-select>
+        <option value="" selected>${escapeHtml(localized('Scegli il metodo', 'Choose the method'))}</option>
+        ${options}
+      </select>
+    </label>
+    <button class="button button-ghost" type="button" data-declare-payment="${escapeHtml(paymentId)}">${escapeHtml(localized('Ho pagato', 'I paid'))}</button>
+    <p class="payment-declare-message" data-declare-payment-message role="status" aria-live="polite"></p>
+  </div>`;
+}
+
+async function declareCrewPayment(paymentId, controls) {
+  const select = controls.querySelector('[data-declare-method-select]');
+  const message = controls.querySelector('[data-declare-payment-message]');
+  const method = select?.value || '';
+  if (!method) {
+    setMessage(message, localized('Scegli un metodo prima di continuare.', 'Choose a method before continuing.'), true);
+    return;
+  }
+  const button = controls.querySelector('[data-declare-payment]');
+  button.disabled = true;
+  select.disabled = true;
+  try {
+    await updateDoc(doc(db, 'boats', activeInvite.boatId, 'paymentRequests', paymentId), {
+      declaredAt: serverTimestamp(),
+      declaredBy: auth.currentUser.uid,
+      declaredMethod: method,
+    });
+    // Nessun messaggio di conferma locale: la sottoscrizione paymentRequests
+    // ridisegna subito la card con lo stato "Dichiarato".
+  } catch (error) {
+    console.error('Egadi dichiarazione pagamento:', error);
+    setMessage(message, localized('Non riesco a registrare la dichiarazione. Riprova tra poco.', 'I could not save this. Please try again shortly.'), true);
+    button.disabled = false;
+    select.disabled = false;
+  }
 }
 
 function paymentAmountCents(payment) {
@@ -1347,7 +1407,7 @@ function renderProfile(member) {
 
 function renderPayments(snapshot) {
   const list = document.querySelector('#participantPaymentList');
-  activeCrewPayments = snapshot.docs.map((item) => item.data());
+  activeCrewPayments = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
   if (snapshot.empty) {
     list.innerHTML = `<p class="empty-state">${escapeHtml(translate('crew.flow.noPayments', 'Il riepilogo ricevuto con l’invito è qui sopra. Qui compariranno solo eventuali promemoria, extra o conferme dello skipper.'))}</p>`;
     renderParticipantFinanceSummary();
@@ -1375,7 +1435,8 @@ function renderPayments(snapshot) {
       : paymentInstructionsAreReady()
         ? localized('Apri il riquadro “Come versare” nel riepilogo della tua quota.', 'Open the “How to pay” panel in your contribution summary.')
         : localized('Lo skipper pubblicherà qui i metodi di versamento: non serve un nuovo invito.', 'The skipper will publish payment methods here: you do not need a new invitation.');
-    return `<article class="payment-row"><div><strong>${formatCurrency(paymentAmount(payment))} · ${escapeHtml(reason)}</strong><span>${escapeHtml(dueDate)}</span>${installment}${methods}${legacyInstructions}<span class="payment-detail-note">${escapeHtml(detail)}</span></div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span></div></article>`;
+    const declare = paymentDeclareMarkup(payment, item.id);
+    return `<article class="payment-row"><div><strong>${formatCurrency(paymentAmount(payment))} · ${escapeHtml(reason)}</strong><span>${escapeHtml(dueDate)}</span>${installment}${methods}${legacyInstructions}<span class="payment-detail-note">${escapeHtml(detail)}</span>${declare}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span></div></article>`;
   }).join('');
   renderParticipantFinanceSummary();
   renderCrewDashboardOverview();
