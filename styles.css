@@ -71,6 +71,10 @@ body.menu-open { overflow:hidden; }
 .dashboard-heading p:last-child { margin:12px 0 0; }
 .dashboard-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; }
 .dashboard-panel { padding:28px; border-radius:18px; background:var(--paper); }
+.dashboard-panel-heading { display:flex; align-items:center; gap:10px; margin-bottom:2px; }
+.dashboard-panel-heading .eyebrow { margin:0; }
+.dashboard-panel-icon { display:grid; place-items:center; flex:0 0 auto; width:36px; height:36px; border-radius:50%; background:var(--sun-deep); color:white; }
+.dashboard-panel-icon svg { width:18px; height:18px; }
 .dashboard-panel h3 { margin:0 0 18px; font:600 2rem/.95 "Fraunces",serif; letter-spacing:-.05em; }
 .dashboard-panel h4 { margin:26px 0 12px; font:600 1.42rem/.98 "Fraunces",serif; letter-spacing:-.035em; }
 .dashboard-grid-single-view { grid-template-columns:minmax(0,1fr); }
