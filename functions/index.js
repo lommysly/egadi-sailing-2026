@@ -417,6 +417,10 @@ function backupPayload({ recordId, boatId, boat, inviteId, invite, member, direc
     inviteId,
     direction,
     recordState: 'active',
+    // La persona può ancora non aver confermato: il foglio umano deve dirlo
+    // chiaramente invece di mostrare lo stesso "Da pianificare" di una
+    // richiesta già confermata (fonte della confusione del 22/09/2026).
+    legState: leg.state === 'ready' ? 'ready' : 'draft',
     boatName: asText(boat?.name, 70),
     participantName: transferConsent ? name : 'Dati non condivisi',
     contactConsent: transferConsent,
@@ -448,6 +452,7 @@ function skipperBackupPayload({ recordId, boatId, boat, direction, leg, profile,
     inviteId: 'skipper',
     direction,
     recordState: 'active',
+    legState: 'ready', // skipperTravel non ha bozze: è salvata già definitiva
     boatName: asText(boat?.name, 70),
     participantName: transferConsent ? skipperDisplayName(profile, boat) : 'Dati non condivisi',
     participantRole: 'skipper',
@@ -728,7 +733,7 @@ const TRANSFER_STATUS_LABELS = {
   revoked: 'Revocato',
 };
 const HUMAN_SHEET_HEADER = ['Nome', 'Barca', 'Data', 'Ora', 'Aeroporto', 'Mezzo', 'Bagagli', 'Come si muove', 'Stato', 'Gruppo', 'Ritrovo', 'Telefono', 'Email', 'Note'];
-const TECHNICAL_SHEET_HEADER = ['ID record', 'Nome', 'Barca', 'Direzione', 'Stato interno', 'Traccia', 'Aggiornato il'];
+const TECHNICAL_SHEET_HEADER = ['ID record', 'Nome', 'Barca', 'Direzione', 'Stato interno', 'Traccia', 'Bozza o confermata', 'Aggiornato il'];
 
 function humanSheetRow(record) {
   if (record?.recordState !== 'active') {
@@ -745,7 +750,7 @@ function humanSheetRow(record) {
     record.transport || '',
     bagagli,
     request,
-    TRANSFER_STATUS_LABELS[record.status] || record.status || '',
+    record.legState === 'draft' ? 'Bozza, non confermata' : (TRANSFER_STATUS_LABELS[record.status] || record.status || ''),
     record.groupName || '',
     [record.meetingPoint, record.meetingDate, record.meetingTime].filter(Boolean).join(' · '),
     record.contactConsent === true ? record.phone || '' : '',
@@ -762,6 +767,7 @@ function technicalSheetRow(record) {
     directionLabel(record.direction),
     record.status || 'new',
     record.recordState === 'active' ? 'Attiva' : 'Revocata',
+    record.legState || '',
     new Date().toISOString(),
   ];
 }
