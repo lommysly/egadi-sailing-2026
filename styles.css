@@ -748,6 +748,14 @@ body.menu-open { overflow:hidden; }
 .transfer-badge--draft { background:#ffd9b3; color:#8a3d00; }
 .transfer-record-draft-notice { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:0 0 14px; padding:12px 14px; border-radius:10px; border:1px solid #f0b429; background:#fff6dd; color:#6b4a00; font-size:.88rem; line-height:1.42; }
 .transfer-record-draft-notice a { color:#6b4a00; font-weight:700; text-underline-offset:2px; }
+/* Fasce orarie dentro un gruppo aeroporto (solo oltre TIME_BAND_MIN_GROUP_SIZE
+   persone, transfer.js renderAirportGroupBody): sotto-titolo più discreto del
+   gruppo aeroporto, non una nuova sezione. */
+.transfer-time-band { margin-top:14px; padding-left:14px; border-left:2px solid var(--line); }
+.transfer-time-band:first-of-type { margin-top:10px; }
+.transfer-time-band-title { display:flex; align-items:center; gap:8px; margin:0 0 8px; color:#5a7a7c; font:700 .7rem "DM Mono",monospace; letter-spacing:.04em; }
+.transfer-time-band-title span { display:grid; place-items:center; min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:#eef0f1; color:#416b6d; font:700 .64rem "DM Sans",sans-serif; letter-spacing:0; }
+.transfer-record-details dd small { display:block; margin-top:3px; color:#416b6d; font-size:.76rem; font-weight:400; line-height:1.35; }
 
 /* Storyboard pubblico: nessun filmato viene incorporato prima delle verifiche di licenza. */
 .storyboard-main { background:var(--paper); }

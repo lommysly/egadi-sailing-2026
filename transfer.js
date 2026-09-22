@@ -134,6 +134,11 @@ const COPY = {
     flightDeparture: 'Orario di partenza del volo',
     meetingPointPlaceholderOutbound: 'Es. Uscita Arrivi, Aeroporto di {airport}',
     meetingPointPlaceholderReturn: 'Es. Molo imbarco, Porto di Marsala',
+    suggestedDepartureLabel: 'Partenza da Marsala (stimata)',
+    suggestedDepartureHint: 'Include il tempo di viaggio e il margine in aeroporto: verifica sempre il traffico reale del giorno.',
+    timeBandArrivalPrefix: 'Arrivo',
+    timeBandDeparturePrefix: 'Partenza da Marsala',
+    timeBandUnscheduled: 'Orario da definire',
   },
   en: {
     heroEyebrow: 'Operations area · transfer company',
@@ -243,6 +248,11 @@ const COPY = {
     flightDeparture: 'Flight departure time',
     meetingPointPlaceholderOutbound: 'E.g. Arrivals exit, {airport} Airport',
     meetingPointPlaceholderReturn: 'E.g. Boarding pontoon, Port of Marsala',
+    suggestedDepartureLabel: 'Departure from Marsala (estimated)',
+    suggestedDepartureHint: 'Includes travel time and the airport margin: always check the real traffic on the day.',
+    timeBandArrivalPrefix: 'Arrival',
+    timeBandDeparturePrefix: 'Departure from Marsala',
+    timeBandUnscheduled: 'Time to be defined',
   },
 };
 
@@ -591,7 +601,101 @@ function renderRecord(record) {
   const meetingPointPlaceholder = direction === 'return'
     ? t('meetingPointPlaceholderReturn')
     : t('meetingPointPlaceholderOutbound').replace('{airport}', airportLabel(airportCode(record)));
-  return `<details class="transfer-record" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span></span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details>`;
+  const suggestedDeparture = direction === 'return' ? suggestedMarsalaDeparture(record) : '';
+  const suggestedDepartureDetail = suggestedDeparture
+    ? recordDetail(t('suggestedDepartureLabel'), `${escapeHtml(suggestedDeparture)}<small>${escapeHtml(t('suggestedDepartureHint'))}</small>`)
+    : '';
+  return `<details class="transfer-record" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span></span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${suggestedDepartureDetail}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details>`;
+}
+
+// Tempi di percorrenza Marsala↔aeroporto e margine di arrivo, confermati dal
+// titolare il 22/09/2026: servono a calcolare a che ora il van deve partire
+// da Marsala per un ritorno, non solo a che ora è il volo. Sono stime, non
+// promesse: il traffico reale può sempre cambiarle.
+const TRANSFER_TRAVEL_MINUTES = { TPS: 45, PMO: 105 };
+const AIRPORT_BUFFER_WITH_CHECKED_BAG_MINUTES = 90;
+const AIRPORT_BUFFER_HAND_LUGGAGE_MINUTES = 60;
+// Oltre questo intervallo fra un orario e il successivo (già ordinati), la
+// persona apre una nuova fascia: due voli/partenze vicini nel tempo vanno
+// nello stesso van, uno lontano nel tempo no.
+const TIME_BAND_GAP_MINUTES = 90;
+// Sotto questa soglia di persone in un gruppo aeroporto, le fasce orarie non
+// aggiungono nulla e sono solo un titolo in più da leggere: si mostra la
+// lista piatta come prima, esattamente come per una barca piccola oggi.
+const TIME_BAND_MIN_GROUP_SIZE = 6;
+
+function timeToMinutes(hhmm) {
+  const normalized = optionalTime(hhmm);
+  if (!normalized) return null;
+  const [hours, minutes] = normalized.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(totalMinutes) {
+  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+// Solo per il ritorno: a che ora il van deve lasciare Marsala perché la
+// persona arrivi in aeroporto col margine giusto, calcolato all'indietro
+// dall'orario del volo. Il bagaglio in stiva richiede più margine di un
+// bagaglio a mano (imbarco più lento), come indicato dal titolare.
+function suggestedMarsalaDeparture(record) {
+  const airport = airportCode(record);
+  const travelMinutes = TRANSFER_TRAVEL_MINUTES[airport];
+  const flightMinutes = timeToMinutes(record.time || record.departureTime);
+  if (!travelMinutes || flightMinutes === null) return '';
+  const bufferMinutes = Number(record.luggageCount) > 0
+    ? AIRPORT_BUFFER_WITH_CHECKED_BAG_MINUTES
+    : AIRPORT_BUFFER_HAND_LUGGAGE_MINUTES;
+  return minutesToTime(flightMinutes - travelMinutes - bufferMinutes);
+}
+
+// Chiave usata per ordinare e raggruppare per fascia oraria: per l'andata è
+// l'orario di arrivo del volo (quando la persona è pronta al ritiro), per il
+// ritorno è l'orario di partenza da Marsala calcolato sopra, non l'orario del
+// volo — altrimenti due voli vicini ma con bagagli diversi finirebbero in
+// fasce sbagliate rispetto a quando il van deve davvero muoversi.
+function recordClusterMinutes(record, direction) {
+  if (direction === 'return') {
+    const suggested = suggestedMarsalaDeparture(record);
+    return suggested ? timeToMinutes(suggested) : timeToMinutes(record.time);
+  }
+  return timeToMinutes(record.time);
+}
+
+// Fasce dinamiche invece di orari fissi (es. "12-14"): due persone vicine nel
+// tempo restano insieme anche a cavallo di un'ora tonda, una lontana apre una
+// fascia nuova. Più utile per organizzare un singolo van/pullman per fascia.
+function groupByTimeBand(records, direction) {
+  const withTime = records
+    .map((record) => ({ record, minutes: recordClusterMinutes(record, direction) }))
+    .filter((entry) => entry.minutes !== null)
+    .sort((left, right) => left.minutes - right.minutes);
+  const withoutTime = records.filter((record) => recordClusterMinutes(record, direction) === null);
+  const bands = [];
+  withTime.forEach((entry) => {
+    const currentBand = bands[bands.length - 1];
+    if (currentBand && entry.minutes - currentBand.maxMinutes <= TIME_BAND_GAP_MINUTES) {
+      currentBand.records.push(entry.record);
+      currentBand.maxMinutes = entry.minutes;
+    } else {
+      bands.push({ records: [entry.record], minMinutes: entry.minutes, maxMinutes: entry.minutes });
+    }
+  });
+  if (withoutTime.length) bands.push({ records: withoutTime, minMinutes: null, maxMinutes: null });
+  return bands;
+}
+
+function timeBandTitle(band, direction) {
+  if (band.minMinutes === null) return t('timeBandUnscheduled');
+  const prefix = direction === 'return' ? t('timeBandDeparturePrefix') : t('timeBandArrivalPrefix');
+  const range = band.minMinutes === band.maxMinutes
+    ? minutesToTime(band.minMinutes)
+    : `${minutesToTime(band.minMinutes)}–${minutesToTime(band.maxMinutes)}`;
+  return `${prefix} ${range}`;
 }
 
 // Un solo elenco misto (andata, ritorno, andata, ritorno...) obbliga a
@@ -616,12 +720,19 @@ function groupByAirport(records) {
   });
 }
 
+function renderAirportGroupBody(groupRecords, direction) {
+  if (groupRecords.length <= TIME_BAND_MIN_GROUP_SIZE) {
+    return `<div class="transfer-operator-list">${groupRecords.map(renderRecord).join('')}</div>`;
+  }
+  return groupByTimeBand(groupRecords, direction).map((band) => `<div class="transfer-time-band"><h4 class="transfer-time-band-title">${escapeHtml(timeBandTitle(band, direction))}<span>${band.records.length}</span></h4><div class="transfer-operator-list">${band.records.map(renderRecord).join('')}</div></div>`).join('');
+}
+
 function renderDirectionPanel(direction, records) {
   const title = direction === 'return' ? t('panelReturnTitle') : t('panelOutboundTitle');
   const hint = direction === 'return' ? t('panelReturnHint') : t('panelOutboundHint');
   const groups = groupByAirport(records);
   const body = groups.length
-    ? groups.map(([code, groupRecords]) => `<div class="transfer-airport-group"><h3 class="transfer-airport-group-title">${escapeHtml(airportLabel(code))}<span>${groupRecords.length}</span></h3><div class="transfer-operator-list">${groupRecords.map(renderRecord).join('')}</div></div>`).join('')
+    ? groups.map(([code, groupRecords]) => `<div class="transfer-airport-group"><h3 class="transfer-airport-group-title">${escapeHtml(airportLabel(code))}<span>${groupRecords.length}</span></h3>${renderAirportGroupBody(groupRecords, direction)}</div>`).join('')
     : `<p class="transfer-empty">${escapeHtml(t('noRecords'))}</p>`;
   return `<section class="transfer-direction-panel"><h2>${escapeHtml(title)}<span class="transfer-direction-panel-count">${records.length}</span></h2><p class="field-hint">${escapeHtml(hint)}</p>${body}</section>`;
 }
