@@ -430,7 +430,10 @@ function renderLegForm(direction, rawLeg) {
   const formId = `travel-${direction}`;
   const card = document.createElement('details');
   card.className = 'skipper-travel-form skipper-cost-panel';
-  card.open = direction === 'outbound';
+  // Entrambe le tratte aperte da subito: una persona vede andata e ritorno
+  // insieme invece di dover scoprire che la seconda va cliccata (segnalato
+  // in test come poco intuitivo).
+  card.open = true;
   card.dataset.travelDirection = direction;
   card.dataset.travelState = leg.state;
   card.innerHTML = `
