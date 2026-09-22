@@ -580,6 +580,23 @@ function setSaving(form, saving) {
   form.querySelectorAll('[data-save-state]').forEach((button) => { button.disabled = saving; });
 }
 
+// Confronta il payload appena inviato con quanto risulta ora sul server
+// (updatedAt escluso, è un serverTimestamp non confrontabile lato client).
+// Serve solo a capire se un errore di setDoc era apparente: il dato è
+// comunque arrivato, per esempio per un intoppo di rete proprio nel momento
+// della risposta.
+const LEG_PAYLOAD_COMPARISON_FIELDS = ['schemaVersion', 'ownerUid', 'inviteId', 'direction', 'state', 'transportMode', 'originCity', 'originAirport', 'destinationCity', 'destinationAirport', 'departureDate', 'departureTime', 'arrivalDate', 'arrivalTime', 'carrier', 'serviceNumber', 'luggageCount', 'bulkyLuggage', 'airportMarsalaChoice', 'transferOperatorConsent', 'carpoolRole', 'carpoolSeats', 'carpoolMatchConsent'];
+
+function legPayloadMatchesDocument(payload, docData) {
+  return Boolean(docData) && LEG_PAYLOAD_COMPARISON_FIELDS.every((field) => payload[field] === docData[field]);
+}
+
+function applySavedLegState(card, message, direction, leg, copy) {
+  card.dataset.travelState = leg.state;
+  card.querySelector('[data-travel-state]').textContent = leg.state === 'ready' ? copy.statusReady : copy.statusDraft;
+  setMessage(message, leg.state === 'ready' ? copy.readySaved : copy.draftSaved);
+}
+
 function bindLegForm(form, direction) {
   installTravelAutocomplete(form);
   form.addEventListener('change', () => updateConditionalFields(form));
@@ -600,43 +617,63 @@ function bindLegForm(form, direction) {
     }
     setSaving(form, true);
     setMessage(message, copy.saving);
+    const payload = {
+      schemaVersion: 1,
+      ownerUid: activeSession.user.uid,
+      inviteId: activeSession.invite.id,
+      direction,
+      state: leg.state,
+      transportMode: leg.transportMode,
+      originCity: leg.originCity,
+      originAirport: leg.originAirport,
+      destinationCity: leg.destinationCity,
+      destinationAirport: leg.destinationAirport,
+      departureDate: leg.departureDate,
+      departureTime: leg.departureTime,
+      arrivalDate: leg.arrivalDate,
+      arrivalTime: leg.arrivalTime,
+      carrier: leg.carrier,
+      serviceNumber: leg.serviceNumber,
+      luggageCount: leg.luggageCount,
+      bulkyLuggage: leg.bulkyLuggage,
+      airportMarsalaChoice: leg.airportMarsalaChoice,
+      transferOperatorConsent: leg.transferOperatorConsent,
+      carpoolRole: leg.carpoolRole,
+      carpoolSeats: leg.carpoolSeats,
+      carpoolMatchConsent: leg.carpoolMatchConsent,
+      updatedAt: serverTimestamp(),
+      updatedBy: activeSession.user.uid,
+    };
+    const card = form.closest('details');
     try {
-      const payload = {
-        schemaVersion: 1,
-        ownerUid: activeSession.user.uid,
-        inviteId: activeSession.invite.id,
-        direction,
-        state: leg.state,
-        transportMode: leg.transportMode,
-        originCity: leg.originCity,
-        originAirport: leg.originAirport,
-        destinationCity: leg.destinationCity,
-        destinationAirport: leg.destinationAirport,
-        departureDate: leg.departureDate,
-        departureTime: leg.departureTime,
-        arrivalDate: leg.arrivalDate,
-        arrivalTime: leg.arrivalTime,
-        carrier: leg.carrier,
-        serviceNumber: leg.serviceNumber,
-        luggageCount: leg.luggageCount,
-        bulkyLuggage: leg.bulkyLuggage,
-        airportMarsalaChoice: leg.airportMarsalaChoice,
-        transferOperatorConsent: leg.transferOperatorConsent,
-        carpoolRole: leg.carpoolRole,
-        carpoolSeats: leg.carpoolSeats,
-        carpoolMatchConsent: leg.carpoolMatchConsent,
-        updatedAt: serverTimestamp(),
-        updatedBy: activeSession.user.uid,
-      };
       await setDoc(legReference(direction), payload);
-      const card = form.closest('details');
-      card.dataset.travelState = leg.state;
-      card.querySelector('[data-travel-state]').textContent = leg.state === 'ready' ? copy.statusReady : copy.statusDraft;
-      setMessage(message, leg.state === 'ready' ? copy.readySaved : copy.draftSaved);
-      await renderMatchesSection(card, direction, leg);
+      applySavedLegState(card, message, direction, leg, copy);
+      try {
+        await renderMatchesSection(card, direction, leg);
+      } catch (matchesError) {
+        // Il salvataggio è già confermato sopra: un problema nella sezione
+        // passaggi compatibili non deve mai sembrare un salvataggio fallito.
+        console.error('Salvataggio riuscito, ma non sono riuscito ad aggiornare i passaggi compatibili.', matchesError);
+      }
     } catch (error) {
       console.error('Impossibile salvare gli spostamenti dell’equipaggio.', error);
-      setMessage(message, copy.saveError, true);
+      let savedAnyway = false;
+      try {
+        const recheck = await getDoc(legReference(direction));
+        savedAnyway = legPayloadMatchesDocument(payload, recheck.exists() ? recheck.data() : null);
+      } catch (recheckError) {
+        console.error('Impossibile verificare se il salvataggio era comunque riuscito.', recheckError);
+      }
+      if (savedAnyway) {
+        applySavedLegState(card, message, direction, leg, copy);
+        try {
+          await renderMatchesSection(card, direction, leg);
+        } catch (matchesError) {
+          console.error('Salvataggio riuscito, ma non sono riuscito ad aggiornare i passaggi compatibili.', matchesError);
+        }
+      } else {
+        setMessage(message, copy.saveError, true);
+      }
     } finally {
       setSaving(form, false);
     }
