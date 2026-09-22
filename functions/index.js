@@ -365,7 +365,12 @@ function timeForTransfer(direction, leg) {
 function validSourceLeg(leg, direction, invite) {
   if (!leg || !invite || invite.status !== 'active') return false;
   if (leg.ownerUid !== invite.participantUid || leg.direction !== direction) return false;
-  if (leg.state !== 'ready') return false;
+  // Non richiediamo leg.state === 'ready': una persona che ha già scelto
+  // "transfer" e dato il consenso, ma non ha ancora premuto "conferma" sul
+  // resto del suo viaggio, deve comunque comparire (come bozza, vedi
+  // legState più sotto) invece di sparire del tutto dalla società transfer,
+  // che altrimenti non saprebbe mai che quella persona esiste (bug reale
+  // scoperto il 22/09/2026 con Maria Luisa Gallotti).
   if (leg.airportMarsalaChoice !== 'transfer' || leg.transferOperatorConsent !== true) return false;
   return TRANSFER_AIRPORTS.has(airportForTransfer(direction, leg));
 }
@@ -572,6 +577,20 @@ async function markTransferRequestRevoked(ref, revision) {
   });
 }
 
+// Riepilogo minimo per lo skipper: solo se una tratta manca, è in bozza o è
+// confermata. Mai volo, orario o aeroporto, che restano privati alla persona
+// (crewTravel/{inviteId}/legs è owner-only nelle regole, lo skipper non può
+// leggerlo). Collezione separata da members perché la sua validazione lato
+// client (hasValidMemberPayload) whitelista già le sue chiavi: aggiungere
+// questi campi lì avrebbe rotto ogni salvataggio successivo della scheda.
+async function writeCrewTravelStatus(boatId, inviteId, direction, travelState) {
+  await db.doc(`boats/${boatId}/crewTravelStatus/${inviteId}`).set({
+    inviteId,
+    [direction]: travelState,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
 exports.materializeCrewTravel = onDocumentWritten({
   document: 'boats/{boatId}/crewTravel/{inviteId}/legs/{direction}',
   region: REGION,
@@ -587,11 +606,16 @@ exports.materializeCrewTravel = onDocumentWritten({
   const after = event.data?.after;
   const revision = sourceRevision(after?.exists ? after : event.data?.before, event.time);
   if (!after?.exists) {
-    await Promise.all([markBackupRevoked(backupRef, revision), markTransferRequestRevoked(transferRef, revision)]);
+    await Promise.all([
+      markBackupRevoked(backupRef, revision),
+      markTransferRequestRevoked(transferRef, revision),
+      writeCrewTravelStatus(boatId, inviteId, direction, 'missing'),
+    ]);
     return;
   }
 
   const leg = after.data();
+  await writeCrewTravelStatus(boatId, inviteId, direction, leg.state === 'ready' ? 'ready' : 'draft');
   const boatRef = db.doc(`boats/${boatId}`);
   const inviteRef = db.doc(`boats/${boatId}/invites/${inviteId}`);
   const memberRef = db.doc(`boats/${boatId}/members/${inviteId}`);
@@ -628,6 +652,7 @@ exports.materializeCrewTravel = onDocumentWritten({
       inviteId,
       direction,
       recordState: 'active',
+      legState: leg.state === 'ready' ? 'ready' : 'draft',
       boatName: asText(boat?.name, 70),
       participantName: asText(member?.displayName || invite?.displayName, 161),
       contactConsent: true,
@@ -707,6 +732,7 @@ exports.materializeSkipperTravel = onDocumentWritten({
       inviteId: 'skipper',
       direction,
       recordState: 'active',
+      legState: 'ready', // skipperTravel non ha bozze: è salvata già definitiva
       boatName: asText(boat?.name, 70),
       participantName: skipperDisplayName(profile, boat),
       participantRole: 'skipper',

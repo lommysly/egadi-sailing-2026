@@ -2389,6 +2389,16 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // Riepilogo minimo (andata/ritorno: mancante/bozza/confermata) scritto
+      // solo da materializeCrewTravel (Cloud Function, privilegi Admin): mai
+      // volo, orario o aeroporto. È l'unico modo per cui lo skipper può
+      // sapere se qualcuno manca, dato che crewTravel/{inviteId}/legs resta
+      // owner-only per privacy (vedi sopra).
+      match /crewTravelStatus/{inviteId} {
+        allow get, list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+        allow write: if false;
+      }
+
       // Il profilo è privato allo skipper e conserva istruzioni di incasso
       // non segrete. Non contiene password, OTP, carte o credenziali provider.
       match /collectionProfile/{profileId} {

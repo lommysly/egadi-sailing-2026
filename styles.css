@@ -179,6 +179,21 @@ body.menu-open { overflow:hidden; }
 .charter-export .panel-lead { margin:0; }
 .charter-export .button:disabled { cursor:not-allowed; opacity:.45; transform:none; }
 .member-list,.payment-list,.invite-list,.projection-list { display:grid; gap:10px; margin-top:24px; }
+/* Viaggio equipaggio (area.js renderCrewTravelOverview): lo skipper vede solo
+   se andata/ritorno di ogni persona sono confermate, in bozza o mancanti —
+   mai il volo o l'orario, che restano privati alla persona. */
+.crew-travel-overview { margin:22px 0 30px; padding:20px; border-radius:14px; background:#f7fffe; border:1px solid rgba(8,123,138,.19); }
+.crew-travel-overview h4 { margin:4px 0 6px; font:600 1.25rem/1.05 "Fraunces",serif; letter-spacing:-.02em; }
+.crew-travel-list { display:grid; gap:8px; margin-top:14px; }
+.crew-travel-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:11px 13px; border-radius:10px; background:white; border:1px solid var(--line); }
+.crew-travel-row-name strong { font-size:.88rem; }
+.crew-travel-row-legs { display:flex; flex-wrap:wrap; gap:6px; }
+.crew-travel-leg { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:999px; background:var(--sand); font:700 .66rem "DM Mono",monospace; letter-spacing:.02em; }
+.crew-travel-leg--ready { background:#c3ecd1; color:#155c34; }
+.crew-travel-leg--draft { background:#ffe6b3; color:#7a4a00; }
+.crew-travel-leg--missing { background:#eef0f1; color:#54595c; }
+.crew-travel-row-action { display:flex; align-items:center; }
+.crew-travel-row-action .button { padding:7px 13px; font-size:.76rem; }
 .profile-summary dl { display:grid; gap:11px; margin:0 0 22px; }
 .profile-summary div { display:grid; gap:2px; padding-bottom:10px; border-bottom:1px solid var(--line); }
 .profile-summary dt { color:rgba(17,45,56,.62); font:500 .68rem "DM Mono",monospace; letter-spacing:.04em; text-transform:uppercase; }
@@ -710,27 +725,15 @@ body.menu-open { overflow:hidden; }
 .transfer-next-step p:not(.eyebrow) { max-width:730px; margin:28px 0 34px; color:rgba(255,255,255,.86); font-size:1.05rem; line-height:1.62; }
 @media (max-width:800px) { .transfer-status,.transfer-leg-grid,.transfer-introduction,.transfer-operator,.transfer-fields,.transfer-consent { grid-template-columns:1fr; }.transfer-introduction { gap:25px; margin-top:52px; }.transfer-leg-grid article { min-height:0; }.transfer-leg-grid article > span { margin-bottom:32px; }.transfer-operator,.transfer-fields,.transfer-consent,.transfer-next-step { padding:32px 24px; } }
 
-/* Dashboard operatore transfer (transfer.html/transfer.js): area autenticata,
-   mai avuto un passaggio di stile dedicato prima d'ora. */
-.transfer-operator-notice { display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:12px; background:var(--sand); }
-.transfer-operator-notice-icon { display:grid; place-items:center; flex:0 0 auto; width:32px; height:32px; border-radius:50%; background:var(--sun-deep); color:white; font-weight:700; }
-.transfer-operator-notice strong { display:block; font-size:.85rem; }
-.transfer-operator-notice span { display:block; color:#416b6d; font-size:.82rem; }
-.transfer-operator-actions { margin:14px 0 24px; }
-.transfer-operator-toolbar { margin-bottom:24px; }
-.transfer-operator-toolbar h2 { margin:6px 0 10px; font:600 2.2rem/1 "Fraunces",serif; letter-spacing:-.04em; }
-.transfer-operator-toolbar p { margin:0 0 10px; color:#416b6d; line-height:1.55; }
-.transfer-operator-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
-.transfer-operator-summary article { padding:18px; border-radius:14px; background:var(--ink); color:white; }
-.transfer-operator-summary span { display:block; margin-bottom:7px; color:#9fc8c5; font:.64rem "DM Mono",monospace; letter-spacing:.08em; text-transform:uppercase; }
-.transfer-operator-summary strong { font:600 1.6rem/1.1 "Fraunces",serif; }
-.transfer-operator-card { padding:26px; border-radius:16px; background:var(--paper); margin-bottom:24px; }
-.transfer-operator-card > h2 { margin:0 0 10px; font:600 1.8rem/1 "Fraunces",serif; letter-spacing:-.03em; }
-.transfer-operator-card > p { color:#416b6d; line-height:1.55; }
-.transfer-operator-filters { display:flex; flex-wrap:wrap; gap:14px; align-items:end; }
-.transfer-operator-filters label { display:grid; gap:8px; flex:1 1 180px; font-size:.78rem; font-weight:700; }
-.transfer-operator-filters input,.transfer-operator-filters select { width:100%; border:1px solid rgba(17,45,56,.25); border-radius:8px; padding:11px 12px; color:var(--ink); background:white; font:400 1rem "DM Sans",sans-serif; }
-.transfer-operator-list { display:grid; gap:12px; margin-top:14px; }
+/* Dashboard operatore transfer (transfer.html/transfer.js): lo stile di base
+   vive nel <style> inline di transfer.html (preesistente, vince sempre la
+   cascata perché segue il <link> a questo file nel <head> — scoperto il
+   22/09/2026 dopo giorni di "non vedo i colori" su più browser/dispositivi
+   nonostante il deploy fosse corretto). Qui restano solo le regole
+   genuinamente nuove, introdotte con i pannelli andata/ritorno per
+   aeroporto e con lo stato bozza: non duplicare qui una classe già
+   presente nell'inline, il duplicato perde sempre e resta solo confusione
+   da manutenere. */
 .transfer-operator-groups { display:grid; gap:20px; margin-bottom:24px; }
 .transfer-direction-panel { padding:22px; border-radius:16px; background:var(--paper); }
 .transfer-direction-panel h2 { display:flex; align-items:center; gap:10px; margin:0; font:600 1.5rem/1 "Fraunces",serif; letter-spacing:-.03em; }
@@ -740,49 +743,11 @@ body.menu-open { overflow:hidden; }
 .transfer-airport-group:first-of-type { margin-top:0; }
 .transfer-airport-group-title { display:flex; align-items:center; gap:8px; margin:0 0 10px; color:#416b6d; font:700 .74rem "DM Mono",monospace; letter-spacing:.06em; text-transform:uppercase; }
 .transfer-airport-group-title span { display:grid; place-items:center; min-width:20px; height:20px; padding:0 5px; border-radius:999px; background:var(--sand); color:var(--sun-deep); font:700 .68rem "DM Sans",sans-serif; text-transform:none; letter-spacing:0; }
-.transfer-empty { padding:20px; border:1px dashed var(--line); border-radius:12px; color:#416b6d; font-style:italic; }
-.transfer-record { border:1px solid var(--line); border-radius:14px; background:var(--paper); overflow:hidden; }
-.transfer-record summary { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px; cursor:pointer; list-style:none; }
-.transfer-record summary::-webkit-details-marker { display:none; }
-.transfer-record-summary-copy { display:grid; gap:4px; }
-.transfer-record-summary-copy strong { font:600 1.05rem "Fraunces",serif; }
-.transfer-record-summary-copy > span { color:#416b6d; font-size:.84rem; }
-.transfer-record-badges { display:flex; gap:7px; flex-wrap:wrap; }
-.transfer-badge { padding:4px 10px; border-radius:999px; background:var(--sand); color:var(--sun-deep); font:700 .68rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
 .transfer-badge--new { background:#ffe6b3; color:#7a4a00; }
 .transfer-badge--planned { background:#c7e6f7; color:#0a4f70; }
-.transfer-badge--confirmed { background:#c3ecd1; color:#155c34; }
-.transfer-badge--completed { background:#dfe3e6; color:#43494d; }
-.transfer-badge--cancelled { background:#f6cfc6; color:#8a2e1f; }
-.transfer-record-body { padding:0 18px 22px; border-top:1px solid var(--line); }
-.transfer-record-details { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0; padding:0; }
-.transfer-record-details > div { padding:12px 13px; border:1px solid var(--line); border-radius:10px; }
-.transfer-record-details dt { margin:0 0 5px; color:#416b6d; font:.62rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; }
-.transfer-record-details dd { margin:0; font-size:.88rem; line-height:1.4; }
-.transfer-record-details .transfer-record-contact { grid-column:1 / -1; }
-.transfer-record-contact dd a { color:var(--sun-deep); font-weight:700; }
-.transfer-record-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding-top:18px; border-top:1px solid var(--line); }
-.transfer-record-form label { display:grid; gap:8px; font-size:.78rem; font-weight:700; }
-.transfer-record-form label[data-wide] { grid-column:1 / -1; }
-.transfer-record-form input,.transfer-record-form select,.transfer-record-form textarea { width:100%; border:1px solid rgba(17,45,56,.25); border-radius:8px; padding:11px 12px; color:var(--ink); background:white; font:400 1rem "DM Sans",sans-serif; }
-.transfer-record-form textarea { min-height:80px; resize:vertical; }
-.transfer-record-form .form-actions { grid-column:1 / -1; }
-.transfer-operator-management-section { margin-top:28px; padding-top:24px; border-top:1px solid var(--line); }
-.transfer-operator-management-section h3 { margin:0 0 8px; font:600 1.3rem/1 "Fraunces",serif; letter-spacing:-.02em; }
-.transfer-operator-management-section > p { margin:0 0 16px; color:#416b6d; line-height:1.5; }
-.transfer-operator-create-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-.transfer-operator-create-form label { display:grid; gap:8px; font-size:.78rem; font-weight:700; }
-.transfer-operator-create-form label[data-wide] { grid-column:1 / -1; }
-.transfer-operator-create-form input { width:100%; border:1px solid rgba(17,45,56,.25); border-radius:8px; padding:11px 12px; color:var(--ink); background:white; font:400 1rem "DM Sans",sans-serif; }
-.transfer-operator-create-form small { color:#416b6d; font-size:.76rem; }
-.transfer-operator-create-form .form-actions { grid-column:1 / -1; }
-.transfer-request-list { display:grid; gap:10px; }
-.transfer-access-request { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border:1px solid var(--line); border-radius:12px; }
-.transfer-access-request strong { display:block; font-size:.92rem; }
-.transfer-access-request > div:first-child span { color:#416b6d; font-size:.8rem; }
-.transfer-access-request-actions { display:flex; gap:8px; flex-wrap:wrap; }
-.transfer-sheet-link { font-weight:700; color:var(--sun-deep); }
-@media (max-width:800px) { .transfer-operator-summary,.transfer-record-details,.transfer-record-form,.transfer-operator-create-form { grid-template-columns:1fr; } }
+.transfer-badge--draft { background:#ffd9b3; color:#8a3d00; }
+.transfer-record-draft-notice { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:0 0 14px; padding:12px 14px; border-radius:10px; border:1px solid #f0b429; background:#fff6dd; color:#6b4a00; font-size:.88rem; line-height:1.42; }
+.transfer-record-draft-notice a { color:#6b4a00; font-weight:700; text-underline-offset:2px; }
 
 /* Storyboard pubblico: nessun filmato viene incorporato prima delle verifiche di licenza. */
 .storyboard-main { background:var(--paper); }

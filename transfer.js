@@ -88,6 +88,10 @@ const COPY = {
     confirmed: 'confermato',
     completed: 'concluso',
     cancelled: 'annullato',
+    draftStatus: 'bozza',
+    draftsLabel: 'bozze',
+    draftNotice: 'Questa persona ha chiesto il transfer ma non ha ancora confermato il resto del viaggio: contattala per sapere se conferma.',
+    whatsappContact: 'Scrivi su WhatsApp',
     allDirections: 'Tutte le tratte',
     allStatuses: 'Tutti gli stati',
     filterDirection: 'Direzione',
@@ -193,6 +197,10 @@ const COPY = {
     confirmed: 'confirmed',
     completed: 'completed',
     cancelled: 'cancelled',
+    draftStatus: 'draft',
+    draftsLabel: 'drafts',
+    draftNotice: 'This person requested the transfer but has not confirmed the rest of the journey yet — contact them to check.',
+    whatsappContact: 'Message on WhatsApp',
     allDirections: 'All directions',
     allStatuses: 'All statuses',
     filterDirection: 'Direction',
@@ -329,15 +337,30 @@ function normalizedStatus(value) {
   return 'new';
 }
 
+const STATUS_LABEL_KEYS = {
+  draft: 'draftStatus',
+  new: 'newStatus',
+  planned: 'planned',
+  confirmed: 'confirmed',
+  completed: 'completed',
+  cancelled: 'cancelled',
+};
+
+// "draft" non è uno stato operativo che l'operatore può scegliere (viene dal
+// viaggio della persona, non da un'azione della società transfer): va
+// riconosciuto così com'è, senza passare da normalizedStatus che non lo
+// conosce e lo farebbe ricadere su "new".
 function statusLabel(value) {
-  const keyByStatus = {
-    new: 'newStatus',
-    planned: 'planned',
-    confirmed: 'confirmed',
-    completed: 'completed',
-    cancelled: 'cancelled',
-  };
-  return t(keyByStatus[normalizedStatus(value)]);
+  const key = STATUS_LABEL_KEYS[value] ? value : normalizedStatus(value);
+  return t(STATUS_LABEL_KEYS[key]);
+}
+
+// Bozza = la persona ha chiesto il transfer (consenso dato) ma non ha ancora
+// confermato il resto del suo viaggio: è un'informazione sul viaggio, non
+// sullo stato operativo che l'operatore imposta, quindi ha priorità visiva
+// ma non sostituisce mai record.status nel form di modifica.
+function recordStatusKey(record) {
+  return record.legState === 'draft' ? 'draft' : normalizedStatus(record.status);
 }
 
 // Nomi conosciuti per i due soli aeroporti del servizio: rende la tratta e i
@@ -501,7 +524,7 @@ function recordMatchesFilters(record) {
   if (record.recordState && record.recordState !== 'active') return false;
   const { direction, status, search } = state.filters;
   const recordDirection = normalizeDirection(record.direction || record.legDirection || record.travelDirection);
-  const recordStatus = normalizedStatus(record.status);
+  const recordStatus = recordStatusKey(record);
   if (direction !== 'all' && direction !== recordDirection) return false;
   if (status !== 'all' && status !== recordStatus) return false;
   if (!search) return true;
@@ -511,11 +534,14 @@ function recordMatchesFilters(record) {
   return haystack.includes(search.toLocaleLowerCase());
 }
 
-function statusOptions(selected) {
-  const current = ['new', 'planned', 'confirmed', 'completed', 'cancelled'].includes(selected)
-    ? selected
-    : '';
-  return ['new', 'planned', 'confirmed', 'completed', 'cancelled']
+const OPERATIONAL_STATUSES = ['new', 'planned', 'confirmed', 'completed', 'cancelled'];
+// "draft" compare solo nel filtro dell'elenco, mai nel form di modifica di un
+// singolo movimento: l'operatore non "imposta" una bozza, la osserva.
+const FILTERABLE_STATUSES = ['draft', ...OPERATIONAL_STATUSES];
+
+function statusOptions(selected, options = OPERATIONAL_STATUSES) {
+  const current = options.includes(selected) ? selected : '';
+  return options
     .map((value) => `<option value="${value}"${value === current ? ' selected' : ''}>${escapeHtml(statusLabel(value))}</option>`)
     .join('');
 }
@@ -534,9 +560,23 @@ function recordDetail(label, value, className = '') {
   return `<div${className ? ` class="${className}"` : ''}><dt>${escapeHtml(label)}</dt><dd>${value || '—'}</dd></div>`;
 }
 
+function whatsappUrl(phone) {
+  const digits = phone.replace(/[^0-9]/g, '');
+  return digits ? `https://wa.me/${digits}` : '';
+}
+
+function renderDraftNotice(record) {
+  if (record.legState !== 'draft') return '';
+  const phone = contactPhone(record);
+  const waUrl = phone ? whatsappUrl(phone) : '';
+  const action = waUrl ? ` <a href="${escapeHtml(waUrl)}" target="_blank" rel="noopener">${escapeHtml(t('whatsappContact'))}</a>` : '';
+  return `<p class="transfer-record-draft-notice">${escapeHtml(t('draftNotice'))}${action}</p>`;
+}
+
 function renderRecord(record) {
   const direction = normalizeDirection(record.direction || record.legDirection || record.travelDirection);
-  const status = normalizedStatus(record.status);
+  const operationalStatus = normalizedStatus(record.status);
+  const displayStatus = recordStatusKey(record);
   const assignment = text(record.assignment || record.operatorAssignment || record.groupName, 120);
   const meetingPoint = text(record.meetingPoint, 160);
   const meetingTime = optionalTime(record.meetingTime);
@@ -551,7 +591,7 @@ function renderRecord(record) {
   const meetingPointPlaceholder = direction === 'return'
     ? t('meetingPointPlaceholderReturn')
     : t('meetingPointPlaceholderOutbound').replace('{airport}', airportLabel(airportCode(record)));
-  return `<details class="transfer-record" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(status)}">${escapeHtml(statusLabel(status))}</span></span></summary><div class="transfer-record-body"><dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(status)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details>`;
+  return `<details class="transfer-record" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span></span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details>`;
 }
 
 // Un solo elenco misto (andata, ritorno, andata, ritorno...) obbliga a
@@ -602,6 +642,7 @@ function recordStats(records) {
     outbound: active.filter((record) => normalizeDirection(record.direction || record.legDirection || record.travelDirection) === 'outbound').length,
     return: active.filter((record) => normalizeDirection(record.direction || record.legDirection || record.travelDirection) === 'return').length,
     pending: active.filter((record) => ['new', 'planned'].includes(normalizedStatus(record.status))).length,
+    drafts: active.filter((record) => record.legState === 'draft').length,
   };
 }
 
@@ -609,7 +650,7 @@ function renderOperatorDashboard() {
   const filtered = state.records.filter(recordMatchesFilters);
   const stats = recordStats(state.records);
   const sheetUrl = state.isOrganizer ? safeSheetUrl(state.event?.transferSheetUrl) : '';
-  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-light" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article></section><section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status)}</select></label><label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
+  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-light" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section><section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label><label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
 }
 
 function renderRecordListOnly() {
@@ -922,7 +963,7 @@ document.addEventListener('change', (event) => {
   if (!form) return;
   const values = new FormData(form);
   state.filters.direction = ['all', 'outbound', 'return'].includes(values.get('direction')) ? values.get('direction') : 'all';
-  state.filters.status = ['all', 'new', 'planned', 'confirmed', 'completed', 'cancelled'].includes(values.get('status')) ? values.get('status') : 'all';
+  state.filters.status = ['all', ...FILTERABLE_STATUSES].includes(values.get('status')) ? values.get('status') : 'all';
   state.filters.search = text(values.get('search'), 120);
   renderRecordListOnly();
 });

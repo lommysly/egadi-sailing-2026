@@ -264,6 +264,12 @@ const DEFAULT_FULL_RULES_EN = [
 ].join('\n');
 let activeBoat = null;
 let activeMembers = [];
+// Stato di viaggio (andata/ritorno) di ogni persona in Crew List, calcolato
+// lato server da materializeCrewTravel: mai i dettagli del viaggio (volo,
+// aeroporto), solo se la tratta manca, è in bozza o è confermata. Lo skipper
+// non può leggere crewTravel/{inviteId}/legs (owner-only per privacy), quindi
+// questa è l'unica vista server-side pensata apposta per lui.
+let activeCrewTravelStatus = [];
 let activePayments = [];
 const paymentPrivateMessageCache = new Map();
 let activeInvites = [];
@@ -282,6 +288,7 @@ const activeSkipperDocumentUploads = new Map();
 let skipperAnnouncementCount = 0;
 let stopBoatSubscription = null;
 let stopMemberSubscription = null;
+let stopCrewTravelStatusSubscription = null;
 let stopPaymentSubscription = null;
 let stopPaymentProfileSubscription = null;
 let stopContributionPlanSubscription = null;
@@ -2542,6 +2549,7 @@ function resetPrivateView() {
   fleetAvailabilitySyncInProgress = false;
   stopBoatSubscription?.();
   stopMemberSubscription?.();
+  stopCrewTravelStatusSubscription?.();
   stopPaymentSubscription?.();
   stopPaymentProfileSubscription?.();
   stopContributionPlanSubscription?.();
@@ -5445,6 +5453,81 @@ function reflectCreatedProjectionInvite(projection, invite) {
   openProjectionCard(projection.id);
 }
 
+const CREW_TRAVEL_LEG_LABELS = {
+  ready: { icon: '✓', text: 'Confermata' },
+  draft: { icon: '!', text: 'In bozza' },
+  missing: { icon: '•', text: 'Da inserire' },
+};
+
+function crewTravelStatusFor(memberId) {
+  return activeCrewTravelStatus.find((entry) => entry.id === memberId) || null;
+}
+
+function crewTravelLegState(status, direction) {
+  const value = status?.[direction];
+  return value === 'ready' || value === 'draft' ? value : 'missing';
+}
+
+// Stesso tono e struttura di whatsappUrl() più sotto (messaggio di invito):
+// un promemoria diretto, mai i dettagli del viaggio che lo skipper stesso
+// non può leggere (vedi crewTravelStatusFor).
+function crewTravelReminderMessage(member, legStates) {
+  const locale = inviteLocale(activeInvites.find((invite) => invite.id === member.id));
+  const firstName = member.firstName || memberName(member);
+  const missingParts = [];
+  if (legStates.outbound !== 'ready') missingParts.push(locale === 'en' ? 'the outbound leg (to Marsala)' : "l’andata (verso Marsala)");
+  if (legStates.return !== 'ready') missingParts.push(locale === 'en' ? 'the return leg (from Marsala)' : 'il ritorno (da Marsala)');
+  const missingText = missingParts.join(locale === 'en' ? ' and ' : ' e ');
+  return locale === 'en'
+    ? `Hi ${firstName} 🌊\n\nCan you finish and confirm ${missingText} in your travel details for Egadi Sailing Experience? I need it to organise transfers and the schedule.\n\nOpen your personal area and save it — thank you!`
+    : `Ciao ${firstName} 🌊\n\nPuoi completare e confermare ${missingText} nei tuoi dati di viaggio per Egadi Sailing Experience? Mi serve per organizzare i transfer e il programma.\n\nApri la tua area personale e salva, grazie!`;
+}
+
+function crewTravelReminderUrl(member, legStates) {
+  const number = normalizeWhatsAppNumber(member.phone || '');
+  if (!number) return '';
+  return selectWhatsappUrl(whatsappLinks(number, crewTravelReminderMessage(member, legStates)), 'preferred');
+}
+
+// "Direttore d'orchestra": lo skipper vede a colpo d'occhio chi ha ancora
+// andata o ritorno da confermare e può sollecitare subito su WhatsApp,
+// invece di scoprirlo solo quando manca un transfer da organizzare (vedi
+// il bug reale del 22/09/2026 con una persona rimasta invisibile in bozza).
+function renderCrewTravelOverview() {
+  const section = document.querySelector('#crewTravelOverview');
+  if (!section) return;
+  if (!activeMembers.length) {
+    section.hidden = true;
+    section.innerHTML = '';
+    return;
+  }
+  const legBadge = (legStates, direction) => {
+    const info = CREW_TRAVEL_LEG_LABELS[legStates[direction]];
+    const label = direction === 'outbound' ? 'Andata' : 'Ritorno';
+    return `<span class="crew-travel-leg crew-travel-leg--${legStates[direction]}"><span aria-hidden="true">${info.icon}</span>${escapeHtml(label)} · ${escapeHtml(info.text)}</span>`;
+  };
+  let pendingCount = 0;
+  const rows = activeMembers.map((member) => {
+    const status = crewTravelStatusFor(member.id);
+    const legStates = {
+      outbound: crewTravelLegState(status, 'outbound'),
+      return: crewTravelLegState(status, 'return'),
+    };
+    const needsReminder = legStates.outbound !== 'ready' || legStates.return !== 'ready';
+    if (needsReminder) pendingCount += 1;
+    const reminderUrl = needsReminder ? crewTravelReminderUrl(member, legStates) : '';
+    const action = reminderUrl
+      ? `<a class="button button-whatsapp" href="${escapeHtml(reminderUrl)}" target="_blank" rel="noopener">${whatsappActionIconMarkup({ external: true })}Sollecita</a>`
+      : needsReminder ? '<span class="field-hint">Nessun numero salvato</span>' : '';
+    return `<article class="crew-travel-row"><div class="crew-travel-row-name"><strong>${escapeHtml(memberName(member))}</strong></div><div class="crew-travel-row-legs">${legBadge(legStates, 'outbound')}${legBadge(legStates, 'return')}</div><div class="crew-travel-row-action">${action}</div></article>`;
+  }).join('');
+  section.hidden = false;
+  const heading = pendingCount
+    ? `<h4>${pendingCount} ${pendingCount === 1 ? 'persona non ha ancora confermato' : 'persone non hanno ancora confermato'} andata o ritorno</h4><p class="panel-lead">Controlla chi manca e manda un sollecito diretto su WhatsApp.</p>`
+    : '<h4>Tutti hanno confermato andata e ritorno ✓</h4>';
+  section.innerHTML = `<p class="eyebrow">Viaggio equipaggio</p>${heading}<div class="crew-travel-list">${rows}</div>`;
+}
+
 function renderMembers() {
   const list = document.querySelector('#memberList');
   if (!activeMembers.length) {
@@ -5453,6 +5536,7 @@ function renderMembers() {
     renderCapacityStatus();
     updateCharterReadiness();
     renderSkipperDashboardOverview();
+    renderCrewTravelOverview();
     void syncPublicFleetAvailabilityFromCrew();
     return;
   }
@@ -5469,6 +5553,7 @@ function renderMembers() {
   renderCapacityStatus();
   updateCharterReadiness();
   renderSkipperDashboardOverview();
+  renderCrewTravelOverview();
   void syncPublicFleetAvailabilityFromCrew();
 }
 
@@ -5677,6 +5762,7 @@ function subscribeToBoat(boat) {
   renderPaymentBerthOptions();
   void publishExistingBoatToFleet(boat);
   stopMemberSubscription?.();
+  stopCrewTravelStatusSubscription?.();
   stopPaymentSubscription?.();
   stopPaymentProfileSubscription?.();
   stopContributionPlanSubscription?.();
@@ -5713,6 +5799,13 @@ function subscribeToBoat(boat) {
     activeMembers = snapshot.docs.map((item) => normalizeMember(item.id, item.data())).sort((first, second) => memberName(first).localeCompare(memberName(second), 'it'));
     renderMembers();
   }, () => setMessage(document.querySelector('#memberFormMessage'), 'Impossibile leggere la Crew List.', true));
+  stopCrewTravelStatusSubscription = onSnapshot(collection(db, 'boats', boat.id, 'crewTravelStatus'), (snapshot) => {
+    activeCrewTravelStatus = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    renderCrewTravelOverview();
+  }, () => {
+    activeCrewTravelStatus = [];
+    renderCrewTravelOverview();
+  });
   stopPaymentProfileSubscription = onSnapshot(doc(db, 'boats', boat.id, 'collectionProfile', PAYMENT_PROFILE_ID), (snapshot) => {
     renderPaymentProfile(snapshot.exists() ? snapshot.data() : null);
   }, () => {
