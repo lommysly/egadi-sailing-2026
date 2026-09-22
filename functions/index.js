@@ -714,38 +714,93 @@ exports.copyTransferOperationsToBackup = onDocumentWritten({
   await backupRef.set(changes, { merge: true });
 });
 
-function sheetRow(record) {
+// Tre fogli separati invece di uno solo "ingegneristico": Arrivi e Partenze
+// mostrano solo dati leggibili (mai un ID tecnico), Tecnico raccoglie i soli
+// riferimenti per chi deve davvero incrociare un dato con Firestore.
+const HUMAN_SHEET_NAMES = { outbound: 'Arrivi', return: 'Partenze' };
+const TECHNICAL_SHEET_NAME = 'Tecnico';
+const TRANSFER_STATUS_LABELS = {
+  new: 'Da pianificare',
+  planned: 'Pianificato',
+  confirmed: 'Confermato',
+  completed: 'Completato',
+  cancelled: 'Annullato',
+  revoked: 'Revocato',
+};
+const HUMAN_SHEET_HEADER = ['Nome', 'Barca', 'Data', 'Ora', 'Aeroporto', 'Mezzo', 'Bagagli', 'Come si muove', 'Stato', 'Gruppo', 'Ritrovo', 'Telefono', 'Email', 'Note'];
+const TECHNICAL_SHEET_HEADER = ['ID record', 'Nome', 'Barca', 'Direzione', 'Stato interno', 'Traccia', 'Aggiornato il'];
+
+function humanSheetRow(record) {
   if (record?.recordState !== 'active') {
-    return [record?.recordId || '', 'Revocata', new Date().toISOString(), '', '', '', '', '', '', '', '', '', '', '', 'No', '', '', 'Richiesta revocata: dati personali rimossi.'];
+    return ['— Revocata —', '', '', '', '', '', '', '', '', '', '', '', '', ''];
   }
   const request = record.airportMarsalaChoice === 'transfer' ? 'Transfer richiesto' : record.carpoolRole === 'offer_ride' ? 'Passaggio auto offerto' : record.carpoolRole === 'need_ride' ? 'Passaggio auto cercato' : 'Solo pianificazione';
   const bagagli = `${asInteger(record.luggageCount, 0, 12)}${record.bulkyLuggage ? ' + ingombrante' : ''}`;
-  const contact = record.contactConsent === true ? 'Sì' : 'No';
   return [
-    record.recordId || '',
-    record.status || 'new',
-    new Date().toISOString(),
-    record.boatName || '',
     record.participantName || '',
-    directionLabel(record.direction),
+    record.boatName || '',
     record.date || '',
     record.time || '',
     record.airport || '',
     record.transport || '',
     bagagli,
     request,
+    TRANSFER_STATUS_LABELS[record.status] || record.status || '',
     record.groupName || '',
     [record.meetingPoint, record.meetingDate, record.meetingTime].filter(Boolean).join(' · '),
-    contact,
     record.contactConsent === true ? record.phone || '' : '',
     record.contactConsent === true ? record.email || '' : '',
     record.operatorNotes || '',
   ];
 }
 
-async function allocateSheetRow(recordId, revision) {
+function technicalSheetRow(record) {
+  return [
+    record.recordId || '',
+    record.participantName || '',
+    record.boatName || '',
+    directionLabel(record.direction),
+    record.status || 'new',
+    record.recordState === 'active' ? 'Attiva' : 'Revocata',
+    new Date().toISOString(),
+  ];
+}
+
+let sheetTabsEnsuredFor = '';
+
+// Crea i tre fogli (con intestazione) se non esistono ancora: evita di dover
+// preparare a mano lo spreadsheet prima del primo utilizzo. Verificato una
+// sola volta per istanza calda della funzione, non a ogni scrittura.
+async function ensureSheetTabs(sheets, sheetId) {
+  if (sheetTabsEnsuredFor === sheetId) return;
+  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: sheetId, fields: 'sheets.properties.title' });
+  const existingTitles = new Set((spreadsheet.data.sheets || []).map((sheet) => sheet.properties?.title));
+  const missing = [
+    { title: 'Arrivi', header: HUMAN_SHEET_HEADER },
+    { title: 'Partenze', header: HUMAN_SHEET_HEADER },
+    { title: TECHNICAL_SHEET_NAME, header: TECHNICAL_SHEET_HEADER },
+  ].filter((sheet) => !existingTitles.has(sheet.title));
+  if (missing.length) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: { requests: missing.map((sheet) => ({ addSheet: { properties: { title: sheet.title } } })) },
+    });
+    await Promise.all(missing.map((sheet) => sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheet.title}!A1:${String.fromCharCode(64 + sheet.header.length)}1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [sheet.header] },
+    })));
+  }
+  sheetTabsEnsuredFor = sheetId;
+}
+
+// Ogni record scrive in due fogli distinti (quello umano + Tecnico): il
+// numero di riga di ciascuno è indipendente, per questo la mappa vive in una
+// sottocollezione per foglio invece di un solo campo condiviso.
+async function allocateSheetRow(recordId, revision, sheetName) {
   const configRef = db.doc(`events/${EVENT_ID}/integrations/transferSheet`);
-  const mapRef = db.doc(`events/${EVENT_ID}/transferSheetRows/${recordId}`);
+  const mapRef = db.doc(`events/${EVENT_ID}/transferSheetRows/${recordId}/sheets/${sheetName}`);
   return db.runTransaction(async (transaction) => {
     const [configSnapshot, mapSnapshot] = await Promise.all([transaction.get(configRef), transaction.get(mapRef)]);
     const config = configSnapshot.exists ? configSnapshot.data() : null;
@@ -753,18 +808,20 @@ async function allocateSheetRow(recordId, revision) {
     const previousRevision = Number(mapSnapshot.exists ? mapSnapshot.data().sourceRevision : 0);
     if (previousRevision > revision) return { ignored: true };
     let rowNumber = Number(mapSnapshot.exists ? mapSnapshot.data().rowNumber : 0);
-    if (!Number.isInteger(rowNumber) || rowNumber < 5) {
-      rowNumber = Math.max(5, Number(config.nextRow || 5));
-      transaction.set(configRef, { nextRow: rowNumber + 1, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    const counterField = `nextRow_${sheetName}`;
+    if (!Number.isInteger(rowNumber) || rowNumber < 2) {
+      rowNumber = Math.max(2, Number(config[counterField] || 2));
+      transaction.set(configRef, { [counterField]: rowNumber + 1, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     }
     transaction.set(mapRef, {
       recordId,
+      sheetName,
       rowNumber,
       sourceRevision: revision,
       updatedAt: FieldValue.serverTimestamp(),
       ...(mapSnapshot.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
     }, { merge: true });
-    return { sheetId: asText(config.sheetId, 160), rowNumber };
+    return { sheetId: asText(config.sheetId, 160), sheetName, rowNumber };
   });
 }
 
@@ -779,17 +836,41 @@ exports.syncTravelBackupToGoogleSheet = onDocumentWritten({
   const after = event.data?.after;
   const record = after?.exists ? after.data() : { recordId, recordState: 'revoked' };
   const revision = sourceRevision(after?.exists ? after : event.data?.before, event.time);
-  const target = await allocateSheetRow(recordId, revision);
-  if (!target || target.ignored) return;
+  const humanSheetName = HUMAN_SHEET_NAMES[record.direction] || HUMAN_SHEET_NAMES.outbound;
+
+  const [humanTarget, technicalTarget] = await Promise.all([
+    allocateSheetRow(recordId, revision, humanSheetName),
+    allocateSheetRow(recordId, revision, TECHNICAL_SHEET_NAME),
+  ]);
+  if ((!humanTarget || humanTarget.ignored) && (!technicalTarget || technicalTarget.ignored)) return;
+  const sheetId = humanTarget?.sheetId || technicalTarget?.sheetId;
+  if (!sheetId) return;
+
   const auth = new google.auth.GoogleAuth({ scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
   const sheets = google.sheets({ version: 'v4', auth });
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: target.sheetId,
-    range: `Movimenti!A${target.rowNumber}:R${target.rowNumber}`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [sheetRow({ ...record, recordId })] },
-  });
-  logger.info('Riga arrivi e partenze aggiornata.', { recordId, rowNumber: target.rowNumber });
+  await ensureSheetTabs(sheets, sheetId);
+
+  const writes = [];
+  if (humanTarget && !humanTarget.ignored) {
+    const lastColumn = String.fromCharCode(64 + HUMAN_SHEET_HEADER.length);
+    writes.push(sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${humanTarget.sheetName}!A${humanTarget.rowNumber}:${lastColumn}${humanTarget.rowNumber}`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [humanSheetRow({ ...record, recordId })] },
+    }));
+  }
+  if (technicalTarget && !technicalTarget.ignored) {
+    const lastColumn = String.fromCharCode(64 + TECHNICAL_SHEET_HEADER.length);
+    writes.push(sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${TECHNICAL_SHEET_NAME}!A${technicalTarget.rowNumber}:${lastColumn}${technicalTarget.rowNumber}`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [technicalSheetRow({ ...record, recordId })] },
+    }));
+  }
+  await Promise.all(writes);
+  logger.info('Riga arrivi e partenze aggiornata.', { recordId, humanSheetName, humanRow: humanTarget?.rowNumber, technicalRow: technicalTarget?.rowNumber });
 });
 
 // ── Abbinamento anonimo per passaggi tra partecipanti ───────────────────────

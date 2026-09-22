@@ -52,10 +52,14 @@ Stato di pubblicazione secondo `CHECKLIST_PUBBLICAZIONE.md`: sito pubblico e are
 
 **Identificato**: quasi certamente la funzione Cloud `syncTravelBackupToGoogleSheet`, che sincronizza le tratte verso un Google Sheet esterno per la società di transfer/backup offline. Non ho potuto leggere il contenuto esatto delle colonne generate (la funzione vive nel branch, il codice completo non era nel set analizzato in dettaglio), ma la lamentela — riferimenti Firebase invece di dati leggibili — è coerente con come tipicamente si esporta un documento Firestore "as-is" verso un foglio, senza un livello di traduzione per la lettura umana.
 
-**Raccomandazione concreta, esattamente come richiesto**: separare l'export in due fogli/viste:
-- **Foglio Arrivi**: nome persona, data, orario, provenienza (città/aeroporto), volo/compagnia, bagagli, chi cerca/offre passaggio — niente altro.
-- **Foglio Partenze**: stessa struttura, per le tratte di rientro.
-- **Foglio tecnico separato** (solo per chi lo deve consultare davvero): ID Firestore, UID, riferimenti interni — mai mescolato con i due sopra.
+#### Aggiornamento 22/09/2026 — implementato
+
+`syncTravelBackupToGoogleSheet` riscritta: da un unico foglio "Movimenti" a 18 colonne (con `recordId` in prima colonna) a **tre fogli separati**, creati automaticamente se mancanti nello spreadsheet:
+- **Arrivi** (tratte `outbound`): nome, barca, data, ora, aeroporto, mezzo, bagagli, come si muove, stato (etichetta leggibile, non il valore tecnico grezzo), gruppo, ritrovo, telefono, email, note — 14 colonne, zero riferimenti tecnici.
+- **Partenze** (tratte `return`): stessa struttura, per il rientro.
+- **Tecnico**: `ID record`, nome, barca, direzione, stato interno, traccia, timestamp — solo qui vivono i riferimenti utili a chi deve incrociare un dato con Firestore.
+
+Ogni foglio ha il proprio contatore di riga indipendente (non più uno condiviso). Verificato con test sull'emulatore Firestore + Functions: instradamento corretto per direzione, contatori indipendenti, nessun crash con configurazione assente. La chiamata reale a Google Sheets non è testabile in locale senza toccare lo spreadsheet vero — verificata per lettura del codice e per analogia con il pattern già in produzione.
 
 ### 3.3 Vista proprietario (creazione account, elenco) — deve essere cognitiva
 
@@ -84,7 +88,7 @@ Costruita e testata (emulatore Firestore + Functions, 26 casi automatici, tutti 
 1. ✅ Mettere in sicurezza il lavoro Git (sezione 1) — fatto.
 2. ✅ Costruire la Cloud Function di matching anonimo per la fascia ±2h — fatto (vedi sopra); resta da deployare e testare su HTTPS con dati fittizi.
 3. Riorganizzare il form Arrivi/Partenze con il pattern hub-a-step già collaudato (3.1).
-4. Ridisegnare l'export verso il foglio esterno in due viste leggibili + un foglio tecnico separato (3.2).
+4. ✅ Ridisegnare l'export verso il foglio esterno in due viste leggibili + un foglio tecnico separato (3.2) — fatto.
 5. Applicare il pattern cognitivo alla vista proprietario per Arrivi/Partenze (3.3).
 6. Completare la sezione "Security Rules e test fittizi" della checklist, mai eseguita per intero, prima di considerare qualunque nuova regola pronta per dati reali.
 
