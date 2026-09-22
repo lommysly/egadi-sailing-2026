@@ -402,11 +402,23 @@ function safeOperationalFields(source = {}) {
   };
 }
 
+// Nome e cognome separati: il foglio di riferimento del titolare (Arrivi/
+// Partenze EGADI 2025) li vuole in due colonne distinte, non un nome
+// completo unico.
+function splitDisplayName(fullName, explicitFirst, explicitLast) {
+  const first = asText(explicitFirst, 80);
+  const last = asText(explicitLast, 80);
+  if (first || last) return { firstName: first, lastName: last };
+  const parts = asText(fullName, 161).split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return { firstName: parts[0] || '', lastName: '' };
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+}
+
 function backupPayload({ recordId, boatId, boat, inviteId, invite, member, direction, leg, existing }) {
   const transferConsent = leg.transferOperatorConsent === true;
   const airport = airportForTransfer(direction, leg);
   const timing = timeForTransfer(direction, leg);
-  const name = asText(member?.displayName || invite?.displayName, 161);
+  const { firstName, lastName } = splitDisplayName(member?.displayName || invite?.displayName, member?.firstName, member?.lastName);
   const phone = transferConsent ? asText(member?.phone || invite?.phone, 40) : '';
   const email = transferConsent ? asText(member?.email, 160) : '';
   const operator = safeOperationalFields(existing);
@@ -422,17 +434,26 @@ function backupPayload({ recordId, boatId, boat, inviteId, invite, member, direc
     // richiesta già confermata (fonte della confusione del 22/09/2026).
     legState: leg.state === 'ready' ? 'ready' : 'draft',
     boatName: asText(boat?.name, 70),
-    participantName: transferConsent ? name : 'Dati non condivisi',
+    firstName: transferConsent ? firstName : '',
+    lastName: transferConsent ? lastName : 'Dati non condivisi',
+    participantName: transferConsent ? asText(member?.displayName || invite?.displayName, 161) : 'Dati non condivisi',
     contactConsent: transferConsent,
     phone,
     email,
+    originCity: asText(leg.originCity, 100),
+    originAirport: asText(leg.originAirport, 3),
+    destinationCity: asText(leg.destinationCity, 100),
+    destinationAirport: asText(leg.destinationAirport, 3),
     airport,
     date: timing.date,
     time: timing.time,
     transport: transportLabel(leg),
+    carrier: asText(leg.carrier, 100),
+    serviceNumber: asText(leg.serviceNumber, 40),
     luggageCount: asInteger(leg.luggageCount, 0, 12),
     bulkyLuggage: leg.bulkyLuggage === true,
     airportMarsalaChoice: asText(leg.airportMarsalaChoice, 20),
+    transferRequested: leg.airportMarsalaChoice === 'transfer',
     carpoolRole: asText(leg.carpoolRole, 20),
     carpoolSeats: asInteger(leg.carpoolSeats, 0, 8),
     ...operator,
@@ -444,6 +465,7 @@ function skipperBackupPayload({ recordId, boatId, boat, direction, leg, profile,
   const transferConsent = leg.transferOperatorConsent === true;
   const airport = airportForTransfer(direction, leg);
   const timing = timeForTransfer(direction, leg);
+  const { firstName, lastName } = splitDisplayName(skipperDisplayName(profile, boat), profile?.firstName, profile?.lastName);
   const operator = safeOperationalFields(existing);
   return {
     schemaVersion: 1,
@@ -454,18 +476,27 @@ function skipperBackupPayload({ recordId, boatId, boat, direction, leg, profile,
     recordState: 'active',
     legState: 'ready', // skipperTravel non ha bozze: è salvata già definitiva
     boatName: asText(boat?.name, 70),
+    firstName: transferConsent ? firstName : '',
+    lastName: transferConsent ? lastName : 'Dati non condivisi',
     participantName: transferConsent ? skipperDisplayName(profile, boat) : 'Dati non condivisi',
     participantRole: 'skipper',
     contactConsent: transferConsent,
     phone: transferConsent ? asText(profile?.phone, 40) : '',
     email: transferConsent ? asText(profile?.email, 160) : '',
+    originCity: asText(leg.originCity, 100),
+    originAirport: asText(leg.originAirport, 3),
+    destinationCity: asText(leg.destinationCity, 100),
+    destinationAirport: asText(leg.destinationAirport, 3),
     airport,
     date: timing.date,
     time: timing.time,
     transport: transportLabel(leg),
+    carrier: asText(leg.carrier, 100),
+    serviceNumber: asText(leg.serviceNumber, 40),
     luggageCount: asInteger(leg.luggageCount, 0, 12),
     bulkyLuggage: leg.bulkyLuggage === true,
     airportMarsalaChoice: asText(leg.airportMarsalaPlan, 20),
+    transferRequested: leg.airportMarsalaPlan === 'transfer',
     carpoolRole: asText(leg.airportMarsalaPlan, 20) === 'ride_offer' ? 'offer_ride' : '',
     carpoolSeats: asInteger(leg.rideOfferSeats, 0, 8),
     ...operator,
@@ -481,17 +512,26 @@ async function markBackupRevoked(ref, revision) {
       schemaVersion: 1,
       recordId: ref.id,
       recordState: 'revoked',
+      firstName: '',
+      lastName: '',
       participantName: '',
       phone: '',
       email: '',
       contactConsent: false,
+      originCity: '',
+      originAirport: '',
+      destinationCity: '',
+      destinationAirport: '',
       airport: '',
       date: '',
       time: '',
       transport: '',
+      carrier: '',
+      serviceNumber: '',
       luggageCount: 0,
       bulkyLuggage: false,
       airportMarsalaChoice: '',
+      transferRequested: false,
       carpoolRole: '',
       carpoolSeats: 0,
       sourceRevision: revision,
@@ -732,30 +772,31 @@ const TRANSFER_STATUS_LABELS = {
   cancelled: 'Annullato',
   revoked: 'Revocato',
 };
-const HUMAN_SHEET_HEADER = ['Nome', 'Barca', 'Data', 'Ora', 'Aeroporto', 'Mezzo', 'Bagagli', 'Come si muove', 'Stato', 'Gruppo', 'Ritrovo', 'Telefono', 'Email', 'Note'];
+// Struttura e colonne ricalcano deliberatamente il foglio "Arrivi/Partenze
+// EGADI 2025" già collaudato dal titolare l'anno scorso (chiaro, essenziale,
+// niente colonne che non servono a organizzare i transfer): nome/cognome
+// separati, un Sì/No colorato per la richiesta transfer, colore per barca.
+const HUMAN_SHEET_HEADER = ['Nome', 'Cognome', 'Telefono', 'Barca', 'Compagnia aerea', 'Volo', 'Aeroporto di partenza', 'Aeroporto di arrivo', 'Data', 'Ora', 'Richiesta transfer', 'Navetta da Marsala', 'Stato'];
 const TECHNICAL_SHEET_HEADER = ['ID record', 'Nome', 'Barca', 'Direzione', 'Stato interno', 'Traccia', 'Bozza o confermata', 'Aggiornato il'];
 
 function humanSheetRow(record) {
   if (record?.recordState !== 'active') {
-    return ['— Revocata —', '', '', '', '', '', '', '', '', '', '', '', '', ''];
+    return ['— Revocata —', '', '', '', '', '', '', '', '', '', '', '', ''];
   }
-  const request = record.airportMarsalaChoice === 'transfer' ? 'Transfer richiesto' : record.carpoolRole === 'offer_ride' ? 'Passaggio auto offerto' : record.carpoolRole === 'need_ride' ? 'Passaggio auto cercato' : 'Solo pianificazione';
-  const bagagli = `${asInteger(record.luggageCount, 0, 12)}${record.bulkyLuggage ? ' + ingombrante' : ''}`;
   return [
-    record.participantName || '',
+    record.firstName || '',
+    record.lastName || '',
+    record.contactConsent === true ? record.phone || '' : '',
     record.boatName || '',
+    record.carrier || '',
+    record.serviceNumber || '',
+    [record.originCity, record.originAirport].filter(Boolean).join(' · '),
+    [record.destinationCity, record.destinationAirport].filter(Boolean).join(' · ') || record.airport || '',
     record.date || '',
     record.time || '',
-    record.airport || '',
-    record.transport || '',
-    bagagli,
-    request,
-    record.legState === 'draft' ? 'Bozza, non confermata' : (TRANSFER_STATUS_LABELS[record.status] || record.status || ''),
-    record.groupName || '',
+    record.transferRequested === true ? 'Sì' : 'No',
     [record.meetingPoint, record.meetingDate, record.meetingTime].filter(Boolean).join(' · '),
-    record.contactConsent === true ? record.phone || '' : '',
-    record.contactConsent === true ? record.email || '' : '',
-    record.operatorNotes || '',
+    record.legState === 'draft' ? 'Bozza, non confermata' : (TRANSFER_STATUS_LABELS[record.status] || record.status || ''),
   ];
 }
 
@@ -777,14 +818,20 @@ let sheetTabsEnsuredFor = '';
 // Crea i tre fogli (con intestazione) se non esistono ancora: evita di dover
 // preparare a mano lo spreadsheet prima del primo utilizzo. Verificato una
 // sola volta per istanza calda della funzione, non a ogni scrittura.
+// Indice (da 0) della colonna "Richiesta transfer" nel foglio umano, per la
+// formattazione condizionale Sì/No in verde/rosso come nel foglio modello.
+const TRANSFER_COLUMN_INDEX = HUMAN_SHEET_HEADER.indexOf('Richiesta transfer');
+let sheetGidsEnsuredFor = null;
+
 async function ensureSheetTabs(sheets, sheetId) {
-  if (sheetTabsEnsuredFor === sheetId) return;
-  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: sheetId, fields: 'sheets.properties.title' });
-  const existingTitles = new Set((spreadsheet.data.sheets || []).map((sheet) => sheet.properties?.title));
+  if (sheetTabsEnsuredFor === sheetId) return sheetGidsEnsuredFor;
+  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: sheetId, fields: 'sheets.properties' });
+  const existingSheets = spreadsheet.data.sheets || [];
+  const existingTitles = new Set(existingSheets.map((sheet) => sheet.properties?.title));
   const wanted = [
-    { title: 'Arrivi', header: HUMAN_SHEET_HEADER },
-    { title: 'Partenze', header: HUMAN_SHEET_HEADER },
-    { title: TECHNICAL_SHEET_NAME, header: TECHNICAL_SHEET_HEADER },
+    { title: 'Arrivi', header: HUMAN_SHEET_HEADER, human: true },
+    { title: 'Partenze', header: HUMAN_SHEET_HEADER, human: true },
+    { title: TECHNICAL_SHEET_NAME, header: TECHNICAL_SHEET_HEADER, human: false },
   ];
   const missing = wanted.filter((sheet) => !existingTitles.has(sheet.title));
   if (missing.length) {
@@ -809,7 +856,86 @@ async function ensureSheetTabs(sheets, sheetId) {
     valueInputOption: 'RAW',
     requestBody: { values: [sheet.header] },
   })));
+
+  const refreshed = await sheets.spreadsheets.get({ spreadsheetId: sheetId, fields: 'sheets.properties' });
+  const gidByTitle = {};
+  (refreshed.data.sheets || []).forEach((sheet) => { gidByTitle[sheet.properties.title] = sheet.properties.sheetId; });
+
+  // Sì in verde, No in rosso, come "Richiesta Transfer" nel foglio modello
+  // (Arrivi/Partenze EGADI 2025) — una sola volta, non ad ogni riga.
+  const humanGids = wanted.filter((sheet) => sheet.human).map((sheet) => gidByTitle[sheet.title]).filter((gid) => gid !== undefined);
+  if (humanGids.length && TRANSFER_COLUMN_INDEX >= 0) {
+    const rangeFor = (gid) => ({ sheetId: gid, startRowIndex: 1, startColumnIndex: TRANSFER_COLUMN_INDEX, endColumnIndex: TRANSFER_COLUMN_INDEX + 1 });
+    const rule = (gid, text, color) => ({
+      addConditionalFormatRule: {
+        rule: {
+          ranges: [rangeFor(gid)],
+          booleanRule: {
+            condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: text }] },
+            format: { backgroundColor: color, textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true } },
+          },
+        },
+        index: 0,
+      },
+    });
+    try {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: sheetId,
+        requestBody: {
+          requests: humanGids.flatMap((gid) => [
+            rule(gid, 'Sì', { red: 0.2, green: 0.58, blue: 0.3 }),
+            rule(gid, 'No', { red: 0.7, green: 0.19, blue: 0.15 }),
+          ]),
+        },
+      });
+    } catch (error) {
+      logger.warn('Formattazione condizionale Richiesta transfer non applicata.', { message: error?.message });
+    }
+  }
+
   sheetTabsEnsuredFor = sheetId;
+  sheetGidsEnsuredFor = gidByTitle;
+  return gidByTitle;
+}
+
+// Palette fissa e deterministica: la stessa barca ha sempre lo stesso
+// colore, senza dover tenere uno stato di assegnazione da qualche parte.
+const BOAT_COLOR_PALETTE = [
+  { red: 0.80, green: 0.88, blue: 0.97 }, // blu
+  { red: 0.99, green: 0.90, blue: 0.73 }, // arancio
+  { red: 0.82, green: 0.93, blue: 0.81 }, // verde
+  { red: 0.95, green: 0.82, blue: 0.87 }, // rosa
+  { red: 0.89, green: 0.85, blue: 0.97 }, // viola
+  { red: 0.99, green: 0.95, blue: 0.70 }, // giallo
+];
+
+function colorForBoat(boatId) {
+  const key = asText(boatId, 200) || 'sconosciuta';
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return BOAT_COLOR_PALETTE[hash % BOAT_COLOR_PALETTE.length];
+}
+
+async function colorBoatCell(sheets, sheetId, gid, rowNumber, boatId) {
+  if (gid === undefined || !boatId) return;
+  const boatColumnIndex = HUMAN_SHEET_HEADER.indexOf('Barca');
+  if (boatColumnIndex < 0) return;
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: {
+        requests: [{
+          repeatCell: {
+            range: { sheetId: gid, startRowIndex: rowNumber - 1, endRowIndex: rowNumber, startColumnIndex: boatColumnIndex, endColumnIndex: boatColumnIndex + 1 },
+            cell: { userEnteredFormat: { backgroundColor: colorForBoat(boatId) } },
+            fields: 'userEnteredFormat.backgroundColor',
+          },
+        }],
+      },
+    });
+  } catch (error) {
+    logger.warn('Colore barca non applicato alla riga del foglio.', { message: error?.message, rowNumber });
+  }
 }
 
 // Ogni record scrive in due fogli distinti (quello umano + Tecnico): il
@@ -865,7 +991,7 @@ exports.syncTravelBackupToGoogleSheet = onDocumentWritten({
 
   const auth = new google.auth.GoogleAuth({ scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
   const sheets = google.sheets({ version: 'v4', auth });
-  await ensureSheetTabs(sheets, sheetId);
+  const gidByTitle = await ensureSheetTabs(sheets, sheetId);
 
   const writes = [];
   if (humanTarget && !humanTarget.ignored) {
@@ -876,6 +1002,9 @@ exports.syncTravelBackupToGoogleSheet = onDocumentWritten({
       valueInputOption: 'RAW',
       requestBody: { values: [humanSheetRow({ ...record, recordId })] },
     }));
+    if (record.recordState === 'active') {
+      writes.push(colorBoatCell(sheets, sheetId, gidByTitle?.[humanTarget.sheetName], humanTarget.rowNumber, record.boatId));
+    }
   }
   if (technicalTarget && !technicalTarget.ignored) {
     const lastColumn = String.fromCharCode(64 + TECHNICAL_SHEET_HEADER.length);
