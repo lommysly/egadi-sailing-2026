@@ -17,10 +17,11 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 ## Arrivi e partenze
 
 - [x] Sezione pubblica online con le quattro tratte, città/aeroporti reali, orari, volo facoltativo, bagagli e finestra di match ±2 ore.
+- [x] Sorgente: card privata con cataloghi locali di città, aeroporti IATA e compagnie; orari `HH:mm` a 24 ore, “Altra città / compagnia” e offerta di posti in auto propria o a noleggio.
 - [x] Passage Plan separa scenari di luce da porto, campo boe o rada e dichiara stato, validità e prossimo aggiornamento.
-- [ ] Aggiungere la scheda privata per raccogliere le tratte nell'area equipaggio: nessun modulo pubblico con contatti.
+- [ ] Pubblicare e testare la card privata delle tratte con soli account fittizi: nessun modulo pubblico con contatti.
 - [ ] Creare l'area riservata della società transfer con identità nominative, gruppi, veicoli, orari e contatti limitati alle tratte aeroporto ↔ Marsala.
-- [ ] Pubblicare Rules, indici e test: le tratte restano separate da Crew List e inviti; i passaggi fra partecipanti usano consenso per tratta e doppia conferma prima di mostrare WhatsApp.
+- [ ] Pubblicare Rules e test: le tratte restano separate da Crew List e inviti; i passaggi fra partecipanti usano consenso per tratta e doppia conferma prima di mostrare WhatsApp.
 - [ ] Aggiornare l'informativa definitiva con società transfer, destinatari, finalità, revoca e tempi di conservazione.
 
 ## Nuovo accesso equipaggio

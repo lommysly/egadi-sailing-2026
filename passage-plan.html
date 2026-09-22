@@ -10,13 +10,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css?v=20260911-menu2" />
+  <link rel="stylesheet" href="passage-visual.css?v=20260911-visual1" />
 </head>
 <body class="area-page">
   <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
   <header class="site-header">
     <a class="brand" href="index.html" aria-label="Egadi Sailing Experience, home"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
     <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-menu" aria-label="Apri menu"><span class="menu-toggle-label">Menu</span><span class="menu-toggle-icon" aria-hidden="true"></span></button>
-    <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale"><a href="index.html">Il viaggio</a><a href="passage-plan.html" aria-current="page">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a></nav>
+    <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale"><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html" aria-current="page">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a></nav>
   </header>
   <button class="menu-backdrop" type="button" aria-label="Chiudi menu" hidden></button>
 
@@ -42,6 +43,22 @@
       <p id="planStopsNote" class="passage-stop-note"></p>
     </section>
 
+    <section class="passage-route-overview" aria-labelledby="routeOverviewTitle">
+      <div class="passage-route-copy">
+        <p class="eyebrow">La rotta in un colpo d’occhio</p>
+        <h2 id="routeOverviewTitle">Quattro giorni,<br /><em>una direzione elastica.</em></h2>
+        <p>Le immagini raccontano i luoghi possibili; vento, mare, regole AMP e skipper scelgono invece la sosta reale.</p>
+        <p class="passage-route-safety">Una cala bella non è una cala assegnata. Ogni decisione della notte resta a bordo.</p>
+      </div>
+      <ol class="passage-route-line" aria-label="Itinerario indicativo da Marsala alle Egadi e ritorno">
+        <li><span>01</span><strong>Marsala</strong><small>Partenza · giovedì</small></li>
+        <li><span>02</span><strong>Levanzo</strong><small>Scenari di rada</small></li>
+        <li><span>03</span><strong>Marettimo</strong><small>Notte in porto</small></li>
+        <li><span>04</span><strong>Favignana</strong><small>Porto e ultimo bagno</small></li>
+        <li><span>05</span><strong>Marsala</strong><small>Rientro · domenica</small></li>
+      </ol>
+    </section>
+
     <section id="planMooringGuide" class="passage-mooring-guide" aria-labelledby="planMooringTitle" hidden>
       <div>
         <p class="eyebrow">Scelte di ormeggio</p>
@@ -63,7 +80,7 @@
 
   <footer class="site-footer">
     <div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><p>8—11 ottobre 2026 · Marsala</p></div>
-    <div><a href="index.html">Il viaggio</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div>
+    <div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div>
   </footer>
   <script src="passage-plan-data.js"></script>
   <script src="passage-plan.js"></script>

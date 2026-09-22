@@ -4,7 +4,7 @@ Questa specifica traduce il piano transfer della flottiglia nel sito Egadi. Non 
 
 ## Obiettivo
 
-Organizzare le tratte dei partecipanti verso e da Marsala senza duplicare persone, telefoni o orari in fogli separati. La sezione pubblica spiega il flusso; la compilazione avverrà solo nell'area personale protetta dell'equipaggio.
+Organizzare le tratte dei partecipanti verso e da Marsala senza duplicare persone, telefoni o orari in fogli separati. La sezione pubblica spiega il flusso; la compilazione avviene solo nell'area personale protetta dell'equipaggio.
 
 ## Le quattro tratte facoltative
 
@@ -15,24 +15,37 @@ Organizzare le tratte dei partecipanti verso e da Marsala senza duplicare person
 
 Una persona può compilare una sola tratta, andata e ritorno diversi, oppure tutte e quattro. Città e aeroporto restano campi distinti: `Milano` non può sostituire `MXP`, `LIN` o `BGY`.
 
+## Compilazione guidata
+
+Il modulo usa un catalogo locale, versionato e senza API a pagamento:
+
+- città e zone frequenti, più l'opzione obbligatoria `Altra città o zona`;
+- aeroporti con codice IATA e nome leggibile;
+- compagnie aeree comuni, più l'opzione obbligatoria `Altra compagnia`.
+
+La città e l'aeroporto sono due scelte diverse. Selezionando `Torino`, per esempio, il modulo suggerisce Caselle, Malpensa, Linate e Bergamo, ma consente di indicare correttamente `Torino → Milano Malpensa (MXP)` senza forzare Caselle.
+
+Gli orari usano il selettore nativo in formato `HH:mm`, 24 ore e intervalli di cinque minuti. Ogni tratta richiede un solo **orario di riferimento** per il match e permette di aggiungere, se utili, anche partenza e arrivo della tratta: la compilazione resta rapida anche da telefono.
+
 ## Campi per ogni tratta
 
-- Tipo di spostamento: volo, auto, treno, nave o altro.
-- Città di partenza e città di arrivo.
-- Aeroporto di partenza e aeroporto di arrivo, con codice IATA quando applicabile.
-- Data, ora di partenza e ora di arrivo.
+- Città / zona e aeroporto effettivo, con codice IATA quando applicabile.
+- Data, orario di riferimento, partenza e arrivo facoltativi.
 - Compagnia aerea e numero di volo facoltativi.
 - Numero di bagagli e presenza di colli ingombranti.
-- Disponibilità: cerco passaggio, posso offrire posti o solo coordinamento.
+- Disponibilità: cerco passaggio, offro posti in auto o solo coordinamento.
+- Per chi offre: auto propria o a noleggio, posti liberi, spazio per valigie e disponibilità per colli ingombranti.
 - Finestra di compatibilità fissa: **±120 minuti**.
 
-Il matching considera stessa tratta, stessa data e stesso aeroporto reale. Per l'andata aeroportuale confronta l'orario di arrivo; per il ritorno confronta l'orario di partenza e l'organizzatore calcola il ritrovo a Marsala a ritroso.
+Il matching considera stessa tratta, stessa data e stesso aeroporto reale. Per l'andata aeroportuale confronta l'orario di arrivo; per il ritorno confronta l'orario di partenza e l'organizzatore calcola il ritrovo a Marsala a ritroso. Per `città → aeroporto` e `aeroporto → città` serve anche la stessa città / zona del catalogo.
+
+Un passaggio in auto è volontario fra partecipanti: il sito non raccoglie targa, patente, carta di credito, prezzo, assicurazione o pagamenti e non lo presenta come servizio professionale di trasporto.
 
 ## Ruoli e visibilità
 
 | Ruolo | Cosa vede |
 | --- | --- |
-| Partecipante | Le proprie tratte e i match che ha accettato. |
+| Partecipante | Le proprie tratte; in una fase successiva anche i match che ha accettato. |
 | Skipper | Solo stato sintetico della propria barca, senza poter cercare contatti di altre barche. |
 | Organizzazione | Le informazioni necessarie a coordinare l'evento e ad assegnare la società transfer. |
 | Società transfer | Solo tratte aeroporto ↔ Marsala, con dati necessari a comporre i mezzi, contattare le persone, gestire orari e bagagli. Nessun passaggio casa ↔ aeroporto. |
@@ -50,12 +63,12 @@ La gestione del transfer aeroportuale e la condivisione fra partecipanti sono du
 
 Il numero di telefono non entra nei segnali di match, negli elenchi pubblici, negli URL né in JavaScript statico.
 
-## Implementazione successiva
+## Stato dell'implementazione
 
-1. Aggiungere una card privata `Arrivi e partenze` in `my-area.html`, con una tratta per documento e possibilità di modifica.
-2. Creare raccolte Firestore dedicate all'evento, separate da Crew List e inviti.
-3. Pubblicare Security Rules che consentano alla persona solo le proprie tratte, all'operatore solo i transfer aeroportuali assegnati e agli altri partecipanti soltanto un match accettato.
-4. Aggiungere un'area riservata della società transfer per raggruppare manualmente le persone, assegnare mezzo, punto/orario di ritrovo e inviare WhatsApp precompilati.
-5. Aggiornare l'informativa definitiva con titolare, canale per i diritti, destinatari, conservazione, cancellazione e revoca.
+1. Il sorgente contiene la card privata `Arrivi e partenze`, con una tratta per documento, cataloghi guidati e modifica o eliminazione della propria tratta.
+2. Il sorgente usa la raccolta dedicata `events/egadi-2026/transferProfiles/{uid}/transferLegs`, separata da Crew List e inviti. Lo skipper e gli altri equipaggi non possono leggerla; l'organizzazione può coordinarla.
+3. Prima della pubblicazione operativa delle tratte reali: testare Rules con account fittizi e completare l'informativa su destinatari, conservazione, cancellazione e revoca.
+4. In seguito: area nominativa della società transfer per le sole tratte aeroporto ↔ Marsala, gruppi, mezzi, punti/orari e WhatsApp precompilati.
+5. In seguito: proposta anonima di match e doppia accettazione prima di mostrare il reciproco WhatsApp fra partecipanti.
 
 Il matching automatico tra equipaggi deve avvenire lato server oppure usare esclusivamente segnali anonimi: Firestore non può nascondere singoli campi di un documento che un utente ha il diritto di leggere.

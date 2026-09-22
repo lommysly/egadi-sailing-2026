@@ -10,8 +10,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css?v=20260911-menu2" />
+  <link rel="stylesheet" href="home-visual.css?v=20260911-homevisual1" />
 </head>
-<body>
+<body class="home-page">
   <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
   <header class="site-header">
     <a class="brand" href="index.html" aria-label="Egadi Sailing Experience, home">
@@ -21,6 +22,7 @@
     <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-menu" aria-label="Apri menu"><span class="menu-toggle-label">Menu</span><span class="menu-toggle-icon" aria-hidden="true"></span></button>
     <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale">
       <a href="index.html" aria-current="page">Il viaggio</a>
+      <a href="flotta.html">Flottiglia</a>
       <a href="passage-plan.html">Passage Plan</a>
       <a href="arrivi-partenze.html">Arrivi &amp; partenze</a>
       <a href="film.html">Il film</a>
@@ -30,28 +32,28 @@
   <button class="menu-backdrop" type="button" aria-label="Chiudi menu" hidden></button>
 
   <main id="main-content">
-    <section class="hero">
+    <section class="hero home-hero">
       <div class="hero-copy">
         <p class="eyebrow">Marsala · Isole Egadi · 08—11.10.2026</p>
         <h1>Il mare non è<br /><em>un programma fisso.</em></h1>
-        <p class="hero-text">Quattro giorni di vela tra Levanzo, Marettimo e Favignana. Più barche, più equipaggi, una sola rotta: quella che il mare ci lascia disegnare.</p>
+        <p class="hero-text">Quattro giorni di vela tra Levanzo, Marettimo e Favignana. Più barche, più equipaggi, una rotta che segue mare, vento e luce.</p>
         <div class="hero-actions">
           <a class="button button-primary" href="passage-plan.html">Meteo &amp; Passage Plan</a>
+          <a class="button button-ghost" href="flotta.html">Scopri la flottiglia</a>
           <a class="button button-ghost" href="accesso.html">Area riservata</a>
         </div>
       </div>
-      <div class="hero-visual" role="img" aria-label="Mappa illustrata della rotta tra Marsala e le Egadi">
-        <div class="sun"></div>
-        <div class="island island-levanzo">Levanzo</div>
-        <div class="island island-marettimo">Marettimo</div>
-        <div class="island island-favignana">Favignana</div>
-        <div class="island island-marsala">Marsala</div>
-        <svg class="route-line" viewBox="0 0 620 500" aria-hidden="true">
-          <path d="M475 407 C408 370 380 276 310 228 S177 160 99 136" />
-          <path d="M99 136 C160 196 247 260 310 228" />
-          <path d="M310 228 C351 316 410 346 475 407" />
-        </svg>
-        <p class="map-note">La rotta effettiva viene confermata ogni giorno dagli skipper.</p>
+      <div class="home-hero-mosaic" aria-label="Le acque e le isole della rotta Egadi">
+        <figure class="home-photo home-photo-primary home-video-frame" aria-label="Mare e vela in movimento">
+          <video class="home-hero-video" muted loop playsinline preload="metadata" poster="media/marettimo-sea.jpg" aria-hidden="true">
+            <source src="media/egadi-hero.mp4" type="video/mp4" />
+          </video>
+        </figure>
+        <figure class="home-photo home-photo-secondary">
+          <img src="media/favignana-crystal-water.jpg" alt="Acqua trasparente di Favignana" decoding="async" />
+        </figure>
+        <div class="home-route-stamp"><span>Rotta aperta</span><strong>Marsala<br />→ Egadi</strong></div>
+        <p class="home-visual-note">Il Passage Plan si aggiorna con il mare reale.</p>
       </div>
     </section>
 
@@ -62,82 +64,80 @@
       <div><span>Rientro</span><strong>Domenica 11 · Marsala entro le 18:00</strong></div>
     </section>
 
-    <section id="arrivi-partenze" class="section transfer-home-section">
+    <section id="arrivi-partenze" class="section transfer-home-section home-logistics-section">
       <div class="section-heading">
         <p class="eyebrow">Arrivi e partenze</p>
-        <h2>La logistica<br />si fa insieme.</h2>
+        <h2>Il viaggio<br />inizia prima.</h2>
       </div>
       <div class="transfer-home-copy">
-        <p>Trapani, Palermo, Marsala e il viaggio verso il proprio aeroporto. La nuova sezione tiene insieme le tratte, cerca coincidenze nella stessa finestra di due ore e protegge i contatti di chi decide di condividere un passaggio.</p>
-        <ul class="feature-list">
-          <li><span>01</span> Arrivo e ritorno possono essere diversi</li>
-          <li><span>02</span> Città, aeroporti, orari e volo reale</li>
-          <li><span>03</span> WhatsApp visibile solo dopo il consenso al match</li>
-        </ul>
+        <p>Un passaggio verso l’aeroporto, un transfer per Marsala, qualcuno con cui condividere il ritorno.</p>
+        <div class="home-logistics-tiles" aria-label="Come funziona arrivi e partenze">
+          <article><span aria-hidden="true">01</span><strong>Parti dalla tua città</strong><p>Passaggi tra amici verso l’aeroporto.</p></article>
+          <article><span aria-hidden="true">02</span><strong>Arriva a Marsala</strong><p>Trapani o Palermo, con finestre compatibili.</p></article>
+          <article><span aria-hidden="true">03</span><strong>Torna insieme</strong><p>Il contatto si condivide solo se lo scegli.</p></article>
+        </div>
         <a class="button button-primary" href="arrivi-partenze.html">Apri Arrivi &amp; partenze</a>
       </div>
     </section>
 
-    <section id="rotta" class="section passage-section">
+    <section id="rotta" class="section passage-section home-route-section">
       <div class="section-heading">
         <p class="eyebrow">Passage plan</p>
         <h2>Una direzione,<br />molte possibilità.</h2>
       </div>
       <div class="passage-intro">
-        <p>Il nostro piano parte da Marsala e attraversa l'arcipelago. Vento, onda, fondali, ordinanze e valutazione dello skipper scelgono però ogni sera la caletta, il porto o la boa più sicura.</p>
-        <div class="safety-note"><span>◌</span> Non promettiamo ancoraggi: promettiamo decisioni condivise e sicure.</div>
+        <p>Una traccia da immaginare, non una promessa di ancoraggio: ogni sera decide lo skipper, dopo aver letto il mare.</p>
+        <div class="safety-note"><span>◌</span> Rada, porto o campo boe: prima la sicurezza, poi la cala.</div>
+        <a class="text-link home-route-link" href="passage-plan.html">Apri il briefing aggiornabile <span>→</span></a>
       </div>
-      <ol class="days">
-        <li>
-          <span class="day-number">01</span>
-          <div><p class="day-label">Giovedì 8 ottobre</p><h3>Marsala → Levanzo</h3><p>Lasciamo Marsala nel pomeriggio. La prima notte cerca una rada adatta a Levanzo e una cena nella luce del tramonto.</p></div>
-        </li>
-        <li>
-          <span class="day-number">02</span>
-          <div><p class="day-label">Venerdì 9 ottobre</p><h3>Levanzo → Marettimo</h3><p>Una seconda caletta, pranzo a bordo e poi la traversata verso Marettimo. Notte in porto, cena libera e serata nel borgo.</p></div>
-        </li>
-        <li>
-          <span class="day-number">03</span>
-          <div><p class="day-label">Sabato 10 ottobre</p><h3>Marettimo → Favignana</h3><p>Coste viste dal largo e il profilo di Punta Troia, nel rispetto delle regole dell’Area Marina Protetta. Nel tardo pomeriggio entriamo a Favignana per la cena collettiva, DJ set e festa.</p></div>
-        </li>
-        <li>
-          <span class="day-number">04</span>
-          <div><p class="day-label">Domenica 11 ottobre</p><h3>Favignana → Marsala</h3><p>Ultimi bagni e calette fino alle 15:30 circa, poi vela verso Marsala per rientrare in porto entro le 18:00.</p></div>
-        </li>
-      </ol>
+      <div class="home-route-cards" aria-label="Le quattro giornate di navigazione">
+        <article class="home-route-card route-card-levanzo">
+          <img src="media/levanzo-sea.jpg" alt="Acqua cristallina di Levanzo" loading="lazy" decoding="async" />
+          <div><p>Giovedì · 08.10</p><h3>Marsala<br />→ Levanzo</h3><span>Tramonto e prima notte, se il mare lo permette.</span></div>
+        </article>
+        <article class="home-route-card route-card-marettimo">
+          <img src="media/marettimo-sea.jpg" alt="Costa di Marettimo vista dal mare" loading="lazy" decoding="async" />
+          <div><p>Venerdì · 09.10</p><h3>Levanzo<br />→ Marettimo</h3><span>Una cala, la traversata e il porto del borgo.</span></div>
+        </article>
+        <article class="home-route-card route-card-favignana">
+          <img src="media/favignana-marasolo.jpg" alt="Mare e costa di Cala Marasolo a Favignana" loading="lazy" decoding="async" />
+          <div><p>Sabato · 10.10</p><h3>Marettimo<br />→ Favignana</h3><span>Costa, porto, cena collettiva e musica.</span></div>
+        </article>
+        <article class="home-route-card route-card-return">
+          <div class="route-card-return-art" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div><p>Domenica · 11.10</p><h3>Favignana<br />→ Marsala</h3><span>Ultimo bagno, poi rientro in porto entro le 18:00.</span></div>
+        </article>
+      </div>
     </section>
 
     <section id="isole" class="section islands-section">
       <div class="section-heading narrow-heading"><p class="eyebrow">La mappa delle possibilità</p><h2>Ogni isola ha più di un volto.</h2></div>
       <div class="island-grid">
         <article class="island-card levanzo-card">
-          <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Aegadian_Islands_Banner_Levanzo.jpg?width=1200" alt="Panorama di Levanzo" loading="lazy" decoding="async" />
-          <div class="island-card-content"><p class="eyebrow">Levanzo</p><h3>Il primo silenzio.</h3><p>Cala Dogana, Cala Fredda, Cala Minnola, Cala Calcara, Cala Tramontana e Faraglione: la prima scelta del weekend dipende dal mare.</p></div>
+          <img src="media/levanzo-sea.jpg" alt="Acqua e rocce di Levanzo" loading="lazy" decoding="async" />
+          <div class="island-card-content"><p class="eyebrow">Levanzo</p><h3>Il primo silenzio.</h3><p>Cale appartate, luce morbida e una prima notte da scegliere con il mare.</p></div>
         </article>
         <article class="island-card marettimo-card">
-          <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Marettimo_-_castello_di_punta_troia_-_panoramio.jpg?width=1200" alt="Castello di Punta Troia a Marettimo" loading="lazy" decoding="async" />
-          <div class="island-card-content"><p class="eyebrow">Marettimo</p><h3>La parte più remota.</h3><p>Porto, Punta Troia, Scalo Maestro, Cala Bianca, Punta Bassana e Cretazzo. Una costa da navigare senza fretta.</p></div>
+          <img src="media/marettimo-sea.jpg" alt="Costa e acqua trasparente di Marettimo" loading="lazy" decoding="async" />
+          <div class="island-card-content"><p class="eyebrow">Marettimo</p><h3>La parte più remota.</h3><p>Punta Troia, costa alta e un borgo che si accende la sera.</p></div>
         </article>
         <article class="island-card favignana-card">
-          <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Cala_azzurra_favignana.jpg?width=1200" alt="Cala Azzurra a Favignana" loading="lazy" decoding="async" />
-          <div class="island-card-content"><p class="eyebrow">Favignana</p><h3>Ultimo tuffo, prima del ritorno.</h3><p>Cala Azzurra, Cala Rossa, Bue Marino, Cala Rotonda, Punta Lunga, Preveto e Grotta Perciata: scegliamo insieme le soste migliori.</p></div>
+          <img src="media/favignana-crystal-water.jpg" alt="Acqua cristallina di Favignana" loading="lazy" decoding="async" />
+          <div class="island-card-content"><p class="eyebrow">Favignana</p><h3>Ultimo tuffo, prima del ritorno.</h3><p>Acqua cristallina, cala scelta sul momento e ritorno con il sole basso.</p></div>
         </article>
       </div>
-      <p class="photo-credit">Immagini adattate al formato del sito: Levanzo — <a href="https://commons.wikimedia.org/wiki/File:Aegadian_Islands_Banner_Levanzo.jpg" target="_blank" rel="noopener noreferrer">Simonetta Viterbi</a> (<a href="https://creativecommons.org/licenses/by/2.0/deed.it" target="_blank" rel="noopener noreferrer">CC BY 2.0</a>); Marettimo — <a href="https://commons.wikimedia.org/wiki/File:Marettimo_-_castello_di_punta_troia_-_panoramio.jpg" target="_blank" rel="noopener noreferrer">italo losero</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/deed.it" target="_blank" rel="noopener noreferrer">CC BY-SA 3.0</a>); Cala Azzurra — <a href="https://commons.wikimedia.org/wiki/File:Cala_azzurra_favignana.jpg" target="_blank" rel="noopener noreferrer">Cmassari</a> (<a href="https://creativecommons.org/licenses/by/3.0/deed.it" target="_blank" rel="noopener noreferrer">CC BY 3.0</a>).</p>
+      <p class="photo-credit">Immagini adattate al formato del sito: Levanzo — <a href="https://commons.wikimedia.org/wiki/File:Levanzo_Italy_12.jpg" target="_blank" rel="noopener noreferrer">Norbert Nagel</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/deed.it" target="_blank" rel="noopener noreferrer">CC BY-SA 3.0</a>); Marettimo — <a href="https://commons.wikimedia.org/wiki/File:Marettimo_coast.jpg" target="_blank" rel="noopener noreferrer">The Cosmonaut</a> (<a href="https://creativecommons.org/licenses/by-sa/2.5/ca/deed.it" target="_blank" rel="noopener noreferrer">CC BY-SA 2.5 CA</a>); Favignana — <a href="https://commons.wikimedia.org/wiki/File:Favignana,_Cala_Marasolo.jpg" target="_blank" rel="noopener noreferrer">Marcolbr23</a> (<a href="https://creativecommons.org/licenses/by-sa/4.0/deed.it" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>) e <a href="https://commons.wikimedia.org/wiki/File:Crystal_clear_water_at_Favignana_-_panoramio.jpg" target="_blank" rel="noopener noreferrer">René Bongard</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/deed.it" target="_blank" rel="noopener noreferrer">CC BY-SA 3.0</a>).</p>
     </section>
 
-    <section id="flotta" class="section fleet-section">
+    <section id="flotta" class="section fleet-section home-fleet-section">
       <div class="section-heading"><p class="eyebrow">Più barche, una flotta</p><h2>Ogni equipaggio<br />ha il suo skipper.</h2></div>
       <div class="fleet-copy">
-        <p>Ogni barca ha una pagina privata. Lo skipper gestisce equipaggio, posti, cabine, richieste di contributo e check-in. Il primo catamarano confermato è un Fountaine Pajot Isla 40: quattro cabine con bagno, due posti aggiuntivi in dinette, cabina marinaio a prua destra e bagno separato a prua sinistra.</p>
-        <ul class="feature-list">
-          <li><span>01</span> Crew List privata e separata per barca</li>
-          <li><span>02</span> Quote personalizzate per cabina, cuccetta o cambusa</li>
-          <li><span>03</span> Piano del giorno e messaggi alla propria crew</li>
-          <li><span>04</span> Meteo e Passage Plan condivisi con tutta la flotta</li>
-        </ul>
-        <a class="button button-primary" href="passage-plan.html">Apri Meteo &amp; Passage Plan</a>
-        <a class="text-link" href="flotta.html">Scopri le barche della flotta <span>→</span></a>
+        <p>La flottiglia è pubblica; gli equipaggi restano indipendenti. Ogni skipper decide se mostrare anche i posti liberi.</p>
+        <article class="home-boat-preview" aria-label="Karibu, catamarano Fountaine Pajot Isla 40">
+          <div class="home-boat-illustration" aria-hidden="true"><span class="boat-mast"></span><span class="boat-sail boat-sail-left"></span><span class="boat-sail boat-sail-right"></span><span class="boat-hull"></span><span class="boat-water"></span></div>
+          <div class="home-boat-copy"><p class="eyebrow">Prima barca confermata</p><h3>Karibu</h3><p>Fountaine Pajot Isla 40</p><ul><li>4 cabine doppie</li><li>2 posti in dinette</li><li>Cabina marinaio a prua</li></ul></div>
+        </article>
+        <a class="button button-primary" href="flotta.html">Entra nella pagina Flottiglia</a>
       </div>
     </section>
 
@@ -145,9 +145,9 @@
       <div class="film-heading">
         <p class="eyebrow">Film in preparazione</p>
         <h2>Non un video<br />turistico. <em>Un ricordo.</em></h2>
-        <p>Lo storyboard prevede tre frammenti verticali e un film orizzontale: verranno pubblicati solo dopo riprese originali o con licenza esplicita, autorizzazioni di immagine e musica utilizzabile.</p>
+        <p>Tre frammenti verticali e un film orizzontale, costruiti soltanto con riprese originali e musica utilizzabile.</p>
       </div>
-      <div class="film-grid">
+      <div class="film-grid" aria-label="Tre capitoli previsti per il film">
         <article class="film-card film-dawn">
           <span class="film-duration">Previsto · 00:12</span>
           <div><p class="eyebrow">Capitolo 01</p><h3>Verso Levanzo</h3><p>Prua, vento, mani sulle cime e il sole che scende.</p></div>
@@ -173,8 +173,9 @@
 
   <footer class="site-footer">
     <div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><p>8—11 ottobre 2026 · Marsala</p></div>
-    <div><a href="index.html">Il viaggio</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div>
+    <div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div>
   </footer>
+  <script src="home-motion.js?v=20260911-motion1"></script>
   <script src="app.js?v=20260911-menu2"></script>
 </body>
 </html>

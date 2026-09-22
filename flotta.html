@@ -3,60 +3,90 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="La flotta pubblica di Egadi Sailing Experience: barche, skipper e posti resi disponibili dagli equipaggi." />
-  <title>La flotta · Egadi Sailing Experience</title>
+  <meta name="description" content="La flottiglia di Egadi Sailing Experience: barche, skipper e posti resi pubblici dagli equipaggi." />
+  <title>La flottiglia · Egadi Sailing Experience</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css?v=20260911-menu2" />
+  <link rel="stylesheet" href="flotta-visual.css?v=20260911-visual1" />
 </head>
-<body class="area-page">
+<body class="area-page fleet-visual-page">
   <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
   <header class="site-header">
     <a class="brand" href="index.html" aria-label="Egadi Sailing Experience, home"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a>
     <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-menu" aria-label="Apri menu"><span class="menu-toggle-label">Menu</span><span class="menu-toggle-icon" aria-hidden="true"></span></button>
-    <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale"><a href="index.html">Il viaggio</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a></nav>
+    <nav id="primary-menu" class="site-nav" aria-label="Navigazione principale"><a href="index.html">Il viaggio</a><a href="flotta.html" aria-current="page">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a></nav>
   </header>
   <button class="menu-backdrop" type="button" aria-label="Chiudi menu" hidden></button>
 
-  <main id="main-content" class="area-main">
-    <section class="area-hero">
-      <p class="eyebrow">La flotta</p>
-      <h1>Una flotta.<br /><em>Molti equipaggi.</em></h1>
-      <p>Ogni barca naviga con il proprio skipper. Qui trovi barca, modello, tipologia e skipper; lo skipper può scegliere se mostrare anche i posti disponibili.</p>
+  <main id="main-content">
+    <section class="fleet-visual-hero" aria-labelledby="fleet-page-title">
+      <figure class="fleet-visual-hero-media">
+        <img src="media/marettimo-sea.jpg" alt="Costa di Marettimo vista dal mare" fetchpriority="high" />
+        <figcaption>Marettimo · una delle direzioni possibili della rotta · Foto <a href="https://commons.wikimedia.org/wiki/File:Marettimo_coast.jpg" target="_blank" rel="noopener noreferrer">The Cosmonaut</a> · <a href="https://creativecommons.org/licenses/by-sa/2.5/ca/deed.it" target="_blank" rel="noopener noreferrer">CC BY-SA 2.5 CA</a></figcaption>
+      </figure>
+      <div class="fleet-visual-hero-copy">
+        <p class="eyebrow">Egadi · 8—11 ottobre 2026</p>
+        <h1 id="fleet-page-title">Una flottiglia.<br /><em>Un mare solo.</em></h1>
+        <p>Barche diverse, skipper diversi, lo stesso orizzonte. Qui la flottiglia prende forma, una barca alla volta.</p>
+        <a class="button button-light" href="#barche">Guarda le barche</a>
+      </div>
+      <div class="fleet-visual-hero-mark" aria-hidden="true"><span>EG</span><i></i><i></i><i></i></div>
     </section>
 
-    <section class="dashboard" aria-labelledby="fleet-list-title">
-      <div class="dashboard-heading">
+    <section class="fleet-visual-overview" aria-label="Come leggere la flottiglia">
+      <div>
+        <span class="fleet-overview-number">01</span>
+        <p><strong>Pubblica, con misura.</strong> Barca, modello e skipper sono visibili a tutti.</p>
+      </div>
+      <div>
+        <span class="fleet-overview-number">02</span>
+        <p><strong>Posti solo se scelti.</strong> Ogni skipper decide se mostrarli oppure no.</p>
+      </div>
+      <div>
+        <span class="fleet-overview-number">03</span>
+        <p><strong>Dati personali protetti.</strong> Nessun contatto, invito o Crew List compare qui.</p>
+      </div>
+    </section>
+
+    <section id="barche" class="fleet-visual-roster" aria-labelledby="fleet-list-title">
+      <div class="fleet-visual-section-heading">
         <div>
           <p class="eyebrow">Barche partecipanti</p>
-          <h2 id="fleet-list-title">La flotta<br />in partenza.</h2>
-          <p>Il totale dei posti liberi considera solo le disponibilità pubblicate. Non sono presenti contatti, inviti o dati della Crew List.</p>
+          <h2 id="fleet-list-title">La flottiglia<br /><em>in partenza.</em></h2>
         </div>
+        <p>Ogni scheda è pubblicata e aggiornata dal rispettivo skipper. Il totale dei posti liberi considera solo le disponibilità che lui ha scelto di rendere visibili.</p>
       </div>
 
-      <p id="fleetStatus" class="form-message" role="status" aria-live="polite">Aggiorno la flotta…</p>
-      <div id="fleetSummary" class="passage-status" aria-label="Riepilogo della flotta" hidden></div>
-      <div id="fleetList" class="dashboard-grid" aria-live="polite"></div>
-      <noscript><p class="empty-state">Per visualizzare la flotta è necessario attivare JavaScript.</p></noscript>
+      <p id="fleetStatus" class="form-message fleet-visual-status" role="status" aria-live="polite">Aggiorno la flottiglia…</p>
+      <div id="fleetSummary" class="passage-status fleet-visual-summary" aria-label="Riepilogo della flottiglia" hidden></div>
+      <div id="fleetList" class="dashboard-grid fleet-visual-list" aria-live="polite"></div>
+      <noscript><p class="empty-state">Per visualizzare la flottiglia è necessario attivare JavaScript.</p></noscript>
     </section>
 
-    <section class="section registration-preview">
-      <div class="access-cards access-cards-single">
-        <article>
-          <p class="eyebrow">Fai parte della flotta?</p>
-          <h2>La tua barca,<br />il tuo equipaggio.</h2>
-          <p>Lo skipper registra e gestisce la propria barca dall’area riservata. La disponibilità dei posti resta sempre una sua scelta.</p>
-          <a class="button button-primary" href="accesso.html">Apri area riservata</a>
-        </article>
+    <section class="fleet-visual-note" aria-labelledby="fleet-visual-note-title">
+      <div class="fleet-visual-note-art" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <div>
+        <p class="eyebrow">Una rotta, non una promessa</p>
+        <h2 id="fleet-visual-note-title">La notte giusta<br /><em>la decide il mare.</em></h2>
+        <p>Le barche viaggiano insieme quando condizioni, ordinanze e decisione dello skipper lo rendono sensato. Il Passage Plan tiene aggiornata tutta la flottiglia.</p>
+        <a class="text-link" href="passage-plan.html">Apri Meteo &amp; Passage Plan <span>→</span></a>
       </div>
+    </section>
+
+    <section class="fleet-visual-skipper" aria-labelledby="fleet-skipper-title">
+      <p class="eyebrow">Sei skipper?</p>
+      <h2 id="fleet-skipper-title">Porta la tua barca.<br /><em>Costruiamo la flottiglia.</em></h2>
+      <p>Registra la barca, poi scegli cosa rendere pubblico. L’equipaggio, le richieste di contributo e la Crew List restano nella tua area riservata.</p>
+      <a class="button button-light" href="accesso.html">Entra nell’area riservata</a>
     </section>
   </main>
 
   <footer class="site-footer">
     <div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><p>8—11 ottobre 2026 · Marsala</p></div>
-    <div><a href="index.html">Il viaggio</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div>
+    <div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div>
   </footer>
   <script src="app.js?v=20260911-menu2"></script>
   <script type="module" src="flotta.js?v=20260911-fleet2"></script>

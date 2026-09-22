@@ -18,7 +18,8 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - `area.html`: area skipper con Google Sign-In, una barca per skipper, Crew List, PDF, bacheca, inviti WhatsApp e richieste di contributo con tag dei metodi e messaggio WhatsApp diretto.
 - `participant.html`: primo accesso dal link WhatsApp; la persona conferma il suo numero e sceglie il proprio codice di 6 cifre, poi completa i dati necessari alla Crew List.
 - `crew.html`: ingresso quotidiano dell'equipaggio con numero WhatsApp e codice personale.
-- `my-area.html`: area personale con scheda, bacheca, regole e richieste dedicate.
+- `my-area.html`: area personale con scheda, bacheca, regole, richieste dedicate e tratte personali.
+- `transfer-catalog.js`: cataloghi locali guidati di città / zone, aeroporti IATA e compagnie, senza API a pagamento.
 - `crew-pdf.js`: foglio A4 orizzontale da salvare in PDF per charter / eventuali controlli; non esporta CSV.
 - `FIRESTORE_RULES_TEST_MATRIX.md`, `CHECKLIST_PUBBLICAZIONE.md` e `PRIVACY_DA_COMPLETARE.md`: tracciabilità dei controlli, delle verifiche da completare e delle decisioni privacy da formalizzare.
 - `ARRIVI_PARTENZE_SPEC.md`: modello operativo per la futura scheda privata dell'equipaggio e per l'area riservata della società transfer.
@@ -87,6 +88,15 @@ boats/{skipperUid}
     history/{rulesVersion}-{participantUid}
       inviteId, acceptedBy, rulesVersion, acceptedAt
 
+events/egadi-2026/transferProfiles/{participantUid}/transferLegs/{legId}
+  ownerUid, boatId, inviteId, legKind
+  cityId, cityLabel, airportIata, airportLabel
+  travelDate, matchTime, departureTime, arrivalTime
+  airlineId, airlineLabel, flightNumber
+  rideIntent, vehicleType, seatsAvailable
+  bagsCount, luggageCapacity, hasBulkyBags, acceptsBulkyBags
+  peerMatchConsent, operatorConsent, createdAt, updatedAt
+
 crewAccess/{participantUid}
   boatId, inviteId, userId, loginEmail, updatedAt
 
@@ -114,9 +124,11 @@ Il sito non incassa denaro, non genera o valida link dei provider e non dichiara
 
 ## Arrivi e partenze
 
-La sezione pubblica è online e descrive il flusso per aeroporto, Marsala e passaggi fra amici. La futura scheda privata richiederà città di partenza/arrivo, aeroporto reale, data e orari, compagnia e numero di volo facoltativi, bagagli e una finestra di compatibilità fissa di ±120 minuti.
+La sezione pubblica è online e descrive il flusso per aeroporto, Marsala e passaggi fra amici. La card privata nel sorgente salva soltanto le proprie tratte in una raccolta separata dalla Crew List: città / zona, aeroporto reale, data, orario di riferimento in formato `HH:mm`, orari aggiuntivi facoltativi, compagnia e volo, bagagli e finestra di compatibilità fissa di ±120 minuti.
 
-La società transfer avrà un'area riservata separata per le sole tratte aeroporto ↔ Marsala: potrà raggruppare persone, assegnare il mezzo e contattarle. I passaggi casa ↔ aeroporto restano fuori dalla sua area. I contatti fra partecipanti non saranno pubblici: saranno visibili solo dopo la scelta per tratta e l'accettazione del collegamento da entrambe le persone. La raccolta effettiva e le Rules dedicate verranno implementate soltanto dopo la definizione dell'accesso nominativo della società e dell'informativa definitiva.
+I cataloghi sono locali e guidati: Torino può indicare Malpensa (MXP) senza trasformare città e aeroporto nello stesso campo. Esiste sempre `Altra città o zona` e `Altra compagnia`, per non bloccare un caso reale. Chi offre un passaggio indica auto propria o a noleggio, posti e spazio bagagli; il sito non raccoglie prezzo, targa, patente, carta di credito o assicurazione.
+
+La società transfer avrà un'area riservata separata per le sole tratte aeroporto ↔ Marsala: potrà raggruppare persone, assegnare il mezzo e contattarle. I passaggi casa ↔ aeroporto restano fuori dalla sua area. I contatti fra partecipanti non sono pubblici: la proposta anonima e la doppia accettazione saranno aggiunte prima di mostrare WhatsApp tra equipaggi. La pubblicazione operativa delle nuove Rules richiede prima i test fittizi e il completamento dell'informativa su destinatari e conservazione.
 
 ## Attivazione operativa
 

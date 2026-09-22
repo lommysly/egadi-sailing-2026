@@ -234,6 +234,108 @@ service cloud.firestore {
         && request.resource.data.rulesVersion == get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion;
     }
 
+    // Le tratte sono intenzionalmente esterne a Crew List e inviti: skipper e
+    // altri equipaggi non devono poter leggere gli spostamenti personali.
+    function isTransferLegOwner(transfer) {
+      return signedIn()
+        && transfer.ownerUid == request.auth.uid
+        && transfer.boatId is string
+        && transfer.inviteId is string
+        && exists(/databases/$(database)/documents/crewAccess/$(request.auth.uid))
+        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.userId == request.auth.uid
+        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.loginEmail == request.auth.token.email
+        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.boatId == transfer.boatId
+        && get(/databases/$(database)/documents/crewAccess/$(request.auth.uid)).data.inviteId == transfer.inviteId
+        && isInviteHolder(transfer.boatId, transfer.inviteId);
+    }
+
+    function hasValidTransferTime(value) {
+      return value is string && (value == '' || value.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$'));
+    }
+
+    function hasValidTransferLegPayload() {
+      return request.resource.data.keys().hasAll(['ownerUid', 'boatId', 'inviteId', 'legKind', 'catalogVersion', 'cityId', 'cityLabel', 'airportIata', 'airportLabel', 'travelDate', 'matchTime', 'departureTime', 'arrivalTime', 'airlineId', 'airlineLabel', 'flightNumber', 'rideIntent', 'vehicleType', 'seatsAvailable', 'bagsCount', 'luggageCapacity', 'hasBulkyBags', 'acceptsBulkyBags', 'peerMatchConsent', 'operatorConsent', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['ownerUid', 'boatId', 'inviteId', 'legKind', 'catalogVersion', 'cityId', 'cityLabel', 'airportIata', 'airportLabel', 'travelDate', 'matchTime', 'departureTime', 'arrivalTime', 'airlineId', 'airlineLabel', 'flightNumber', 'rideIntent', 'vehicleType', 'seatsAvailable', 'bagsCount', 'luggageCapacity', 'hasBulkyBags', 'acceptsBulkyBags', 'peerMatchConsent', 'operatorConsent', 'createdAt', 'updatedAt'])
+        && request.resource.data.ownerUid is string
+        && request.resource.data.boatId is string
+        && request.resource.data.boatId.size() > 0
+        && request.resource.data.boatId.size() <= 128
+        && request.resource.data.inviteId is string
+        && request.resource.data.inviteId.size() > 0
+        && request.resource.data.inviteId.size() <= 128
+        && request.resource.data.legKind in ['home_to_airport', 'airport_to_marsala', 'marsala_to_airport', 'airport_to_home']
+        && request.resource.data.catalogVersion is string
+        && request.resource.data.catalogVersion.size() > 0
+        && request.resource.data.catalogVersion.size() <= 32
+        && request.resource.data.cityId is string
+        && request.resource.data.cityId.size() > 0
+        && request.resource.data.cityId.size() <= 64
+        && request.resource.data.cityLabel is string
+        && request.resource.data.cityLabel.size() > 0
+        && request.resource.data.cityLabel.size() <= 100
+        && request.resource.data.airportIata is string
+        && request.resource.data.airportIata.matches('^[A-Z]{3}$')
+        && request.resource.data.airportLabel is string
+        && request.resource.data.airportLabel.size() > 0
+        && request.resource.data.airportLabel.size() <= 160
+        && request.resource.data.travelDate is string
+        && request.resource.data.travelDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && hasValidTransferTime(request.resource.data.matchTime)
+        && request.resource.data.matchTime != ''
+        && hasValidTransferTime(request.resource.data.departureTime)
+        && hasValidTransferTime(request.resource.data.arrivalTime)
+        && request.resource.data.airlineId is string
+        && request.resource.data.airlineId.size() <= 48
+        && request.resource.data.airlineLabel is string
+        && request.resource.data.airlineLabel.size() <= 100
+        && request.resource.data.flightNumber is string
+        && request.resource.data.flightNumber.size() <= 16
+        && request.resource.data.rideIntent in ['not_needed', 'looking', 'offering']
+        && request.resource.data.vehicleType in ['none', 'own_car', 'rental_car']
+        && request.resource.data.seatsAvailable is int
+        && request.resource.data.bagsCount is int
+        && request.resource.data.luggageCapacity is int
+        && request.resource.data.hasBulkyBags is bool
+        && request.resource.data.acceptsBulkyBags is bool
+        && request.resource.data.peerMatchConsent is bool
+        && request.resource.data.operatorConsent is bool
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && ((request.resource.data.rideIntent == 'offering'
+          && request.resource.data.vehicleType in ['own_car', 'rental_car']
+          && request.resource.data.seatsAvailable >= 1
+          && request.resource.data.seatsAvailable <= 5
+          && request.resource.data.bagsCount == 0
+          && request.resource.data.luggageCapacity >= 0
+          && request.resource.data.luggageCapacity <= 4
+          && request.resource.data.hasBulkyBags == false)
+          || (request.resource.data.rideIntent in ['not_needed', 'looking']
+            && request.resource.data.vehicleType == 'none'
+            && request.resource.data.seatsAvailable == 0
+            && request.resource.data.bagsCount >= 0
+            && request.resource.data.bagsCount <= 4
+            && request.resource.data.luggageCapacity == 0
+            && request.resource.data.acceptsBulkyBags == false))
+        && (request.resource.data.peerMatchConsent == false || request.resource.data.rideIntent in ['looking', 'offering'])
+        && (request.resource.data.operatorConsent == false || request.resource.data.legKind in ['airport_to_marsala', 'marsala_to_airport']);
+    }
+
+    function isValidNewTransferLeg() {
+      return hasValidTransferLegPayload()
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function isValidTransferLegUpdate() {
+      return hasValidTransferLegPayload()
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.boatId == resource.data.boatId
+        && request.resource.data.inviteId == resource.data.inviteId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['legKind', 'catalogVersion', 'cityId', 'cityLabel', 'airportIata', 'airportLabel', 'travelDate', 'matchTime', 'departureTime', 'arrivalTime', 'airlineId', 'airlineLabel', 'flightNumber', 'rideIntent', 'vehicleType', 'seatsAvailable', 'bagsCount', 'luggageCapacity', 'hasBulkyBags', 'acceptsBulkyBags', 'peerMatchConsent', 'operatorConsent', 'updatedAt']);
+    }
+
     function isPaymentManager(boatId) {
       return isOrganizer() || isSkipper(boatId);
     }
@@ -414,6 +516,15 @@ service cloud.firestore {
         && resource.data.skipperId == request.auth.uid
         && request.resource.data == resource.data;
       allow read, delete: if false;
+    }
+
+    match /events/egadi-2026/transferProfiles/{ownerUid}/transferLegs/{legId} {
+      // Il titolare può coordinare i dati; skipper e altri partecipanti no.
+      // I contatti e i match tra partecipanti avranno una raccolta distinta.
+      allow get, list: if isPrivateAreaOpen() && (isOrganizer() || (signedIn() && ownerUid == request.auth.uid && isTransferLegOwner(resource.data)));
+      allow create: if isPrivateAreaOpen() && signedIn() && ownerUid == request.auth.uid && isTransferLegOwner(request.resource.data) && isValidNewTransferLeg();
+      allow update: if isPrivateAreaOpen() && signedIn() && ownerUid == request.auth.uid && isTransferLegOwner(resource.data) && isTransferLegOwner(request.resource.data) && isValidTransferLegUpdate();
+      allow delete: if isPrivateAreaOpen() && (isOrganizer() || (signedIn() && ownerUid == request.auth.uid && isTransferLegOwner(resource.data)));
     }
 
     // Indice pseudonimo: non contiene nome, telefono o Crew List. È creato
