@@ -402,6 +402,14 @@ function selectValue(form, name, allowed) {
 
 const TRAVEL_STEPS = ['trip', 'connection', 'carpool'];
 
+// Icone minime per riconoscere le tre sezioni a colpo d'occhio, non solo dal
+// testo del pulsante: valigia (viaggio), aereo (collegamento), auto (passaggio).
+const TRAVEL_STEP_ICONS = {
+  trip: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="4" y="7" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 7V5.5A1.5 1.5 0 0 1 9 4h2a1.5 1.5 0 0 1 1.5 1.5V7" stroke="currentColor" stroke-width="1.6"/><path d="M4 10.5h12" stroke="currentColor" stroke-width="1.6"/></svg>',
+  connection: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17 3 3 9.5l5.5 1.6L11 17l2-5.6L17 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>',
+  carpool: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.5 12.5 5.6 8a1.5 1.5 0 0 1 1.4-1h6a1.5 1.5 0 0 1 1.4 1l1.1 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="12.5" width="14" height="3.2" rx="1.2" stroke="currentColor" stroke-width="1.6"/><circle cx="6.2" cy="15.7" r="1.1" fill="currentColor"/><circle cx="13.8" cy="15.7" r="1.1" fill="currentColor"/></svg>',
+};
+
 // Una sezione alla volta invece di un unico form lungo: lo stesso principio
 // già collaudato nella dashboard economica (Imposta/Richiedi/Controlla).
 function setTravelStep(card, step) {
@@ -447,9 +455,9 @@ function renderLegForm(direction, rawLeg) {
         <div><p class="eyebrow">${labels.eyebrow}</p><h4>${labels.title}</h4><p>${labels.lead}</p></div>
       </div>
       <nav class="dashboard-view-navigation" data-travel-step-nav aria-label="${copy.stepNavLabel}">
-        <button type="button" data-travel-step="trip">${copy.stepTrip}</button>
-        <button type="button" data-travel-step="connection">${copy.stepConnection}</button>
-        <button type="button" data-travel-step="carpool">${copy.stepCarpool}</button>
+        <button type="button" data-travel-step="trip">${TRAVEL_STEP_ICONS.trip}${copy.stepTrip}</button>
+        <button type="button" data-travel-step="connection">${TRAVEL_STEP_ICONS.connection}${copy.stepConnection}</button>
+        <button type="button" data-travel-step="carpool">${TRAVEL_STEP_ICONS.carpool}${copy.stepCarpool}</button>
       </nav>
       <fieldset class="skipper-travel-main-fieldset" data-travel-step-panel="trip">
         <legend>${copy.details}</legend>
