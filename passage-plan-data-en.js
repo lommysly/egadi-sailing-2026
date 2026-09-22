@@ -23,7 +23,21 @@
       { label: 'Italian Air Force Weather Service · Sicily', url: 'https://www.meteoam.it/it/sicilia', scope: 'weather and sea forecasts in the useful window', checkedAt: '20 September 2026' },
       { label: 'Egadi MPA · permits and applications', url: 'https://www.ampisoleegadi.it/index.php/moduli-e-istanze/', scope: 'permits, anchoring and mooring', checkedAt: '20 September 2026' },
       { label: 'Egadi MPA · mooring fields', url: 'https://redirect.ampisoleegadi.it/1497.html', scope: 'areas and availability to verify', checkedAt: '20 September 2026' },
+      { label: 'Climate averages · Egadi Islands', url: 'https://www.climieviaggi.it/clima/italia/isole-egadi', scope: 'typical October air/sea temperature, rain and sunshine (historical data, not a forecast)', checkedAt: '22 September 2026' },
     ],
+    // Historical average for the period, not a forecast for this trip: just
+    // to picture the place while waiting for the real outlook on 28/9.
+    climateOutlook: {
+      title: 'What early October is usually like here',
+      disclaimer: 'Historical average for the Egadi Islands, not a forecast for this trip: it can change. The first real outlook arrives on 28 September.',
+      items: [
+        { icon: 'air', label: 'Air', value: '16–24°C', detail: 'mild by day, cooler in the evening' },
+        { icon: 'water', label: 'Sea', value: 'around 22°C', detail: 'still warm, usually comfortable for a swim' },
+        { icon: 'wind', label: 'Wind', value: 'variable', detail: 'often a breeze, some windier days possible' },
+        { icon: 'rain', label: 'Rain', value: 'about 7 days out of 31', detail: 'the rest of the month is typically dry' },
+        { icon: 'sun', label: 'Sunshine', value: '7–8 hours a day', detail: 'full daylight for most of the day' },
+      ],
+    },
     stopsNote: 'A beautiful cove is not enough for an overnight anchorage: it also needs shelter, a suitable seabed, manoeuvring room, MPA rules and effective permits. If any of these is missing, the plan changes without regret: a harbour berth or another shelter is part of the journey, not a fallback.',
     mooringGuide: {
       title: 'Where do we actually spend the night?',

@@ -20,8 +20,22 @@ window.PASSAGE_PLAN_DATA = {
     { label: "Fonte astronomica", url: "https://aa.usno.navy.mil/data/api", scope: "alba, tramonto e luna · fuso Europe/Rome", checkedAt: "calcolo del piano: 11 settembre 2026" },
     { label: "Meteo Aeronautica Militare · Sicilia", url: "https://www.meteoam.it/it/sicilia", scope: "previsioni e mare nella finestra utile", checkedAt: "20 settembre 2026" },
     { label: "AMP Egadi · moduli e autorizzazioni", url: "https://www.ampisoleegadi.it/index.php/moduli-e-istanze/", scope: "permessi, ancoraggio e ormeggio", checkedAt: "20 settembre 2026" },
-    { label: "AMP Egadi · campi boe", url: "https://redirect.ampisoleegadi.it/1497.html", scope: "aree e disponibilità da verificare", checkedAt: "20 settembre 2026" }
+    { label: "AMP Egadi · campi boe", url: "https://redirect.ampisoleegadi.it/1497.html", scope: "aree e disponibilità da verificare", checkedAt: "20 settembre 2026" },
+    { label: "Medie climatiche · Isole Egadi", url: "https://www.climieviaggi.it/clima/italia/isole-egadi", scope: "temperature, mare, pioggia e sole medi di ottobre (dato storico, non una previsione)", checkedAt: "22 settembre 2026" }
   ],
+  // Media storica del periodo, non una previsione per questo viaggio: serve
+  // solo a farsi un'idea mentre si aspetta la prima tendenza reale del 28/9.
+  climateOutlook: {
+    title: "Cosa aspettarsi di solito a inizio ottobre",
+    disclaimer: "Media storica delle Egadi, non una previsione per questo viaggio: può cambiare. La prima tendenza reale arriva il 28 settembre.",
+    items: [
+      { icon: "air", label: "Aria", value: "16–24°C", detail: "mite di giorno, si rinfresca la sera" },
+      { icon: "water", label: "Mare", value: "circa 22°C", detail: "acqua ancora calda, bagno normalmente comodo" },
+      { icon: "wind", label: "Vento", value: "variabile", detail: "spesso brezza, possibili giornate più ventose" },
+      { icon: "rain", label: "Pioggia", value: "circa 7 giorni su 31", detail: "il resto del mese è tipicamente asciutto" },
+      { icon: "sun", label: "Sole", value: "7–8 ore al giorno", detail: "luce piena per gran parte della giornata" }
+    ]
+  },
   stopsNote: "Per una notte in rada non basta che una cala sia bella: servono ridosso, fondo adatto, spazio di manovra, regole AMP e autorizzazioni effettive. Se uno di questi elementi manca, il piano cambia senza rimpianti: porto o altro riparo sono parte della navigazione, non un ripiego.",
   mooringGuide: {
     title: "Dove si dorme davvero?",

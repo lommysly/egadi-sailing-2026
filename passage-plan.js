@@ -50,6 +50,7 @@
       overnightStatus: 'Da verificare',
       indicativeOvernight: 'Piano notte indicativo:',
       alternative: 'Alternativa:',
+      climateOutlookEyebrow: 'Clima tipico del periodo',
     },
     en: {
       visualLabels: [
@@ -97,6 +98,7 @@
       overnightStatus: 'To be checked',
       indicativeOvernight: 'Indicative overnight plan:',
       alternative: 'Alternative:',
+      climateOutlookEyebrow: 'Typical climate for the period',
     },
   };
   const copy = COPY[locale];
@@ -109,6 +111,16 @@
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#039;");
+
+  // Icone minime per il clima tipico del periodo: stesso stile a tratto
+  // usato altrove nel sito, un colpo d'occhio invece di solo testo.
+  const CLIMATE_ICONS = {
+    air: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M8 4.5a1.8 1.8 0 1 1 1.8 1.8H5.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><rect x="8.4" y="7.5" width="2.6" height="8" rx="1.3" stroke="currentColor" stroke-width="1.4"/></svg>',
+    water: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3c2.4 3 4.3 5.7 4.3 8.2A4.3 4.3 0 0 1 10 15.5a4.3 4.3 0 0 1-4.3-4.3C5.7 8.7 7.6 6 10 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+    wind: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M2.5 7h9a2 2 0 1 0-1.9-2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2.5 13h11a2 2 0 1 1-1.9 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2.5 10h14.5a1.8 1.8 0 1 0-1.7-2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    rain: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5.5 9.5a3 3 0 0 1 .4-5.9 4 4 0 0 1 7.6.9 3 3 0 0 1-.5 6H6Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6.5 13v2.4M10 13v2.4M13.5 13v2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    sun: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="3.3" stroke="currentColor" stroke-width="1.4"/><path d="M10 2.6v2M10 15.4v2M17.4 10h-2M4.6 10h-2M15.2 4.8l-1.4 1.4M6.2 13.8l-1.4 1.4M15.2 15.2l-1.4-1.4M6.2 6.2 4.8 4.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  };
 
   // Sono immagini di scenario, non indicazioni nautiche né conferme di sosta.
   // Le fonti e le licenze sono riportate accanto a ogni fotografia.
@@ -222,6 +234,22 @@
     if (sourceDetails) sourceElement.append(` (${sourceDetails})`);
   });
   $("#planStopsNote").textContent = data.stopsNote || "";
+
+  const climateOutlook = data.climateOutlook;
+  const climateOutlookElement = $("#planClimateOutlook");
+  if (climateOutlook?.title && Array.isArray(climateOutlook.items) && climateOutlook.items.length) {
+    $("#planClimateOutlookEyebrow").textContent = copy.climateOutlookEyebrow;
+    $("#planClimateOutlookTitle").textContent = climateOutlook.title;
+    $("#planClimateOutlookDisclaimer").textContent = climateOutlook.disclaimer || "";
+    $("#planClimateOutlookGrid").innerHTML = climateOutlook.items.map((item) => `
+      <div class="passage-climate-item">
+        <span class="passage-climate-icon" aria-hidden="true">${CLIMATE_ICONS[item.icon] || ""}</span>
+        <dt>${escapeHtml(item.label)}<b>${escapeHtml(item.value)}</b></dt>
+        <dd>${escapeHtml(item.detail)}</dd>
+      </div>
+    `).join("");
+    climateOutlookElement.hidden = false;
+  }
   $("#planUpdatedAt").textContent = data.updatedAt
     ? `${copy.updated} ${data.updatedAt}`
     : copy.noOperationalBulletin;
