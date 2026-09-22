@@ -44,7 +44,11 @@ Stato di pubblicazione secondo `CHECKLIST_PUBBLICAZIONE.md`: sito pubblico e are
 
 **Esiste ed è abbastanza sofisticato**: 4 tratte indipendenti, catalogo guidato (città/aeroporto/compagnia), orario obbligatorio, bagagli, disponibilità (cerco/offro passaggio). La finestra di compatibilità per il matching è fissata **a ±120 minuti — esattamente le "2 ore" di cui mi hai parlato**, quindi la logica di fondo che avevi in mente è già nella specifica.
 
-**Perché la compilazione sembra complessa**: è un form con molti campi tutti su una schermata (non è ancora stato riorganizzato con il pattern "hub a step" che il progetto usa già altrove per la dashboard economica). È anche il modulo più recentemente modificato: l'ultimo commit del branch più avanzato (21 settembre) era ancora un fix su un bug delle regole di sicurezza che bloccava la lettura/scrittura delle proprie tratte — segno che il modulo era instabile fino all'ultimo giorno di lavoro.
+**Perché la compilazione sembra complessa**: era un form con molti campi tutti su una schermata. È anche il modulo più recentemente modificato: l'ultimo commit del branch più avanzato (21 settembre) era ancora un fix su un bug delle regole di sicurezza che bloccava la lettura/scrittura delle proprie tratte — segno che il modulo era instabile fino all'ultimo giorno di lavoro.
+
+#### Aggiornamento 22/09/2026 — implementato
+
+Ogni tratta (andata/rientro) è ora divisa in 3 sezioni navigabili con schede pillola in cima ("Il tuo viaggio" · "Collegamento aeroporto" · "Passaggio auto"), una visibile alla volta — stesso pattern già collaudato per la dashboard economica (`dashboard-view-navigation`), riusato senza inventare nulla di nuovo. Nessun campo è stato spostato o rinominato: i tre fieldset esistenti sono diventati i tre step, più la sezione "persone compatibili" agganciata allo step "Passaggio auto". Verificato visivamente in un harness isolato (navigazione tra step, contenuto corretto per ciascuno) prima di integrarlo.
 
 **Raccomandazione concreta**: applicare all'inserimento delle tratte lo stesso pattern "hub a card" già validato nella dashboard economica (una card per tratta, un passo alla volta, riepilogo finale prima di salvare) invece del form attuale presumibilmente a schermata unica.
 
@@ -87,7 +91,7 @@ Costruita e testata (emulatore Firestore + Functions, 26 casi automatici, tutti 
 
 1. ✅ Mettere in sicurezza il lavoro Git (sezione 1) — fatto.
 2. ✅ Costruire la Cloud Function di matching anonimo per la fascia ±2h — fatto (vedi sopra); resta da deployare e testare su HTTPS con dati fittizi.
-3. Riorganizzare il form Arrivi/Partenze con il pattern hub-a-step già collaudato (3.1).
+3. ✅ Riorganizzare il form Arrivi/Partenze con il pattern hub-a-step già collaudato (3.1) — fatto.
 4. ✅ Ridisegnare l'export verso il foglio esterno in due viste leggibili + un foglio tecnico separato (3.2) — fatto.
 5. Applicare il pattern cognitivo alla vista proprietario per Arrivi/Partenze (3.3).
 6. Completare la sezione "Security Rules e test fittizi" della checklist, mai eseguita per intero, prima di considerare qualunque nuova regola pronta per dati reali.

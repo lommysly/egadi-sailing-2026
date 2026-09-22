@@ -49,6 +49,10 @@ function copyForLocale() {
       },
       statusDraft: 'Personal draft',
       statusReady: 'Travel details confirmed',
+      stepNavLabel: 'Sections of this journey',
+      stepTrip: 'Your trip',
+      stepConnection: 'Airport connection',
+      stepCarpool: 'Carpool',
       details: 'Journey details',
       transport: 'Main transport',
       choose: 'Choose',
@@ -91,6 +95,7 @@ function copyForLocale() {
       matchesLoading: 'Checking for compatible people…',
       matchesError: 'I could not check for compatible people right now.',
       matchesNone: 'No compatible person yet. This updates automatically as others add their journey.',
+      matchesNotOptedIn: 'Choose "I am looking for a ride" or "I can offer a ride" above to see compatible people here.',
       matchesFoundOne: 'You have 1 compatible person for this journey.',
       matchesFoundMany: (count) => `You have ${count} compatible people for this journey.`,
       matchProposed: 'Someone else is travelling around the same time.',
@@ -152,6 +157,10 @@ function copyForLocale() {
       outbound: { eyebrow: 'Andata', title: 'Verso Marsala', lead: 'Inizia dal mezzo principale. Se non hai ancora il biglietto, per ora bastano città o aeroporto.' },
       return: { eyebrow: 'Rientro', title: 'Da Marsala', lead: 'Aggiungi il ritorno quando conosci gli orari: non blocca mai l’andata.' },
     },
+    stepNavLabel: 'Sezioni di questo viaggio',
+    stepTrip: 'Il tuo viaggio',
+    stepConnection: 'Collegamento aeroporto',
+    stepCarpool: 'Passaggio auto',
     statusDraft: 'Bozza personale',
     statusReady: 'Informazioni confermate',
     details: 'Dettagli del viaggio',
@@ -196,6 +205,7 @@ function copyForLocale() {
     matchesLoading: 'Controllo le persone compatibili…',
     matchesError: 'Non riesco a controllare le persone compatibili in questo momento.',
     matchesNone: 'Nessuna persona compatibile per ora. Si aggiorna da sola quando altri inseriscono il loro viaggio.',
+    matchesNotOptedIn: 'Scegli "Cerco un passaggio" o "Posso offrire un passaggio" qui sopra per vedere qui le persone compatibili.',
     matchesFoundOne: 'C’è 1 persona compatibile per questo viaggio.',
     matchesFoundMany: (count) => `Ci sono ${count} persone compatibili per questo viaggio.`,
     matchProposed: 'Un’altra persona viaggia in una fascia oraria simile alla tua.',
@@ -390,6 +400,29 @@ function selectValue(form, name, allowed) {
   return valueOr(inputValue(form, name), allowed);
 }
 
+const TRAVEL_STEPS = ['trip', 'connection', 'carpool'];
+
+// Una sezione alla volta invece di un unico form lungo: lo stesso principio
+// già collaudato nella dashboard economica (Imposta/Richiedi/Controlla).
+function setTravelStep(card, step) {
+  const validStep = TRAVEL_STEPS.includes(step) ? step : 'trip';
+  card.querySelectorAll('[data-travel-step-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.travelStepPanel !== validStep;
+  });
+  card.querySelectorAll('[data-travel-step]').forEach((button) => {
+    if (button.dataset.travelStep === validStep) button.setAttribute('aria-current', 'step');
+    else button.removeAttribute('aria-current');
+  });
+}
+
+function bindTravelStepNav(card) {
+  card.querySelector('[data-travel-step-nav]')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-travel-step]');
+    if (!button) return;
+    setTravelStep(card, button.dataset.travelStep);
+  });
+}
+
 function renderLegForm(direction, rawLeg) {
   const copy = copyForLocale();
   const labels = copy.direction[direction];
@@ -410,7 +443,12 @@ function renderLegForm(direction, rawLeg) {
         <span class="skipper-travel-direction${direction === 'return' ? ' is-return' : ''}" aria-hidden="true">${direction === 'outbound' ? '→' : '←'}</span>
         <div><p class="eyebrow">${labels.eyebrow}</p><h4>${labels.title}</h4><p>${labels.lead}</p></div>
       </div>
-      <fieldset class="skipper-travel-main-fieldset">
+      <nav class="dashboard-view-navigation" data-travel-step-nav aria-label="${copy.stepNavLabel}">
+        <button type="button" data-travel-step="trip">${copy.stepTrip}</button>
+        <button type="button" data-travel-step="connection">${copy.stepConnection}</button>
+        <button type="button" data-travel-step="carpool">${copy.stepCarpool}</button>
+      </nav>
+      <fieldset class="skipper-travel-main-fieldset" data-travel-step-panel="trip">
         <legend>${copy.details}</legend>
         <label class="travel-mode-control">${copy.transport}<select name="transportMode"><option value="">${copy.choose}</option><option value="flight">${copy.flight}</option><option value="train">${copy.train}</option><option value="car">${copy.car}</option><option value="ferry">${copy.ferry}</option><option value="other">${copy.other}</option></select></label>
         <div class="travel-route">
@@ -421,30 +459,32 @@ function renderLegForm(direction, rawLeg) {
         <div class="travel-timing-grid"><label>${copy.departureDate}<input name="departureDate" type="date" /></label><label>${copy.departureTime}<input name="departureTime" type="time" /></label><label>${copy.arrivalDate}<input name="arrivalDate" type="date" /></label><label>${copy.arrivalTime}<input name="arrivalTime" type="time" /></label></div>
         <div class="form-grid"><div class="travel-autocomplete" data-travel-combobox><label>${copy.carrier}<input name="carrier" autocomplete="organization" data-travel-autocomplete="carrier" placeholder="${copy.carrierPlaceholder}" /></label></div><label>${copy.serviceNumber}<input name="serviceNumber" autocomplete="off" autocapitalize="characters" /></label><label>${copy.luggage}<input name="luggageCount" type="number" min="0" max="12" inputmode="numeric" /></label><label class="consent-field"><input name="bulkyLuggage" type="checkbox" /><span>${copy.bulkyLuggage}</span></label></div>
       </fieldset>
-      <fieldset class="skipper-transfer-fieldset">
+      <fieldset class="skipper-transfer-fieldset" data-travel-step-panel="connection">
         <legend>${copy.airportTransfer}</legend>
         <p class="field-hint">${copy.airportTransferHint}</p>
         <label><select name="airportMarsalaChoice"><option value="">${copy.airportChoiceNone}</option><option value="transfer">${copy.airportChoiceTransfer}</option><option value="independent">${copy.airportChoiceIndependent}</option><option value="ride_offer">${copy.airportChoiceRideOffer}</option></select></label>
         <label class="consent-field" data-transfer-consent hidden><input name="transferOperatorConsent" type="checkbox" /><span>${copy.operatorConsent}</span></label>
       </fieldset>
-      <fieldset class="skipper-transfer-fieldset">
+      <fieldset class="skipper-transfer-fieldset" data-travel-step-panel="carpool">
         <legend>${copy.carpool}</legend>
         <p class="field-hint">${copy.carpoolHint}</p>
         <label><select name="carpoolRole"><option value="">${copy.carpoolNone}</option><option value="need_ride">${copy.carpoolNeed}</option><option value="offer_ride">${copy.carpoolOffer}</option></select></label>
         <label data-carpool-seats hidden>${copy.carpoolSeats}<input name="carpoolSeats" type="number" min="0" max="8" inputmode="numeric" /></label>
         <p class="field-hint" data-carpool-consent-note hidden>${copy.carpoolConsentNote}</p>
       </fieldset>
+      <fieldset class="skipper-transfer-fieldset travel-matches" data-travel-matches data-travel-step-panel="carpool">
+        <legend>${copy.matchesTitle}</legend>
+        <p class="field-hint">${copy.matchesHint}</p>
+        <div data-travel-matches-list></div>
+      </fieldset>
       <div class="form-actions"><button class="button button-ghost" type="submit" data-save-state="draft">${copy.saveDraft}</button><button class="button button-primary" type="submit" data-save-state="ready">${copy.confirm}</button><p class="form-message" data-travel-message role="status" aria-live="polite"></p></div>
-    </form>
-    <fieldset class="skipper-transfer-fieldset travel-matches" data-travel-matches hidden>
-      <legend>${copy.matchesTitle}</legend>
-      <p class="field-hint">${copy.matchesHint}</p>
-      <div data-travel-matches-list></div>
-    </fieldset>`;
+    </form>`;
   const form = card.querySelector('form');
   form.dataset.saveState = 'draft';
   populateLegForm(form, leg);
   bindLegForm(form, direction);
+  bindTravelStepNav(card);
+  setTravelStep(card, 'trip');
   return card;
 }
 
@@ -649,12 +689,12 @@ async function renderMatchesSection(card, direction, leg) {
   const copy = copyForLocale();
   const section = card.querySelector('[data-travel-matches]');
   const list = section.querySelector('[data-travel-matches-list]');
+  // La visibilità del fieldset dipende solo dallo step attivo (vedi
+  // setTravelStep): qui si aggiorna solo il contenuto della lista.
   if (!canHaveMatches(leg)) {
-    section.hidden = true;
-    list.innerHTML = '';
+    list.innerHTML = `<p class="empty-state">${copy.matchesNotOptedIn}</p>`;
     return;
   }
-  section.hidden = false;
   list.innerHTML = `<p>${copy.matchesLoading}</p>`;
   try {
     const snapshot = await getDocs(collection(legReference(direction), 'matchCandidates'));
