@@ -307,7 +307,7 @@ function normalizedStatus(value) {
   if (['planned', 'planning', 'assigned'].includes(normalized)) return 'planned';
   if (['confirmed', 'confirm'].includes(normalized)) return 'confirmed';
   if (['completed', 'done'].includes(normalized)) return 'completed';
-  if (['cancelled', 'canceled'].includes(normalized)) return 'cancelled';
+  if (['cancelled', 'canceled', 'revoked'].includes(normalized)) return 'cancelled';
   return 'new';
 }
 
@@ -461,6 +461,12 @@ function renderAccessManagement() {
 }
 
 function recordMatchesFilters(record) {
+  // Un record "revoked" nasce da una tratta non ancora confermata (bozza) o
+  // per cui la persona non ha chiesto il transfer organizzato: i campi sono
+  // sempre vuoti (vedi markTransferRequestRevoked in functions/index.js), non
+  // c'è nulla da mostrare né da organizzare. Va escluso qui, non solo dal
+  // filtro stato, perché altrimenti compare comunque con "Tutti gli stati".
+  if (record.recordState && record.recordState !== 'active') return false;
   const { direction, status, search } = state.filters;
   const recordDirection = normalizeDirection(record.direction || record.legDirection || record.travelDirection);
   const recordStatus = normalizedStatus(record.status);
