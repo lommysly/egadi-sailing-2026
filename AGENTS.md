@@ -28,6 +28,12 @@ Queste regole esistono perché sono già successe, non per teoria:
 
 9. **Mai esporre riferimenti tecnici (ID Firestore, UID Firebase, hash SHA-256) nelle viste pensate per la lettura umana** (proprietario o utente finale). I riferimenti tecnici vanno in una vista/foglio separato, chiaramente etichettato come tecnico, mai mescolati con i dati che una persona deve leggere per organizzarsi.
 
+10. **Ogni volta che modifichi `styles.css`, `travel.js`, `area.js`, `my-area.js`, `transfer.js`, `passage-plan.js`/`passage-plan-data*.js` o qualunque file linkato da `<link>`/`<script src>`, aggiorna SUBITO il parametro `?v=...` in TUTTI i file HTML che lo referenziano, nello stesso commit.** Il sito gira su GitHub Pages con CDN Fastly davanti (`cache-control: max-age=600`); senza cambiare la stringa di versione, chi ha già visitato il sito continua a vedere il file vecchio anche dopo il deploy, e sembra un bug quando invece è solo cache. Successo il 22/9/2026: tre round di modifiche a `styles.css` di fila con lo stesso `?v=`, il titolare vedeva la struttura nuova (dal JS, versione aggiornata) ma i colori vecchi (dal CSS, versione ferma). Un solo comando per farlo su tutti i file insieme:
+    ```
+    for f in *.html; do sed -i '' -E 's/styles\.css\?v=[^"]*/styles.css?v=NUOVA-VERSIONE/' "$f"; done
+    ```
+    (ripetere per ogni file JS toccato, cambiando il nome del file nel comando).
+
 10. **Prima di aprire l'area privata o pubblicare Rules nuove a dati reali**, la sezione "Security Rules e test fittizi obbligatori" della checklist deve essere completamente spuntata. Non è mai stata eseguita per intero finora — non è più accettabile lasciarla indietro mentre si aggiungono funzionalità sopra.
 
 ## 2. Prompt di ingegneria e design — da usare per ogni nuova funzionalità o modifica UI
