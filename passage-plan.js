@@ -217,22 +217,27 @@
   $("#planConfidence").textContent = data.confidence || "—";
   $("#planNextUpdate").textContent = data.nextUpdateAt || copy.nextUpdateUnknown;
   $("#planSummary").textContent = data.summary || "—";
-  const sourceElement = $("#planSources");
-  sourceElement.replaceChildren(document.createTextNode(data.sourceNote || "—"));
+  $("#planSources").textContent = data.sourceNote || "—";
   const sources = Array.isArray(data.sources)
     ? data.sources
     : data.sourceUrl ? [{ url: data.sourceUrl, label: data.sourceLabel }] : [];
-  sources.forEach((source, index) => {
-    if (!source?.url) return;
+  const sourcesListElement = $("#planSourcesList");
+  sourcesListElement.replaceChildren(...sources.filter((source) => source?.url).map((source) => {
+    const item = document.createElement('li');
+    const icon = document.createElement('span');
+    icon.className = 'passage-source-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = '<svg viewBox="0 0 20 20" fill="none"><path d="M8 12 16 4M16 4h-5M16 4v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     const sourceLink = document.createElement('a');
     sourceLink.href = source.url;
     sourceLink.target = '_blank';
     sourceLink.rel = 'noopener noreferrer';
     sourceLink.textContent = source.label || copy.openSource;
-    sourceElement.append(index === 0 ? ' ' : ' · ', sourceLink);
-    const sourceDetails = [source.scope, source.checkedAt].filter(Boolean).join(' · ');
-    if (sourceDetails) sourceElement.append(` (${sourceDetails})`);
-  });
+    const sourceDetails = document.createElement('small');
+    sourceDetails.textContent = [source.scope, source.checkedAt].filter(Boolean).join(' · ');
+    item.append(icon, sourceLink, sourceDetails);
+    return item;
+  }));
   $("#planStopsNote").textContent = data.stopsNote || "";
 
   const climateOutlook = data.climateOutlook;
