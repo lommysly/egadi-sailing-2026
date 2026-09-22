@@ -788,10 +788,17 @@ async function ensureSheetTabs(sheets, sheetId) {
   ];
   const missing = wanted.filter((sheet) => !existingTitles.has(sheet.title));
   if (missing.length) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: sheetId,
-      requestBody: { requests: missing.map((sheet) => ({ addSheet: { properties: { title: sheet.title } } })) },
-    });
+    try {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: sheetId,
+        requestBody: { requests: missing.map((sheet) => ({ addSheet: { properties: { title: sheet.title } } })) },
+      });
+    } catch (error) {
+      // Più scritture quasi simultanee possono far controllare a due
+      // istanze la stessa lista di fogli prima che una delle due li crei:
+      // se il foglio esiste già quando arriviamo qui, non è un errore reale.
+      if (!/already exists/i.test(error?.message || '')) throw error;
+    }
   }
   // Riscrive sempre la riga di intestazione (anche per i fogli già
   // esistenti): se l'elenco delle colonne cambia in futuro, il foglio si
