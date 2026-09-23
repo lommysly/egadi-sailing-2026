@@ -64,7 +64,10 @@ export async function withSaveRetry(operation, onRetry) {
 // stessa mattina, ottenendo un salvataggio valido per il codice vecchio ma
 // incompleto per quello nuovo. Ogni pagina equipaggio chiama questa funzione
 // passando `import.meta.url` (che contiene la propria versione) per
-// accorgersi da sola quando è superata e offrire un aggiornamento esplicito.
+// accorgersi da sola quando è superata. Se non c'è nulla da perdere (scheda
+// nascosta, o nessun campo ancora toccato) si ricarica da sola; altrimenti
+// mostra un avviso con un tocco esplicito, per non cancellare dati non
+// ancora salvati.
 export function watchForStaleScript(scriptUrl) {
   let scriptPath;
   let currentVersion;
@@ -78,6 +81,9 @@ export function watchForStaleScript(scriptUrl) {
   if (!scriptPath || !currentVersion) return;
   let checking = false;
   let banner = null;
+  let userHasEdited = false;
+  document.addEventListener('input', () => { userHasEdited = true; }, { capture: true });
+  document.addEventListener('change', () => { userHasEdited = true; }, { capture: true });
   async function check() {
     if (checking || banner) return;
     checking = true;
@@ -87,13 +93,25 @@ export function watchForStaleScript(scriptUrl) {
       const html = await response.text();
       const escapedPath = scriptPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const match = html.match(new RegExp(`${escapedPath}\\?v=([A-Za-z0-9._-]+)`));
-      if (match && match[1] !== currentVersion) showBanner();
+      if (match && match[1] !== currentVersion) handleStale();
     } catch (error) {
       // Rete assente o instabile: si ritenta al prossimo controllo, senza
       // disturbare chi sta compilando un modulo.
     } finally {
       checking = false;
     }
+  }
+  function handleStale() {
+    // Niente da perdere (scheda nascosta, o nessun campo ancora toccato in
+    // questo caricamento): ricarica subito da sola, così nessuno interagisce
+    // mai col codice vecchio. Con qualcosa già scritto in un modulo, invece,
+    // non ricarichiamo di nascosto: meglio un avviso con un tocco esplicito,
+    // per non cancellare dati non salvati.
+    if (document.visibilityState === 'hidden' || !userHasEdited) {
+      window.location.reload();
+      return;
+    }
+    showBanner();
   }
   function showBanner() {
     if (banner) return;

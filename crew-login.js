@@ -1,4 +1,4 @@
-import { crewAccessErrorMessage, personalAreaUrl, signInCrew, startCrewAreaSession, watchForStaleScript } from './crew-session.js?v=20260923-stale-check-v1';
+import { crewAccessErrorMessage, personalAreaUrl, signInCrew, startCrewAreaSession, watchForStaleScript } from './crew-session.js?v=20260923-stale-check-v2';
 
 watchForStaleScript(import.meta.url);
 
