@@ -9,7 +9,8 @@ import {
   personalAreaUrl,
   startCrewAreaSession,
   startInviteActivation,
-} from './crew-session.js?v=20260923-long-polling-v1';
+  withSaveRetry,
+} from './crew-session.js?v=20260923-save-retry-v2';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
@@ -684,8 +685,9 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
       return;
     }
     const draftRef = doc(db, 'boats', activeInvite.boatId, 'crewDrafts', activeInvite.id);
+    const verifyingMessage = () => setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.verifying', 'Connessione lenta — verifico se è stato comunque salvato…'));
     if (isDraft) {
-      await setDoc(draftRef, {
+      await withSaveRetry(() => setDoc(draftRef, {
         ...profile,
         // La bozza resta legata alla persona e alla versione dell'invito che
         // l'ha creata: una riemissione sullo stesso ID non può esporla a un
@@ -694,7 +696,7 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
         accessVersion: Number.isInteger(activeInvite.accessVersion) ? activeInvite.accessVersion : 0,
         updatedAt: serverTimestamp(),
         updatedBy: auth.currentUser.uid,
-      });
+      }), verifyingMessage);
       activeCrewDraft = profile;
       pendingParticipantProfile = null;
       renderDraftHint(activeCrewDraft);
@@ -703,15 +705,20 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
     }
 
     const roleChanged = profile.role !== String(activeMember?.role || '').trim();
-    const batch = writeBatch(db);
-    batch.set(doc(db, 'boats', activeInvite.boatId, 'members', activeInvite.id), {
-      ...profile,
-      roleConfirmed: roleChanged ? false : activeMember?.roleConfirmed === true,
-      updatedAt: serverTimestamp(),
-      updatedBy: auth.currentUser.uid,
-    }, { merge: true });
-    if (activeCrewDraft) batch.delete(draftRef);
-    await batch.commit();
+    // Un batch già "committed" non è più riutilizzabile: se un tentativo
+    // fallisce se ne crea uno nuovo identico ad ogni riprova, invece di
+    // richiamare commit() sullo stesso oggetto.
+    await withSaveRetry(() => {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'boats', activeInvite.boatId, 'members', activeInvite.id), {
+        ...profile,
+        roleConfirmed: roleChanged ? false : activeMember?.roleConfirmed === true,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser.uid,
+      }, { merge: true });
+      if (activeCrewDraft) batch.delete(draftRef);
+      return batch.commit();
+    }, verifyingMessage);
     activeCrewDraft = null;
     pendingParticipantProfile = null;
     renderDraftHint(null);

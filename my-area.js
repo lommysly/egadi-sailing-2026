@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { auth, crewAccessErrorMessage, crewAccessUrl, db, profileUrl, signOutCrew, startCrewAreaSession } from './crew-session.js?v=20260923-long-polling-v1';
+import { auth, crewAccessErrorMessage, crewAccessUrl, db, profileUrl, signOutCrew, startCrewAreaSession, withSaveRetry } from './crew-session.js?v=20260923-save-retry-v2';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 
 const i18n = window.EgadiI18n;
@@ -739,11 +739,14 @@ async function declareCrewPayment(paymentId, controls) {
   button.disabled = true;
   select.disabled = true;
   try {
-    await updateDoc(doc(db, 'boats', activeInvite.boatId, 'paymentRequests', paymentId), {
-      declaredAt: serverTimestamp(),
-      declaredBy: auth.currentUser.uid,
-      declaredMethod: method,
-    });
+    await withSaveRetry(
+      () => updateDoc(doc(db, 'boats', activeInvite.boatId, 'paymentRequests', paymentId), {
+        declaredAt: serverTimestamp(),
+        declaredBy: auth.currentUser.uid,
+        declaredMethod: method,
+      }),
+      () => setMessage(message, localized('Connessione lenta — verifico se è stato comunque salvato…', 'Slow connection — checking whether it actually saved…')),
+    );
     // Nessun messaggio di conferma locale: la sottoscrizione paymentRequests
     // ridisegna subito la card con lo stato "Dichiarato".
   } catch (error) {
@@ -2028,11 +2031,14 @@ document.querySelector('#acceptRulesButton').addEventListener('click', async () 
     const acceptanceRef = doc(db, 'boats', activeInvite.boatId, 'ruleAcceptances', activeInvite.id);
     const historyId = `${rulesVersion}-${auth.currentUser.uid}`;
     const historyRef = doc(acceptanceRef, 'history', historyId);
-    await runTransaction(db, async (transaction) => {
-      const historySnapshot = await transaction.get(historyRef);
-      transaction.set(acceptanceRef, acceptance);
-      if (!historySnapshot.exists()) transaction.set(historyRef, acceptance);
-    });
+    await withSaveRetry(
+      () => runTransaction(db, async (transaction) => {
+        const historySnapshot = await transaction.get(historyRef);
+        transaction.set(acceptanceRef, acceptance);
+        if (!historySnapshot.exists()) transaction.set(historyRef, acceptance);
+      }),
+      () => setMessage(document.querySelector('#participantRulesMessage'), translate('crew.flow.verifying', 'Connessione lenta — verifico se è stato comunque salvato…')),
+    );
     setMessage(document.querySelector('#participantRulesMessage'), translate('crew.flow.briefingConfirmedOpenArea', 'Briefing confermato. Apro la tua area di bordo…'));
   } catch (error) {
     console.error('Impossibile salvare la conferma del briefing.', error);

@@ -28,6 +28,32 @@ export const accessKey = new URLSearchParams(window.location.search).get('key') 
 export const hasValidInviteParameters = isInviteCode(inviteId)
   && /^[A-Za-z0-9_-]{1,128}$/.test(boatId)
   && isInviteCode(accessKey);
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+// Una rete debole può far fallire un salvataggio Firestore (setDoc, updateDoc,
+// runTransaction) anche solo per un istante, mentre il dato arriva comunque
+// al server poco dopo. Riprovare la stessa scrittura è sicuro: set/update/
+// transaction con lo stesso payload non fanno danno se il primo tentativo è
+// in realtà riuscito. Usato da ogni pagina equipaggio che salva dati
+// personali, dopo il caso reale del 22-23/09/2026 con Maria Luisa Gallotti
+// (salvataggio riuscito ma segnalato come fallito, due volte, su reti
+// diverse).
+const SAVE_RETRY_DELAYS_MS = [800, 1600, 3200];
+
+export async function withSaveRetry(operation, onRetry) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (attempt >= SAVE_RETRY_DELAYS_MS.length) throw error;
+      onRetry?.(attempt);
+      await wait(SAVE_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+}
 const translate = (key, fallback, params) => {
   const translated = window.EgadiI18n?.t?.(key, params);
   return translated && translated !== key ? translated : fallback;

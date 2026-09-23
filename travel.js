@@ -1,7 +1,7 @@
 import { getApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { crewAccessErrorMessage, crewAccessUrl, db, personalAreaUrl, profileUrl, startCrewAreaSession } from './crew-session.js?v=20260923-long-polling-v1';
+import { crewAccessErrorMessage, crewAccessUrl, db, personalAreaUrl, profileUrl, startCrewAreaSession, withSaveRetry } from './crew-session.js?v=20260923-save-retry-v2';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260920-travel-private-v1';
 
 const functions = getFunctions(getApp(), 'europe-west8');
@@ -582,42 +582,6 @@ function setSaving(form, saving) {
   form.querySelectorAll('[data-save-state]').forEach((button) => { button.disabled = saving; });
 }
 
-// Confronta il payload appena inviato con quanto risulta ora sul server
-// (updatedAt escluso, è un serverTimestamp non confrontabile lato client).
-// Serve solo a capire se un errore di setDoc era apparente: il dato è
-// comunque arrivato, per esempio per un intoppo di rete proprio nel momento
-// della risposta.
-const LEG_PAYLOAD_COMPARISON_FIELDS = ['schemaVersion', 'ownerUid', 'inviteId', 'direction', 'state', 'transportMode', 'originCity', 'originAirport', 'destinationCity', 'destinationAirport', 'departureDate', 'departureTime', 'arrivalDate', 'arrivalTime', 'carrier', 'serviceNumber', 'luggageCount', 'bulkyLuggage', 'airportMarsalaChoice', 'transferOperatorConsent', 'carpoolRole', 'carpoolSeats', 'carpoolMatchConsent'];
-
-function legPayloadMatchesDocument(payload, docData) {
-  return Boolean(docData) && LEG_PAYLOAD_COMPARISON_FIELDS.every((field) => payload[field] === docData[field]);
-}
-
-function wait(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-// Una connessione debole può far fallire la promise di setDoc sul momento e
-// il dato arrivare comunque al server pochi secondi dopo (il client
-// Firestore riprova per conto suo). Un solo ricontrollo immediato dopo
-// l'errore può cadere proprio in quella finestra e concludere erroneamente
-// che il salvataggio sia fallito: si riprova con un'attesa crescente prima
-// di arrendersi davvero.
-const SAVE_RECHECK_DELAYS_MS = [800, 1600, 3200];
-
-async function waitForLegSaved(direction, payload) {
-  for (const delay of SAVE_RECHECK_DELAYS_MS) {
-    await wait(delay);
-    try {
-      const recheck = await getDoc(legReference(direction));
-      if (legPayloadMatchesDocument(payload, recheck.exists() ? recheck.data() : null)) return true;
-    } catch (recheckError) {
-      console.error('Impossibile verificare se il salvataggio era comunque riuscito.', recheckError);
-    }
-  }
-  return false;
-}
-
 function applySavedLegState(card, message, direction, leg, copy) {
   card.dataset.travelState = leg.state;
   card.querySelector('[data-travel-state]').textContent = leg.state === 'ready' ? copy.statusReady : copy.statusDraft;
@@ -673,7 +637,10 @@ function bindLegForm(form, direction) {
     };
     const card = form.closest('details');
     try {
-      await setDoc(legReference(direction), payload);
+      await withSaveRetry(
+        () => setDoc(legReference(direction), payload),
+        () => setMessage(message, copy.verifying),
+      );
       applySavedLegState(card, message, direction, leg, copy);
       try {
         await renderMatchesSection(card, direction, leg);
@@ -684,18 +651,7 @@ function bindLegForm(form, direction) {
       }
     } catch (error) {
       console.error('Impossibile salvare gli spostamenti dell’equipaggio.', error);
-      setMessage(message, copy.verifying);
-      const savedAnyway = await waitForLegSaved(direction, payload);
-      if (savedAnyway) {
-        applySavedLegState(card, message, direction, leg, copy);
-        try {
-          await renderMatchesSection(card, direction, leg);
-        } catch (matchesError) {
-          console.error('Salvataggio riuscito, ma non sono riuscito ad aggiornare i passaggi compatibili.', matchesError);
-        }
-      } else {
-        setMessage(message, copy.saveError, true);
-      }
+      setMessage(message, copy.saveError, true);
     } finally {
       setSaving(form, false);
     }
