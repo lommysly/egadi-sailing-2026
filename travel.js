@@ -112,6 +112,7 @@ function copyForLocale() {
       draftSaved: 'Draft saved. You can come back and complete it whenever you like.',
       readySaved: 'Travel details confirmed. The transfer coordinator can use them according to your consent.',
       saving: 'Saving…',
+      verifying: 'Slow connection — checking whether it actually saved…',
       blockedNoProfile: 'Complete your personal charter details in your area before adding travel information.',
       blockedNoBriefing: 'The skipper has not published the boarding briefing yet. Your travel details will open after it is available and accepted.',
       blockedBriefing: 'Read and accept the boarding rules in your personal area before entering travel information.',
@@ -222,6 +223,7 @@ function copyForLocale() {
     draftSaved: 'Bozza salvata. Puoi tornare qui e completarla quando vuoi.',
     readySaved: 'Viaggio confermato. Il coordinatore transfer potrà usarlo nei limiti del consenso che hai dato.',
     saving: 'Salvataggio…',
+    verifying: 'Connessione lenta — verifico se è stato comunque salvato…',
     blockedNoProfile: 'Completa prima i tuoi dati personali richiesti dal charter nella tua area.',
     blockedNoBriefing: 'Lo skipper non ha ancora pubblicato il briefing di bordo. I tuoi spostamenti si apriranno dopo la sua pubblicazione e accettazione.',
     blockedBriefing: 'Leggi e accetta le regole di bordo nella tua area personale prima di inserire gli spostamenti.',
@@ -591,6 +593,31 @@ function legPayloadMatchesDocument(payload, docData) {
   return Boolean(docData) && LEG_PAYLOAD_COMPARISON_FIELDS.every((field) => payload[field] === docData[field]);
 }
 
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+// Una connessione debole può far fallire la promise di setDoc sul momento e
+// il dato arrivare comunque al server pochi secondi dopo (il client
+// Firestore riprova per conto suo). Un solo ricontrollo immediato dopo
+// l'errore può cadere proprio in quella finestra e concludere erroneamente
+// che il salvataggio sia fallito: si riprova con un'attesa crescente prima
+// di arrendersi davvero.
+const SAVE_RECHECK_DELAYS_MS = [800, 1600, 3200];
+
+async function waitForLegSaved(direction, payload) {
+  for (const delay of SAVE_RECHECK_DELAYS_MS) {
+    await wait(delay);
+    try {
+      const recheck = await getDoc(legReference(direction));
+      if (legPayloadMatchesDocument(payload, recheck.exists() ? recheck.data() : null)) return true;
+    } catch (recheckError) {
+      console.error('Impossibile verificare se il salvataggio era comunque riuscito.', recheckError);
+    }
+  }
+  return false;
+}
+
 function applySavedLegState(card, message, direction, leg, copy) {
   card.dataset.travelState = leg.state;
   card.querySelector('[data-travel-state]').textContent = leg.state === 'ready' ? copy.statusReady : copy.statusDraft;
@@ -657,13 +684,8 @@ function bindLegForm(form, direction) {
       }
     } catch (error) {
       console.error('Impossibile salvare gli spostamenti dell’equipaggio.', error);
-      let savedAnyway = false;
-      try {
-        const recheck = await getDoc(legReference(direction));
-        savedAnyway = legPayloadMatchesDocument(payload, recheck.exists() ? recheck.data() : null);
-      } catch (recheckError) {
-        console.error('Impossibile verificare se il salvataggio era comunque riuscito.', recheckError);
-      }
+      setMessage(message, copy.verifying);
+      const savedAnyway = await waitForLegSaved(direction, payload);
       if (savedAnyway) {
         applySavedLegState(card, message, direction, leg, copy);
         try {
