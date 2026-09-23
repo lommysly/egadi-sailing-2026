@@ -68,17 +68,41 @@ export async function withSaveRetry(operation, onRetry) {
 // nascosta, o nessun campo ancora toccato) si ricarica da sola; altrimenti
 // mostra un avviso con un tocco esplicito, per non cancellare dati non
 // ancora salvati.
-export function watchForStaleScript(scriptUrl) {
-  let scriptPath;
-  let currentVersion;
+function parseVersionedScriptUrl(scriptUrl) {
   try {
     const parsed = new URL(scriptUrl);
-    scriptPath = parsed.pathname.split('/').pop();
-    currentVersion = parsed.searchParams.get('v');
+    const scriptPath = parsed.pathname.split('/').pop();
+    const currentVersion = parsed.searchParams.get('v');
+    return scriptPath && currentVersion ? { scriptPath, currentVersion } : null;
   } catch (error) {
-    return;
+    return null;
   }
-  if (!scriptPath || !currentVersion) return;
+}
+
+// Controllo puntuale, usabile subito prima di una scrittura importante (una
+// conferma di viaggio, il salvataggio della Crew List): a differenza del
+// banner di watchForStaleScript, qui la risposta serve per decidere se far
+// partire o no il salvataggio, non solo per avvisare più tardi.
+export async function isScriptStale(scriptUrl) {
+  const parsed = parseVersionedScriptUrl(scriptUrl);
+  if (!parsed) return false;
+  try {
+    const response = await fetch(`${window.location.pathname}${window.location.search}`, { cache: 'no-store' });
+    if (!response.ok) return false;
+    const html = await response.text();
+    const escapedPath = parsed.scriptPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = html.match(new RegExp(`${escapedPath}\\?v=([A-Za-z0-9._-]+)`));
+    return Boolean(match && match[1] !== parsed.currentVersion);
+  } catch (error) {
+    // Rete assente o instabile: non blocchiamo un salvataggio solo perché
+    // non siamo riusciti a verificare la versione.
+    return false;
+  }
+}
+
+export function watchForStaleScript(scriptUrl) {
+  const parsed = parseVersionedScriptUrl(scriptUrl);
+  if (!parsed) return;
   let checking = false;
   let banner = null;
   let userHasEdited = false;
@@ -88,15 +112,7 @@ export function watchForStaleScript(scriptUrl) {
     if (checking || banner) return;
     checking = true;
     try {
-      const response = await fetch(`${window.location.pathname}${window.location.search}`, { cache: 'no-store' });
-      if (!response.ok) return;
-      const html = await response.text();
-      const escapedPath = scriptPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const match = html.match(new RegExp(`${escapedPath}\\?v=([A-Za-z0-9._-]+)`));
-      if (match && match[1] !== currentVersion) handleStale();
-    } catch (error) {
-      // Rete assente o instabile: si ritenta al prossimo controllo, senza
-      // disturbare chi sta compilando un modulo.
+      if (await isScriptStale(scriptUrl)) handleStale();
     } finally {
       checking = false;
     }

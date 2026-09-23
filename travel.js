@@ -1,7 +1,7 @@
 import { getApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { crewAccessErrorMessage, crewAccessUrl, db, personalAreaUrl, profileUrl, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260923-stale-check-v2';
+import { crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, personalAreaUrl, profileUrl, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260923-stale-check-v3';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260920-travel-private-v1';
 
 watchForStaleScript(import.meta.url);
@@ -146,6 +146,7 @@ function copyForLocale() {
       readySavedJourneyOnly: 'Trip saved.',
       saving: 'Saving…',
       verifying: 'Slow connection — checking whether it actually saved…',
+      staleReload: 'This page was not up to date. Reloading it now, so your confirmation is checked with the latest rules — please try again after it reloads.',
       blockedNoProfile: 'Complete your personal charter details in your area before adding travel information.',
       blockedNoBriefing: 'The skipper has not published the boarding briefing yet. Your travel details will open after it is available and accepted.',
       blockedBriefing: 'Read and accept the boarding rules in your personal area before entering travel information.',
@@ -283,6 +284,7 @@ function copyForLocale() {
     readySavedJourneyOnly: 'Viaggio salvato.',
     saving: 'Salvataggio…',
     verifying: 'Connessione lenta — verifico se è stato comunque salvato…',
+    staleReload: 'Questa pagina non era aggiornata. La ricarico per controllare la conferma con le regole più recenti — riprova dopo il ricaricamento.',
     blockedNoProfile: 'Completa prima i tuoi dati personali richiesti dal charter nella tua area.',
     blockedNoBriefing: 'Lo skipper non ha ancora pubblicato il briefing di bordo. I tuoi spostamenti si apriranno dopo la sua pubblicazione e accettazione.',
     blockedBriefing: 'Leggi e accetta le regole di bordo nella tua area personale prima di inserire gli spostamenti.',
@@ -750,8 +752,20 @@ function bindLegForm(form, direction) {
       setMessage(message, validation, true);
       return;
     }
-    setSaving(form, true);
     setMessage(message, copy.saving);
+    if (state === 'ready') {
+      // Prima di confermare (non per le bozze, meno critiche) verifica che
+      // la pagina esegua ancora le regole di validazione più recenti: una
+      // scheda rimasta aperta da prima di una pubblicazione potrebbe
+      // lasciar passare una conferma incompleta con la logica vecchia,
+      // come successo il 23/09/2026 con Mirella Miccio.
+      if (await isScriptStale(import.meta.url)) {
+        setMessage(message, copy.staleReload, true);
+        window.location.reload();
+        return;
+      }
+    }
+    setSaving(form, true);
     const payload = {
       schemaVersion: 1,
       ownerUid: activeSession.user.uid,

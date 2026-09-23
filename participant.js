@@ -6,12 +6,13 @@ import {
   crewAccessErrorMessage,
   db,
   inviteId,
+  isScriptStale,
   personalAreaUrl,
   startCrewAreaSession,
   startInviteActivation,
   watchForStaleScript,
   withSaveRetry,
-} from './crew-session.js?v=20260923-stale-check-v2';
+} from './crew-session.js?v=20260923-stale-check-v3';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
@@ -704,6 +705,20 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
       pendingParticipantProfile = null;
       renderDraftHint(activeCrewDraft);
       setMessage(document.querySelector('#participantFormMessage'), translate('crew.flow.draftSaved', 'Bozza salvata nella tua area privata. Non è ancora nella Crew List e non entra nel PDF del charter.'));
+      return;
+    }
+
+    // Prima di inviare i dati definitivi (non per le bozze) verifica che la
+    // pagina esegua ancora la versione più recente: una scheda rimasta
+    // aperta da prima di una pubblicazione potrebbe applicare regole di
+    // validazione superate. Vedi lo stesso controllo in travel.js, aggiunto
+    // dopo il caso reale del 23/09/2026 con Mirella Miccio.
+    if (await isScriptStale(import.meta.url)) {
+      setMessage(document.querySelector('#participantFormMessage'), localized(
+        'Questa pagina non era aggiornata. La ricarico per controllare i dati con le regole più recenti — riprova dopo il ricaricamento.',
+        'This page was not up to date. Reloading it now to check your details with the latest rules — please try again after it reloads.',
+      ), true);
+      window.location.reload();
       return;
     }
 
