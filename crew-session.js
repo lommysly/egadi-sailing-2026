@@ -7,14 +7,21 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { doc, getDoc, getFirestore, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { doc, getDoc, initializeFirestore, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { createCrewInviteIdentity, isCrewPin, isInviteCode, phoneFingerprintFor } from './crew-identity.js';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Equipaggio: telefoni, browser e reti molto più varie di quelle di skipper e
+// organizzatori (WiFi pubblico, browser integrati in altre app, reti
+// aziendali con proxy). Su queste reti lo stream normale di Firestore può
+// fallire in modo intermittente pur riuscendo poi in background: il rilevamento
+// automatico del long-polling passa a un trasporto più compatibile invece di
+// insistere con uno stream che quella rete non regge (causa vera, il 23/09/2026,
+// di salvataggi segnalati come falliti ma in realtà riusciti pochi secondi dopo).
+export const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
 export const inviteId = new URLSearchParams(window.location.search).get('invite') || '';
 export const boatId = new URLSearchParams(window.location.search).get('boat') || '';
 export const accessKey = new URLSearchParams(window.location.search).get('key') || '';
