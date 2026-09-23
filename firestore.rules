@@ -663,6 +663,14 @@ service cloud.firestore {
           && request.resource.data.starterPackItemsSnapshot.toSet().hasOnly(['bed_linen', 'bath_towels', 'bath_kit', 'beach_towel', 'outboard', 'final_cleaning', 'sup', 'egadi_navigation_permit', 'tender']));
     }
 
+    // Il formato di cabinGroupId non viene ripetuto qui: ogni chiamante di
+    // questa funzione chiama sempre anche hasCrewProjectionCabinGroupWithinBoat
+    // (verificato su tutti i call site), che lo controlla già in modo più
+    // completo (anche contro il layout reale della barca). La ripetizione
+    // qui era ridondante e concorreva a far superare, per proiezioni con un
+    // gruppo cabina profondo (es. "double-4"), il limite di 1000 espressioni
+    // valutabili per richiesta — scoperto il 23/09/2026 con Antonio Lorenzon,
+    // il cui invito veniva rifiutato in silenzio proprio per questo.
     function hasValidCrewProjectionPayloadV3(projectionId) {
       return request.resource.data.keys().hasAll(['contributesToCosts', 'pricingMode'])
         && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'starterPackItemsSnapshot', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
@@ -673,12 +681,6 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['pricingSnapshotAt'])
           || request.resource.data.pricingSnapshotAt is timestamp)
         && hasValidCrewProjectionStarterPackSnapshot()
-        && (!request.resource.data.keys().hasAny(['cabinGroupId'])
-          || (request.resource.data.cabinGroupId is string
-            && (request.resource.data.cabinGroupId == ''
-              || request.resource.data.cabinGroupId.matches('^double-[1-9][0-9]*$'))
-            && (request.resource.data.berthType == 'double_cabin'
-              || request.resource.data.cabinGroupId == '')))
         && (request.resource.data.contributesToCosts == true
           || (request.resource.data.berthCents == 0
             && request.resource.data.starterPackCents == 0
@@ -835,19 +837,35 @@ service cloud.firestore {
     // Il collegamento diventa reale solo nel batch che crea l'invito con lo
     // stesso ID. `!exists` impedisce di agganciare una proiezione a un invito
     // già esistente o a un record appartenente a un altro flusso.
+    // `getAfter` chiamato una sola volta (non cinque) e riusato dal binding
+    // `let`: ogni occorrenza di getAfter/exists pesa sul limite di 1000
+    // espressioni valutabili per richiesta, e con proiezioni su cabine più
+    // profonde (es. "double-4") questa funzione da sola bastava a superarlo,
+    // facendo fallire silenziosamente la creazione dell'invito (scoperto il
+    // 23/09/2026 con Antonio Lorenzon).
     function hasMatchingCrewProjectionInviteAfter(boatId, projectionId) {
-      return !exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId))
-        && existsAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId))
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data.id == projectionId
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data.boatId == boatId
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data.status == 'pending'
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data.displayName == request.resource.data.displayName
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data.whatsappNumber == request.resource.data.whatsappNumber;
+      let existedBefore = exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId));
+      let existsNow = existsAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId));
+      let invite = existsNow ? getAfter(/databases/$(database)/documents/boats/$(boatId)/invites/$(projectionId)).data : null;
+      return !existedBefore
+        && existsNow
+        && invite.id == projectionId
+        && invite.boatId == boatId
+        && invite.status == 'pending'
+        && invite.displayName == request.resource.data.displayName
+        && invite.whatsappNumber == request.resource.data.whatsappNumber;
     }
 
+    // hasCrewProjectionCabinGroupWithinBoat non serve qui: affectedKeys() più
+    // sotto esclude già berthType e cabinGroupId da questa transizione, quindi
+    // il gruppo cabina non può cambiare e resta quello già validato contro il
+    // layout reale della barca quando la scheda è stata creata o modificata
+    // l'ultima volta. Ripetere qui quel controllo (getAfter sulla barca + 12
+    // confronti) era il pezzo più pesante che faceva superare, per un gruppo
+    // cabina profondo come "double-4", il limite di 1000 espressioni per
+    // richiesta — scoperto il 23/09/2026 con Antonio Lorenzon.
     function isValidCrewProjectionInviteTransition(boatId, projectionId) {
       return hasValidCrewProjectionPayloadV3(projectionId)
-        && hasCrewProjectionCabinGroupWithinBoat(boatId)
         && resource.data.id == projectionId
         && resource.data.status == 'projected'
         && resource.data.inviteId == null
@@ -1016,11 +1034,20 @@ service cloud.firestore {
 
     // Un invito attivo non basta per comparire nella Crew List: prima va
     // accettata l'ultima versione del briefing pubblicato dallo skipper.
+    // `board` letto una sola volta: ogni occorrenza di get()/exists() pesa sul
+    // limite di 1000 espressioni valutabili per richiesta, e questa funzione
+    // viene richiamata (spesso più volte nella stessa richiesta, tramite
+    // hasCurrentBriefingAcceptance) da quasi ogni scrittura dell'equipaggio —
+    // scoperta un'origine reale di "salvataggio fallito" il 23/09/2026 con
+    // Roberta Totaro, sullo stesso schema già visto con le proiezioni.
     function hasPublishedBriefing(boatId) {
-      return exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
-        && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesText is string
-        && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesText.size() > 0
-        && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion is int;
+      let board = exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
+        ? get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data
+        : null;
+      return board != null
+        && board.rulesText is string
+        && board.rulesText.size() > 0
+        && board.rulesVersion is int;
     }
 
     // La versione inglese è un contenuto ufficiale parallelo, non una
@@ -1112,20 +1139,37 @@ service cloud.firestore {
     }
 
     function briefingRequiresFullRulesRead(boatId) {
-      return exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
-        && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.keys().hasAll(['fullRulesRequired'])
-        && get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.fullRulesRequired == true;
+      let board = exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
+        ? get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data
+        : null;
+      return board != null
+        && board.keys().hasAll(['fullRulesRequired'])
+        && board.fullRulesRequired == true;
     }
 
+    // Percorso più caldo di tutti (richiamato da quasi ogni scrittura
+    // dell'equipaggio, spesso più volte nella stessa richiesta): board e
+    // acceptance vengono letti una sola volta ciascuno, invece di 4+4 volte
+    // come prima. Riscritta per intero invece di richiamare hasPublishedBriefing/
+    // briefingRequiresFullRulesRead perché anche quelle, pur ora ottimizzate,
+    // rileggerebbero board una seconda e terza volta.
     function hasCurrentBriefingAcceptance(boatId, inviteId) {
-      return hasPublishedBriefing(boatId)
-        && exists(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId))
-        && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.inviteId == inviteId
-        && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.acceptedBy == request.auth.uid
-        && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.rulesVersion == get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data.rulesVersion
-        && (!briefingRequiresFullRulesRead(boatId)
-          || (get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.keys().hasAll(['fullRulesRead'])
-            && get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data.fullRulesRead == true));
+      let board = exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
+        ? get(/databases/$(database)/documents/boats/$(boatId)/briefing/board).data
+        : null;
+      let acceptance = exists(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId))
+        ? get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId)).data
+        : null;
+      return board != null
+        && board.rulesText is string
+        && board.rulesText.size() > 0
+        && board.rulesVersion is int
+        && acceptance != null
+        && acceptance.inviteId == inviteId
+        && acceptance.acceptedBy == request.auth.uid
+        && acceptance.rulesVersion == board.rulesVersion
+        && (!(board.keys().hasAll(['fullRulesRequired']) && board.fullRulesRequired == true)
+          || (acceptance.keys().hasAll(['fullRulesRead']) && acceptance.fullRulesRead == true));
     }
 
     function hasValidPaymentMethodSelection(methods) {
