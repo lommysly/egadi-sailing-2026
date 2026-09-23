@@ -42,14 +42,18 @@ function copyForLocale() {
       flow: [
         ['1', 'Open outbound', 'Choose the main transport and enter even just the city or airport you already know.'],
         ['2', 'Save a draft', 'Use “Save draft” whenever the ticket or timing is still missing.'],
-        ['3', 'Add the return later', 'The two trips are separate; choose the transfer only when you need it.'],
+        ['3', 'Add the return later', 'Outbound and return are separate: if you need a transfer both ways, select it in each trip.'],
       ],
       direction: {
         outbound: { eyebrow: 'Outbound', title: 'Towards Marsala', lead: 'Start with your main transport. If you do not have the ticket yet, a city or airport is enough for now.' },
         return: { eyebrow: 'Return', title: 'From Marsala', lead: 'Add the return journey independently when you know the timing; it does not block the outbound trip.' },
       },
       statusDraft: 'Personal draft',
+      statusDraftTransfer: 'Draft · transfer selected',
       statusReady: 'Travel details confirmed',
+      statusReadyTransfer: 'Travel confirmed · transfer requested',
+      statusReadyNoTransfer: 'Travel confirmed · no transfer requested',
+      statusReadyPending: 'Travel confirmed · transfer not specified',
       stepNavLabel: 'Sections of this journey',
       stepTrip: 'Your trip',
       stepConnection: 'Airport connection',
@@ -78,11 +82,15 @@ function copyForLocale() {
       luggage: 'Checked bags',
       bulkyLuggage: 'I am travelling with bulky luggage.',
       airportTransfer: 'Airport ↔ Marsala connection',
+      airportTransferDirection: { outbound: 'From the airport to Marsala', return: 'From Marsala to the airport' },
       airportTransferHint: 'The organised connection works only through Trapani (TPS) or Palermo (PMO).',
+      airportChoiceLabel: 'How will you make this connection?',
       airportChoiceNone: 'I do not need to indicate it yet',
       airportChoiceTransfer: 'I would like the organised transfer',
       airportChoiceIndependent: 'I will arrange it independently',
       airportChoiceRideOffer: 'I can offer a car ride',
+      airportChoiceSummary: { '': 'Connection not chosen yet', transfer: 'Organised transfer selected', independent: 'Travelling independently', ride_offer: 'Offering a car ride' },
+      airportChoiceNeedsConsent: 'Organised transfer selected · consent still needed',
       operatorConsent: 'I agree that the organiser and the appointed transfer company may use these travel details and my contact information only to arrange the airport ↔ Marsala connection. The operational record is also backed up in the organisers’ private Google Sheet.',
       carpool: 'Carpool with other participants',
       carpoolHint: 'Optional. It can be used for any journey where a car ride is useful.',
@@ -109,9 +117,13 @@ function copyForLocale() {
       matchActionError: 'I could not save your answer. Try again shortly.',
       matchClosed: 'This match is no longer available.',
       saveDraft: 'Save draft',
-      confirm: 'Confirm travel details',
+      confirm: { outbound: 'Confirm outbound trip', return: 'Confirm return trip' },
       draftSaved: 'Draft saved. You can come back and complete it whenever you like.',
-      readySaved: 'Travel details confirmed. The transfer coordinator can use them according to your consent.',
+      draftSavedTransfer: 'Draft saved with your transfer choice. The coordinator can see it as a trip still to complete.',
+      draftSavedTransferNeedsAirport: 'Draft saved with transfer selected. Add Trapani (TPS) or Palermo (PMO) so the coordinator can use this request.',
+      readySavedTransfer: 'Trip saved and organised transfer requested. The coordinator may now arrange this connection.',
+      readySavedNoTransfer: 'Trip saved. No organised transfer was requested for this journey.',
+      readySavedJourneyOnly: 'Trip saved.',
       saving: 'Saving…',
       verifying: 'Slow connection — checking whether it actually saved…',
       blockedNoProfile: 'Complete your personal charter details in your area before adding travel information.',
@@ -124,6 +136,7 @@ function copyForLocale() {
       validationRoute: 'Add both the departure city and the arrival city before confirming.',
       validationTimes: 'Add departure and arrival date and time before confirming.',
       validationFlightAirports: 'For a flight, select both airports from the suggestions.',
+      validationAirportChoice: 'Before confirming this flight, choose the airport connection: organised transfer or travelling independently. If you do not know yet, save a draft.',
       validationTransferAirport: 'For an airport ↔ Marsala connection, select Trapani (TPS) or Palermo (PMO) as one of the airports.',
       validationTransferConsent: 'Confirm the consent for the transfer operator before confirming this connection.',
       validationCarpoolSeats: 'Indicate at least one available seat for a ride offer.',
@@ -153,7 +166,7 @@ function copyForLocale() {
     flow: [
       ['1', 'Apri l’andata', 'Scegli il mezzo e inserisci anche solo la città o l’aeroporto che già conosci.'],
       ['2', 'Salva una bozza', 'Usa “Salva bozza” se mancano ancora biglietto o orari.'],
-      ['3', 'Aggiungi il rientro dopo', 'Le due tratte sono separate: il transfer lo scegli solo se ti serve.'],
+      ['3', 'Aggiungi il rientro dopo', 'Andata e rientro sono separati: se vuoi il transfer in entrambi i sensi, selezionalo in tutte e due le schede.'],
     ],
     direction: {
       outbound: { eyebrow: 'Andata', title: 'Verso Marsala', lead: 'Inizia dal mezzo principale. Se non hai ancora il biglietto, per ora bastano città o aeroporto.' },
@@ -164,7 +177,11 @@ function copyForLocale() {
     stepConnection: 'Collegamento aeroporto',
     stepCarpool: 'Passaggio auto',
     statusDraft: 'Bozza personale',
+    statusDraftTransfer: 'Bozza · transfer selezionato',
     statusReady: 'Informazioni confermate',
+    statusReadyTransfer: 'Viaggio confermato · transfer richiesto',
+    statusReadyNoTransfer: 'Viaggio confermato · nessun transfer richiesto',
+    statusReadyPending: 'Viaggio confermato · transfer non indicato',
     details: 'Dettagli del viaggio',
     transport: 'Mezzo principale',
     choose: 'Seleziona',
@@ -189,11 +206,15 @@ function copyForLocale() {
     luggage: 'Bagagli in stiva',
     bulkyLuggage: 'Viaggio con un bagaglio ingombrante.',
     airportTransfer: 'Collegamento aeroporto ↔ Marsala',
+    airportTransferDirection: { outbound: 'Dall’aeroporto a Marsala', return: 'Da Marsala all’aeroporto' },
     airportTransferHint: 'Il collegamento organizzato è disponibile soltanto da/per Trapani (TPS) o Palermo (PMO).',
+    airportChoiceLabel: 'Come farai questo collegamento?',
     airportChoiceNone: 'Non devo ancora indicarlo',
     airportChoiceTransfer: 'Vorrei il transfer organizzato',
     airportChoiceIndependent: 'Mi organizzo in autonomia',
     airportChoiceRideOffer: 'Posso offrire un passaggio in auto',
+    airportChoiceSummary: { '': 'Collegamento ancora da scegliere', transfer: 'Transfer organizzato selezionato', independent: 'Ti organizzi in autonomia', ride_offer: 'Offri un passaggio in auto' },
+    airportChoiceNeedsConsent: 'Transfer selezionato · manca il consenso',
     operatorConsent: 'Acconsento che organizzazione e società transfer incaricata usino questi dati di viaggio e il mio contatto solo per organizzare il collegamento aeroporto ↔ Marsala. La registrazione operativa viene inoltre riportata nel foglio Google privato dell’organizzazione.',
     carpool: 'Passaggi auto con altri partecipanti',
     carpoolHint: 'È facoltativo: serve per qualsiasi tratto in cui un passaggio in auto può essere utile.',
@@ -220,9 +241,13 @@ function copyForLocale() {
     matchActionError: 'Non riesco a salvare la tua risposta. Riprova tra poco.',
     matchClosed: 'Questo abbinamento non è più disponibile.',
     saveDraft: 'Salva bozza',
-    confirm: 'Conferma il viaggio',
+    confirm: { outbound: 'Conferma andata', return: 'Conferma rientro' },
     draftSaved: 'Bozza salvata. Puoi tornare qui e completarla quando vuoi.',
-    readySaved: 'Viaggio confermato. Il coordinatore transfer potrà usarlo nei limiti del consenso che hai dato.',
+    draftSavedTransfer: 'Bozza salvata con transfer selezionato. Il coordinatore potrà vederla come viaggio ancora da completare.',
+    draftSavedTransferNeedsAirport: 'Bozza salvata con transfer selezionato. Indica Trapani (TPS) o Palermo (PMO) perché il coordinatore possa usare la richiesta.',
+    readySavedTransfer: 'Viaggio salvato e transfer organizzato richiesto. Il coordinatore potrà organizzare questo collegamento.',
+    readySavedNoTransfer: 'Viaggio salvato. Per questa tratta non hai richiesto un transfer organizzato.',
+    readySavedJourneyOnly: 'Viaggio salvato.',
     saving: 'Salvataggio…',
     verifying: 'Connessione lenta — verifico se è stato comunque salvato…',
     blockedNoProfile: 'Completa prima i tuoi dati personali richiesti dal charter nella tua area.',
@@ -235,6 +260,7 @@ function copyForLocale() {
     validationRoute: 'Prima di confermare, inserisci sia la città di partenza sia quella di arrivo.',
     validationTimes: 'Prima di confermare, inserisci data e ora di partenza e arrivo.',
     validationFlightAirports: 'Per un volo, seleziona entrambi gli aeroporti dai suggerimenti.',
+    validationAirportChoice: 'Prima di confermare il volo, scegli il collegamento aeroporto: transfer organizzato oppure autonomia. Se non lo sai ancora, salva una bozza.',
     validationTransferAirport: 'Per il collegamento aeroporto ↔ Marsala seleziona Trapani (TPS) o Palermo (PMO) in uno dei due aeroporti.',
     validationTransferConsent: 'Prima di confermare questo collegamento, dai il consenso alla società transfer.',
     validationCarpoolSeats: 'Per offrire un passaggio indica almeno un posto disponibile.',
@@ -315,6 +341,30 @@ function normalizeLeg(raw, direction) {
     carpoolSeats: number(source.carpoolSeats, 0, 8),
     carpoolMatchConsent: source.carpoolMatchConsent === true,
   };
+}
+
+function legStatusText(leg, copy) {
+  if (leg.state !== 'ready') {
+    if (leg.airportMarsalaChoice === 'transfer' && leg.transferOperatorConsent) return copy.statusDraftTransfer;
+    return copy.statusDraft;
+  }
+  if (leg.airportMarsalaChoice === 'transfer' && leg.transferOperatorConsent) return copy.statusReadyTransfer;
+  if (leg.airportMarsalaChoice === 'independent' || leg.airportMarsalaChoice === 'ride_offer') return copy.statusReadyNoTransfer;
+  if (leg.transportMode !== 'flight') return copy.statusReady;
+  return copy.statusReadyPending;
+}
+
+function savedLegMessage(leg, copy) {
+  if (leg.state !== 'ready') {
+    if (leg.airportMarsalaChoice === 'transfer' && leg.transferOperatorConsent) {
+      const airport = leg.direction === 'return' ? leg.originAirport : leg.destinationAirport;
+      return TERMINAL_AIRPORTS.has(airport) ? copy.draftSavedTransfer : copy.draftSavedTransferNeedsAirport;
+    }
+    return copy.draftSaved;
+  }
+  if (leg.airportMarsalaChoice === 'transfer' && leg.transferOperatorConsent) return copy.readySavedTransfer;
+  if (leg.airportMarsalaChoice) return copy.readySavedNoTransfer;
+  return copy.readySavedJourneyOnly;
 }
 
 function setMessage(element, message, isError = false) {
@@ -450,7 +500,7 @@ function renderLegForm(direction, rawLeg) {
   card.innerHTML = `
     <summary>
       <span>${labels.title}</span>
-      <small data-travel-state>${leg.state === 'ready' ? copy.statusReady : copy.statusDraft}</small>
+      <small data-travel-state>${legStatusText(leg, copy)}</small>
     </summary>
     <form id="${formId}" novalidate>
       <div class="skipper-travel-form-heading">
@@ -474,9 +524,9 @@ function renderLegForm(direction, rawLeg) {
         <div class="form-grid"><div class="travel-autocomplete" data-travel-combobox><label>${copy.carrier}<input name="carrier" autocomplete="organization" data-travel-autocomplete="carrier" placeholder="${copy.carrierPlaceholder}" /></label></div><label>${copy.serviceNumber}<input name="serviceNumber" autocomplete="off" autocapitalize="characters" /></label><label>${copy.luggage}<input name="luggageCount" type="number" min="0" max="12" inputmode="numeric" /></label><label class="consent-field"><input name="bulkyLuggage" type="checkbox" /><span>${copy.bulkyLuggage}</span></label></div>
       </fieldset>
       <fieldset class="skipper-transfer-fieldset" data-travel-step-panel="connection">
-        <legend>${copy.airportTransfer}</legend>
+        <legend>${copy.airportTransferDirection[direction]}</legend>
         <p class="field-hint">${copy.airportTransferHint}</p>
-        <label><select name="airportMarsalaChoice"><option value="">${copy.airportChoiceNone}</option><option value="transfer">${copy.airportChoiceTransfer}</option><option value="independent">${copy.airportChoiceIndependent}</option><option value="ride_offer">${copy.airportChoiceRideOffer}</option></select></label>
+        <label>${copy.airportChoiceLabel}<select name="airportMarsalaChoice"><option value="">${copy.airportChoiceNone}</option><option value="transfer">${copy.airportChoiceTransfer}</option><option value="independent">${copy.airportChoiceIndependent}</option><option value="ride_offer">${copy.airportChoiceRideOffer}</option></select></label>
         <label class="consent-field" data-transfer-consent hidden><input name="transferOperatorConsent" type="checkbox" /><span>${copy.operatorConsent}</span></label>
       </fieldset>
       <fieldset class="skipper-transfer-fieldset" data-travel-step-panel="carpool">
@@ -491,7 +541,8 @@ function renderLegForm(direction, rawLeg) {
         <p class="field-hint">${copy.matchesHint}</p>
         <div data-travel-matches-list></div>
       </fieldset>
-      <div class="form-actions"><button class="button button-ghost" type="submit" data-save-state="draft">${copy.saveDraft}</button><button class="button button-primary" type="submit" data-save-state="ready">${copy.confirm}</button><p class="form-message" data-travel-message role="status" aria-live="polite"></p></div>
+      <p class="field-hint" data-travel-connection-summary aria-live="polite"></p>
+      <div class="form-actions"><button class="button button-ghost" type="submit" data-save-state="draft">${copy.saveDraft}</button><button class="button button-primary" type="submit" data-save-state="ready">${copy.confirm[direction]}</button><p class="form-message" data-travel-message role="status" aria-live="polite"></p></div>
     </form>`;
   const form = card.querySelector('form');
   form.dataset.saveState = 'draft';
@@ -526,6 +577,14 @@ function updateConditionalFields(form) {
   const needsTransferConsent = airportChoice === 'transfer';
   transferConsent.hidden = !needsTransferConsent;
   if (!needsTransferConsent) field(form, 'transferOperatorConsent').checked = false;
+  const direction = form.closest('[data-travel-direction]')?.dataset.travelDirection;
+  const summary = form.querySelector('[data-travel-connection-summary]');
+  if (direction && summary) {
+    const copy = copyForLocale();
+    const choiceText = needsTransferConsent && !inputChecked(form, 'transferOperatorConsent')
+      ? copy.airportChoiceNeedsConsent : copy.airportChoiceSummary[airportChoice];
+    summary.textContent = `${copy.direction[direction].eyebrow} · ${choiceText}`;
+  }
   // Scegliere un ruolo passaggio è già il consenso: niente casella separata
   // (vedi ARRIVI_PARTENZE_SPEC.md), solo una nota informativa quando serve.
   carpoolConsentNote.hidden = !resolvedCarpoolRole;
@@ -567,6 +626,7 @@ function validationMessage(leg, copy) {
   if (!leg.originCity || !leg.destinationCity) return copy.validationRoute;
   if (!leg.departureDate || !leg.departureTime || !leg.arrivalDate || !leg.arrivalTime) return copy.validationTimes;
   if (leg.transportMode === 'flight' && (!leg.originAirport || !leg.destinationAirport)) return copy.validationFlightAirports;
+  if (leg.transportMode === 'flight' && !leg.airportMarsalaChoice) return copy.validationAirportChoice;
   if (leg.airportMarsalaChoice === 'transfer' || leg.airportMarsalaChoice === 'ride_offer') {
     const terminalAirport = leg.direction === 'return' ? leg.originAirport : leg.destinationAirport;
     const hasTerminalAirport = TERMINAL_AIRPORTS.has(terminalAirport);
@@ -585,13 +645,17 @@ function setSaving(form, saving) {
 
 function applySavedLegState(card, message, direction, leg, copy) {
   card.dataset.travelState = leg.state;
-  card.querySelector('[data-travel-state]').textContent = leg.state === 'ready' ? copy.statusReady : copy.statusDraft;
-  setMessage(message, leg.state === 'ready' ? copy.readySaved : copy.draftSaved);
+  card.querySelector('[data-travel-state]').textContent = legStatusText(leg, copy);
+  setMessage(message, `${copy.direction[direction].eyebrow}: ${savedLegMessage(leg, copy)}`);
 }
 
 function bindLegForm(form, direction) {
   installTravelAutocomplete(form);
-  form.addEventListener('change', () => updateConditionalFields(form));
+  form.addEventListener('change', () => {
+    updateConditionalFields(form);
+    const message = form.querySelector('[data-travel-message]');
+    if (message.classList.contains('is-error')) setMessage(message, '');
+  });
   form.querySelectorAll('[data-save-state]').forEach((button) => {
     button.addEventListener('click', () => { form.dataset.saveState = button.dataset.saveState || 'draft'; });
   });
@@ -604,6 +668,10 @@ function bindLegForm(form, direction) {
     const validation = validationMessage(leg, copy);
     const message = form.querySelector('[data-travel-message]');
     if (validation) {
+      const card = form.closest('details');
+      if (validation === copy.validationAirportChoice || validation === copy.validationTransferConsent) setTravelStep(card, 'connection');
+      else if (validation === copy.validationCarpoolSeats || validation === copy.validationRideOffer) setTravelStep(card, 'carpool');
+      else setTravelStep(card, 'trip');
       setMessage(message, validation, true);
       return;
     }
@@ -753,7 +821,7 @@ function watchLegStatus(card, direction) {
     const copy = copyForLocale();
     card.dataset.travelState = leg.state;
     const badge = card.querySelector('[data-travel-state]');
-    if (badge) badge.textContent = leg.state === 'ready' ? copy.statusReady : copy.statusDraft;
+    if (badge) badge.textContent = legStatusText(leg, copy);
   }, (error) => {
     console.error('Impossibile seguire in diretta lo stato di questa tratta.', error);
   });

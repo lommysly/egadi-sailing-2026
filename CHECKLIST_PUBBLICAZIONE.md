@@ -1,6 +1,6 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+Ultimo aggiornamento: 23 settembre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
 
 ## Sito pubblico e contenuti
 
@@ -24,7 +24,9 @@ Ultimo aggiornamento: 11 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] Passage Plan separa scenari di luce da porto, campo boe o rada e dichiara stato, validità e prossimo aggiornamento.
 - [ ] Pubblicare e testare `skipperTravel/outbound` e `skipperTravel/return`: due bozze operative private, salvabili una alla volta anche incomplete, per viaggio e possibile transfer dello skipper. Devono restare accessibili soltanto allo skipper della propria barca; nessuna Crew List, PDF, flotta, pagamento, organizzatore, equipaggio o società transfer può leggerle.
 - [x] Scheda privata `travel.html`/`travel.js` per raccogliere le tratte nell'area equipaggio: nessun modulo pubblico con contatti.
-- [ ] Creare l'area riservata della società transfer con identità nominative, gruppi, veicoli, orari e contatti limitati alle tratte aeroporto ↔ Marsala.
+- [x] Sorgente locale: conferma volo bloccata finché non è scelto esplicitamente transfer o autonomia; andata/rientro, consenso e stato transfer sono visibili nel riepilogo. Test del form mobile con scrittura simulata in WebKit e controllo dei campi in Chromium: scelta e consenso restano presenti anche tornando alla scheda viaggio.
+- [ ] Dopo la pubblicazione, ripetere con una partecipante autenticata su iPhone il rientro con transfer e consenso, riaprire la pagina e verificare sia i valori salvati sia la scheda nella coda della società transfer. Non modificare i dati di Roberta per simulare la prova.
+- [ ] Completare il test live dell'area riservata `transfer.html` con un operatore nominativo attivo: verificare accesso limitato alle sole schede aeroportuali consentite, gruppi, veicoli, orari e contatti; il sorgente e le Rules esistono già.
 - [x] Codice di matching tra partecipanti scritto e testato sull'emulatore Firestore + Functions (22/09/2026): Cloud Function `matchCarpoolLegs` + `respondToTravelMatch`, consenso per tratta (`carpoolMatchConsent`, già esistente) e doppia conferma prima di mostrare WhatsApp — vedi caso 12 in `FIRESTORE_RULES_TEST_MATRIX.md`.
 - [x] `firestore.rules`, `firestore.indexes.json` (field override collection-group `legs.carpoolMatchConsent`) e le due Cloud Function deployate in produzione (22/09/2026).
 - [ ] Ripetere il test del caso 12 con account fittizi reali su HTTPS (l'emulatore non sostituisce questo passaggio, anche se il deploy è già live).
