@@ -54,6 +54,70 @@ export async function withSaveRetry(operation, onRetry) {
     }
   }
 }
+
+// Una scheda rimasta aperta da prima di una pubblicazione continua a
+// eseguire il JavaScript vecchio anche a lungo (in background su mobile non
+// viene mai ricaricata da sola). Il numero di versione nell'URL dello script
+// serve a niente finché il browser non rilegge la pagina: caso reale del
+// 23/09/2026, Mirella Miccio ha confermato un volo alle 18:25 su una scheda
+// aperta prima delle 13:12, quindi senza il controllo introdotto quella
+// stessa mattina, ottenendo un salvataggio valido per il codice vecchio ma
+// incompleto per quello nuovo. Ogni pagina equipaggio chiama questa funzione
+// passando `import.meta.url` (che contiene la propria versione) per
+// accorgersi da sola quando è superata e offrire un aggiornamento esplicito.
+export function watchForStaleScript(scriptUrl) {
+  let scriptPath;
+  let currentVersion;
+  try {
+    const parsed = new URL(scriptUrl);
+    scriptPath = parsed.pathname.split('/').pop();
+    currentVersion = parsed.searchParams.get('v');
+  } catch (error) {
+    return;
+  }
+  if (!scriptPath || !currentVersion) return;
+  let checking = false;
+  let banner = null;
+  async function check() {
+    if (checking || banner) return;
+    checking = true;
+    try {
+      const response = await fetch(`${window.location.pathname}${window.location.search}`, { cache: 'no-store' });
+      if (!response.ok) return;
+      const html = await response.text();
+      const escapedPath = scriptPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const match = html.match(new RegExp(`${escapedPath}\\?v=([A-Za-z0-9._-]+)`));
+      if (match && match[1] !== currentVersion) showBanner();
+    } catch (error) {
+      // Rete assente o instabile: si ritenta al prossimo controllo, senza
+      // disturbare chi sta compilando un modulo.
+    } finally {
+      checking = false;
+    }
+  }
+  function showBanner() {
+    if (banner) return;
+    banner = document.createElement('div');
+    banner.setAttribute('role', 'status');
+    banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;padding:12px 16px;background:#0b2e35;color:#fff;font:600 .85rem "DM Sans",sans-serif;box-shadow:0 -6px 18px rgba(0,0,0,.18);';
+    const text = document.createElement('span');
+    text.textContent = 'È disponibile una versione aggiornata di questa pagina. Aggiorna prima di continuare a compilare.';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Aggiorna ora';
+    button.style.cssText = 'background:#e8734a;color:#fff;border:none;border-radius:999px;padding:8px 16px;font:700 .8rem "DM Sans",sans-serif;cursor:pointer;';
+    button.addEventListener('click', () => window.location.reload());
+    banner.append(text, button);
+    document.body.appendChild(banner);
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check();
+  });
+  window.addEventListener('focus', check);
+  window.addEventListener('pageshow', check);
+  setInterval(check, 5 * 60 * 1000);
+  check();
+}
 const translate = (key, fallback, params) => {
   const translated = window.EgadiI18n?.t?.(key, params);
   return translated && translated !== key ? translated : fallback;

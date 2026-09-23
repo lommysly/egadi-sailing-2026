@@ -1,6 +1,8 @@
 import { collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { auth, crewAccessErrorMessage, crewAccessUrl, db, profileUrl, signOutCrew, startCrewAreaSession, withSaveRetry } from './crew-session.js?v=20260923-save-retry-v2';
+import { auth, crewAccessErrorMessage, crewAccessUrl, db, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260923-stale-check-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
+
+watchForStaleScript(import.meta.url);
 
 const i18n = window.EgadiI18n;
 const translate = (key, fallback, params) => {
