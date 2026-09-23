@@ -250,6 +250,8 @@ Il portale `transfer.html` legge soltanto le schede aeroportuali materializzate 
 
 Il riepilogo skipper delle tratte legge `crewTravelStatus`: conta anche un viaggio già salvato se la scelta del collegamento aeroporto–Marsala è ancora vuota. La coda della società transfer, invece, mostra esclusivamente le richieste con consenso esplicito; la differenza fra i due conteggi non indica da sola una perdita di dati. Chi è contemporaneamente skipper e referente transfer trova nel portale il collegamento diretto all'area skipper senza uscire. Il foglio di backup registra anche le tratte senza richiesta, oscurando nome e contatto quando il consenso transfer manca; in questo caso indica «Transfer da scegliere» o «Transfer non richiesto», mai «Revocato» per un viaggio tuttora attivo.
 
+Nel Google Sheet privato le schede aggiornate automaticamente sono **Arrivi** e **Partenze**. La vecchia scheda **Archivio (non aggiornato)** resta conservata, ma non va usata per organizzare i transfer. L'accesso generale del file è limitato al proprietario e all'account tecnico che lo aggiorna; gli operatori leggono le richieste autorizzate nel portale, non attraverso un link pubblico al foglio.
+
 ## Attivazione operativa
 
 1. Il sorgente, le Security Rules e il dominio HTTPS sono pubblicati.
