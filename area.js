@@ -5454,18 +5454,34 @@ function reflectCreatedProjectionInvite(projection, invite) {
 }
 
 const CREW_TRAVEL_LEG_LABELS = {
-  ready: { icon: '✓', text: 'Confermata' },
-  draft: { icon: '!', text: 'In bozza' },
   missing: { icon: '•', text: 'Da inserire' },
+  draft: { icon: '!', text: 'In bozza' },
+  transfer_pending: { icon: '!', text: 'Transfer da scegliere' },
+  no_transfer: { icon: '–', text: 'Transfer non richiesto' },
+  transfer_ready: { icon: '✓', text: 'Transfer confermato' },
 };
+// "ready" da solo non basta: è lo stato del viaggio (volo/orari), non del
+// transfer. Un viaggio "confermato" con la scelta del collegamento
+// aeroporto ancora vuota non comparirà mai nel pannello dell'operatore
+// transfer (vedi validSourceLeg in functions/index.js) — scoperto il
+// 23/09/2026 quando Francesca Sanna e Roberta Totaro risultavano qui
+// "confermate" su entrambe le tratte ma il loro ritorno restava invisibile
+// all'operatore, perché non avevano mai scelto "Vorrei il transfer
+// organizzato" per quella tratta.
+const CREW_TRAVEL_NEEDS_REMINDER = new Set(['missing', 'draft', 'transfer_pending']);
 
 function crewTravelStatusFor(memberId) {
   return activeCrewTravelStatus.find((entry) => entry.id === memberId) || null;
 }
 
 function crewTravelLegState(status, direction) {
-  const value = status?.[direction];
-  return value === 'ready' || value === 'draft' ? value : 'missing';
+  const tripState = status?.[direction];
+  if (tripState !== 'ready' && tripState !== 'draft') return 'missing';
+  if (tripState === 'draft') return 'draft';
+  const transferState = status?.[`${direction}Transfer`];
+  if (transferState === 'requested') return 'transfer_ready';
+  if (transferState === 'not_requested') return 'no_transfer';
+  return 'transfer_pending';
 }
 
 // Stesso tono e struttura di whatsappUrl() più sotto (messaggio di invito):
@@ -5474,10 +5490,18 @@ function crewTravelLegState(status, direction) {
 function crewTravelReminderMessage(member, legStates) {
   const locale = inviteLocale(activeInvites.find((invite) => invite.id === member.id));
   const firstName = member.firstName || memberName(member);
-  const missingParts = [];
-  if (legStates.outbound !== 'ready') missingParts.push(locale === 'en' ? 'the outbound leg (to Marsala)' : "l’andata (verso Marsala)");
-  if (legStates.return !== 'ready') missingParts.push(locale === 'en' ? 'the return leg (from Marsala)' : 'il ritorno (da Marsala)');
-  const missingText = missingParts.join(locale === 'en' ? ' and ' : ' e ');
+  const pendingDirections = ['outbound', 'return'].filter((direction) => CREW_TRAVEL_NEEDS_REMINDER.has(legStates[direction]));
+  const onlyTransferMissing = pendingDirections.length > 0
+    && pendingDirections.every((direction) => legStates[direction] === 'transfer_pending');
+  const directionLabel = (direction) => (direction === 'return'
+    ? (locale === 'en' ? 'the return leg (from Marsala)' : 'il ritorno (da Marsala)')
+    : (locale === 'en' ? 'the outbound leg (to Marsala)' : "l’andata (verso Marsala)"));
+  const missingText = pendingDirections.map(directionLabel).join(locale === 'en' ? ' and ' : ' e ');
+  if (onlyTransferMissing) {
+    return locale === 'en'
+      ? `Hi ${firstName} 🌊\n\nYour travel details for Egadi Sailing Experience look complete, but you haven’t chosen the airport ↔ Marsala connection yet for ${missingText}. Open “Airport connection” in your travel area, pick an option and save — thank you!`
+      : `Ciao ${firstName} 🌊\n\nI tuoi dati di viaggio per Egadi Sailing Experience sembrano completi, ma non hai ancora scelto il collegamento aeroporto ↔ Marsala per ${missingText}. Apri “Collegamento aeroporto” nella tua area viaggio, scegli un’opzione e salva — grazie!`;
+  }
   return locale === 'en'
     ? `Hi ${firstName} 🌊\n\nCan you finish and confirm ${missingText} in your travel details for Egadi Sailing Experience? I need it to organise transfers and the schedule.\n\nOpen your personal area and save it — thank you!`
     : `Ciao ${firstName} 🌊\n\nPuoi completare e confermare ${missingText} nei tuoi dati di viaggio per Egadi Sailing Experience? Mi serve per organizzare i transfer e il programma.\n\nApri la tua area personale e salva, grazie!`;
@@ -5513,7 +5537,7 @@ function renderCrewTravelOverview() {
       outbound: crewTravelLegState(status, 'outbound'),
       return: crewTravelLegState(status, 'return'),
     };
-    const needsReminder = legStates.outbound !== 'ready' || legStates.return !== 'ready';
+    const needsReminder = CREW_TRAVEL_NEEDS_REMINDER.has(legStates.outbound) || CREW_TRAVEL_NEEDS_REMINDER.has(legStates.return);
     if (needsReminder) pendingCount += 1;
     const reminderUrl = needsReminder ? crewTravelReminderUrl(member, legStates) : '';
     const action = reminderUrl

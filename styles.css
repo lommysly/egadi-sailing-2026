@@ -189,9 +189,10 @@ body.menu-open { overflow:hidden; }
 .crew-travel-row-name strong { font-size:.88rem; }
 .crew-travel-row-legs { display:flex; flex-wrap:wrap; gap:6px; }
 .crew-travel-leg { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:999px; background:var(--sand); font:700 .66rem "DM Mono",monospace; letter-spacing:.02em; }
-.crew-travel-leg--ready { background:#c3ecd1; color:#155c34; }
-.crew-travel-leg--draft { background:#ffe6b3; color:#7a4a00; }
+.crew-travel-leg--transfer_ready { background:#c3ecd1; color:#155c34; }
+.crew-travel-leg--draft,.crew-travel-leg--transfer_pending { background:#ffe6b3; color:#7a4a00; }
 .crew-travel-leg--missing { background:#eef0f1; color:#54595c; }
+.crew-travel-leg--no_transfer { background:#e4e9ea; color:#3c4a4d; }
 .crew-travel-row-action { display:flex; align-items:center; }
 .crew-travel-row-action .button { padding:7px 13px; font-size:.76rem; }
 .profile-summary dl { display:grid; gap:11px; margin:0 0 22px; }

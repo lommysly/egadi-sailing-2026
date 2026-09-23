@@ -577,16 +577,33 @@ async function markTransferRequestRevoked(ref, revision) {
   });
 }
 
+// Se la tratta è "ready" (volo/orari confermati), lo stato del transfer
+// dice se serve ancora un sollecito: "transfer" scelto e consenso dato è
+// l'unica combinazione che fa comparire la persona nel pannello operatore
+// (vedi validSourceLeg più sotto); "independent"/"ride_offer" è una scelta
+// esplicita di non usarlo; tutto il resto (scelta vuota, o "transfer" senza
+// consenso) è ancora da decidere. Senza questa distinzione lo skipper vedeva
+// "confermato" per persone il cui ritorno restava comunque invisibile
+// all'operatore transfer (scoperto il 23/09/2026 con Francesca Sanna e
+// Roberta Totaro).
+function transferRequestState(leg) {
+  if (leg.airportMarsalaChoice === 'transfer') return leg.transferOperatorConsent === true ? 'requested' : 'undecided';
+  if (leg.airportMarsalaChoice === 'independent' || leg.airportMarsalaChoice === 'ride_offer') return 'not_requested';
+  return 'undecided';
+}
+
 // Riepilogo minimo per lo skipper: solo se una tratta manca, è in bozza o è
-// confermata. Mai volo, orario o aeroporto, che restano privati alla persona
-// (crewTravel/{inviteId}/legs è owner-only nelle regole, lo skipper non può
-// leggerlo). Collezione separata da members perché la sua validazione lato
-// client (hasValidMemberPayload) whitelista già le sue chiavi: aggiungere
-// questi campi lì avrebbe rotto ogni salvataggio successivo della scheda.
-async function writeCrewTravelStatus(boatId, inviteId, direction, travelState) {
+// confermata, e se il transfer è stato richiesto. Mai volo, orario o
+// aeroporto, che restano privati alla persona (crewTravel/{inviteId}/legs è
+// owner-only nelle regole, lo skipper non può leggerlo). Collezione separata
+// da members perché la sua validazione lato client (hasValidMemberPayload)
+// whitelista già le sue chiavi: aggiungere questi campi lì avrebbe rotto
+// ogni salvataggio successivo della scheda.
+async function writeCrewTravelStatus(boatId, inviteId, direction, travelState, transferState) {
   await db.doc(`boats/${boatId}/crewTravelStatus/${inviteId}`).set({
     inviteId,
     [direction]: travelState,
+    [`${direction}Transfer`]: transferState,
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
 }
@@ -609,13 +626,13 @@ exports.materializeCrewTravel = onDocumentWritten({
     await Promise.all([
       markBackupRevoked(backupRef, revision),
       markTransferRequestRevoked(transferRef, revision),
-      writeCrewTravelStatus(boatId, inviteId, direction, 'missing'),
+      writeCrewTravelStatus(boatId, inviteId, direction, 'missing', 'undecided'),
     ]);
     return;
   }
 
   const leg = after.data();
-  await writeCrewTravelStatus(boatId, inviteId, direction, leg.state === 'ready' ? 'ready' : 'draft');
+  await writeCrewTravelStatus(boatId, inviteId, direction, leg.state === 'ready' ? 'ready' : 'draft', transferRequestState(leg));
   const boatRef = db.doc(`boats/${boatId}`);
   const inviteRef = db.doc(`boats/${boatId}/invites/${inviteId}`);
   const memberRef = db.doc(`boats/${boatId}/members/${inviteId}`);
