@@ -5458,7 +5458,11 @@ const CREW_TRAVEL_LEG_LABELS = {
   draft: { icon: '!', text: 'In bozza' },
   transfer_pending: { icon: '!', text: 'Transfer da scegliere' },
   no_transfer: { icon: '–', text: 'Transfer non richiesto' },
-  transfer_ready: { icon: '✓', text: 'Transfer confermato' },
+  transfer_ready: { icon: '•', text: 'Transfer richiesto' },
+  transfer_planning: { icon: '•', text: 'In organizzazione' },
+  transfer_confirmed: { icon: '✓', text: 'Transfer confermato' },
+  transfer_completed: { icon: '✓', text: 'Transfer concluso' },
+  transfer_cancelled: { icon: '!', text: 'Transfer annullato' },
 };
 // "ready" da solo non basta: è lo stato del viaggio (volo/orari), non del
 // transfer. Un viaggio "confermato" con la scelta del collegamento
@@ -5479,7 +5483,12 @@ function crewTravelLegState(status, direction) {
   if (tripState !== 'ready' && tripState !== 'draft') return 'missing';
   if (tripState === 'draft') return 'draft';
   const transferState = status?.[`${direction}Transfer`];
-  if (transferState === 'requested') return 'transfer_ready';
+  if (transferState === 'requested') {
+    const operation = status?.[`${direction}OperationStatus`];
+    if (operation === 'planned') return 'transfer_planning';
+    if (['confirmed', 'completed', 'cancelled'].includes(operation)) return `transfer_${operation}`;
+    return 'transfer_ready';
+  }
   if (transferState === 'not_requested') return 'no_transfer';
   return 'transfer_pending';
 }
@@ -5548,7 +5557,7 @@ function renderCrewTravelOverview() {
   section.hidden = false;
   const heading = pendingCount
     ? `<h4>${pendingCount} ${pendingCount === 1 ? 'persona deve ancora completare' : 'persone devono ancora completare'} andata o ritorno</h4><p class="panel-lead">“Transfer da scegliere” significa che il viaggio è salvato, ma manca la scelta del collegamento con Marsala. Nella gestione transfer compaiono solo le richieste con consenso. Puoi inviare un promemoria su WhatsApp.</p>`
-    : '<h4>Tutti hanno completato andata e ritorno ✓</h4>';
+    : '<h4>Andata e ritorno compilati</h4><p class="panel-lead">Controlla qui se il transfer è soltanto richiesto, in organizzazione o confermato dal gestore.</p>';
   section.innerHTML = `<p class="eyebrow">Viaggio equipaggio</p>${heading}<div class="crew-travel-list">${rows}</div>`;
 }
 
