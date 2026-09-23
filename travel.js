@@ -1,6 +1,6 @@
 import { getApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
-import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { crewAccessErrorMessage, crewAccessUrl, db, personalAreaUrl, profileUrl, startCrewAreaSession, withSaveRetry } from './crew-session.js?v=20260923-save-retry-v2';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260920-travel-private-v1';
 
@@ -14,6 +14,7 @@ const TERMINAL_AIRPORTS = new Set(['TPS', 'PMO']);
 
 let activeSession = null;
 let currentLocale = 'it';
+let stopLegStatusSubscriptions = [];
 
 function isEnglish() {
   return window.EgadiI18n?.getLocale?.() === 'en';
@@ -739,13 +740,35 @@ async function renderMatchesSection(card, direction, leg) {
   }
 }
 
+// Solo l'etichetta di stato segue il server in diretta, mai i campi del
+// modulo: senza questo, una scheda apparsa già "confermata" o "bozza" alla
+// prima apertura pagina restava così anche dopo un salvataggio riuscito
+// altrove (es. un'altra scheda dello stesso dispositivo, o un salvataggio
+// admin), finché non si ricaricava tutta la pagina — fonte reale di
+// confusione ("dice che non è stato fatto" / "mi chiede di confermare
+// entrambi") scoperta il 23/09/2026 con Roberta Totaro.
+function watchLegStatus(card, direction) {
+  return onSnapshot(legReference(direction), (snapshot) => {
+    const leg = normalizeLeg(snapshot.exists() ? snapshot.data() : null, direction);
+    const copy = copyForLocale();
+    card.dataset.travelState = leg.state;
+    const badge = card.querySelector('[data-travel-state]');
+    if (badge) badge.textContent = leg.state === 'ready' ? copy.statusReady : copy.statusDraft;
+  }, (error) => {
+    console.error('Impossibile seguire in diretta lo stato di questa tratta.', error);
+  });
+}
+
 async function loadLegs() {
+  stopLegStatusSubscriptions.forEach((unsubscribe) => unsubscribe());
+  stopLegStatusSubscriptions = [];
   const snapshots = await Promise.all(DIRECTIONS.map((direction) => getDoc(legReference(direction))));
   const target = document.querySelector('#travelForms');
   const legs = DIRECTIONS.map((direction, index) => normalizeLeg(snapshots[index].exists() ? snapshots[index].data() : null, direction));
   const cards = DIRECTIONS.map((direction, index) => renderLegForm(direction, snapshots[index].exists() ? snapshots[index].data() : null));
   target.replaceChildren(...cards);
   await Promise.all(cards.map((card, index) => renderMatchesSection(card, DIRECTIONS[index], legs[index])));
+  stopLegStatusSubscriptions = cards.map((card, index) => watchLegStatus(card, DIRECTIONS[index]));
 }
 
 async function openTravelWorkspace(session) {
@@ -817,5 +840,16 @@ window.addEventListener('egadi:localechange', () => {
     return [direction, formData(card.querySelector('form'), direction, state)];
   }));
   const target = document.querySelector('#travelForms');
-  target.replaceChildren(...DIRECTIONS.map((direction) => renderLegForm(direction, pendingLegs.get(direction))));
+  const cards = DIRECTIONS.map((direction) => renderLegForm(direction, pendingLegs.get(direction)));
+  target.replaceChildren(...cards);
+  // Il cambio lingua ridisegna le card senza passare da loadLegs(): senza
+  // questo, gli ascoltatori in diretta dello stato restavano agganciati alle
+  // card precedenti (ormai rimosse dal DOM) e le nuove card smettevano di
+  // aggiornarsi finché non si ricaricava tutta la pagina.
+  stopLegStatusSubscriptions.forEach((unsubscribe) => unsubscribe());
+  stopLegStatusSubscriptions = cards.map((card, index) => watchLegStatus(card, DIRECTIONS[index]));
+});
+
+window.addEventListener('beforeunload', () => {
+  stopLegStatusSubscriptions.forEach((unsubscribe) => unsubscribe());
 });
