@@ -609,6 +609,29 @@ async function writeCrewTravelStatus(boatId, inviteId, direction, travelState, t
   }, { merge: true });
 }
 
+// L'equipaggio vede soltanto lo stato della propria richiesta: niente
+// nominativi, contatti, mezzi o note presenti nella coda dell'operatore.
+async function writeCrewTransferOperationStatus(record, revision) {
+  const boatId = asUid(record?.boatId);
+  const inviteId = asUid(record?.inviteId);
+  const direction = record?.direction;
+  if (!boatId || !inviteId || inviteId === 'skipper' || !['outbound', 'return'].includes(direction)) return;
+  const statusRef = db.doc(`boats/${boatId}/crewTravelStatus/${inviteId}`);
+  const statusKey = `${direction}OperationStatus`;
+  const revisionKey = `${direction}OperationRevision`;
+  const status = record?.recordState === 'active' ? safeStatus(record.status) : 'revoked';
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(statusRef);
+    if (Number(snapshot.data()?.[revisionKey] || 0) >= revision) return;
+    transaction.set(statusRef, {
+      inviteId,
+      [statusKey]: status,
+      [revisionKey]: revision,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+}
+
 exports.materializeCrewTravel = onDocumentWritten({
   document: 'boats/{boatId}/crewTravel/{inviteId}/legs/{direction}',
   region: REGION,
@@ -784,6 +807,7 @@ exports.copyTransferOperationsToBackup = onDocumentWritten({
   const backupRef = db.doc(`events/${EVENT_ID}/travelBackupRecords/${recordId}`);
   const source = after?.exists ? after.data() : null;
   const revision = sourceRevision(after?.exists ? after : event.data?.before, event.time);
+  await writeCrewTransferOperationStatus(source || { ...event.data?.before?.data(), recordState: 'revoked' }, revision);
   await db.runTransaction(async (transaction) => {
     const backup = await transaction.get(backupRef);
     if (!backup.exists || Number(backup.data().operatorRevision || 0) > revision) return;

@@ -18,11 +18,15 @@ let activeProjection = null;
 let activeCrewPayments = [];
 let activeCrewAnnouncements = [];
 let activePaymentInstructions = null;
+let activeCrewTravelStatus = null;
+let crewTravelStatusLoaded = false;
+let crewTravelStatusReadError = false;
 let stopPaymentSubscription = null;
 let stopAnnouncementSubscription = null;
 let stopContributionPlanSubscription = null;
 let stopProjectionSubscription = null;
 let stopPaymentInstructionsSubscription = null;
+let stopCrewTravelStatusSubscription = null;
 const CREW_DASHBOARD_HASHES = Object.freeze({
   overview: 'crew-panorama',
   profile: 'crew-profilo',
@@ -258,7 +262,7 @@ function renderCrewDashboardShell() {
       </button>
       <a class="dashboard-hub-card dashboard-hub-card-travel" href="${escapeHtml(i18n?.preserveLocaleUrl?.('travel.html') || 'travel.html')}">
         <span class="dashboard-hub-icon">${crewDashboardIcon('travel')}</span><span class="dashboard-hub-label">${escapeHtml(copy.travel)}</span>
-        <strong>${escapeHtml(copy.travelStatus)}</strong><small>${escapeHtml(copy.travelDetail)}</small>
+        <strong data-crew-summary="travel">${escapeHtml(copy.travelStatus)}</strong><small data-crew-detail="travel">${escapeHtml(copy.travelDetail)}</small>
       </a>
       <article class="dashboard-hub-card dashboard-hub-card-activity crew-dashboard-activity-card">
         <span class="dashboard-hub-icon">${crewDashboardIcon('activity')}</span><span class="dashboard-hub-label">${escapeHtml(copy.activity)}</span>
@@ -448,6 +452,10 @@ function renderCrewActivityTimeline({ profileReady, briefingReady, pendingPaymen
     },
     paymentActivity,
   ];
+  for (const direction of ['outbound', 'return']) {
+    const progress = crewTravelProgress(direction);
+    activity.push({ tone: progress.tone, label: progress.label, detail: progress.detail });
+  }
   if (latestAnnouncement) {
     const title = latestAnnouncement.title || localized('Comunicazione dello skipper', 'Skipper update');
     const publishedAt = formatDateTime(latestAnnouncement.createdAt);
@@ -463,6 +471,25 @@ function renderCrewActivityTimeline({ profileReady, briefingReady, pendingPaymen
       <div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.detail)}</small></div>
     </li>
   `).join('');
+}
+
+function crewTravelProgress(direction) {
+  const name = direction === 'outbound' ? localized('Andata', 'Outbound') : localized('Rientro', 'Return');
+  if (crewTravelStatusReadError) return { tone: 'attention', label: `${name} · ${localized('stato non disponibile', 'status unavailable')}`, detail: localized('Non riesco a leggere l’ultimo aggiornamento. Riprova tra poco.', 'I cannot read the latest update. Try again shortly.') };
+  if (!crewTravelStatusLoaded) return { tone: 'waiting', label: `${name} · ${localized('stato in aggiornamento', 'updating status')}`, detail: localized('Controllo l’ultimo stato salvato dal server.', 'Checking the latest state saved on the server.') };
+  const travelState = activeCrewTravelStatus?.[direction];
+  const transferState = activeCrewTravelStatus?.[`${direction}Transfer`];
+  const operation = activeCrewTravelStatus?.[`${direction}OperationStatus`];
+  const item = (tone, label, detail) => ({ tone, label: `${name} · ${label}`, detail });
+  if (!travelState || travelState === 'missing') return item('waiting', localized('da inserire', 'not added yet'), localized('Apri Arrivi e partenze per aggiungere questa tratta.', 'Open Arrivals and departures to add this journey.'));
+  if (travelState === 'draft') return item('attention', localized('bozza salvata', 'draft saved'), localized('Puoi completarla quando conosci gli orari.', 'Complete it when you know the times.'));
+  if (transferState === 'not_requested') return item('complete', localized('senza transfer organizzato', 'no organised transfer'), localized('Hai scelto di organizzare il collegamento autonomamente.', 'You chose to arrange this connection yourself.'));
+  if (transferState !== 'requested') return item('attention', localized('collegamento da scegliere', 'connection to choose'), localized('Se vuoi il transfer, selezionalo in questa tratta e dai il consenso.', 'If you need a transfer, select it for this journey and give your consent.'));
+  if (operation === 'planned') return item('update', localized('transfer in organizzazione', 'transfer being arranged'), localized('Il gestore sta preparando il collegamento.', 'The organiser is preparing the connection.'));
+  if (operation === 'confirmed') return item('complete', localized('transfer confermato', 'transfer confirmed'), localized('Il gestore ha confermato il collegamento; chiedigli i dettagli del ritrovo.', 'The organiser confirmed the connection; ask them for meeting details.'));
+  if (operation === 'completed') return item('complete', localized('transfer concluso', 'transfer completed'), localized('Il gestore ha segnato il collegamento come concluso.', 'The organiser marked the connection as completed.'));
+  if (operation === 'cancelled') return item('attention', localized('transfer annullato', 'transfer cancelled'), localized('Contatta lo skipper prima di partire.', 'Contact your skipper before travelling.'));
+  return item('waiting', localized('transfer richiesto', 'transfer requested'), localized('Richiesta salvata; il gestore non l’ha ancora confermata.', 'Request saved; the organiser has not confirmed it yet.'));
 }
 
 function renderCrewDashboardOverview() {
@@ -538,6 +565,9 @@ function renderCrewDashboardOverview() {
     moneyDetail,
   );
   setCrewDashboardMetric('profile', profileReady ? copy.profileReady : copy.profileWaiting, copy.profileDetail);
+  const outboundProgress = crewTravelProgress('outbound');
+  const returnProgress = crewTravelProgress('return');
+  setCrewDashboardMetric('travel', copy.travel, `${outboundProgress.label} · ${returnProgress.label}`);
   const readyItems = [profileReady, briefingReady].filter(Boolean).length;
   setCrewDashboardMetric(
     'activity',
@@ -1360,11 +1390,13 @@ function clearPersonalDashboard() {
   stopContributionPlanSubscription?.();
   stopProjectionSubscription?.();
   stopPaymentInstructionsSubscription?.();
+  stopCrewTravelStatusSubscription?.();
   stopPaymentSubscription = null;
   stopAnnouncementSubscription = null;
   stopContributionPlanSubscription = null;
   stopProjectionSubscription = null;
   stopPaymentInstructionsSubscription = null;
+  stopCrewTravelStatusSubscription = null;
   activeInvite = null;
   activeBriefing = null;
   activeRuleAcceptance = null;
@@ -1374,6 +1406,9 @@ function clearPersonalDashboard() {
   activeCrewPayments = [];
   activeCrewAnnouncements = [];
   activePaymentInstructions = null;
+  activeCrewTravelStatus = null;
+  crewTravelStatusLoaded = false;
+  crewTravelStatusReadError = false;
   ['#participantProfileSummary', '#participantPaymentList', '#participantFinanceSummary', '#boardingSchedule', '#participantSchedule', '#boardingRulesSummary', '#boardingRulesText', '#participantRulesSummary', '#participantRulesText', '#participantAnnouncementList', '#participantContributionIncluded', '#participantContributionSeparate'].forEach((selector) => {
     document.querySelector(selector).replaceChildren();
   });
@@ -1795,16 +1830,40 @@ function stopDashboardSubscriptions() {
   stopContributionPlanSubscription?.();
   stopProjectionSubscription?.();
   stopPaymentInstructionsSubscription?.();
+  stopCrewTravelStatusSubscription?.();
   stopPaymentSubscription = null;
   stopAnnouncementSubscription = null;
   stopContributionPlanSubscription = null;
   stopProjectionSubscription = null;
   stopPaymentInstructionsSubscription = null;
+  stopCrewTravelStatusSubscription = null;
   activePaymentInstructions = null;
+  activeCrewTravelStatus = null;
+  crewTravelStatusLoaded = false;
+  crewTravelStatusReadError = false;
 }
 
 function startDashboardSubscriptions() {
   if (!activeInvite) return;
+  if (!stopCrewTravelStatusSubscription) {
+    stopCrewTravelStatusSubscription = onSnapshot(
+      doc(db, 'boats', activeInvite.boatId, 'crewTravelStatus', activeInvite.id),
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) return;
+        crewTravelStatusLoaded = true;
+        crewTravelStatusReadError = false;
+        activeCrewTravelStatus = snapshot.exists() ? snapshot.data() : null;
+        renderCrewDashboardOverview();
+      },
+      (error) => {
+        console.error('Impossibile leggere lo stato personale del transfer.', error);
+        crewTravelStatusReadError = true;
+        activeCrewTravelStatus = null;
+        renderCrewDashboardOverview();
+      },
+    );
+  }
   if (!stopPaymentSubscription) {
     stopPaymentSubscription = onSnapshot(
       query(collection(db, 'boats', activeInvite.boatId, 'paymentRequests'), where('recipientId', '==', activeInvite.id)),

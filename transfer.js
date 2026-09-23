@@ -24,6 +24,7 @@ provider.setCustomParameters({ prompt: 'select_account' });
 
 const hero = document.querySelector('#transferHero');
 const root = document.querySelector('#transferApp');
+const roleSwitch = document.querySelector('#transferRoleSwitch');
 
 const COPY = {
   it: {
@@ -81,6 +82,7 @@ const COPY = {
     operatorTitle: 'Movimenti da organizzare.',
     operatorText: 'Qui compaiono solo le tratte per cui è stato richiesto il transfer con consenso. Le scelte ancora da fare restano nell’area skipper; per queste tratte puoi organizzare mezzo, punto e orario di ritrovo.',
     skipperArea: 'Torna all’area skipper',
+    switchContext: 'Sei nella gestione transfer',
     records: 'movimenti',
     inbound: 'andata',
     outbound: 'ritorno',
@@ -196,6 +198,7 @@ const COPY = {
     operatorTitle: 'Journeys to arrange.',
     operatorText: 'Only journeys with a transfer request and consent appear here. Choices still to be made remain in the skipper area; use this page to organise the vehicle, meeting point and time.',
     skipperArea: 'Back to skipper area',
+    switchContext: 'You are managing transfers',
     records: 'journeys',
     inbound: 'outbound',
     outbound: 'return',
@@ -764,10 +767,17 @@ function renderOperatorDashboard() {
   const filtered = state.records.filter(recordMatchesFilters);
   const stats = recordStats(state.records);
   const sheetUrl = state.isOrganizer ? safeSheetUrl(state.event?.transferSheetUrl) : '';
-  const skipperLink = state.hasSkipperBoat
-    ? `<a class="button button-light" href="area.html?lang=${escapeHtml(locale())}#skipper-equipaggio">${escapeHtml(t('skipperArea'))}</a>`
-    : '';
-  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions">${skipperLink}<button class="button button-light" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section><section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label><label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
+  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-light" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section><section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label><label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
+}
+
+function renderRoleSwitch() {
+  if (!roleSwitch) return;
+  roleSwitch.hidden = !state.user || !state.hasSkipperBoat;
+  if (roleSwitch.hidden) {
+    roleSwitch.replaceChildren();
+    return;
+  }
+  roleSwitch.innerHTML = `<span>${escapeHtml(t('switchContext'))}</span><a class="button button-ghost" href="area.html?lang=${escapeHtml(locale())}#skipper-equipaggio">← ${escapeHtml(t('skipperArea'))}</a>`;
 }
 
 function renderRecordListOnly() {
@@ -779,6 +789,7 @@ function renderRecordListOnly() {
 
 function render() {
   renderHero();
+  renderRoleSwitch();
   if (state.loading) {
     renderLoading();
     return;

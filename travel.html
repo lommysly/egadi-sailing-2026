@@ -10,6 +10,17 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css?v=20260923-transfer-status-v1" />
+  <style>
+    .crew-transfer-progress { display:grid; grid-template-columns:auto minmax(0,1fr); gap:12px; align-items:start; margin:0 0 18px; padding:15px 16px; border:1px solid rgba(8,123,138,.24); border-radius:13px; background:#f1fbfa; }
+    .crew-transfer-progress[hidden] { display:none; }
+    .crew-transfer-progress-icon { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#087b8a; color:white; font-weight:700; }
+    .crew-transfer-progress--draft .crew-transfer-progress-icon,.crew-transfer-progress--requested .crew-transfer-progress-icon { background:#ad772e; }
+    .crew-transfer-progress--cancelled .crew-transfer-progress-icon { background:#a83e35; }
+    .crew-transfer-progress .eyebrow { margin:0 0 5px; color:#087b8a; font-size:.62rem; }
+    .crew-transfer-progress strong,.crew-transfer-progress span:last-child { display:block; }
+    .crew-transfer-progress strong { color:#063644; font:600 1.07rem/1.2 "Fraunces",serif; }
+    .crew-transfer-progress span:last-child { margin-top:4px; color:#416b6d; font-size:.81rem; line-height:1.43; }
+  </style>
 </head>
 <body class="area-page area-crew">
   <a class="skip-link" href="#main-content" data-i18n="page.shared.skipToMain">Vai al contenuto principale</a>
@@ -64,6 +75,6 @@
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="i18n-crew.js?v=20260923-save-retry-v2"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="travel.js?v=20260923-persisted-status-v1"></script>
+  <script type="module" src="travel.js?v=20260923-transfer-progress-v1"></script>
 </body>
 </html>

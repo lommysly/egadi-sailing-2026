@@ -15,6 +15,11 @@ const TERMINAL_AIRPORTS = new Set(['TPS', 'PMO']);
 let activeSession = null;
 let currentLocale = 'it';
 let stopLegStatusSubscriptions = [];
+let stopTransferProgressSubscription = null;
+let currentTransferOperationStatus = {};
+let currentPersistedLegs = {};
+let transferProgressLoaded = false;
+let transferProgressReadError = false;
 
 function isEnglish() {
   return window.EgadiI18n?.getLocale?.() === 'en';
@@ -120,6 +125,17 @@ function copyForLocale() {
       confirm: { outbound: 'Confirm outbound trip', return: 'Confirm return trip' },
       update: { outbound: 'Save outbound changes', return: 'Save return changes' },
       savedStateLabel: 'Last saved state',
+      transferProgress: {
+        eyebrow: 'Organised transfer · live status',
+        loading: ['Updating status', 'Your request is saved. I am checking the latest update from the transfer organiser.'],
+        unavailable: ['Status unavailable', 'Your request is saved, but I cannot check the organiser’s latest update right now. Try again shortly.'],
+        draft: ['Trip still in draft', 'The organiser can see this transfer choice, but your trip details are not confirmed yet.'],
+        requested: ['Request saved', 'The transfer organiser has not confirmed your connection yet.'],
+        planning: ['Being arranged', 'The transfer organiser is working on your connection.'],
+        confirmed: ['Transfer confirmed', 'The organiser has confirmed this connection. Check with them for the meeting details.'],
+        completed: ['Transfer completed', 'This connection has been marked as completed.'],
+        cancelled: ['Transfer cancelled', 'The organiser has cancelled this request. Contact your skipper before travelling.'],
+      },
       draftSaved: 'Draft saved. You can come back and complete it whenever you like.',
       draftSavedTransfer: 'Draft saved with your transfer choice. The coordinator can see it as a trip still to complete.',
       draftSavedTransferNeedsAirport: 'Draft saved with transfer selected. Add Trapani (TPS) or Palermo (PMO) so the coordinator can use this request.',
@@ -246,6 +262,17 @@ function copyForLocale() {
     confirm: { outbound: 'Conferma andata', return: 'Conferma rientro' },
     update: { outbound: 'Salva modifiche andata', return: 'Salva modifiche rientro' },
     savedStateLabel: 'Ultimo stato salvato',
+    transferProgress: {
+      eyebrow: 'Transfer organizzato · stato aggiornato',
+      loading: ['Stato in aggiornamento', 'La richiesta è salvata. Controllo l’ultimo aggiornamento del gestore.'],
+      unavailable: ['Stato non disponibile', 'La richiesta è salvata, ma ora non riesco a leggere l’ultimo aggiornamento del gestore. Riprova tra poco.'],
+      draft: ['Viaggio ancora in bozza', 'Il gestore può vedere la scelta del transfer, ma i dati del viaggio non sono ancora confermati.'],
+      requested: ['Richiesta salvata', 'Il gestore non ha ancora confermato il collegamento.'],
+      planning: ['In organizzazione', 'Il gestore sta organizzando questo collegamento.'],
+      confirmed: ['Transfer confermato', 'Il gestore ha confermato il collegamento. Chiedigli i dettagli del ritrovo.'],
+      completed: ['Transfer concluso', 'Questo collegamento risulta completato.'],
+      cancelled: ['Transfer annullato', 'Il gestore ha annullato la richiesta. Contatta lo skipper prima di partire.'],
+    },
     draftSaved: 'Bozza salvata. Puoi tornare qui e completarla quando vuoi.',
     draftSavedTransfer: 'Bozza salvata con transfer selezionato. Il coordinatore potrà vederla come viaggio ancora da completare.',
     draftSavedTransferNeedsAirport: 'Bozza salvata con transfer selezionato. Indica Trapani (TPS) o Palermo (PMO) perché il coordinatore possa usare la richiesta.',
@@ -512,6 +539,7 @@ function renderLegForm(direction, rawLeg) {
         <div><p class="eyebrow">${labels.eyebrow}</p><h4>${labels.title}</h4><p>${labels.lead}</p></div>
       </div>
       <div class="skipper-travel-status" data-travel-persisted-status role="status" aria-live="polite"><span class="skipper-travel-status-icon" data-travel-persisted-icon aria-hidden="true"></span><div><strong data-travel-persisted-title></strong><span data-travel-persisted-detail></span></div></div>
+      <section class="crew-transfer-progress" data-transfer-progress aria-live="polite" hidden></section>
       <nav class="dashboard-view-navigation" data-travel-step-nav aria-label="${copy.stepNavLabel}">
         <button type="button" data-travel-step="trip">${TRAVEL_STEP_ICONS.trip}${copy.stepTrip}</button>
         <button type="button" data-travel-step="connection">${TRAVEL_STEP_ICONS.connection}${copy.stepConnection}</button>
@@ -662,9 +690,32 @@ function updatePersistedLegState(card, direction, leg, copy) {
   draftButton.hidden = leg.state === 'ready';
   draftButton.type = leg.state === 'ready' ? 'button' : 'submit';
   card.querySelector('[data-save-state="ready"]').textContent = leg.state === 'ready' ? copy.update[direction] : copy.confirm[direction];
+  renderTransferProgress(card, direction, currentPersistedLegs[direction] || leg, copy);
+}
+
+function renderTransferProgress(card, direction, leg, copy) {
+  const target = card.querySelector('[data-transfer-progress]');
+  if (leg.airportMarsalaChoice !== 'transfer' || !leg.transferOperatorConsent) {
+    target.hidden = true;
+    target.replaceChildren();
+    return;
+  }
+  const operational = currentTransferOperationStatus[`${direction}OperationStatus`];
+  let key = 'requested';
+  if (leg.state !== 'ready') key = 'draft';
+  else if (transferProgressReadError) key = 'unavailable';
+  else if (!transferProgressLoaded) key = 'loading';
+  else if (operational === 'planned') key = 'planning';
+  else if (['confirmed', 'completed', 'cancelled'].includes(operational)) key = operational;
+  const [title, detail] = copy.transferProgress[key];
+  const icon = key === 'confirmed' || key === 'completed' ? '✓' : key === 'cancelled' || key === 'draft' ? '!' : '•';
+  target.hidden = false;
+  target.className = `crew-transfer-progress crew-transfer-progress--${key}`;
+  target.innerHTML = `<span class="crew-transfer-progress-icon" aria-hidden="true">${icon}</span><div><p class="eyebrow">${copy.transferProgress.eyebrow}</p><strong>${title}</strong><span>${detail}</span></div>`;
 }
 
 function applySavedLegState(card, message, direction, leg, copy) {
+  currentPersistedLegs[direction] = leg;
   updatePersistedLegState(card, direction, leg, copy);
   setMessage(message, `${copy.direction[direction].eyebrow}: ${savedLegMessage(leg, copy)}`);
 }
@@ -839,6 +890,7 @@ function watchLegStatus(card, direction) {
   return onSnapshot(legReference(direction), { includeMetadataChanges: true }, (snapshot) => {
     if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) return;
     const leg = normalizeLeg(snapshot.exists() ? snapshot.data() : null, direction);
+    currentPersistedLegs[direction] = leg;
     const copy = copyForLocale();
     updatePersistedLegState(card, direction, leg, copy);
     const form = card.querySelector('form');
@@ -851,13 +903,36 @@ function watchLegStatus(card, direction) {
 async function loadLegs() {
   stopLegStatusSubscriptions.forEach((unsubscribe) => unsubscribe());
   stopLegStatusSubscriptions = [];
+  if (stopTransferProgressSubscription) stopTransferProgressSubscription();
+  currentTransferOperationStatus = {};
+  transferProgressLoaded = false;
+  transferProgressReadError = false;
   const snapshots = await Promise.all(DIRECTIONS.map((direction) => getDocFromServer(legReference(direction))));
   const target = document.querySelector('#travelForms');
   const legs = DIRECTIONS.map((direction, index) => normalizeLeg(snapshots[index].exists() ? snapshots[index].data() : null, direction));
+  currentPersistedLegs = Object.fromEntries(DIRECTIONS.map((direction, index) => [direction, legs[index]]));
   const cards = DIRECTIONS.map((direction, index) => renderLegForm(direction, snapshots[index].exists() ? snapshots[index].data() : null));
   target.replaceChildren(...cards);
   await Promise.all(cards.map((card, index) => renderMatchesSection(card, DIRECTIONS[index], legs[index])));
   stopLegStatusSubscriptions = cards.map((card, index) => watchLegStatus(card, DIRECTIONS[index]));
+  const progressRef = doc(db, 'boats', activeSession.invite.boatId, 'crewTravelStatus', activeSession.invite.id);
+  stopTransferProgressSubscription = onSnapshot(progressRef, { includeMetadataChanges: true }, (snapshot) => {
+    if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) return;
+    transferProgressLoaded = true;
+    transferProgressReadError = false;
+    currentTransferOperationStatus = snapshot.exists() ? snapshot.data() : {};
+    document.querySelectorAll('[data-travel-direction]').forEach((card) => {
+      const direction = card.dataset.travelDirection;
+      renderTransferProgress(card, direction, currentPersistedLegs[direction] || defaultLeg(direction), copyForLocale());
+    });
+  }, (error) => {
+    console.error('Impossibile aggiornare lo stato operativo del transfer.', error);
+    transferProgressReadError = true;
+    document.querySelectorAll('[data-travel-direction]').forEach((card) => {
+      const direction = card.dataset.travelDirection;
+      renderTransferProgress(card, direction, currentPersistedLegs[direction] || defaultLeg(direction), copyForLocale());
+    });
+  });
 }
 
 async function openTravelWorkspace(session) {
@@ -932,7 +1007,8 @@ window.addEventListener('egadi:localechange', () => {
   const target = document.querySelector('#travelForms');
   const cards = DIRECTIONS.map((direction) => {
     const pending = pendingLegs.get(direction);
-    const card = renderLegForm(direction, pending.leg);
+    const card = renderLegForm(direction, currentPersistedLegs[direction] || pending.leg);
+    if (pending.dirty) populateLegForm(card.querySelector('form'), pending.leg);
     card.querySelector('form').dataset.travelDirty = String(pending.dirty);
     return card;
   });
@@ -947,4 +1023,5 @@ window.addEventListener('egadi:localechange', () => {
 
 window.addEventListener('beforeunload', () => {
   stopLegStatusSubscriptions.forEach((unsubscribe) => unsubscribe());
+  if (stopTransferProgressSubscription) stopTransferProgressSubscription();
 });
