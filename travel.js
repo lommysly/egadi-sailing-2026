@@ -1,6 +1,6 @@
 import { getApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
-import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { crewAccessErrorMessage, crewAccessUrl, db, personalAreaUrl, profileUrl, startCrewAreaSession, withSaveRetry } from './crew-session.js?v=20260923-save-retry-v2';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260920-travel-private-v1';
 
@@ -118,6 +118,8 @@ function copyForLocale() {
       matchClosed: 'This match is no longer available.',
       saveDraft: 'Save draft',
       confirm: { outbound: 'Confirm outbound trip', return: 'Confirm return trip' },
+      update: { outbound: 'Save outbound changes', return: 'Save return changes' },
+      savedStateLabel: 'Last saved state',
       draftSaved: 'Draft saved. You can come back and complete it whenever you like.',
       draftSavedTransfer: 'Draft saved with your transfer choice. The coordinator can see it as a trip still to complete.',
       draftSavedTransferNeedsAirport: 'Draft saved with transfer selected. Add Trapani (TPS) or Palermo (PMO) so the coordinator can use this request.',
@@ -242,6 +244,8 @@ function copyForLocale() {
     matchClosed: 'Questo abbinamento non è più disponibile.',
     saveDraft: 'Salva bozza',
     confirm: { outbound: 'Conferma andata', return: 'Conferma rientro' },
+    update: { outbound: 'Salva modifiche andata', return: 'Salva modifiche rientro' },
+    savedStateLabel: 'Ultimo stato salvato',
     draftSaved: 'Bozza salvata. Puoi tornare qui e completarla quando vuoi.',
     draftSavedTransfer: 'Bozza salvata con transfer selezionato. Il coordinatore potrà vederla come viaggio ancora da completare.',
     draftSavedTransferNeedsAirport: 'Bozza salvata con transfer selezionato. Indica Trapani (TPS) o Palermo (PMO) perché il coordinatore possa usare la richiesta.',
@@ -507,6 +511,7 @@ function renderLegForm(direction, rawLeg) {
         <span class="skipper-travel-direction${direction === 'return' ? ' is-return' : ''}" aria-hidden="true">${direction === 'outbound' ? '→' : '←'}</span>
         <div><p class="eyebrow">${labels.eyebrow}</p><h4>${labels.title}</h4><p>${labels.lead}</p></div>
       </div>
+      <div class="skipper-travel-status" data-travel-persisted-status role="status" aria-live="polite"><span class="skipper-travel-status-icon" data-travel-persisted-icon aria-hidden="true"></span><div><strong data-travel-persisted-title></strong><span data-travel-persisted-detail></span></div></div>
       <nav class="dashboard-view-navigation" data-travel-step-nav aria-label="${copy.stepNavLabel}">
         <button type="button" data-travel-step="trip">${TRAVEL_STEP_ICONS.trip}${copy.stepTrip}</button>
         <button type="button" data-travel-step="connection">${TRAVEL_STEP_ICONS.connection}${copy.stepConnection}</button>
@@ -547,6 +552,7 @@ function renderLegForm(direction, rawLeg) {
   const form = card.querySelector('form');
   form.dataset.saveState = 'draft';
   populateLegForm(form, leg);
+  updatePersistedLegState(card, direction, leg, copy);
   bindLegForm(form, direction);
   bindTravelStepNav(card);
   setTravelStep(card, 'trip');
@@ -643,15 +649,31 @@ function setSaving(form, saving) {
   form.querySelectorAll('[data-save-state]').forEach((button) => { button.disabled = saving; });
 }
 
-function applySavedLegState(card, message, direction, leg, copy) {
+function updatePersistedLegState(card, direction, leg, copy) {
   card.dataset.travelState = leg.state;
-  card.querySelector('[data-travel-state]').textContent = legStatusText(leg, copy);
+  const status = legStatusText(leg, copy);
+  card.querySelector('[data-travel-state]').textContent = status;
+  card.querySelector('[data-travel-persisted-title]').textContent = status;
+  card.querySelector('[data-travel-persisted-detail]').textContent = copy.savedStateLabel;
+  const icon = card.querySelector('[data-travel-persisted-icon]');
+  icon.textContent = leg.state === 'ready' ? '✓' : '!';
+  icon.classList.toggle('is-pending', leg.state !== 'ready');
+  const draftButton = card.querySelector('[data-save-state="draft"]');
+  draftButton.hidden = leg.state === 'ready';
+  draftButton.type = leg.state === 'ready' ? 'button' : 'submit';
+  card.querySelector('[data-save-state="ready"]').textContent = leg.state === 'ready' ? copy.update[direction] : copy.confirm[direction];
+}
+
+function applySavedLegState(card, message, direction, leg, copy) {
+  updatePersistedLegState(card, direction, leg, copy);
   setMessage(message, `${copy.direction[direction].eyebrow}: ${savedLegMessage(leg, copy)}`);
 }
 
 function bindLegForm(form, direction) {
   installTravelAutocomplete(form);
+  form.addEventListener('input', () => { form.dataset.travelDirty = 'true'; });
   form.addEventListener('change', () => {
+    form.dataset.travelDirty = 'true';
     updateConditionalFields(form);
     const message = form.querySelector('[data-travel-message]');
     if (message.classList.contains('is-error')) setMessage(message, '');
@@ -710,6 +732,8 @@ function bindLegForm(form, direction) {
         () => setDoc(legReference(direction), payload),
         () => setMessage(message, copy.verifying),
       );
+      form.dataset.travelDirty = 'false';
+      populateLegForm(form, leg);
       applySavedLegState(card, message, direction, leg, copy);
       try {
         await renderMatchesSection(card, direction, leg);
@@ -808,20 +832,17 @@ async function renderMatchesSection(card, direction, leg) {
   }
 }
 
-// Solo l'etichetta di stato segue il server in diretta, mai i campi del
-// modulo: senza questo, una scheda apparsa già "confermata" o "bozza" alla
-// prima apertura pagina restava così anche dopo un salvataggio riuscito
-// altrove (es. un'altra scheda dello stesso dispositivo, o un salvataggio
-// admin), finché non si ricaricava tutta la pagina — fonte reale di
-// confusione ("dice che non è stato fatto" / "mi chiede di confermare
-// entrambi") scoperta il 23/09/2026 con Roberta Totaro.
+// Aggiorna lo stato dal server e riallinea i campi solo se la persona non
+// sta compilando modifiche. Una lettura locale obsoleta non deve far apparire
+// di nuovo "da confermare" una tratta già salvata.
 function watchLegStatus(card, direction) {
-  return onSnapshot(legReference(direction), (snapshot) => {
+  return onSnapshot(legReference(direction), { includeMetadataChanges: true }, (snapshot) => {
+    if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) return;
     const leg = normalizeLeg(snapshot.exists() ? snapshot.data() : null, direction);
     const copy = copyForLocale();
-    card.dataset.travelState = leg.state;
-    const badge = card.querySelector('[data-travel-state]');
-    if (badge) badge.textContent = legStatusText(leg, copy);
+    updatePersistedLegState(card, direction, leg, copy);
+    const form = card.querySelector('form');
+    if (form?.dataset.travelDirty !== 'true') populateLegForm(form, leg);
   }, (error) => {
     console.error('Impossibile seguire in diretta lo stato di questa tratta.', error);
   });
@@ -830,7 +851,7 @@ function watchLegStatus(card, direction) {
 async function loadLegs() {
   stopLegStatusSubscriptions.forEach((unsubscribe) => unsubscribe());
   stopLegStatusSubscriptions = [];
-  const snapshots = await Promise.all(DIRECTIONS.map((direction) => getDoc(legReference(direction))));
+  const snapshots = await Promise.all(DIRECTIONS.map((direction) => getDocFromServer(legReference(direction))));
   const target = document.querySelector('#travelForms');
   const legs = DIRECTIONS.map((direction, index) => normalizeLeg(snapshots[index].exists() ? snapshots[index].data() : null, direction));
   const cards = DIRECTIONS.map((direction, index) => renderLegForm(direction, snapshots[index].exists() ? snapshots[index].data() : null));
@@ -905,10 +926,16 @@ window.addEventListener('egadi:localechange', () => {
   const pendingLegs = new Map([...document.querySelectorAll('[data-travel-direction]')].map((card) => {
     const direction = card.dataset.travelDirection;
     const state = card.dataset.travelState === 'ready' ? 'ready' : 'draft';
-    return [direction, formData(card.querySelector('form'), direction, state)];
+    const form = card.querySelector('form');
+    return [direction, { leg: formData(form, direction, state), dirty: form.dataset.travelDirty === 'true' }];
   }));
   const target = document.querySelector('#travelForms');
-  const cards = DIRECTIONS.map((direction) => renderLegForm(direction, pendingLegs.get(direction)));
+  const cards = DIRECTIONS.map((direction) => {
+    const pending = pendingLegs.get(direction);
+    const card = renderLegForm(direction, pending.leg);
+    card.querySelector('form').dataset.travelDirty = String(pending.dirty);
+    return card;
+  });
   target.replaceChildren(...cards);
   // Il cambio lingua ridisegna le card senza passare da loadLegs(): senza
   // questo, gli ascoltatori in diretta dello stato restavano agganciati alle
