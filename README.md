@@ -248,6 +248,8 @@ Nel modulo equipaggio, la conferma di un volo richiede una scelta esplicita per 
 
 Il portale `transfer.html` legge soltanto le schede aeroportuali materializzate dal server in `transferOpsRecords` dopo scelta e consenso. L'accesso è nominativo e limitato all'organizzazione e agli operatori attivi. Il backup operativo in `travelBackupRecords` non è leggibile dal browser; il foglio Google privato riceve la copia prevista dal processo. I contatti per i passaggi fra partecipanti sono rivelati solo dopo doppia accettazione dello stesso abbinamento. I test live conclusivi e l'informativa definitiva restano nella checklist.
 
+Il riepilogo skipper delle tratte legge `crewTravelStatus`: conta anche un viaggio già salvato se la scelta del collegamento aeroporto–Marsala è ancora vuota. La coda della società transfer, invece, mostra esclusivamente le richieste con consenso esplicito; la differenza fra i due conteggi non indica da sola una perdita di dati. Chi è contemporaneamente skipper e referente transfer trova nel portale il collegamento diretto all'area skipper senza uscire. Il foglio di backup registra anche le tratte senza richiesta, oscurando nome e contatto quando il consenso transfer manca; in questo caso indica «Transfer da scegliere» o «Transfer non richiesto», mai «Revocato» per un viaggio tuttora attivo.
+
 ## Attivazione operativa
 
 1. Il sorgente, le Security Rules e il dominio HTTPS sono pubblicati.

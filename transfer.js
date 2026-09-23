@@ -79,7 +79,8 @@ const COPY = {
     approved: 'Operatore abilitato',
     operatorEyebrow: 'Area transfer attiva',
     operatorTitle: 'Movimenti da organizzare.',
-    operatorText: 'Aggiorna qui l’assegnazione del mezzo, il punto e l’orario di ritrovo. Le informazioni personali arrivano solo dalle persone che hanno accettato di condividerle con il servizio.',
+    operatorText: 'Qui compaiono solo le tratte per cui è stato richiesto il transfer con consenso. Le scelte ancora da fare restano nell’area skipper; per queste tratte puoi organizzare mezzo, punto e orario di ritrovo.',
+    skipperArea: 'Torna all’area skipper',
     records: 'movimenti',
     inbound: 'andata',
     outbound: 'ritorno',
@@ -193,7 +194,8 @@ const COPY = {
     approved: 'Operator enabled',
     operatorEyebrow: 'Transfer area active',
     operatorTitle: 'Journeys to arrange.',
-    operatorText: 'Use this area to set the vehicle, meeting point and meeting time. Personal information is shown only when the traveller agreed to share it with the service.',
+    operatorText: 'Only journeys with a transfer request and consent appear here. Choices still to be made remain in the skipper area; use this page to organise the vehicle, meeting point and time.',
+    skipperArea: 'Back to skipper area',
     records: 'journeys',
     inbound: 'outbound',
     outbound: 'return',
@@ -260,6 +262,7 @@ const state = {
   user: null,
   event: null,
   isOrganizer: false,
+  hasSkipperBoat: false,
   operator: null,
   accessRequest: null,
   accessRequests: [],
@@ -761,7 +764,10 @@ function renderOperatorDashboard() {
   const filtered = state.records.filter(recordMatchesFilters);
   const stats = recordStats(state.records);
   const sheetUrl = state.isOrganizer ? safeSheetUrl(state.event?.transferSheetUrl) : '';
-  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-light" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section><section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label><label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
+  const skipperLink = state.hasSkipperBoat
+    ? `<a class="button button-light" href="area.html?lang=${escapeHtml(locale())}#skipper-equipaggio">${escapeHtml(t('skipperArea'))}</a>`
+    : '';
+  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions">${skipperLink}<button class="button button-light" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section><section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label><label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
 }
 
 function renderRecordListOnly() {
@@ -856,6 +862,7 @@ async function refreshAccess() {
   state.error = '';
   state.event = null;
   state.isOrganizer = false;
+  state.hasSkipperBoat = false;
   state.operator = null;
   state.accessRequest = null;
   state.accessRequests = [];
@@ -884,6 +891,12 @@ async function refreshAccess() {
       console.info('Accesso transfer senza privilegi organizzatore.', eventError.code || eventError);
       state.event = null;
       state.isOrganizer = false;
+    }
+    try {
+      const boatSnapshot = await getDoc(doc(db, 'boats', state.user.uid));
+      state.hasSkipperBoat = boatSnapshot.exists() && boatSnapshot.data()?.skipperId === state.user.uid;
+    } catch (_) {
+      state.hasSkipperBoat = false;
     }
     state.operator = operatorSnapshot.exists() ? { id: operatorSnapshot.id, ...operatorSnapshot.data() } : null;
     state.accessRequest = requestSnapshot.exists() ? { id: requestSnapshot.id, ...requestSnapshot.data() } : null;

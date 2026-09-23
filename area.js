@@ -5547,8 +5547,8 @@ function renderCrewTravelOverview() {
   }).join('');
   section.hidden = false;
   const heading = pendingCount
-    ? `<h4>${pendingCount} ${pendingCount === 1 ? 'persona non ha ancora confermato' : 'persone non hanno ancora confermato'} andata o ritorno</h4><p class="panel-lead">Controlla chi manca e manda un sollecito diretto su WhatsApp.</p>`
-    : '<h4>Tutti hanno confermato andata e ritorno ✓</h4>';
+    ? `<h4>${pendingCount} ${pendingCount === 1 ? 'persona deve ancora completare' : 'persone devono ancora completare'} andata o ritorno</h4><p class="panel-lead">“Transfer da scegliere” significa che il viaggio è salvato, ma manca la scelta del collegamento con Marsala. Nella gestione transfer compaiono solo le richieste con consenso. Puoi inviare un promemoria su WhatsApp.</p>`
+    : '<h4>Tutti hanno completato andata e ritorno ✓</h4>';
   section.innerHTML = `<p class="eyebrow">Viaggio equipaggio</p>${heading}<div class="crew-travel-list">${rows}</div>`;
 }
 

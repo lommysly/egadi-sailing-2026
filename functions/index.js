@@ -6,6 +6,7 @@ const { logger } = require('firebase-functions');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { google } = require('googleapis');
+const { sheetTransferRequestLabel, sheetTravelStatusLabel } = require('./sheet-status');
 
 initializeApp();
 
@@ -781,25 +782,28 @@ exports.copyTransferOperationsToBackup = onDocumentWritten({
   const { recordId } = event.params;
   const after = event.data?.after;
   const backupRef = db.doc(`events/${EVENT_ID}/travelBackupRecords/${recordId}`);
-  const backup = await backupRef.get();
-  if (!backup.exists) return;
   const source = after?.exists ? after.data() : null;
   const revision = sourceRevision(after?.exists ? after : event.data?.before, event.time);
-  const changes = source && source.recordState === 'active'
-    ? { ...safeOperationalFields(source), operatorRevision: revision, updatedAt: FieldValue.serverTimestamp() }
-    : {
-        status: 'revoked',
-        assignedOperatorUid: '',
-        groupName: '',
-        vehicleName: '',
-        meetingPoint: '',
-        meetingDate: '',
-        meetingTime: '',
-        operatorNotes: '',
-        operatorRevision: revision,
-        updatedAt: FieldValue.serverTimestamp(),
-      };
-  await backupRef.set(changes, { merge: true });
+  await db.runTransaction(async (transaction) => {
+    const backup = await transaction.get(backupRef);
+    if (!backup.exists || Number(backup.data().operatorRevision || 0) > revision) return;
+    const changes = source && source.recordState === 'active'
+      ? { ...safeOperationalFields(source), operatorRevision: revision, updatedAt: FieldValue.serverTimestamp() }
+      : {
+          // Revocare la richiesta al gestore non revoca il viaggio salvato.
+          status: backup.data().recordState === 'active' ? 'new' : 'revoked',
+          assignedOperatorUid: '',
+          groupName: '',
+          vehicleName: '',
+          meetingPoint: '',
+          meetingDate: '',
+          meetingTime: '',
+          operatorNotes: '',
+          operatorRevision: revision,
+          updatedAt: FieldValue.serverTimestamp(),
+        };
+    transaction.set(backupRef, changes, { merge: true });
+  });
 });
 
 // Tre fogli separati invece di uno solo "ingegneristico": Arrivi e Partenze
@@ -807,14 +811,6 @@ exports.copyTransferOperationsToBackup = onDocumentWritten({
 // riferimenti per chi deve davvero incrociare un dato con Firestore.
 const HUMAN_SHEET_NAMES = { outbound: 'Arrivi', return: 'Partenze' };
 const TECHNICAL_SHEET_NAME = 'Tecnico';
-const TRANSFER_STATUS_LABELS = {
-  new: 'Da pianificare',
-  planned: 'Pianificato',
-  confirmed: 'Confermato',
-  completed: 'Completato',
-  cancelled: 'Annullato',
-  revoked: 'Revocato',
-};
 // Struttura e colonne ricalcano deliberatamente il foglio "Arrivi/Partenze
 // EGADI 2025" già collaudato dal titolare l'anno scorso (chiaro, essenziale,
 // niente colonne che non servono a organizzare i transfer): nome/cognome
@@ -837,9 +833,9 @@ function humanSheetRow(record) {
     [record.destinationCity, record.destinationAirport].filter(Boolean).join(' · ') || record.airport || '',
     record.date || '',
     record.time || '',
-    record.transferRequested === true ? 'Sì' : 'No',
+    sheetTransferRequestLabel(record),
     [record.meetingPoint, record.meetingDate, record.meetingTime].filter(Boolean).join(' · '),
-    record.legState === 'draft' ? 'Bozza, non confermata' : (TRANSFER_STATUS_LABELS[record.status] || record.status || ''),
+    sheetTravelStatusLabel(record),
   ];
 }
 
