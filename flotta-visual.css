@@ -43,6 +43,7 @@
 .fleet-visual-hero-media figcaption {
   position: absolute;
   z-index: 2;
+  left: clamp(24px, 6vw, 92px);
   right: clamp(24px, 6vw, 92px);
   bottom: 22px;
   margin: 0;
@@ -50,6 +51,7 @@
   font: 500 .65rem/1.35 "DM Mono", monospace;
   letter-spacing: .08em;
   text-transform: uppercase;
+  text-align: right;
 }
 
 .fleet-visual-hero-media figcaption a {
