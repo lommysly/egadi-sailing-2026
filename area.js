@@ -2837,7 +2837,12 @@ function isManualPaymentReceipt(payment) {
   return payment?.entryType === 'manual_receipt';
 }
 
+function isSelfReportedPayment(payment) {
+  return payment?.entryType === 'self_reported';
+}
+
 function paymentInstallmentLabel(payment) {
+  if (isSelfReportedPayment(payment)) return 'Segnalato dalla persona';
   if (isManualPaymentReceipt(payment) && payment?.installmentType === 'advance') return 'Acconto già ricevuto';
   if (payment?.installmentType === 'balance') return 'Saldo richiesto';
   if (payment?.installmentType === 'full') return 'Quota richiesta';
@@ -5671,28 +5676,34 @@ function renderPayments(snapshot) {
     const name = recipientName(recipientId);
     const amount = formatCurrency(paymentAmount(payment));
     const manualReceipt = isManualPaymentReceipt(payment);
-    const reason = manualReceipt
+    const selfReported = isSelfReportedPayment(payment);
+    const reason = manualReceipt || selfReported
       ? paymentInstallmentLabel(payment)
       : `${paymentInstallmentLabel(payment)} · ${payment.reason || 'Contributo weekend'}${payment.isOptional ? ' · Facoltativo' : ''}`;
     const dueDate = manualReceipt
       ? payment.receivedOn ? ` · ricevuto il ${formatDate(payment.receivedOn)}` : ''
-      : payment.dueDate ? ` · Entro ${formatDate(payment.dueDate)}` : '';
+      : !selfReported && payment.dueDate ? ` · Entro ${formatDate(payment.dueDate)}` : '';
     const status = paymentStatusLabel(payment);
     const canUpdateStatus = !manualReceipt && isPendingPayment(payment);
     const statusActions = canUpdateStatus
       ? `<button class="text-button" type="button" data-verify-payment="${escapeHtml(payment.id)}">Conferma accredito</button><button class="text-button" type="button" data-cancel-payment="${escapeHtml(payment.id)}">Annulla richiesta</button>`
       : '';
     const pendingInvite = activeInvites.find((invite) => invite.id === recipientId && invite.status === 'pending' && invite.accessKey);
-    const hasWhatsappRecipient = !manualReceipt && Boolean(paymentRecipientWhatsappNumber(recipientId));
+    const hasWhatsappRecipient = !manualReceipt && !selfReported && Boolean(paymentRecipientWhatsappNumber(recipientId));
     const primaryDeliveryAction = pendingInvite
       ? `<a class="text-button payment-action-control payment-action-primary" href="${escapeHtml(whatsappUrl(pendingInvite))}" title="Apri WhatsApp con l’invito personale">${whatsappActionIconMarkup()}<span>Invia invito su WhatsApp</span></a>`
       : hasWhatsappRecipient
         ? `<button class="text-button payment-action-control payment-action-primary" type="button" data-whatsapp-payment="${escapeHtml(payment.id)}" title="Apri WhatsApp con la richiesta di quota">${whatsappActionIconMarkup()}<span>Invia richiesta su WhatsApp</span></button>`
         : '';
-    const legacyInstructions = payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
+    const legacyInstructions = !selfReported && payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
+    const selfReportedMethodLabel = selfReported
+      ? PAYMENT_METHODS.find((method) => method.id === payment.declaredMethod)?.label || payment.declaredMethod
+      : '';
     const methods = manualReceipt
       ? '<span>Registrazione manuale verificata dallo skipper: non contiene link o coordinate di pagamento.</span>'
-      : paymentMethodTags(payment) || '<span>Metodo da concordare nello scambio WhatsApp.</span>';
+      : selfReported
+        ? `<span>Segnalato direttamente dalla persona con ${escapeHtml(selfReportedMethodLabel)}: controlla l’accredito reale prima di confermare.</span>`
+        : paymentMethodTags(payment) || '<span>Metodo da concordare nello scambio WhatsApp.</span>';
     const accountingTag = paymentCountsTowardCostPlan(payment)
       ? '<span class="payment-accounting-tag">Spese della barca</span>'
       : '';

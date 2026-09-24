@@ -2093,6 +2093,68 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['declaredAt', 'declaredBy', 'declaredMethod']);
     }
 
+    // Non tutti pagano dopo una richiesta nominale dello skipper: chi versa
+    // di propria iniziativa deve poter segnalarlo subito, invece di restare
+    // senza alcun pulsante finché lo skipper non prepara una richiesta (caso
+    // reale del 24/09/2026, Carla Olivieri). La persona può creare soltanto
+    // una richiesta già "dichiarata" a se stessa: non ottiene mai lo stato
+    // 'verified' né sceglie la categoria contabile o il collegamento alla
+    // barca dello skipper — resta un promemoria da verificare, esattamente
+    // come una dichiarazione su una richiesta esistente (canDeclarePayment).
+    function isValidSelfReportedPaymentCreate(boatId) {
+      let access = get(/databases/$(database)/documents/crewAccess/$(request.auth.uid));
+      let inviteId = access.data.inviteId;
+      let invite = get(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId));
+      let board = get(/databases/$(database)/documents/boats/$(boatId)/briefing/board);
+      let acceptance = get(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId));
+      return isPasswordCrew()
+        && exists(/databases/$(database)/documents/crewAccess/$(request.auth.uid))
+        && access.data.userId == request.auth.uid
+        && access.data.loginEmail == request.auth.token.email
+        && access.data.boatId == boatId
+        && access.data.inviteId is string
+        && exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId))
+        && invite.data.status == 'active'
+        && invite.data.participantUid == request.auth.uid
+        && exists(/databases/$(database)/documents/boats/$(boatId)/briefing/board)
+        && board.data.rulesText is string
+        && board.data.rulesText.size() > 0
+        && board.data.rulesVersion is int
+        && exists(/databases/$(database)/documents/boats/$(boatId)/ruleAcceptances/$(inviteId))
+        && acceptance.data.inviteId == inviteId
+        && acceptance.data.acceptedBy == request.auth.uid
+        && acceptance.data.rulesVersion == board.data.rulesVersion
+        && (!board.data.keys().hasAll(['fullRulesRequired'])
+          || board.data.fullRulesRequired != true
+          || (acceptance.data.keys().hasAll(['fullRulesRead']) && acceptance.data.fullRulesRead == true))
+        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'entryType', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy', 'declaredAt', 'declaredBy', 'declaredMethod'])
+        && request.resource.data.recipientId == inviteId
+        && request.resource.data.memberId == inviteId
+        && request.resource.data.payerInviteId == inviteId
+        && request.resource.data.entryType == 'self_reported'
+        && request.resource.data.amountCents is int
+        && request.resource.data.amountCents >= 1
+        && request.resource.data.amountCents <= 1000000
+        && request.resource.data.currency == 'EUR'
+        && request.resource.data.reason == 'Pagamento segnalato dalla persona'
+        && request.resource.data.accountingCategory == 'cost_recovery'
+        && request.resource.data.isOptional == false
+        && request.resource.data.dueDate == ''
+        && hasValidEmptyPaymentMethodSelection(request.resource.data.paymentMethods)
+        && request.resource.data.status == 'prepared'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.verifiedAt == null
+        && request.resource.data.verifiedBy == null
+        && request.resource.data.cancelledAt == null
+        && request.resource.data.cancelledBy == null
+        && request.resource.data.declaredAt == request.time
+        && request.resource.data.declaredBy == request.auth.uid
+        && request.resource.data.declaredMethod is string
+        && request.resource.data.declaredMethod.size() > 0
+        && request.resource.data.declaredMethod.size() <= 40;
+    }
+
     // La vetrina pubblica non riusa mai /boats: quel documento contiene
     // identificativi tecnici e metadati privati. Una mappa privata e
     // immutabile lega l'ID casuale al solo skipper che l'ha creato.
@@ -2540,15 +2602,18 @@ service cloud.firestore {
         // Il profilo di incasso protegge le sole richieste da inviare. Una
         // ricevuta manuale non propone canali di pagamento e può documentare
         // un acconto già raccolto prima della configurazione del profilo.
+        // Chi non è skipper può creare soltanto una segnalazione già
+        // "dichiarata" su se stesso (vedi isValidSelfReportedPaymentCreate).
         allow create: if isPrivateAreaOpen()
-          && isSkipper(boatId)
-          // La diramazione evita di valutare anche il profilo e tutti i suoi
-          // link quando il payload è una ricevuta manuale già verificata.
-          && ((request.resource.data.keys().hasAll(['entryType'])
-              && request.resource.data.entryType == 'manual_receipt')
-            ? isValidManualReceiptCreate(boatId)
-            : (collectionProfileExists(boatId)
-              && isValidPaymentRequestCreate(boatId)));
+          && (isSkipper(boatId)
+            // La diramazione evita di valutare anche il profilo e tutti i suoi
+            // link quando il payload è una ricevuta manuale già verificata.
+            ? ((request.resource.data.keys().hasAll(['entryType'])
+                && request.resource.data.entryType == 'manual_receipt')
+              ? isValidManualReceiptCreate(boatId)
+              : (collectionProfileExists(boatId)
+                && isValidPaymentRequestCreate(boatId)))
+            : isValidSelfReportedPaymentCreate(boatId));
         allow update: if isPrivateAreaOpen()
           && ((isSkipper(boatId)
               && (canVerifyPayment()

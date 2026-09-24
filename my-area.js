@@ -1,5 +1,5 @@
-import { collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { auth, crewAccessErrorMessage, crewAccessUrl, db, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260923-stale-check-v3';
+import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { auth, crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260923-stale-check-v3';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 
 watchForStaleScript(import.meta.url);
@@ -314,6 +314,11 @@ function setupCrewDashboard() {
     const declareButton = event.target.closest('[data-declare-payment]');
     if (declareButton && dashboard.contains(declareButton)) {
       declareCrewPayment(declareButton.dataset.declarePayment, declareButton.closest('[data-payment-declare-id]'));
+      return;
+    }
+    const reportButton = event.target.closest('[data-report-payment]');
+    if (reportButton && dashboard.contains(reportButton)) {
+      reportCrewPayment(reportButton.closest('[data-payment-self-report]'));
       return;
     }
     const rulesReference = event.target.closest('[data-rules-reference="deposit"]');
@@ -801,6 +806,10 @@ function isManualCrewReceipt(payment) {
   return payment?.entryType === 'manual_receipt';
 }
 
+function isSelfReportedCrewPayment(payment) {
+  return payment?.entryType === 'self_reported';
+}
+
 function paymentInstallmentKind(payment) {
   const value = String(payment?.installmentType || '').trim().toLowerCase();
   if (value === 'advance') return 'advance';
@@ -811,6 +820,7 @@ function paymentInstallmentKind(payment) {
 }
 
 function paymentInstallmentLabel(payment) {
+  if (isSelfReportedCrewPayment(payment)) return localized('Segnalato da te', 'Reported by you');
   const labels = {
     advance: localized('Acconto', 'Advance'),
     balance: localized('Saldo', 'Balance'),
@@ -1106,7 +1116,105 @@ function participantPaymentInstructionsMarkup(onlineContribution) {
     <div class="participant-payment-causale"><span>${escapeHtml(localized('Causale consigliata', 'Suggested payment reference'))}</span><code>${escapeHtml(causale)}</code>${paymentInstructionCopyControl(causale, localized('Copia causale', 'Copy reference'))}</div>
     <p class="participant-payment-note">${escapeHtml(localized('Starter Pack e cauzione rimborsabile restano separati: controlla le rispettive card qui sotto per sapere cosa portare in contanti a bordo.', 'The Starter Pack and refundable deposit remain separate: check their cards below to see what to bring in cash on board.'))}</p>
     <p class="participant-payment-status" data-payment-instruction-status role="status" aria-live="polite"></p>
+    ${selfReportPaymentMarkup(methods, onlineContribution.remainingCents)}
   </section>`;
+}
+
+// Non tutti pagano dopo una richiesta formale dello skipper: chi versa di
+// propria iniziativa (es. bonifico spontaneo dopo aver letto questi
+// metodi) deve poter segnalarlo subito, senza restare bloccato ad
+// aspettare che lo skipper prepari prima una richiesta nominale — caso
+// reale del 24/09/2026 con Carla Olivieri, che aveva già pagato ma non
+// aveva nessun pulsante per dirlo. La segnalazione crea una richiesta a
+// tutti gli effetti già "dichiarata": lo skipper la vede e la verifica
+// esattamente come le altre, non serve nessuna azione tecnica in più.
+function selfReportPaymentMarkup(methods, remainingCents) {
+  const availableMethods = PAYMENT_METHODS.filter((method) => methods[method.id] === true);
+  if (!availableMethods.length) return '';
+  const options = availableMethods.map((method) => `<option value="${escapeHtml(method.id)}">${escapeHtml(method.label)}</option>`).join('');
+  const defaultAmount = remainingCents > 0 ? (remainingCents / 100).toFixed(2) : '';
+  return `<div class="payment-self-report" data-payment-self-report>
+    <p class="payment-self-report-intro">${escapeHtml(localized('Hai già versato? Segnalalo qui: lo skipper lo vede subito e verifica l’accredito.', 'Already paid? Report it here: the skipper sees it right away and verifies the payment.'))}</p>
+    <label>
+      <span>${escapeHtml(localized('Importo versato', 'Amount paid'))}</span>
+      <input type="number" step="0.01" min="0.01" max="10000" inputmode="decimal" data-report-amount value="${escapeHtml(defaultAmount)}" />
+    </label>
+    <label>
+      <span>${escapeHtml(localized('Con quale metodo hai pagato?', 'Which method did you pay with?'))}</span>
+      <select data-report-method-select>
+        <option value="" selected>${escapeHtml(localized('Scegli il metodo', 'Choose the method'))}</option>
+        ${options}
+      </select>
+    </label>
+    <button class="button button-ghost" type="button" data-report-payment>${escapeHtml(localized('Ho pagato', 'I paid'))}</button>
+    <p class="payment-self-report-message" data-report-payment-message role="status" aria-live="polite"></p>
+  </div>`;
+}
+
+async function reportCrewPayment(controls) {
+  const amountInput = controls.querySelector('[data-report-amount]');
+  const select = controls.querySelector('[data-report-method-select]');
+  const message = controls.querySelector('[data-report-payment-message]');
+  const method = select?.value || '';
+  const amount = Number(amountInput?.value);
+  const amountCents = Math.round(amount * 100);
+  if (!method) {
+    setMessage(message, localized('Scegli un metodo prima di continuare.', 'Choose a method before continuing.'), true);
+    return;
+  }
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amountCents) || amountCents > 1000000) {
+    setMessage(message, localized('Inserisci un importo valido.', 'Enter a valid amount.'), true);
+    return;
+  }
+  const button = controls.querySelector('[data-report-payment]');
+  button.disabled = true;
+  select.disabled = true;
+  amountInput.disabled = true;
+  setMessage(message, localized('Invio…', 'Sending…'));
+  try {
+    if (await isScriptStale(import.meta.url)) {
+      setMessage(message, localized(
+        'Questa pagina non era aggiornata. La ricarico — riprova a segnalare il pagamento dopo il ricaricamento.',
+        'This page was not up to date. Reloading it now — please report the payment again after it reloads.',
+      ), true);
+      window.location.reload();
+      return;
+    }
+    await withSaveRetry(
+      () => addDoc(collection(db, 'boats', activeInvite.boatId, 'paymentRequests'), {
+        recipientId: activeInvite.id,
+        memberId: activeInvite.id,
+        payerInviteId: activeInvite.id,
+        entryType: 'self_reported',
+        amountCents,
+        currency: 'EUR',
+        reason: 'Pagamento segnalato dalla persona',
+        accountingCategory: 'cost_recovery',
+        isOptional: false,
+        dueDate: '',
+        paymentMethods: {},
+        status: 'prepared',
+        createdAt: serverTimestamp(),
+        createdBy: auth.currentUser.uid,
+        verifiedAt: null,
+        verifiedBy: null,
+        cancelledAt: null,
+        cancelledBy: null,
+        declaredAt: serverTimestamp(),
+        declaredBy: auth.currentUser.uid,
+        declaredMethod: method,
+      }),
+      () => setMessage(message, localized('Connessione lenta — verifico se è stato comunque salvato…', 'Slow connection — checking whether it actually saved…')),
+    );
+    // Nessun messaggio locale aggiuntivo: la sottoscrizione paymentRequests
+    // ridisegna subito questa sezione con la segnalazione in elenco.
+  } catch (error) {
+    console.error('Egadi segnalazione pagamento:', error);
+    setMessage(message, localized('Non riesco a registrare la segnalazione. Riprova tra poco, oppure avvisa lo skipper su WhatsApp.', 'I could not save this. Please try again shortly, or let the skipper know on WhatsApp.'), true);
+    button.disabled = false;
+    select.disabled = false;
+    amountInput.disabled = false;
+  }
 }
 
 function verifiedContributionDetail(totals) {
@@ -1457,24 +1565,32 @@ function renderPayments(snapshot) {
   list.innerHTML = snapshot.docs.map((item) => {
     const payment = item.data();
     const isManualReceipt = isManualCrewReceipt(payment);
+    const isSelfReported = isSelfReportedCrewPayment(payment);
     const dueDate = isManualReceipt && payment.receivedOn
       ? ` · ${localized('ricevuto il', 'received on')} ${formatDate(payment.receivedOn)}`
-      : !isManualReceipt && payment.dueDate ? ` · ${translate('crew.flow.dueBy', 'Entro')} ${formatDate(payment.dueDate)}` : '';
+      : !isManualReceipt && !isSelfReported && payment.dueDate ? ` · ${translate('crew.flow.dueBy', 'Entro')} ${formatDate(payment.dueDate)}` : '';
     const reason = `${payment.reason || translate('crew.flow.weekendContribution', 'Contributo weekend')}${payment.isOptional ? ` · ${translate('crew.flow.optional', 'Facoltativo')}` : ''}`;
     const status = paymentStatusLabel(payment);
     const installment = `<span class="payment-contribution-tag">${escapeHtml(paymentInstallmentLabel(payment))}</span>`;
+    const declaredMethodLabel = isSelfReported
+      ? PAYMENT_METHODS.find((method) => method.id === payment.declaredMethod)?.label || payment.declaredMethod
+      : '';
     const methods = isManualReceipt
       ? ''
-      : paymentMethodTags(payment) || `<span>${escapeHtml(translate('crew.flow.paymentMethodToAgree', 'Metodo da concordare con lo skipper.'))}</span>`;
-    const legacyInstructions = !isManualReceipt && payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
+      : isSelfReported
+        ? `<span>${escapeHtml(localized(`Segnalato con ${declaredMethodLabel}.`, `Reported with ${declaredMethodLabel}.`))}</span>`
+        : paymentMethodTags(payment) || `<span>${escapeHtml(translate('crew.flow.paymentMethodToAgree', 'Metodo da concordare con lo skipper.'))}</span>`;
+    const legacyInstructions = !isManualReceipt && !isSelfReported && payment.instructions ? `<span>${escapeHtml(payment.instructions)}</span>` : '';
     const detail = isManualReceipt
       ? localized(
         'Registrato dallo skipper come accredito già ricevuto: non è una nuova richiesta e non richiede WhatsApp.',
         'Recorded by the skipper as a payment already received: this is not a new request and does not require WhatsApp.',
       )
-      : paymentInstructionsAreReady()
-        ? localized('Apri il riquadro “Come versare” nel riepilogo della tua quota.', 'Open the “How to pay” panel in your contribution summary.')
-        : localized('Lo skipper pubblicherà qui i metodi di versamento: non serve un nuovo invito.', 'The skipper will publish payment methods here: you do not need a new invitation.');
+      : isSelfReported
+        ? localized('Segnalato da te nella tua area: lo skipper deve ancora verificare l’accredito reale.', 'Reported by you in your area: the skipper still has to verify the actual payment.')
+        : paymentInstructionsAreReady()
+          ? localized('Apri il riquadro “Come versare” nel riepilogo della tua quota.', 'Open the “How to pay” panel in your contribution summary.')
+          : localized('Lo skipper pubblicherà qui i metodi di versamento: non serve un nuovo invito.', 'The skipper will publish payment methods here: you do not need a new invitation.');
     const declare = paymentDeclareMarkup(payment, item.id);
     return `<article class="payment-row"><div><strong>${formatCurrency(paymentAmount(payment))} · ${escapeHtml(reason)}</strong><span>${escapeHtml(dueDate)}</span>${installment}${methods}${legacyInstructions}<span class="payment-detail-note">${escapeHtml(detail)}</span>${declare}</div><div class="payment-action"><span class="payment-status">${escapeHtml(status)}</span></div></article>`;
   }).join('');

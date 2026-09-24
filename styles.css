@@ -135,6 +135,13 @@ body.menu-open { overflow:hidden; }
 .payment-declare-message { width:100%; margin:0; font-size:.74rem; color:#b3261e; }
 .payment-declare-message:empty { display:none; }
 .payment-declared-hint { display:block; margin-top:8px; padding:8px 10px; border-radius:10px; background:#fff6e5; color:#7a5b00 !important; font-size:.76rem; line-height:1.4; }
+.payment-self-report { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; margin-top:14px; padding-top:14px; border-top:1px dashed rgba(8,123,138,.28); }
+.payment-self-report-intro { width:100%; margin:0 0 2px; font-size:.8rem; line-height:1.4; color:var(--ink); }
+.payment-self-report label { display:flex; flex-direction:column; gap:4px; font-size:.76rem; font-weight:600; color:var(--ink); }
+.payment-self-report input, .payment-self-report select { min-height:36px; padding:4px 8px; border:1px solid rgba(7,59,76,.2); border-radius:8px; background:#fff; font-size:.8rem; }
+.payment-self-report input[type="number"] { width:120px; }
+.payment-self-report-message { width:100%; margin:0; font-size:.74rem; color:#b3261e; }
+.payment-self-report-message:empty { display:none; }
 .invite-panel { margin-top:28px; padding:22px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .invite-panel h4 { margin:0 0 10px; font:600 1.45rem "Fraunces",serif; letter-spacing:-.03em; }
 .crew-projection-panel { margin-top:22px; padding:20px; border:1px solid rgba(8,123,138,.22); border-radius:14px; background:linear-gradient(140deg,#eafbfa 0%,#f8fffe 100%); }
