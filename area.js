@@ -5861,7 +5861,7 @@ function subscribeToBoat(boat) {
   const rateDescription = describeBerthRates(boat.berthRates);
   accommodation.hidden = !accommodationDescription && !rateDescription;
   accommodation.textContent = accommodationDescription
-    ? `Sistemazioni private: ${accommodationDescription}. ${accommodationCapacity}.${rateDescription ? ` Quote per persona: ${rateDescription}.` : ''}`
+    ? `Sistemazioni private: ${accommodationDescription}. ${accommodationCapacity}${rateDescription ? ` Quote per persona: ${rateDescription}.` : ''}`
     : rateDescription ? `Quote private per persona: ${rateDescription}.` : '';
   renderFleetProfileForm();
   renderCostPlan(null);
