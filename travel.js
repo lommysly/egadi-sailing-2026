@@ -690,10 +690,17 @@ function updatePersistedLegState(card, direction, leg, copy) {
   const icon = card.querySelector('[data-travel-persisted-icon]');
   icon.textContent = leg.state === 'ready' ? '✓' : '!';
   icon.classList.toggle('is-pending', leg.state !== 'ready');
-  const draftButton = card.querySelector('[data-save-state="draft"]');
+  // Il form porta lo stesso data-save-state="draft"/"ready" del pulsante
+  // corrispondente (serve a sapere cosa salvare quando si preme Invio, vedi
+  // riga 585 e il click handler in bindLegForm): un selettore senza `button`
+  // trova prima il form stesso, che lo precede nell'ordine del documento, e
+  // gli applica hidden/testo pensando di modificare il pulsante — bug reale
+  // del 25/09/2026, catturato dal vivo (il volo confermato spariva del
+  // tutto). Restringere a `button[...]` esclude sempre il form.
+  const draftButton = card.querySelector('button[data-save-state="draft"]');
   draftButton.hidden = leg.state === 'ready';
   draftButton.type = leg.state === 'ready' ? 'button' : 'submit';
-  card.querySelector('[data-save-state="ready"]').textContent = leg.state === 'ready' ? copy.update[direction] : copy.confirm[direction];
+  card.querySelector('button[data-save-state="ready"]').textContent = leg.state === 'ready' ? copy.update[direction] : copy.confirm[direction];
   renderTransferProgress(card, direction, currentPersistedLegs[direction] || leg, copy);
 }
 
