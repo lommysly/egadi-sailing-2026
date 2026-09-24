@@ -4367,6 +4367,15 @@ function projectionPaymentBalance(projection) {
   };
 }
 
+// Un invito da solo non è un impegno economico: finché non esiste un acconto
+// o un saldo della quota realmente verificato, lo skipper deve poter
+// correggere senza attriti posto, ruolo, partecipazione alle spese e importi.
+// Le voci extra non bloccano la sistemazione; conta soltanto una quota di
+// cabina o di assicurazione effettivamente incassata.
+function projectionHasVerifiedContribution(projection) {
+  return projectionPaymentBalance(projection).verifiedCents > 0;
+}
+
 function projectionPaymentBalanceMarkup(projection) {
   const balance = projectionPaymentBalance(projection);
   if (balance.expectedCents < 1) return '';
@@ -4382,7 +4391,10 @@ function projectionPaymentBalanceMarkup(projection) {
     : balance.pendingCents > 0
       ? `<span class="projection-payment-balance-warning">Le richieste aperte non riducono il saldo finché l'accredito non è verificato.</span>`
       : '';
-  return `<div class="projection-payment-balance"><span>Situazione contributi · Starter Pack e cauzione restano separati</span><span>Quota concordata<b>${euro(balance.expectedCents)}</b></span><span>Già ricevuto e verificato<b>${euro(balance.verifiedCents)}</b></span>${advance}<span class="projection-payment-balance-open">Saldo da ricevere<b>${euro(balance.remainingCents)}</b></span>${pending}${warning}</div>`;
+  const lock = balance.verifiedCents > 0
+    ? '<span class="projection-payment-balance-warning">Quota, partecipazione alle spese, posto e cabina sono protetti perché è stato verificato un versamento.</span>'
+    : '';
+  return `<div class="projection-payment-balance"><span>Situazione contributi · Starter Pack e cauzione restano separati</span><span>Quota concordata<b>${euro(balance.expectedCents)}</b></span><span>Già ricevuto e verificato<b>${euro(balance.verifiedCents)}</b></span>${advance}<span class="projection-payment-balance-open">Saldo da ricevere<b>${euro(balance.remainingCents)}</b></span>${pending}${warning}${lock}</div>`;
 }
 
 function manualReceiptAllocation(projection, target, amountCents) {
@@ -4489,14 +4501,16 @@ function projectionInvite(projection) {
 
 function projectionStatusLabel(projection) {
   const invite = projectionInvite(projection);
-  if (!invite) return 'Scheda salvata · invito WhatsApp da creare';
+  const paymentNote = projectionHasVerifiedContribution(projection) ? ' · quota protetta' : '';
+  if (!invite) return `Scheda salvata · invito WhatsApp da creare${paymentNote}`;
   if (invite.status === 'active') {
-    return activeMembers.some((member) => member.id === invite.id)
+    const accessStatus = activeMembers.some((member) => member.id === invite.id)
       ? 'Accesso attivo · anagrafica completata'
       : 'Accesso attivo · dati charter da completare';
+    return `${accessStatus}${paymentNote}`;
   }
   const expired = invite.expiresAt?.toDate && invite.expiresAt.toDate() < new Date();
-  return expired ? 'Invito scaduto · genera un nuovo link' : 'Link pronto da inviare';
+  return `${expired ? 'Invito scaduto · genera un nuovo link' : 'Link pronto da inviare'}${paymentNote}`;
 }
 
 function crewSeatLimit() {
@@ -5257,6 +5271,9 @@ function projectionCabinControl(projection) {
   if (!doubleCabinGroups().length) {
     return '<span class="projection-cabin-note">Configura prima le cabine da 2 posti della barca.</span>';
   }
+  if (projectionHasVerifiedContribution(projection)) {
+    return `<span class="projection-cabin-note">Cabina: ${escapeHtml(cabinGroupId ? cabinGroupLabel(cabinGroupId) : 'da assegnare')} · assegnazione protetta dopo un versamento verificato.</span>`;
+  }
   return `<label class="projection-cabin-control">Cabina<select data-cabin-group="${escapeHtml(projection.id)}" aria-label="Cabina assegnata a ${escapeHtml(projection.displayName)}">${cabinGroupOptionsHtml(cabinGroupId, projection.id)}</select></label>`;
 }
 
@@ -5264,27 +5281,26 @@ function projectionCardActions(projection, invite) {
   const actions = [];
   const secondaryActions = [];
   const balance = projectionPaymentBalance(projection);
-  const editAction = projectionActionTextButton('edit-projection', projection.id, 'Modifica persona e quota', '✎');
+  const contributionVerified = projectionHasVerifiedContribution(projection);
+  const editAction = projectionActionTextButton('edit-projection', projection.id, 'Modifica scheda e quota', '✎');
   if (balance.expectedCents > 0) {
     actions.push(projectionActionTextButton('register-manual-receipt', projection.id, 'Registra acconto', '+'));
   }
   if (!invite) {
     actions.unshift(projectionActionTextButton('send-projection', projection.id, 'Crea invito WhatsApp', '🔗', 'primary'));
-    actions.push(editAction);
-    secondaryActions.push(
-      projectionActionTextButton('edit-projection-pricing', projection.id, 'Modifica solo quota', '€'),
-      projectionActionTextButton('release-projection', projection.id, 'Libera posto', '×', 'release'),
-    );
+    if (!contributionVerified) {
+      actions.push(editAction);
+      secondaryActions.push(projectionActionTextButton('release-projection', projection.id, 'Libera posto', '×', 'release'));
+    }
     return [...actions, projectionMoreActions(secondaryActions)].join('');
   }
   const primaryInviteAction = invitePrimaryAction(invite);
   if (primaryInviteAction) actions.unshift(primaryInviteAction);
-  actions.push(editAction);
+  if (!contributionVerified) actions.push(editAction);
   if (balance.remainingCents > 0) {
     actions.push(projectionActionTextButton('request-projection-balance', projection.id, 'Chiedi saldo', '€'));
   }
-  secondaryActions.push(projectionActionTextButton('edit-projection-pricing', projection.id, 'Modifica solo quota', '€'));
-  if (projection.pricingMode === 'dashboard') {
+  if (!contributionVerified && projection.pricingMode === 'dashboard') {
     secondaryActions.push(projectionActionTextButton('refresh-projection-pricing', projection.id, 'Aggiorna dalla dashboard', '⟳'));
   }
   secondaryActions.push(...inviteDeliveryAlternatives(invite));
@@ -5312,9 +5328,12 @@ function renderProjectionCard(projection, { isOpen = false } = {}) {
   const invite = projectionInvite(projection);
   const cost = projectionCostBreakdown(projection);
   const isExemptFromCosts = projection.contributesToCosts === false;
+  const contributionVerified = projectionHasVerifiedContribution(projection);
   const currentCostModel = costPlanQuoteModel();
   const dashboardPricingReady = Boolean(currentCostModel && !automaticCostPlanPricingMessage(currentCostModel));
-  const pricingSource = isExemptFromCosts
+  const pricingSource = contributionVerified
+    ? 'Quota bloccata dopo versamento verificato'
+    : isExemptFromCosts
     ? 'Ruolo gratuito'
     : cost.normalized.pricingMode === 'dashboard'
       ? projection.status === 'invited'
@@ -5354,7 +5373,9 @@ function renderProjectionCard(projection, { isOpen = false } = {}) {
     : weekendCost === 'Da definire'
       ? 'Totale partecipazione da definire'
       : 'Totale partecipazione';
-  const summaryNote = isExemptFromCosts
+  const summaryNote = contributionVerified
+    ? 'Quota e posto protetti'
+    : isExemptFromCosts
     ? 'Apri la scheda'
     : 'Cauzione rimborsabile esclusa';
   const transferAmount = isExemptFromCosts ? 'Non previsto' : total;
@@ -6068,24 +6089,24 @@ function projectionDraftFromFields(fields, id, existingProjection = null) {
   const firstName = String(fields.get('firstName') || '').trim();
   const lastName = String(fields.get('lastName') || '').trim();
   const berthType = PROJECTION_BERTH_TYPES[fields.get('berthType')] ? fields.get('berthType') : 'to_define';
-  const frozenInvitation = existingProjection?.status === 'invited'
+  const paidProjection = existingProjection && projectionHasVerifiedContribution(existingProjection)
     ? normalizeProjection(id, existingProjection)
     : null;
-  // La modifica ordinaria di una card con invito può spostare ruolo o
-  // sistemazione, ma non può alterare in silenzio ciò che è stato concordato.
-  const contributesToCosts = frozenInvitation
-    ? frozenInvitation.contributesToCosts
+  // L'invito non blocca una correzione: la scheda diventa stabile soltanto
+  // dopo un contributo della quota realmente verificato dallo skipper.
+  const contributesToCosts = paidProjection
+    ? paidProjection.contributesToCosts
     : fields.get('contributesToCosts') === 'on';
-  const pricingMode = frozenInvitation
-    ? frozenInvitation.pricingMode
+  const pricingMode = paidProjection
+    ? paidProjection.pricingMode
     : fields.get('useCustomPricing') === 'on' ? 'custom' : 'dashboard';
   const dashboardPricing = dashboardProjectionPreset(berthType, { contributesToCosts });
-  const defaultPricing = frozenInvitation
+  const defaultPricing = paidProjection
     ? {
-      berthCents: contributesToCosts ? frozenInvitation.berthCents : 0,
-      starterPackCents: contributesToCosts ? frozenInvitation.starterPackCents : 0,
-      protectionInsuranceCents: contributesToCosts ? frozenInvitation.protectionInsuranceCents : 0,
-      refundableDepositCents: frozenInvitation.refundableDepositCents,
+      berthCents: contributesToCosts ? paidProjection.berthCents : 0,
+      starterPackCents: contributesToCosts ? paidProjection.starterPackCents : 0,
+      protectionInsuranceCents: contributesToCosts ? paidProjection.protectionInsuranceCents : 0,
+      refundableDepositCents: paidProjection.refundableDepositCents,
     }
     : dashboardPricing;
   return {
@@ -6098,13 +6119,13 @@ function projectionDraftFromFields(fields, id, existingProjection = null) {
     berthType,
     cabinGroupId: berthType === 'double_cabin' ? normalizeCabinGroupId(fields.get('cabinGroupId')) : '',
     pricingMode,
-    berthCents: frozenInvitation ? defaultPricing.berthCents : (pricingMode === 'custom' ? toEuroCents(fields.get('berthAmount')) : defaultPricing.berthCents),
-    starterPackCents: frozenInvitation ? defaultPricing.starterPackCents : (pricingMode === 'custom' ? toEuroCents(fields.get('starterPackAmount')) : defaultPricing.starterPackCents),
-    protectionInsuranceCents: frozenInvitation ? defaultPricing.protectionInsuranceCents : (pricingMode === 'custom' ? toEuroCents(fields.get('protectionInsuranceAmount')) : defaultPricing.protectionInsuranceCents),
-    refundableDepositCents: frozenInvitation ? defaultPricing.refundableDepositCents : (pricingMode === 'custom' ? toEuroCents(fields.get('refundableDepositAmount')) : defaultPricing.refundableDepositCents),
+    berthCents: paidProjection ? defaultPricing.berthCents : (pricingMode === 'custom' ? toEuroCents(fields.get('berthAmount')) : defaultPricing.berthCents),
+    starterPackCents: paidProjection ? defaultPricing.starterPackCents : (pricingMode === 'custom' ? toEuroCents(fields.get('starterPackAmount')) : defaultPricing.starterPackCents),
+    protectionInsuranceCents: paidProjection ? defaultPricing.protectionInsuranceCents : (pricingMode === 'custom' ? toEuroCents(fields.get('protectionInsuranceAmount')) : defaultPricing.protectionInsuranceCents),
+    refundableDepositCents: paidProjection ? defaultPricing.refundableDepositCents : (pricingMode === 'custom' ? toEuroCents(fields.get('refundableDepositAmount')) : defaultPricing.refundableDepositCents),
     preferredLocale: fields.get('preferredLocale') === 'en' ? 'en' : 'it',
     contributesToCosts,
-    contactConsent: frozenInvitation ? frozenInvitation.contactConsent === true : fields.get('contactConsent') === 'on',
+    contactConsent: paidProjection ? paidProjection.contactConsent === true : fields.get('contactConsent') === 'on',
   };
 }
 
@@ -6254,7 +6275,9 @@ function editingProjection() {
 
 function isEditingInvitedDashboardProjection() {
   const projection = editingProjection();
-  return projection?.status === 'invited' && projection.pricingMode === 'dashboard';
+  return projection?.status === 'invited'
+    && projection.pricingMode === 'dashboard'
+    && projectionHasVerifiedContribution(projection);
 }
 
 function isEditingInvitedProjectionPricing() {
@@ -6268,7 +6291,7 @@ function syncProjectionCostParticipation() {
   const contributesToCosts = form.elements.contributesToCosts?.checked === true;
   const usesCustomPricing = projectionFormUsesCustomPricing(form);
   const keepsInvitationPricing = !usesCustomPricing && isEditingInvitedDashboardProjection();
-  const pricingLocked = editingProjection()?.status === 'invited' && !isEditingInvitedProjectionPricing();
+  const pricingLocked = projectionHasVerifiedContribution(editingProjection());
   const currentCostModel = costPlanQuoteModel();
   const dashboardPricingReady = Boolean(currentCostModel && !automaticCostPlanPricingMessage(currentCostModel));
   const contributionHint = document.querySelector('#projectionContributionHint');
@@ -6289,15 +6312,14 @@ function syncProjectionCostParticipation() {
   const depositInput = form.elements.refundableDepositAmount;
   if (depositInput) depositInput.disabled = pricingLocked || !usesCustomPricing;
   if (form.elements.useCustomPricing) form.elements.useCustomPricing.disabled = pricingLocked;
-  // La partecipazione ai costi cambia il significato dell'accordo. Dopo
-  // l'invito resta quindi stabile: la revisione € può modificare importi,
-  // non convertire accidentalmente una persona in ruolo gratuito.
   if (form.elements.contributesToCosts) {
-    form.elements.contributesToCosts.disabled = editingProjection()?.status === 'invited';
+    form.elements.contributesToCosts.disabled = pricingLocked;
   }
   if (contributionHint) {
     contributionHint.textContent = !contributesToCosts
       ? 'Questa persona è esente da quota posto, Starter Pack e assicurazione. La cauzione rimborsabile resta separata e può essere prevista.'
+      : pricingLocked
+        ? 'È presente un versamento verificato: quota, partecipazione alle spese, posto e cabina non sono più modificabili.'
       : isEditingInvitedProjectionPricing()
         ? 'Stai rivedendo una quota già concordata: controlla ogni importo e salva solo dopo esserti accordato con la persona. La partecipazione ai costi resta quella già definita. La modifica non crea alcun pagamento.'
       : usesCustomPricing
@@ -6333,8 +6355,8 @@ function applyProjectionBerthPreset() {
     contributesToCosts: form.elements.contributesToCosts?.checked === true,
   });
   // Un importo inserito come eccezione, anche se è zero, non deve mai essere
-  // ripopolato dalla dashboard. Lo stesso vale per una quota già fissata in un
-  // invito: l'aggiornamento richiede il comando esplicito sulla sua card.
+  // ripopolato dalla dashboard. Una quota invitata ma non ancora incassata
+  // resta invece correggibile dalla stessa scheda.
   if (!projectionFormUsesCustomPricing(form) && !isEditingInvitedDashboardProjection()) {
     applyProjectionCalculatedAmount(form.elements.berthAmount, preset.berthCents, 'autoProjectionRate');
     applyProjectionCalculatedAmount(form.elements.starterPackAmount, preset.starterPackCents, 'autoStarterPackRate');
@@ -6388,6 +6410,10 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
     : null;
   if (editingProjectionId && !editingProjection) {
     setMessage(message, 'Questa scheda è stata modificata in un’altra sessione: aggiorna l’area e riprova.', true);
+    return;
+  }
+  if (editingProjection && projectionHasVerifiedContribution(editingProjection)) {
+    setMessage(message, `La scheda di ${editingProjection.displayName} non è stata modificata: è presente un acconto o un saldo della quota già verificato.`, true);
     return;
   }
   const submitButton = form.querySelector('button[type="submit"]');
@@ -6576,6 +6602,10 @@ document.querySelector('#projectionList').addEventListener('click', async (event
   if (editButton) {
     const projection = activeProjections.find((candidate) => candidate.id === editButton.dataset.editProjection);
     if (!projection) return;
+    if (projectionHasVerifiedContribution(projection)) {
+      setMessage(message, `La scheda di ${projection.displayName} non si può più modificare: è presente un acconto o un saldo della quota già verificato.`, true);
+      return;
+    }
     if (!canReplaceProjectionEditor()) return;
     const invite = projectionInvite(projection);
     setProjectionEditorVisibility(true);
@@ -6587,13 +6617,20 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     editingProjectionId = projection.id;
     setProjectionIdentityFieldsLocked(Boolean(invite));
     projectionForm.elements.preferredLocale.disabled = Boolean(invite);
+    if (invite) {
+      // Dopo l'invito, ma prima di un pagamento, la stessa scheda resta la
+      // sola correzione necessaria: non costringiamo lo skipper a cercare un
+      // secondo comando per riattivare quota o partecipazione alle spese.
+      const exception = projectionForm.querySelector('.projection-pricing-exception');
+      if (exception) exception.open = true;
+    }
     syncProjectionCabinGroupField();
     syncProjectionCostParticipation();
     document.querySelector('#projectionSubmitButton').textContent = 'Salva la scheda';
     document.querySelector('#cancelProjectionEdit').hidden = false;
-    document.querySelector('#projectionTitle').textContent = `Modifica la scheda di ${projection.displayName}`;
+    document.querySelector('#projectionTitle').textContent = `Modifica scheda e quota di ${projection.displayName}`;
     setMessage(document.querySelector('#projectionFormMessage'), invite
-      ? 'Puoi aggiornare ruolo, sistemazione, cabina e importi. Nome, WhatsApp, lingua e link personale restano invariati.'
+      ? 'Puoi aggiornare ruolo, partecipazione alle quote, sistemazione, cabina e importi. Nome, WhatsApp, lingua e link personale restano invariati.'
       : 'Modifica posto, ruolo, sistemazione, cabina e importo previsto, poi salva.');
     projectionForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
     projectionForm.elements.berthType.focus({ preventScroll: true });
@@ -6604,6 +6641,10 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     const projection = activeProjections.find((candidate) => candidate.id === editPricingButton.dataset.editProjectionPricing);
     const invite = projection ? projectionInvite(projection) : null;
     if (!projection) return;
+    if (projectionHasVerifiedContribution(projection)) {
+      setMessage(message, `La quota di ${projection.displayName} non si può più modificare: esiste già un versamento verificato.`, true);
+      return;
+    }
     if (!canReplaceProjectionEditor()) return;
     setProjectionEditorVisibility(true);
     setProjectionEditorStatus('');
@@ -6667,6 +6708,10 @@ document.querySelector('#projectionList').addEventListener('click', async (event
   if (refreshPricingButton) {
     const projection = activeProjections.find((candidate) => candidate.id === refreshPricingButton.dataset.refreshProjectionPricing);
     if (!projection || projection.status !== 'invited' || projection.pricingMode !== 'dashboard') return;
+    if (projectionHasVerifiedContribution(projection)) {
+      setMessage(message, `La quota di ${projection.displayName} non si può aggiornare dalla dashboard: esiste già un versamento verificato.`, true);
+      return;
+    }
     const confirmed = window.confirm(
       `Aggiornare gli importi fissati per ${projection.displayName} usando la Dashboard economica attuale? Questa modifica non crea una richiesta WhatsApp: avvisa prima la persona e usa poi le richieste personali solo per l’importo concordato.`,
     );
@@ -6726,6 +6771,11 @@ document.querySelector('#projectionList').addEventListener('change', async (even
   if (!select || blockPrivateAction(message) || !activeBoat || !auth.currentUser) return;
   const projection = activeProjections.find((candidate) => candidate.id === select.dataset.cabinGroup);
   if (!projection) return;
+  if (projectionHasVerifiedContribution(projection)) {
+    renderProjections();
+    setMessage(message, `La cabina di ${projection.displayName} è protetta perché esiste già un versamento verificato.`, true);
+    return;
+  }
   const cabinGroupId = normalizeCabinGroupId(select.value);
   if (cabinGroupId === projectionCabinGroupId(projection)) return;
   const cabinGroupError = validateProjectionCabinGroup({ ...projection, cabinGroupId }, projection.id);
