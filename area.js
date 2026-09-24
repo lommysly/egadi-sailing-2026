@@ -4,12 +4,15 @@ import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, o
 import { getBlob, getMetadata, getStorage, ref as storageRef, uploadBytesResumable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, getMissingSkipperProfileFields, isBoatReadyForPdf, isCharterReady, isSkipperProfileCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260915-skipper-documents-v1';
+import { watchForStaleScript } from './stale-script.js?v=20260925-extract-v1';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
 import { hasVerifiedContribution } from './area-projection-guards.js?v=20260924-login-guard-v1';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260915-travel-card-v3';
+
+watchForStaleScript(import.meta.url);
 
 const eventId = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
@@ -1021,7 +1024,10 @@ function renderSkipperDashboardOverview() {
   const capacity = crewSeatLimit();
   const allocated = allocatedCrewSeatCount();
   const pendingInvites = activeInvites.filter((invite) => invite.status === 'pending').length;
-  const completedProfiles = activeMembers.length;
+  // Una scheda esistente non è per forza completa per il charter: contare
+  // solo activeMembers.length gonfiava "schede completate" con chi aveva
+  // salvato dati parziali (stesso bug di projectionStatusLabel sopra).
+  const completedProfiles = activeMembers.filter((member) => isCharterReady(member)).length;
   const projectedCrew = activeProjections.length;
   setSkipperDashboardMetric(
     'crew',
@@ -4538,7 +4544,14 @@ function projectionStatusLabel(projection) {
   const paymentNote = projectionHasVerifiedContribution(projection) ? ' · quota protetta' : '';
   if (!invite) return `Scheda salvata · invito WhatsApp da creare${paymentNote}`;
   if (invite.status === 'active') {
-    const accessStatus = activeMembers.some((member) => member.id === invite.id)
+    // Trovare la scheda non basta: deve avere davvero tutti i campi richiesti
+    // dal charter (isCharterReady), non solo esistere — altrimenti una
+    // scheda salvata a metà risultava "anagrafica completata" qui mentre
+    // l'elenco equipaggio, più a valle, diceva correttamente "Mancano N
+    // dati" per la stessa persona (segnalato da Gualtiero Brazzelli,
+    // 25/09/2026, su Anna Marostica e Pauline Eloff).
+    const member = activeMembers.find((candidate) => candidate.id === invite.id);
+    const accessStatus = member && isCharterReady(member)
       ? 'Accesso attivo · anagrafica completata'
       : 'Accesso attivo · dati charter da completare';
     return `${accessStatus}${paymentNote}`;
