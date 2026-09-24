@@ -520,7 +520,7 @@ function renderManagedOperatorRow(operator) {
 }
 
 function renderOperatorCreationForm() {
-  return `<form class="transfer-operator-create-form" data-create-transfer-operator><label><span>${escapeHtml(t('operatorNameLabel'))}</span><input name="name" type="text" required autocomplete="name" maxlength="120" /></label><label><span>${escapeHtml(t('operatorEmailLabel'))}</span><input name="email" type="email" required autocomplete="username" inputmode="email" maxlength="160" /></label><label data-wide><span>${escapeHtml(t('temporaryPasswordLabel'))}</span><input name="temporaryPassword" type="password" required autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="temporary-password-help" /><small id="temporary-password-help">${escapeHtml(t('temporaryPasswordHelp'))}</small></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('createOperator'))}</button><p class="form-message" data-message="operator-create" role="status"></p></div></form>`;
+  return `<form class="compact-form" data-create-transfer-operator><label><span>${escapeHtml(t('operatorNameLabel'))}</span><input name="name" type="text" required autocomplete="name" maxlength="120" /></label><label><span>${escapeHtml(t('operatorEmailLabel'))}</span><input name="email" type="email" required autocomplete="username" inputmode="email" maxlength="160" /></label><label data-wide><span>${escapeHtml(t('temporaryPasswordLabel'))}</span><input name="temporaryPassword" type="password" required autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="temporary-password-help" /><small id="temporary-password-help">${escapeHtml(t('temporaryPasswordHelp'))}</small></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('createOperator'))}</button><p class="form-message" data-message="operator-create" role="status"></p></div></form>`;
 }
 
 function renderAccessManagement() {
@@ -528,7 +528,7 @@ function renderAccessManagement() {
   const requests = [...state.accessRequests]
     .filter((request) => requestRole(request)?.accessMode !== 'managed_password')
     .sort((a, b) => (dateValue(b.updatedAt)?.getTime() || 0) - (dateValue(a.updatedAt)?.getTime() || 0));
-  return `<section class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('organizationEyebrow'))}</p><h2>${escapeHtml(t('organizationTitle'))}</h2><p>${escapeHtml(t('organizationText'))}</p><div class="transfer-operator-management-section"><h3>${escapeHtml(t('createOperatorTitle'))}</h3><p>${escapeHtml(t('createOperatorText'))}</p>${renderOperatorCreationForm()}</div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('operatorsTitle'))}</h3><div class="transfer-request-list">${operators.length ? operators.map(renderManagedOperatorRow).join('') : `<p class="transfer-empty">${escapeHtml(t('noOperators'))}</p>`}</div></div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('requestsTitle'))}</h3><div class="transfer-request-list">${requests.length ? requests.map(renderAccessRequestRow).join('') : `<p class="transfer-empty">${escapeHtml(t('noRequests'))}</p>`}</div></div><p class="form-message" data-message="access-management" role="status"></p></section>`;
+  return `<section class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('organizationEyebrow'))}</p><h2>${escapeHtml(t('organizationTitle'))}</h2><p>${escapeHtml(t('organizationText'))}</p><div class="transfer-operator-management-section"><h3>${escapeHtml(t('createOperatorTitle'))}</h3><p>${escapeHtml(t('createOperatorText'))}</p>${renderOperatorCreationForm()}</div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('operatorsTitle'))}</h3><div class="transfer-request-list">${operators.length ? operators.map(renderManagedOperatorRow).join('') : `<p class="empty-state">${escapeHtml(t('noOperators'))}</p>`}</div></div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('requestsTitle'))}</h3><div class="transfer-request-list">${requests.length ? requests.map(renderAccessRequestRow).join('') : `<p class="empty-state">${escapeHtml(t('noRequests'))}</p>`}</div></div><p class="form-message" data-message="access-management" role="status"></p></section>`;
 }
 
 function recordMatchesFilters(record) {
@@ -739,7 +739,7 @@ function renderDirectionPanel(direction, records) {
   const groups = groupByAirport(records);
   const body = groups.length
     ? groups.map(([code, groupRecords]) => `<div class="transfer-airport-group"><h3 class="transfer-airport-group-title">${escapeHtml(airportLabel(code))}<span>${groupRecords.length}</span></h3>${renderAirportGroupBody(groupRecords, direction)}</div>`).join('')
-    : `<p class="transfer-empty">${escapeHtml(t('noRecords'))}</p>`;
+    : `<p class="empty-state">${escapeHtml(t('noRecords'))}</p>`;
   return `<section class="transfer-direction-panel"><h2>${escapeHtml(title)}<span class="transfer-direction-panel-count">${records.length}</span></h2><p class="field-hint">${escapeHtml(hint)}</p>${body}</section>`;
 }
 
