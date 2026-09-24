@@ -7,6 +7,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - Il sito pubblico è raggiungibile su `https://egadi.thatsablast.it/`.
 - Il sito usa un solo sorgente bilingue IT / EN: il selettore conserva lingua, query e hash. L'inglese è copy editoriale scritto e revisionato nel progetto, non un widget Google Translate o una traduzione al volo.
 - L'area privata è attiva su HTTPS per autorizzazione esplicita del titolare: skipper con Google, equipaggio solo tramite invito WhatsApp personale e codice di sei cifre.
+- L’area skipper può essere aperta senza selezionare alcuna scheda equipaggio: l’inizializzazione dell’accesso Google non dipende dalla lettura delle quote.
 - `PRIVATE_AREA_ENABLED` nel sorgente e `events/egadi-2026.privateAreaEnabled` in Firestore sono entrambi `true`. Per una chiusura di emergenza basta riportare uno dei due a `false`; per coerenza operativa vanno riportati entrambi a `false`.
 - Google ed Email/Password sono attivi; email-link e SMS non sono usati. Il dominio `egadi.thatsablast.it` è autorizzato in Firebase Authentication.
 

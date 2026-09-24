@@ -4373,7 +4373,7 @@ function projectionPaymentBalance(projection) {
 // Le voci extra non bloccano la sistemazione; conta soltanto una quota di
 // cabina o di assicurazione effettivamente incassata.
 function projectionHasVerifiedContribution(projection) {
-  return projectionPaymentBalance(projection).verifiedCents > 0;
+  return Boolean(projection) && projectionPaymentBalance(projection).verifiedCents > 0;
 }
 
 function projectionPaymentBalanceMarkup(projection) {
