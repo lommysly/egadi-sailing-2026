@@ -16,6 +16,7 @@ import {
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
+import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -219,14 +220,6 @@ function hasAcceptedCurrentBriefing() {
     && (!briefingRequiresFullRulesRead() || activeRuleAcceptance?.fullRulesRead === true);
 }
 
-function hasReachedEnd(element) {
-  return element.clientHeight > 0 && element.scrollHeight - element.scrollTop - element.clientHeight <= 8;
-}
-
-function isEntireRulesTextVisible(element) {
-  return element.clientHeight > 0 && element.scrollHeight <= element.clientHeight + 8;
-}
-
 function clearPreRegistrationRulesGate() {
   const gate = document.querySelector('#preRegistrationBriefing');
   const scrollRegion = document.querySelector('#preRegistrationRulesScroll');
@@ -235,10 +228,11 @@ function clearPreRegistrationRulesGate() {
   gate.dataset.fullRulesRead = '';
   scrollRegion.scrollTop = 0;
   scrollRegion.classList.remove('is-complete');
+  preRegistrationRulesDialogController.close();
   document.querySelector('#preRegistrationAcknowledgement').checked = false;
   document.querySelector('#preRegistrationAcknowledgement').disabled = true;
   document.querySelector('#preRegistrationAcceptButton').disabled = true;
-  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Leggi il regolamento completo. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.');
+  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Apri il regolamento e leggilo fino alla fine. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.');
 }
 
 function updatePreRegistrationAcceptState() {
@@ -268,11 +262,10 @@ function resetPreRegistrationRulesRead() {
   gate.dataset.fullRulesRead = '';
   scrollRegion.scrollTop = 0;
   scrollRegion.classList.remove('is-complete');
-  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Leggi il regolamento completo. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.');
+  preRegistrationRulesDialogController.close();
+  document.querySelector('#preRegistrationFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Apri il regolamento e leggilo fino alla fine. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.');
   updatePreRegistrationAcceptState();
-  requestAnimationFrame(() => {
-    if (isEntireRulesTextVisible(scrollRegion)) markPreRegistrationRulesRead();
-  });
+  requestAnimationFrame(() => preRegistrationRulesDialogController.checkComplete());
 }
 
 function briefingSchedule() {
@@ -760,16 +753,15 @@ document.querySelector('#preRegistrationAcknowledgement').addEventListener('chan
   if (!event.currentTarget.disabled) updatePreRegistrationAcceptState();
 });
 
-document.querySelector('#preRegistrationRulesScroll').addEventListener('scroll', (event) => {
-  if (hasPublishedBriefing() && hasReachedEnd(event.currentTarget)) markPreRegistrationRulesRead();
+const preRegistrationRulesDialogController = bindRulesDialog({
+  dialog: document.querySelector('#preRegistrationRulesDialog'),
+  openButton: document.querySelector('#preRegistrationRulesOpenButton'),
+  scrollRegion: document.querySelector('#preRegistrationRulesScroll'),
 });
-
-if ('ResizeObserver' in window) {
-  new ResizeObserver(() => {
-    const scrollRegion = document.querySelector('#preRegistrationRulesScroll');
-    if (hasPublishedBriefing() && scrollRegion && isEntireRulesTextVisible(scrollRegion)) markPreRegistrationRulesRead();
-  }).observe(document.querySelector('#preRegistrationRulesScroll'));
-}
+preRegistrationRulesDialogController.setOnFullyRead(() => {
+  if (hasPublishedBriefing()) markPreRegistrationRulesRead();
+});
+document.querySelector('#preRegistrationRulesCloseButton').addEventListener('click', () => preRegistrationRulesDialogController.close());
 
 document.querySelector('#preRegistrationBriefingStatus').setAttribute('role', 'status');
 document.querySelector('#preRegistrationBriefingStatus').setAttribute('aria-live', 'polite');

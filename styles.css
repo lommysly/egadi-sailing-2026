@@ -837,6 +837,34 @@ body.menu-open { overflow:hidden; }
 .dashboard-panel .rules-section-heading { margin:0 0 9px; font:600 1.16rem/1.06 "Fraunces",serif; letter-spacing:-.025em; }
 .rules-section-copy { display:grid; gap:10px; }
 .rules-section-copy p { margin:0; white-space:pre-line; line-height:1.58; }
+.rules-open-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px 20px; margin:18px 0; padding:18px 20px; border:1px solid rgba(255,255,255,.18); border-radius:14px; background:rgba(255,255,255,.06); }
+.rules-open-row .rules-reading-heading { margin:0 0 6px; }
+.rules-open-row .rules-scroll-hint { margin:0; }
+.rules-open-button { flex:0 0 auto; }
+
+/* Il regolamento completo si legge dentro un <dialog> nativo, a schermo
+   pieno su telefono: niente più tre contenitori annidati (card → regione di
+   scroll → scheda regola) a stringere il testo, e una tipografia più larga
+   e comoda per leggere davvero, non solo per stare nello spazio disponibile
+   (segnalato da Silvio, 25/09/2026). */
+.rules-dialog { width:min(760px,100vw); height:min(90vh,860px); max-width:100vw; max-height:100vh; margin:auto; padding:0; border:none; border-radius:20px; background:#063644; color:white; }
+.rules-dialog::backdrop { background:rgba(3,20,26,.72); }
+.rules-dialog-header { position:sticky; top:0; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,.16); background:#063644; border-radius:20px 20px 0 0; }
+.rules-dialog-header strong { font:600 1.15rem "Fraunces",serif; }
+.rules-dialog-close { flex:0 0 auto; display:grid; place-items:center; width:38px; height:38px; border:1px solid rgba(255,255,255,.3); border-radius:50%; background:transparent; color:white; font-size:1.1rem; line-height:1; cursor:pointer; }
+.rules-dialog-scroll { height:calc(100% - 70px); overflow-y:auto; padding:24px clamp(18px,5vw,56px) 40px; }
+.rules-dialog-scroll:focus { outline:none; }
+.rules-dialog-scroll .rules-sections { max-width:64ch; margin:0 auto; gap:18px; }
+.rules-dialog-scroll .rules-section-card { padding:20px; font-size:1.03rem; }
+.rules-dialog-scroll .rules-section-copy p { line-height:1.75; }
+.rules-dialog-scroll.is-complete { box-shadow:inset 0 0 0 9999px rgba(159,245,237,.03); }
+@media (max-width:640px) {
+  .rules-dialog { width:100vw; height:100vh; max-height:100vh; border-radius:0; }
+  .rules-dialog-header { border-radius:0; }
+  .rules-section-card { grid-template-columns:30px minmax(0,1fr); gap:10px; padding:14px; }
+  .rules-section-icon { width:30px; height:30px; font-size:.98rem; }
+}
+
 .boarding-rules-card .rules-summary-card { background:rgba(255,255,255,.09); }
 .boarding-rules-card .rules-summary-card h3 { color:white; }
 .briefing-recap summary { display:flex; align-items:center; gap:8px; }

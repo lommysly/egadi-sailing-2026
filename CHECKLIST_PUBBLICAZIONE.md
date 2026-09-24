@@ -96,5 +96,6 @@ Ultimo aggiornamento: 24 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] Commit pubblicato, build GitHub Pages e dominio HTTPS riletti.
 - [x] Con conferma esplicita del titolare, impostati insieme `PRIVATE_AREA_ENABLED=true` nel sorgente e `privateAreaEnabled: true` nel documento evento.
 - [ ] Eseguire il test live conclusivo con skipper e una crew autorizzata, poi controllare che non esistano dati test indesiderati.
+- [ ] Test regolamento a comparsa (25/09/2026, segnalato da Silvio su telefono stretto): con un account fittizio non ancora in regola, verificare che "Apri il regolamento" apra un `<dialog>` a schermo pieno su telefono e centrato su desktop, che la lettura scorra fino in fondo abilitando la dichiarazione, che il pulsante "✕" e il tasto Esc chiudano senza perdere lo stato di lettura raggiunto, e che riaprendo il dialog lo scroll riparta da dove interrotto. Ripetere su `participant.html` (prima registrazione) e `my-area.html` (rientro), in italiano e inglese. Verificato con contenuto reale in locale (screenshot mobile e desktop) il 25/09/2026; resta da ripetere live con account fittizio.
 
 L'area è attiva: l'invito personale resta obbligatorio. I punti privacy ancora non spuntati vanno completati prima di estendere l'uso a tutta la flotta.

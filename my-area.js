@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { auth, crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260925-stale-script-shared-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
+import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -1868,14 +1869,6 @@ function hasAcceptedCurrentBriefing() {
     && (!briefingRequiresFullRulesRead() || activeRuleAcceptance?.fullRulesRead === true);
 }
 
-function hasReachedEnd(element) {
-  return element.clientHeight > 0 && element.scrollHeight - element.scrollTop - element.clientHeight <= 8;
-}
-
-function isEntireRulesTextVisible(element) {
-  return element.clientHeight > 0 && element.scrollHeight <= element.clientHeight + 8;
-}
-
 function clearBoardingRulesGateState() {
   const gate = document.querySelector('#boardingRulesGate');
   const scrollRegion = document.querySelector('#boardingRulesScroll');
@@ -1884,10 +1877,11 @@ function clearBoardingRulesGateState() {
   gate.dataset.fullRulesRead = '';
   scrollRegion.scrollTop = 0;
   scrollRegion.classList.remove('is-complete');
+  boardingRulesDialogController.close();
   document.querySelector('#rulesAcknowledgement').checked = false;
   document.querySelector('#rulesAcknowledgement').disabled = true;
   document.querySelector('#acceptRulesButton').disabled = true;
-  document.querySelector('#boardingFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Leggi il regolamento completo. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.');
+  document.querySelector('#boardingFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Apri il regolamento e leggilo fino alla fine. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.');
 }
 
 function updateBoardingAcceptState() {
@@ -1917,11 +1911,10 @@ function resetBoardingRulesRead() {
   gate.dataset.fullRulesRead = '';
   scrollRegion.scrollTop = 0;
   scrollRegion.classList.remove('is-complete');
-  document.querySelector('#boardingFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Leggi il regolamento completo. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.');
+  boardingRulesDialogController.close();
+  document.querySelector('#boardingFullRulesHint').textContent = translate('crew.flow.scrollToEnd', 'Apri il regolamento e leggilo fino alla fine. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.');
   updateBoardingAcceptState();
-  requestAnimationFrame(() => {
-    if (isEntireRulesTextVisible(scrollRegion)) markBoardingRulesRead();
-  });
+  requestAnimationFrame(() => boardingRulesDialogController.checkComplete());
 }
 
 function briefingSchedule() {
@@ -2173,16 +2166,15 @@ document.querySelector('#rulesAcknowledgement').addEventListener('change', (even
   if (!event.currentTarget.disabled) updateBoardingAcceptState();
 });
 
-document.querySelector('#boardingRulesScroll').addEventListener('scroll', (event) => {
-  if (canAcceptCurrentLocaleBriefing() && hasReachedEnd(event.currentTarget)) markBoardingRulesRead();
+const boardingRulesDialogController = bindRulesDialog({
+  dialog: document.querySelector('#boardingRulesDialog'),
+  openButton: document.querySelector('#boardingRulesOpenButton'),
+  scrollRegion: document.querySelector('#boardingRulesScroll'),
 });
-
-if ('ResizeObserver' in window) {
-  new ResizeObserver(() => {
-    const scrollRegion = document.querySelector('#boardingRulesScroll');
-    if (canAcceptCurrentLocaleBriefing() && scrollRegion && isEntireRulesTextVisible(scrollRegion)) markBoardingRulesRead();
-  }).observe(document.querySelector('#boardingRulesScroll'));
-}
+boardingRulesDialogController.setOnFullyRead(() => {
+  if (canAcceptCurrentLocaleBriefing()) markBoardingRulesRead();
+});
+document.querySelector('#boardingRulesCloseButton').addEventListener('click', () => boardingRulesDialogController.close());
 
 document.querySelector('#boardingGateStatus').setAttribute('role', 'status');
 document.querySelector('#boardingGateStatus').setAttribute('aria-live', 'polite');
