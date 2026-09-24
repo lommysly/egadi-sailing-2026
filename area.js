@@ -1,10 +1,11 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
-import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { GoogleAuthProvider, getAuth, getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { getBlob, getMetadata, getStorage, ref as storageRef, uploadBytesResumable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, getMissingSkipperProfileFields, isBoatReadyForPdf, isCharterReady, isSkipperProfileCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260915-skipper-documents-v1';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
+import { hasVerifiedContribution } from './area-projection-guards.js?v=20260924-login-guard-v1';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
@@ -25,6 +26,7 @@ const transferManagementLink = document.querySelector('#transferManagementLink')
 const registerSection = document.querySelector('#registra-barca');
 const dashboard = document.querySelector('#dashboard');
 const signInButton = document.querySelector('#signInButton');
+const signInRedirectButton = document.querySelector('#signInRedirectButton');
 const authMessage = document.querySelector('#authMessage');
 const PAYMENT_PROFILE_ID = 'default';
 const CREW_PAYMENT_INSTRUCTIONS_ID = 'default';
@@ -1384,6 +1386,32 @@ function getAuthErrorMessage(error) {
   return 'Accesso non completato. Riprova tra poco.';
 }
 
+function shouldUseGoogleRedirect() {
+  return /Android|iPad|iPhone|iPod/i.test(navigator.userAgent || '');
+}
+
+function setGoogleSignInBusy(isBusy) {
+  signInButton.disabled = isBusy;
+  if (signInRedirectButton) signInRedirectButton.disabled = isBusy;
+}
+
+function showGoogleRedirectFallback(show) {
+  if (signInRedirectButton) signInRedirectButton.hidden = !show;
+}
+
+async function finishGoogleRedirectSignIn() {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      showGoogleRedirectFallback(false);
+      setMessage(authMessage, 'Accesso Google completato.');
+    }
+  } catch (error) {
+    showGoogleRedirectFallback(true);
+    setMessage(authMessage, getAuthErrorMessage(error), true);
+  }
+}
+
 function getFirestoreErrorMessage(error, fallbackMessage) {
   // Il codice è sufficiente per capire il ramo da verificare senza esporre
   // dettagli dei dati personali o delle Rules nella pagina pubblica.
@@ -2604,6 +2632,7 @@ function showPrivateAreaBlocked() {
   signInCard.hidden = false;
   accountCard.hidden = true;
   signInButton.disabled = true;
+  if (signInRedirectButton) signInRedirectButton.disabled = true;
   setMessage(authMessage, privateAreaBlockMessage(), true);
 }
 
@@ -4373,7 +4402,7 @@ function projectionPaymentBalance(projection) {
 // Le voci extra non bloccano la sistemazione; conta soltanto una quota di
 // cabina o di assicurazione effettivamente incassata.
 function projectionHasVerifiedContribution(projection) {
-  return Boolean(projection) && projectionPaymentBalance(projection).verifiedCents > 0;
+  return hasVerifiedContribution(projection, projectionPaymentBalance);
 }
 
 function projectionPaymentBalanceMarkup(projection) {
@@ -5937,18 +5966,35 @@ function loadSkipperArea(user) {
   });
 }
 
-signInButton.addEventListener('click', async () => {
+async function startGoogleSignIn({ forceRedirect = false } = {}) {
   if (blockPrivateAction(authMessage)) return;
-  signInButton.disabled = true;
-  setMessage(authMessage, 'Apro l’accesso Google…');
+  const useRedirect = forceRedirect || shouldUseGoogleRedirect();
+  setGoogleSignInBusy(true);
+  showGoogleRedirectFallback(false);
+  setMessage(authMessage, useRedirect
+    ? 'Ti porto su Google: al termine tornerai qui automaticamente.'
+    : 'Apro l’accesso Google…');
   try {
+    if (useRedirect) {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
     await signInWithPopup(auth, provider);
   } catch (error) {
-    setMessage(authMessage, error.code === 'auth/popup-closed-by-user' ? 'Accesso annullato.' : getAuthErrorMessage(error), true);
+    if (error.code === 'auth/popup-closed-by-user') {
+      showGoogleRedirectFallback(true);
+      setMessage(authMessage, 'La finestra Google si è chiusa prima della conferma. Prova “Accedi senza popup”: al termine tornerai qui automaticamente.', true);
+      return;
+    }
+    setMessage(authMessage, getAuthErrorMessage(error), true);
   } finally {
-    signInButton.disabled = false;
+    setGoogleSignInBusy(false);
   }
-});
+}
+
+signInButton.addEventListener('click', () => startGoogleSignIn());
+signInRedirectButton?.addEventListener('click', () => startGoogleSignIn({ forceRedirect: true }));
+void finishGoogleRedirectSignIn();
 
 document.querySelector('#signOutButton').addEventListener('click', () => signOut(auth));
 document.querySelector('#editBoatButton').addEventListener('click', openBoatEdit);

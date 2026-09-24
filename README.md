@@ -262,5 +262,6 @@ Nel Google Sheet privato le schede aggiornate automaticamente sono **Arrivi** e 
 3. Con autorizzazione del titolare dell'11 settembre 2026 sono stati attivati insieme `PRIVATE_AREA_ENABLED=true` e `privateAreaEnabled: true`.
 4. Il primo utilizzo deve partire dallo skipper: Google, verifica della barca `Karibu`, poi un invito personale a una persona alla volta.
 5. Restano da completare e formalizzare i punti in `PRIVACY_DA_COMPLETARE.md`, in particolare contatto, tempi di conservazione e procedura di cancellazione.
+6. Prima di pubblicare una modifica a `area.js`, eseguire `node --test tools/area-projection-guards.test.mjs`, aprire `area.html` in una sessione anonima e controllare l’assenza di errori JavaScript prima della prova con Google. Su telefono l’accesso Google usa il reindirizzamento e torna automaticamente al sito; su desktop usa la finestra Google e offre il recupero «Accedi senza popup» se quella finestra viene chiusa.
 
 L'invito resta obbligatorio: l'apertura dell'area non crea una registrazione pubblica libera.
