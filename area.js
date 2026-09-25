@@ -315,6 +315,12 @@ let editingProjectionId = null;
 // di rivedere l'accordo economico della persona.
 let editingInvitedPricing = false;
 let linkingLegacyInviteId = null;
+// "Chiedi saldo" salta da Equipaggio a Cassa skipper senza cambiare l'hash
+// dell'URL (per non perdere lo stato interno della sotto-vista "Richiedi"):
+// questo teneva traccia di dove tornare una volta inviata la richiesta,
+// invece di lasciare lo skipper sulla Cassa skipper senza un modo semplice
+// per tornare a Equipaggio (caso reale Luca Nacci, 25/09/2026).
+let balanceRequestReturnView = null;
 const fleetPublicationInProgress = new Set();
 let fleetAvailabilitySyncInProgress = false;
 const SKIPPER_DASHBOARD_HASHES = Object.freeze({
@@ -895,6 +901,10 @@ function setupSkipperDashboard() {
     if (!button || !dashboard.contains(button)) return;
     const view = button.dataset.skipperView;
     if (!SKIPPER_DASHBOARD_HASHES[view]) return;
+    // Un clic esplicito su una sezione conta come "lo skipper sa dove vuole
+    // andare": non deve più tornare da solo a Equipaggio dopo, altrimenti un
+    // invio successivo e scollegato lo riporterebbe indietro a sorpresa.
+    balanceRequestReturnView = null;
     const nextHash = `#${SKIPPER_DASHBOARD_HASHES[view]}`;
     if (window.location.hash === nextHash) {
       setSkipperDashboardView(view);
@@ -4573,7 +4583,14 @@ function updateManualReceiptInstallmentHint() {
 function prepareProjectionBalanceRequest(projection) {
   const form = document.querySelector('#paymentForm');
   if (!form) return;
+  if (skipperDashboardView !== 'money') balanceRequestReturnView = skipperDashboardView;
   setSkipperDashboardView('money');
+  // Sincronizza l'hash con la vista mostrata SENZA scatenare un hashchange
+  // (che rimetterebbe la Cassa skipper sulla sua vista generale, annullando
+  // il setSkipperFinanceDashboardView qui sotto) e senza aggiungere una voce
+  // nella cronologia del browser per un salto che lo skipper non ha scelto
+  // esplicitamente lui stesso.
+  history.replaceState(null, '', `#${SKIPPER_DASHBOARD_HASHES.money}`);
   setSkipperFinanceDashboardView(SKIPPER_FINANCE_VIEWS.request);
   renderPaymentRecipientOptions();
   form.elements.recipientId.value = projection.id;
@@ -8041,6 +8058,18 @@ paymentForm.addEventListener('submit', async (event) => {
     setMessage(document.querySelector('#paymentFormMessage'), whatsappWindow
       ? nativeMessage
       : 'Richiesta preparata. Il browser ha bloccato la nuova finestra: usa “Invia richiesta su WhatsApp” oppure “Altre opzioni” nella richiesta.');
+    // Se questa richiesta è nata da "Chiedi saldo" sulla card di una persona
+    // (Equipaggio), torna lì da solo: prima lo skipper restava sulla Cassa
+    // skipper senza un modo semplice per tornare indietro (caso reale Luca
+    // Nacci, 25/09/2026). Un piccolo ritardo lascia il tempo di leggere la
+    // conferma qui sopra prima che la vista cambi.
+    if (balanceRequestReturnView) {
+      const returnView = balanceRequestReturnView;
+      balanceRequestReturnView = null;
+      setTimeout(() => {
+        window.location.hash = `#${SKIPPER_DASHBOARD_HASHES[returnView]}`;
+      }, 900);
+    }
   } catch (error) {
     whatsappWindow?.close();
     setMessage(document.querySelector('#paymentFormMessage'), 'Non riesco a preparare la richiesta.', true);
