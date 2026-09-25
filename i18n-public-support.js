@@ -142,6 +142,10 @@
           helpTitle: 'You can return without the link.',
           helpText: 'If you have already chosen a personal PIN, sign in with your WhatsApp number and PIN. If you never activated the invitation, forgot your PIN or changed number, ask the skipper to revoke the old access and send a new personal link.',
           helpAction: 'Try again with number and PIN',
+          transferEyebrow: 'For the transfer company',
+          transferTitle: 'I manage the group’s transfers.',
+          transferText: 'If you have been enabled as a transfer operator or are part of the organisation, sign in with Google to view and update airport transfers.',
+          transferAction: 'Sign in to the transfer area',
         },
         privacy: {
           metaDescription: 'Information about privacy and data handling for Egadi Sailing Experience.',
