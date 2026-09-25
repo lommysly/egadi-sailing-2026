@@ -1297,7 +1297,7 @@ function renderSkipperCashOverview() {
   const verifiedPayments = activePayments.filter((payment) => payment.status === 'verified').length;
   const collectionMethods = availablePaymentMethods().length;
   overview.innerHTML = `
-    <div class="finance-overview-heading"><p class="eyebrow">Cassa skipper</p><p>Qui controlli solo ciò che passa dalla tua gestione: metodi proposti, richieste personali e accrediti che hai verificato. Il preventivo e le quote della barca restano nella sezione <strong>La barca</strong>.</p></div>
+    <div class="finance-overview-heading"><p class="eyebrow">Cassa skipper</p><p>I totali qui sotto sommano tutto il movimento della barca: le tue richieste personali, gli acconti equipaggio registrati in «La barca» e le segnalazioni spontanee. Il preventivo — quanto costa a testa — resta nella sezione <strong>La barca</strong>.</p></div>
     <div class="finance-overview-grid skipper-cash-overview-grid">
       <article class="finance-overview-card"><span>Costi skipper da recuperare</span><strong>${escapeHtml(formatCurrency(skipperRecoverableCents / 100))}</strong><small>${escapeHtml(skipperRecoverableCents ? 'Volo o treno, auto e transfer locali: al salvataggio incidono sulle quote nella sezione La barca.' : 'Se li vuoi ripartire, inserisci qui volo o treno, auto e transfer locali.')}</small></article>
       <article class="finance-overview-card"><span>Metodi pronti</span><strong>${escapeHtml(collectionMethods ? `${collectionMethods} attivi` : 'Da configurare')}</strong><small>${escapeHtml(collectionMethods ? 'I dettagli restano privati e vengono aggiunti solo al messaggio WhatsApp della persona scelta.' : 'Configura almeno un metodo prima di preparare una richiesta personale.')}</small></article>
@@ -2849,7 +2849,13 @@ function isSelfReportedPayment(payment) {
 
 function paymentInstallmentLabel(payment) {
   if (isSelfReportedPayment(payment)) return 'Segnalato dalla persona';
-  if (isManualPaymentReceipt(payment) && payment?.installmentType === 'advance') return 'Acconto già ricevuto';
+  if (isManualPaymentReceipt(payment)) {
+    // "Acconto" in italiano vuol dire pagamento parziale: se l'importo
+    // registrato copriva già l'intero saldo dovuto (vedi il confronto fatto
+    // al salvataggio, prima di scrivere installmentType), l'etichetta deve
+    // dirlo, altrimenti sembra che manchi ancora denaro su un conto chiuso.
+    return payment?.installmentType === 'balance' ? 'Saldo ricevuto' : 'Acconto già ricevuto';
+  }
   if (payment?.installmentType === 'balance') return 'Saldo richiesto';
   if (payment?.installmentType === 'full') return 'Quota richiesta';
   if (payment?.installmentType === 'advance') return 'Acconto richiesto';
@@ -3030,8 +3036,15 @@ function syncCostPlanBerthPricingMode() {
   });
   const model = costPlanQuoteModel(readCostPlanForm());
   const manualInput = form.elements.manualStandardBerthPrice;
+  const manualHint = form.querySelector('[data-manual-standard-berth-hint]');
   if (manualInput && model.calculatedStandardBerthCents > 0) {
     manualInput.min = (model.calculatedStandardBerthCents / 100).toFixed(2);
+    // Il minimo compariva solo dopo un tentativo insufficiente (vedi
+    // berthRoundingConfigurationMessage): mostrarlo qui, prima che l'utente
+    // digiti, evita l'andirivieni scroll-giù/scroll-su per scoprirlo.
+    if (manualHint) manualHint.textContent = `Non può essere inferiore al pareggio calcolato: ${formatCurrency(model.calculatedStandardBerthCents / 100)}. Il riepilogo mostra l’eventuale avanzo da riallocare.`;
+  } else if (manualHint) {
+    manualHint.textContent = 'Non può essere inferiore al pareggio calcolato. Il riepilogo mostra l’eventuale avanzo da riallocare.';
   }
 }
 
@@ -3202,7 +3215,7 @@ function renderCostPlanSummary() {
       ? 'Quota cabina scelta dallo skipper.'
       : 'Quota calcolata esattamente al centesimo.';
   const roundingReserveText = model.roundingReserveCents > 0
-    ? `Le quote proposte raccolgono ${formatCurrency(model.roundingReserveCents / 100)} in più dei costi da recuperare: è una riserva da riallocare nella cassa comune, non un guadagno.`
+    ? `Le quote proposte raccolgono ${formatCurrency(model.roundingReserveCents / 100)} in più dei costi da recuperare: da usare per le spese comuni della barca, non un guadagno per te.`
     : model.roundingReserveCents < 0
       ? `Le quote proposte lasciano ${formatCurrency(Math.abs(model.roundingReserveCents) / 100)} da coprire: aumenta la quota cabina prima di inviare gli inviti.`
       : 'Le quote proposte sono in pareggio con i costi da recuperare.';
@@ -3911,7 +3924,10 @@ function contributionCatalogRow(item) {
         ? '<small>La quota per persona arriva dal totale assicurazione nel Preventivo barca; può essere richiesta separatamente.</small>'
         : item.id === 'refundable_deposit'
           ? '<small>Gestita dal Preventivo barca: sempre rimborsabile, in contanti all’imbarco e mai in una richiesta WhatsApp.</small>'
-          : '';
+          // Le due opzioni sono etichette quasi sinonime con effetto opposto:
+          // solo "Da richiedere a parte" fa comparire la voce, con importo
+          // pronto, nel passo 2 · Richiedi (vedi extraContributionTypes).
+          : '<small>«Da richiedere a parte» fa comparire questa voce, con l’importo già pronto, nel passo 2 · Richiedi. Le altre opzioni non generano una richiesta qui: gestisci l’accordo direttamente con l’equipaggio.</small>';
   const amountLabel = automatic ? '€ a persona · calcolato' : '€ a persona · richiesto a parte / regolato separatamente';
   return `<article class="contribution-catalog-row" data-contribution-id="${escapeHtml(item.id)}"><div class="contribution-catalog-label">${escapeHtml(item.label)}${stateHint}</div><label>Gestione<select data-contribution-state${automatic ? ' disabled' : ''}>${contributionStateOptions(item)}</select></label><label>${amountLabel}<input data-contribution-amount type="number" min="0" max="10000" step="0.01" inputmode="decimal" value="${euroInputValue(item.amountCents)}" placeholder="Es. 30,00"${automatic ? ' disabled' : ''} /></label></article>`;
 }
@@ -4139,12 +4155,23 @@ function renderPaymentBerthOptions() {
     : '';
   select.innerHTML = '<option value="custom">Importo libero / altra voce</option>'
     + (assignedOptions ? `<optgroup label="Quota assegnata alla persona">${assignedOptions}</optgroup>` : '')
-    + (berthOptions ? `<optgroup label="Listino barca manuale · override esplicito">${berthOptions}</optgroup>` : '')
+    + (berthOptions ? `<optgroup label="Listino barca manuale · ignora il prezzo già fissato alla persona">${berthOptions}</optgroup>` : '')
     + calculatedOption
     + (extraOptions ? `<optgroup label="Voci da richiedere a parte">${extraOptions}</optgroup>` : '');
   select.value = (assignedPaymentType(selectedType, recipientId) || berthRateType(selectedType) || extraContributionType(selectedType) || costPlanContributionType(selectedType)) && [...select.options].some((option) => option.value === selectedType)
     ? selectedType
     : 'custom';
+}
+
+// Il campo "Motivo" smette di auto-compilarsi alla prima modifica manuale
+// (vedi il listener 'input' su reason), ma finora nulla lo segnalava: se poi
+// si cambiava voce sopra, il messaggio poteva partire con un motivo ormai
+// scollegato dall'importo/voce effettivamente selezionati.
+function updatePaymentReasonLockHint() {
+  const form = document.querySelector('#paymentForm');
+  const hint = form?.querySelector('[data-reason-lock-hint]');
+  if (!hint) return;
+  hint.hidden = form.elements.reason.dataset.autoBerthReason === 'true' || !form.elements.reason.value.trim();
 }
 
 function applyPaymentBerthPreset() {
@@ -4199,6 +4226,7 @@ function applyPaymentBerthPreset() {
     accountingCategory.checked = false;
     delete accountingCategory.dataset.autoCostRecovery;
   }
+  updatePaymentReasonLockHint();
 }
 
 function normalizeMember(id, member) {
@@ -5715,7 +5743,10 @@ function renderPayments(snapshot) {
     const methods = manualReceipt
       ? '<span>Registrazione manuale verificata dallo skipper: non contiene link o coordinate di pagamento.</span>'
       : selfReported
-        ? `<span>Segnalato direttamente dalla persona con ${escapeHtml(selfReportedMethodLabel)}: controlla l’accredito reale prima di confermare.</span>`
+        // L'invito a controllare l'accredito prima di confermare compare già
+        // nel box dedicato (paymentDeclaredHint, sotto): ripeterlo qui creava
+        // lo stesso avviso due volte di fila con parole leggermente diverse.
+        ? `<span>Segnalato direttamente dalla persona con ${escapeHtml(selfReportedMethodLabel)}.</span>`
         : paymentMethodTags(payment) || '<span>Metodo da concordare nello scambio WhatsApp.</span>';
     const accountingTag = paymentCountsTowardCostPlan(payment)
       ? '<span class="payment-accounting-tag">Spese della barca</span>'
@@ -6641,6 +6672,20 @@ syncProjectionCabinGroupField();
 document.querySelector('#openProjectionEditor').addEventListener('click', startNewProjection);
 document.querySelector('#closeProjectionEditor').addEventListener('click', cancelProjectionEdit);
 document.querySelector('#cancelProjectionEdit').addEventListener('click', cancelProjectionEdit);
+
+// L'evento "toggle" di <details> non risale (bubble) nel DOM, ma attraversa
+// comunque la fase di cattura: un solo listener qui, in cattura, intercetta
+// l'apertura di qualunque scheda persona senza doverlo riattaccare a ogni
+// ricreazione della lista (projectionList resta lo stesso elemento, solo il
+// suo contenuto viene rigenerato da renderProjections). Richiesto dal
+// titolare: mai due schede persona aperte insieme, si richiudono a vicenda.
+document.querySelector('#projectionList').addEventListener('toggle', (event) => {
+  const card = event.target;
+  if (!card.matches?.('details[data-projection-card]') || !card.open) return;
+  document.querySelectorAll('#projectionList > details[data-projection-card][open]').forEach((other) => {
+    if (other !== card) other.open = false;
+  });
+}, true);
 
 document.querySelector('#projectionList').addEventListener('click', async (event) => {
   const message = document.querySelector('#projectionEditorStatus');
@@ -7618,6 +7663,10 @@ manualReceiptForm.addEventListener('submit', async (event) => {
   }
   const allocation = manualReceiptAllocation(projection, form.elements.allocationTarget.value, amountCents);
   const collectorName = String(activePaymentProfile?.collectorName || auth.currentUser.displayName || 'Skipper').trim().slice(0, 100);
+  // Confrontato PRIMA di scrivere il documento: se copre già l'intero saldo
+  // dovuto è un saldo, non un acconto (vedi paymentInstallmentLabel), così
+  // la lista di Controlla non continua a dire "Acconto" su un conto chiuso.
+  const balanceBeforeCents = projectionPaymentBalance(projection).remainingCents;
   const payment = {
     recipientId,
     memberId: recipientId,
@@ -7635,7 +7684,7 @@ manualReceiptForm.addEventListener('submit', async (event) => {
     collectorName,
     paymentMethods: {},
     entryType: 'manual_receipt',
-    installmentType: 'advance',
+    installmentType: amountCents >= balanceBeforeCents ? 'balance' : 'advance',
     allocation,
     receivedOn,
     status: 'verified',
@@ -7668,8 +7717,12 @@ const paymentForm = document.querySelector('#paymentForm');
 paymentForm.elements.recipientId.addEventListener('change', () => {
   // Un importo manuale appartiene alla persona precedente: non deve seguire
   // silenziosamente il nuovo destinatario soltanto perché si cambia select.
+  // Stessa logica per la nota privata: è un testo libero legato a quella
+  // persona quanto (se non più di) importo e causale, che venivano già
+  // azzerati qui senza azzerare anche lei.
   paymentForm.elements.amount.value = '';
   paymentForm.elements.reason.value = '';
+  paymentForm.elements.messageDetails.value = '';
   delete paymentForm.elements.amount.dataset.autoBerthRate;
   delete paymentForm.elements.reason.dataset.autoBerthReason;
   delete paymentForm.elements.accountingCategory.dataset.autoCostRecovery;
@@ -7689,6 +7742,7 @@ paymentForm.elements.amount.addEventListener('input', () => {
 });
 paymentForm.elements.reason.addEventListener('input', () => {
   delete paymentForm.elements.reason.dataset.autoBerthReason;
+  updatePaymentReasonLockHint();
 });
 
 paymentForm.addEventListener('submit', async (event) => {
@@ -7784,6 +7838,7 @@ paymentForm.addEventListener('submit', async (event) => {
     renderPaymentBerthOptions();
     renderPaymentBalancePreview();
     renderPaymentMethodOptions();
+    updatePaymentReasonLockHint();
     if (whatsappWindow) whatsappWindow.location.replace(whatsappUrl);
     const nativeMessage = prefersNativeMacWhatsapp()
       ? 'Richiesta preparata: WhatsApp dovrebbe aprirsi nell’app. Se non accade, apri “Altre opzioni” e scegli “Apri nel browser” oppure “Copia messaggio”.'
