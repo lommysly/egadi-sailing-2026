@@ -929,7 +929,13 @@ function setSkipperDashboardView(nextView) {
   const capacityStatus = document.querySelector('#capacityStatus');
   const editBoatButton = document.querySelector('#editBoatButton');
   overview.hidden = view !== 'overview';
-  navigation.hidden = view === 'overview';
+  // Resta visibile SEMPRE, anche sulla Panoramica: prima si nascondeva
+  // proprio lì, lasciando come unico modo di navigare i riquadri della
+  // Panoramica stessa — su schermate lunghe (o dopo aver scrollato oltre i
+  // riquadri) non c'era alcun menu fisso da cui saltare altrove (caso reale
+  // segnalato il 25/09/2026: "non trovo un menu dove andare senza scrollare
+  // ogni volta").
+  navigation.hidden = false;
   grid.hidden = view === 'overview';
   grid.classList.toggle('dashboard-grid-single-view', view !== 'overview');
   grid.querySelectorAll('[data-skipper-panel]').forEach((panel) => {

@@ -375,7 +375,10 @@ function setCrewDashboardView(nextView) {
   const grid = dashboard?.querySelector('.dashboard-grid');
   if (!overview || !navigation || !grid) return;
   overview.hidden = view !== 'overview';
-  navigation.hidden = view === 'overview';
+  // Resta visibile SEMPRE, anche sulla Panoramica: vedi lo stesso commento
+  // in area.js (setSkipperDashboardView) — stesso bug, stessa correzione,
+  // stesso caso reale segnalato il 25/09/2026.
+  navigation.hidden = false;
   grid.hidden = view === 'overview';
   grid.classList.toggle('dashboard-grid-single-view', view !== 'overview');
   grid.querySelectorAll('[data-crew-panel]').forEach((panel) => {
