@@ -10,7 +10,7 @@ import { hasVerifiedContribution } from './area-projection-guards.js?v=20260924-
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
-import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260915-travel-card-v3';
+import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
 
 watchForStaleScript(import.meta.url);
 

@@ -23,7 +23,10 @@ function asText(value) {
 }
 
 function airportLabel(airport) {
-  return airport ? airport.name + ' · ' + airport.code : '';
+  if (!airport) return '';
+  // Un aeroporto estero digitato a mano (fuori dal catalogo, solo italiano:
+  // vedi resolveExactValue) non ha un nome noto, solo il codice IATA.
+  return airport.name ? `${airport.name} · ${airport.code}` : airport.code;
 }
 
 function airportDescription(airport) {
@@ -243,7 +246,25 @@ class TravelAutocomplete {
   resolveExactValue() {
     if (this.input.dataset.travelSelectedValue || !travelCatalog) return;
     const entry = exactEntry(this.kind, this.input.value);
-    if (entry) this.choose(entry, { silent: true });
+    if (entry) {
+      this.choose(entry, { silent: true });
+      return;
+    }
+    // Il catalogo suggerimenti contiene solo aeroporti italiani: senza
+    // questo, chi vola da un aeroporto estero (caso reale Pauline Eloff,
+    // barca Maccabunna, 25/09/2026: partenza dai Paesi Bassi) non vedeva
+    // mai un suggerimento e il campo restava vuoto senza alcun errore,
+    // finché non abbandonava la pagina. Le Rules lato server accettano già
+    // qualunque codice IATA di tre lettere (isOptionalIataAirport in
+    // firestore.rules), quindi qui basta accettare lo stesso formato anche
+    // senza una corrispondenza nel catalogo.
+    if (this.kind === 'airport') {
+      const typed = asText(this.input.value).trim();
+      if (/^[A-Za-z]{3}$/.test(typed)) {
+        const code = typed.toUpperCase();
+        this.choose({ code, city: '', label: code }, { silent: true });
+      }
+    }
   }
 
   clearAirportTargets() {

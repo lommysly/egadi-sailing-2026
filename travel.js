@@ -2,7 +2,7 @@ import { getApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, personalAreaUrl, profileUrl, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260925-crewaccess-error-fix-v1';
-import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260920-travel-private-v1';
+import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
 
 watchForStaleScript(import.meta.url);
 
