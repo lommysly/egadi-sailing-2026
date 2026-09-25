@@ -3522,6 +3522,13 @@ function invitationTripBreakdownMessage(invite, locale) {
   const { normalized, payableCents, starterPackCents, refundableDepositCents } = summary;
   const berthCents = normalized.berthCents;
   const insuranceCents = normalized.protectionInsuranceCents;
+  // Questo stesso messaggio serve anche per re-inviare il link a chi ha già
+  // versato qualcosa (es. "Invia su WhatsApp" dopo un acconto verificato):
+  // deve riflettere quanto resta da versare, non ripetere sempre la quota
+  // intera come se nulla fosse stato ricevuto (caso reale Massimo Giuffrida,
+  // 25/09/2026 — l'unico messaggio che già lo faceva correttamente era
+  // quello di una richiesta di saldo vera e propria, non questo riepilogo).
+  const balance = projectionPaymentBalance(projection);
   const hasAnyAmount = berthCents > 0 || insuranceCents > 0 || starterPackCents > 0 || refundableDepositCents > 0;
   const accommodation = invitationAccommodationLabel(projection, locale);
   if (!hasAnyAmount && !accommodation) return '';
@@ -3581,7 +3588,14 @@ function invitationTripBreakdownMessage(invite, locale) {
     ? (locale === 'en' ? `*✨ COST OF YOUR WEEKEND: ${euro(participationCents)}*` : `*✨ COSTO DEL TUO WEEKEND: ${euro(participationCents)}*`)
     : '';
   const paymentHeading = payableCents > 0
-    ? (locale === 'en' ? `*💳 PAY THE SKIPPER NOW: ${euro(payableCents)}*` : `*💳 DA VERSARE ORA ALLO SKIPPER: ${euro(payableCents)}*`)
+    ? (balance.remainingCents > 0
+      ? (locale === 'en' ? `*💳 PAY THE SKIPPER NOW: ${euro(balance.remainingCents)}*` : `*💳 DA VERSARE ORA ALLO SKIPPER: ${euro(balance.remainingCents)}*`)
+      : (locale === 'en' ? '*💳 NOTHING LEFT TO PAY THE SKIPPER*' : '*💳 NIENTE PIÙ DA VERSARE ALLO SKIPPER*'))
+    : '';
+  const paymentVerifiedLine = payableCents > 0 && balance.verifiedCents > 0
+    ? (locale === 'en'
+      ? `Already paid and verified: ${euro(balance.verifiedCents)} of ${euro(payableCents)} agreed.`
+      : `Già versato e verificato: ${euro(balance.verifiedCents)} su ${euro(payableCents)} concordati.`)
     : '';
   const cashHeading = cashAtBoardCents > 0
     ? (locale === 'en' ? `*💶 CASH TO BRING AT BOARDING: ${euro(cashAtBoardCents)}*` : `*💶 CONTANTI DA PORTARE ALL’IMBARCO: ${euro(cashAtBoardCents)}*`)
@@ -3589,7 +3603,7 @@ function invitationTripBreakdownMessage(invite, locale) {
   const blocks = [
     [heading, reservationRows.length ? (locale === 'en' ? '*🛏️ YOUR ACCOMMODATION*' : '*🛏️ LA TUA SISTEMAZIONE*') : '', ...reservationRows].filter(Boolean).join('\n'),
     participationHeading ? [participationHeading, ...costRows, locale === 'en' ? 'The refundable security deposit is not included in this total.' : 'La cauzione rimborsabile non è compresa in questo totale.'].join('\n') : '',
-    paymentHeading ? [paymentHeading, locale === 'en' ? 'This covers the berth and deposit-protection insurance. The payment method is agreed directly with the skipper.' : 'Comprende posto/cabina e assicurazione sulla cauzione. Il metodo di pagamento viene concordato direttamente con lo skipper.'].join('\n') : '',
+    paymentHeading ? [paymentHeading, locale === 'en' ? 'This covers the berth and deposit-protection insurance. The payment method is agreed directly with the skipper.' : 'Comprende posto/cabina e assicurazione sulla cauzione. Il metodo di pagamento viene concordato direttamente con lo skipper.', paymentVerifiedLine].filter(Boolean).join('\n') : '',
     starterPackRows.join('\n'),
     cashHeading ? [cashHeading, ...cashRows].join('\n') : '',
   ].filter(Boolean);
