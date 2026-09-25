@@ -2030,6 +2030,21 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt', 'cancelledBy']);
     }
 
+    // Una ricevuta manuale verificata resta immutabile (non si può correggere
+    // l'importo o la data di un versamento già registrato): l'unico modo per
+    // rimediare a un errore di inserimento è annullarla, cosa che la esclude
+    // dal saldo (projectionPaymentBalance ignora i pagamenti "cancelled") e
+    // permette allo skipper di registrarne una nuova corretta. La cronologia
+    // dell'errore resta comunque nel documento, non viene sovrascritta.
+    function canCancelManualReceipt() {
+      return resource.data.entryType == 'manual_receipt'
+        && resource.data.status == 'verified'
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.cancelledAt == request.time
+        && request.resource.data.cancelledBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt', 'cancelledBy']);
+    }
+
     // Non riscrive mai importo, destinatario o stato: serve solo a classificare
     // una richiesta storica già verificata senza doverne creare un duplicato.
     // Non la trasforma in "ricevuta manuale", perché quest'ultima richiede la
@@ -2623,6 +2638,7 @@ service cloud.firestore {
           && ((isSkipper(boatId)
               && (canVerifyPayment()
                 || canCancelPayment()
+                || canCancelManualReceipt()
                 || canClassifyVerifiedLegacyPaymentInstallment()))
             || canDeclarePayment(boatId));
         allow delete: if false;

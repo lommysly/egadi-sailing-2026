@@ -5381,6 +5381,21 @@ function projectionCabinControl(projection) {
   return `<label class="projection-cabin-control">Cabina<select data-cabin-group="${escapeHtml(projection.id)}" aria-label="Cabina assegnata a ${escapeHtml(projection.displayName)}">${cabinGroupOptionsHtml(cabinGroupId, projection.id)}</select></label>`;
 }
 
+// Una ricevuta manuale verificata è immutabile (vedi canCancelManualReceipt
+// in firestore.rules): l'unico modo di correggere un importo o una data
+// sbagliati è annullarla e registrarne una nuova. Se ce n'è più di una (per
+// esempio un acconto e poi il saldo, registrati separatamente), si propone
+// di correggere la più recente: è quella più probabile da voler rimediare.
+function latestVerifiedManualReceiptForProjection(projection) {
+  const candidates = activePayments.filter((payment) => payment.status === 'verified'
+    && isManualPaymentReceipt(payment)
+    && paymentRecipientId(payment) === projection.id);
+  if (!candidates.length) return null;
+  return candidates.reduce((latest, payment) => (
+    (payment.receivedOn || '') > (latest.receivedOn || '') ? payment : latest
+  ));
+}
+
 function projectionCardActions(projection, invite) {
   const actions = [];
   const secondaryActions = [];
@@ -5389,6 +5404,10 @@ function projectionCardActions(projection, invite) {
   const editAction = projectionActionTextButton('edit-projection', projection.id, 'Modifica scheda e quota', '✎');
   if (balance.expectedCents > 0) {
     actions.push(projectionActionTextButton('register-manual-receipt', projection.id, 'Registra acconto', '+'));
+  }
+  const correctableReceipt = contributionVerified ? latestVerifiedManualReceiptForProjection(projection) : null;
+  if (correctableReceipt) {
+    secondaryActions.push(projectionActionTextButton('cancel-manual-receipt', correctableReceipt.id, 'Correggi ultimo versamento', '↺'));
   }
   if (!invite) {
     actions.unshift(projectionActionTextButton('send-projection', projection.id, 'Crea invito WhatsApp', '🔗', 'primary'));
@@ -6733,6 +6752,25 @@ document.querySelector('#projectionList').addEventListener('click', async (event
   if (manualReceiptButton) {
     const projection = activeProjections.find((candidate) => candidate.id === manualReceiptButton.dataset.registerManualReceipt);
     if (projection) openManualReceiptPanel(projection);
+    return;
+  }
+  const cancelManualReceiptButton = event.target.closest('[data-cancel-manual-receipt]');
+  if (cancelManualReceiptButton) {
+    const payment = activePayments.find((candidate) => candidate.id === cancelManualReceiptButton.dataset.cancelManualReceipt);
+    if (!payment) return;
+    if (!window.confirm('Annullare questo versamento? Resta annotato nello storico ma non conterà più nel saldo; potrai subito registrarne uno corretto.')) return;
+    cancelManualReceiptButton.disabled = true;
+    try {
+      await updateDoc(doc(db, 'boats', activeBoat.id, 'paymentRequests', payment.id), {
+        status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: auth.currentUser.uid,
+      });
+      setMessage(message, 'Versamento annullato: registra qui sotto quello corretto.');
+      const projection = activeProjections.find((candidate) => candidate.id === paymentRecipientId(payment));
+      if (projection) openManualReceiptPanel(projection);
+    } catch (error) {
+      cancelManualReceiptButton.disabled = false;
+      setMessage(message, getFirestoreErrorMessage(error, 'Non riesco ad annullare questo versamento.'), true);
+    }
     return;
   }
   const balanceRequestButton = event.target.closest('[data-request-projection-balance]');

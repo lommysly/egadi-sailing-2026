@@ -720,6 +720,97 @@ test('acconto: un altro skipper non puo registrare un acconto sulla barca di SKI
 });
 
 // ===========================================================================
+// CASO 2bis: Correggere una ricevuta manuale sbagliata (25/09/2026)
+// Una ricevuta manuale verificata resta immutabile: l'unico modo di
+// correggere un importo/data sbagliati e' annullarla (verified -> cancelled)
+// e registrarne una nuova. Vedi canCancelManualReceipt() in firestore.rules.
+// ===========================================================================
+
+test('correzione: SKIPPER_A annulla una ricevuta manuale verificata', async () => {
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('manual-to-cancel', {
+    entryType: 'manual_receipt', status: 'verified', recipientId: INVITE_A_ID,
+    amountCents: 20000, allocation: allocationFor(20000), paymentMethods: {},
+    verifiedAt: Timestamp.now(), verifiedBy: SKIPPER_A,
+  });
+  const skipper = skipperContext(testEnv);
+  await assertSucceeds(updateDoc(paymentDoc(skipper, 'manual-to-cancel'), {
+    status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: SKIPPER_A,
+  }));
+  let snap;
+  await testEnv.withSecurityRulesDisabled(async (ctx) => { snap = await getDoc(paymentDoc(ctx, 'manual-to-cancel')); });
+  assert.equal(snap.data().status, 'cancelled');
+  assert.equal(snap.data().amountCents, 20000);
+});
+
+test('correzione: annullare una ricevuta manuale cambiando anche altri campi viene negato', async () => {
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('manual-cancel-plus-amount', {
+    entryType: 'manual_receipt', status: 'verified', recipientId: INVITE_A_ID,
+    amountCents: 20000, allocation: allocationFor(20000), paymentMethods: {},
+    verifiedAt: Timestamp.now(), verifiedBy: SKIPPER_A,
+  });
+  const skipper = skipperContext(testEnv);
+  await assertFails(updateDoc(paymentDoc(skipper, 'manual-cancel-plus-amount'), {
+    status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: SKIPPER_A, amountCents: 30000,
+  }));
+});
+
+test('correzione: annullare una ricevuta manuale gia annullata viene negato', async () => {
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('manual-already-cancelled', {
+    entryType: 'manual_receipt', status: 'cancelled', recipientId: INVITE_A_ID,
+    amountCents: 20000, allocation: allocationFor(20000), paymentMethods: {},
+    cancelledAt: Timestamp.now(), cancelledBy: SKIPPER_A,
+  });
+  const skipper = skipperContext(testEnv);
+  await assertFails(updateDoc(paymentDoc(skipper, 'manual-already-cancelled'), {
+    status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: SKIPPER_A,
+  }));
+});
+
+test('correzione: ORGANIZER_A non puo annullare una ricevuta manuale verificata', async () => {
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('manual-organizer-cancel', {
+    entryType: 'manual_receipt', status: 'verified', recipientId: INVITE_A_ID,
+    amountCents: 20000, allocation: allocationFor(20000), paymentMethods: {},
+    verifiedAt: Timestamp.now(), verifiedBy: SKIPPER_A,
+  });
+  const organizer = organizerContext(testEnv);
+  await assertFails(updateDoc(paymentDoc(organizer, 'manual-organizer-cancel'), {
+    status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: ORGANIZER_A,
+  }));
+});
+
+test('correzione: CREW_A non puo annullare la propria ricevuta manuale verificata', async () => {
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('manual-crew-cancel', {
+    entryType: 'manual_receipt', status: 'verified', recipientId: INVITE_A_ID,
+    amountCents: 20000, allocation: allocationFor(20000), paymentMethods: {},
+    verifiedAt: Timestamp.now(), verifiedBy: SKIPPER_A,
+  });
+  const crewA = crewAContext(testEnv);
+  await assertFails(updateDoc(paymentDoc(crewA, 'manual-crew-cancel'), {
+    status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: CREW_A,
+  }));
+});
+
+test('correzione: una richiesta ordinaria (entryType request) gia verified non diventa cancellabile', async () => {
+  // canCancelManualReceipt() richiede entryType manual_receipt: una richiesta
+  // ordinaria gia verificata resta bloccata come prima (nessuna regressione).
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('request-verified-not-cancellable', {
+    entryType: 'request', status: 'verified', recipientId: INVITE_A_ID,
+    amountCents: 20000, allocation: allocationFor(20000), paymentMethods: { paypal: true },
+    verifiedAt: Timestamp.now(), verifiedBy: SKIPPER_A,
+  });
+  const skipper = skipperContext(testEnv);
+  await assertFails(updateDoc(paymentDoc(skipper, 'request-verified-not-cancellable'), {
+    status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: SKIPPER_A,
+  }));
+});
+
+// ===========================================================================
 // CASO 3: Lettura e stati contributo
 // ===========================================================================
 
