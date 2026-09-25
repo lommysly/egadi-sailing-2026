@@ -5383,17 +5383,22 @@ function projectionCabinControl(projection) {
 
 // Una ricevuta manuale verificata è immutabile (vedi canCancelManualReceipt
 // in firestore.rules): l'unico modo di correggere un importo o una data
-// sbagliati è annullarla e registrarne una nuova. Se ce n'è più di una (per
-// esempio un acconto e poi il saldo, registrati separatamente), si propone
-// di correggere la più recente: è quella più probabile da voler rimediare.
-function latestVerifiedManualReceiptForProjection(projection) {
-  const candidates = activePayments.filter((payment) => payment.status === 'verified'
-    && isManualPaymentReceipt(payment)
-    && paymentRecipientId(payment) === projection.id);
-  if (!candidates.length) return null;
-  return candidates.reduce((latest, payment) => (
-    (payment.receivedOn || '') > (latest.receivedOn || '') ? payment : latest
-  ));
+// sbagliati è annullarla e registrarne una nuova. Se per errore ne esistono
+// più di una (ogni "Registra acconto" ne crea una nuova, non sostituisce la
+// precedente) vanno mostrate TUTTE separatamente, non solo "l'ultima": con
+// più tentativi accumulati un solo pulsante non basta a correggerli tutti
+// (caso reale Profumo di mare / Alessia Cassini, 25/09/2026). Include anche
+// le richieste (entryType "request") ancora in attesa, non solo gli acconti
+// già verificati: anche quelle possono essere state inviate per sbaglio.
+function cancellableActivePaymentsForProjection(projection) {
+  return activePayments
+    .filter((payment) => payment.status !== 'cancelled'
+      && paymentRecipientId(payment) === projection.id
+      && (
+        (isManualPaymentReceipt(payment) && payment.status === 'verified')
+        || (!isManualPaymentReceipt(payment) && isPendingPayment(payment))
+      ))
+    .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
 }
 
 function projectionCardActions(projection, invite) {
@@ -5405,10 +5410,18 @@ function projectionCardActions(projection, invite) {
   if (balance.expectedCents > 0) {
     actions.push(projectionActionTextButton('register-manual-receipt', projection.id, 'Registra acconto', '+'));
   }
-  const correctableReceipt = contributionVerified ? latestVerifiedManualReceiptForProjection(projection) : null;
-  if (correctableReceipt) {
-    secondaryActions.push(projectionActionTextButton('cancel-manual-receipt', correctableReceipt.id, 'Correggi ultimo versamento', '↺'));
-  }
+  cancellableActivePaymentsForProjection(projection).forEach((payment) => {
+    const isManual = isManualPaymentReceipt(payment);
+    const amountLabel = formatCurrency(paymentAmount(payment));
+    const dateLabel = isManual && payment.receivedOn ? ` del ${formatDate(payment.receivedOn)}` : '';
+    const label = isManual ? `Annulla versamento ${amountLabel}${dateLabel}` : `Annulla richiesta ${amountLabel}`;
+    secondaryActions.push(projectionActionTextButton(
+      isManual ? 'cancel-manual-receipt' : 'cancel-pending-request',
+      payment.id,
+      label,
+      '↺',
+    ));
+  });
   if (!invite) {
     actions.unshift(projectionActionTextButton('send-projection', projection.id, 'Crea invito WhatsApp', '🔗', 'primary'));
     if (!contributionVerified) {
@@ -6758,18 +6771,37 @@ document.querySelector('#projectionList').addEventListener('click', async (event
   if (cancelManualReceiptButton) {
     const payment = activePayments.find((candidate) => candidate.id === cancelManualReceiptButton.dataset.cancelManualReceipt);
     if (!payment) return;
-    if (!window.confirm('Annullare questo versamento? Resta annotato nello storico ma non conterà più nel saldo; potrai subito registrarne uno corretto.')) return;
+    if (!window.confirm(`Annullare il versamento di ${formatCurrency(paymentAmount(payment))}? Resta annotato nello storico ma non conterà più nel saldo.`)) return;
     cancelManualReceiptButton.disabled = true;
     try {
       await updateDoc(doc(db, 'boats', activeBoat.id, 'paymentRequests', payment.id), {
         status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: auth.currentUser.uid,
       });
-      setMessage(message, 'Versamento annullato: registra qui sotto quello corretto.');
-      const projection = activeProjections.find((candidate) => candidate.id === paymentRecipientId(payment));
-      if (projection) openManualReceiptPanel(projection);
+      // Non riapro qui il modulo di registrazione: se ci sono più versamenti
+      // sbagliati da annullare (vedi cancellableActivePaymentsForProjection),
+      // farlo dopo ognuno interromperebbe la pulizia in corso. Lo skipper
+      // riapre "Registra acconto" da solo quando è pronto per quello giusto.
+      setMessage(message, 'Versamento annullato.');
     } catch (error) {
       cancelManualReceiptButton.disabled = false;
       setMessage(message, getFirestoreErrorMessage(error, 'Non riesco ad annullare questo versamento.'), true);
+    }
+    return;
+  }
+  const cancelPendingRequestButton = event.target.closest('[data-cancel-pending-request]');
+  if (cancelPendingRequestButton) {
+    const payment = activePayments.find((candidate) => candidate.id === cancelPendingRequestButton.dataset.cancelPendingRequest);
+    if (!payment || !isPendingPayment(payment)) return;
+    if (!window.confirm(`Annullare la richiesta di ${formatCurrency(paymentAmount(payment))}? Resta registrata nello storico ma non verrà più proposta alla persona.`)) return;
+    cancelPendingRequestButton.disabled = true;
+    try {
+      await updateDoc(doc(db, 'boats', activeBoat.id, 'paymentRequests', payment.id), {
+        status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: auth.currentUser.uid,
+      });
+      setMessage(message, 'Richiesta annullata.');
+    } catch (error) {
+      cancelPendingRequestButton.disabled = false;
+      setMessage(message, getFirestoreErrorMessage(error, 'Non riesco ad annullare questa richiesta.'), true);
     }
     return;
   }
@@ -7746,6 +7778,14 @@ manualReceiptForm.addEventListener('submit', async (event) => {
   // dovuto è un saldo, non un acconto (vedi paymentInstallmentLabel), così
   // la lista di Controlla non continua a dire "Acconto" su un conto chiuso.
   const balanceBeforeCents = projectionPaymentBalance(projection).remainingCents;
+  // Ogni "Registra acconto" crea SEMPRE un nuovo versamento: non sostituisce
+  // uno già registrato. Se il saldo è già a zero, è quasi sempre un errore
+  // (un tentativo ripetuto dopo un versamento sbagliato, non un secondo
+  // versamento vero) — meglio chiedere conferma qui che ritrovarsi un
+  // eccesso da sistemare dopo (caso reale Profumo di mare, 25/09/2026).
+  if (balanceBeforeCents <= 0 && !window.confirm(`Il saldo di ${projection.displayName} è già a zero o in eccesso. Registrare comunque un altro versamento da ${formatCurrency(amountCents / 100)}? Se stai correggendo un errore, annulla prima il versamento sbagliato con “Altre opzioni”.`)) {
+    return;
+  }
   const payment = {
     recipientId,
     memberId: recipientId,
