@@ -137,24 +137,32 @@ function ensureCrewPin(pin) {
 
 async function readCrewAccess(user) {
   if (!user || user.isAnonymous || !user.email) throw new CrewAccessError('access-not-active');
-  const accessSnapshot = await getDoc(crewAccessReference(user.uid));
-  if (!accessSnapshot.exists()) throw new CrewAccessError('access-not-active');
-  const access = accessSnapshot.data();
-  if (access.userId !== user.uid || access.loginEmail !== user.email
-    || !/^[A-Za-z0-9_-]{1,128}$/.test(access.boatId || '') || !isInviteCode(access.inviteId)) {
-    throw new CrewAccessError('access-not-active');
+  try {
+    const accessSnapshot = await getDoc(crewAccessReference(user.uid));
+    if (!accessSnapshot.exists()) throw new CrewAccessError('access-not-active');
+    const access = accessSnapshot.data();
+    if (access.userId !== user.uid || access.loginEmail !== user.email
+      || !/^[A-Za-z0-9_-]{1,128}$/.test(access.boatId || '') || !isInviteCode(access.inviteId)) {
+      throw new CrewAccessError('access-not-active');
+    }
+    const inviteSnapshot = await getDoc(inviteReference(access.boatId, access.inviteId));
+    if (!inviteSnapshot.exists()) throw new CrewAccessError('access-not-active');
+    const invite = inviteSnapshot.data();
+    if (invite.status !== 'active' || invite.participantUid !== user.uid) {
+      throw new CrewAccessError('access-not-active');
+    }
+    return {
+      user,
+      access: { ...access, id: user.uid },
+      invite: { ...invite, id: access.inviteId, boatId: access.boatId },
+    };
+  } catch (error) {
+    // Un permesso negato qui è quasi sempre un invito riemesso o revocato
+    // altrove (sessione del browser rimasta con le credenziali vecchie):
+    // stesso messaggio azionabile di "access-not-active", mai il generico
+    // "controlla la connessione" che nasconde la causa reale all'utente.
+    throw error instanceof CrewAccessError ? error : new CrewAccessError('access-not-active', error);
   }
-  const inviteSnapshot = await getDoc(inviteReference(access.boatId, access.inviteId));
-  if (!inviteSnapshot.exists()) throw new CrewAccessError('access-not-active');
-  const invite = inviteSnapshot.data();
-  if (invite.status !== 'active' || invite.participantUid !== user.uid) {
-    throw new CrewAccessError('access-not-active');
-  }
-  return {
-    user,
-    access: { ...access, id: user.uid },
-    invite: { ...invite, id: access.inviteId, boatId: access.boatId },
-  };
 }
 
 async function signInOrCreateCrewAccount(loginEmail, pin) {
