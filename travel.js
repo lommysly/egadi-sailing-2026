@@ -604,7 +604,26 @@ function populateLegForm(form, leg) {
   updateConditionalFields(form);
 }
 
+// Chi arriva o riparte da Trapani o Palermo ha quasi certamente bisogno del
+// collegamento con Marsala: lasciare la scelta vuota per default significava
+// che molte persone compilavano il volo e si fermavano lì, restando bloccate
+// su "Transfer da scegliere" finché lo skipper non sollecitava (segnalato dal
+// titolare). Pre-selezioniamo "Transfer organizzato" solo quando la scelta è
+// ancora vuota: resta comunque modificabile in un click, e il consenso a
+// condividere i dati con la società transfer resta comunque una spunta
+// esplicita separata, mai automatica.
+function autoSelectAirportTransferChoice(form) {
+  const choiceField = field(form, 'airportMarsalaChoice');
+  if (!choiceField || choiceField.value !== '') return;
+  if (selectValue(form, 'transportMode', TRANSPORT_MODES) !== 'flight') return;
+  const direction = form.closest('[data-travel-direction]')?.dataset.travelDirection;
+  const terminalAirport = (direction === 'return' ? inputValue(form, 'originAirport') : inputValue(form, 'destinationAirport')).toUpperCase();
+  if (!TERMINAL_AIRPORTS.has(terminalAirport)) return;
+  choiceField.value = 'transfer';
+}
+
 function updateConditionalFields(form) {
+  autoSelectAirportTransferChoice(form);
   const airportChoice = inputValue(form, 'airportMarsalaChoice');
   const carpoolRole = inputValue(form, 'carpoolRole');
   const transferConsent = form.querySelector('[data-transfer-consent]');
