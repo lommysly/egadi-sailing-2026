@@ -5414,6 +5414,13 @@ function projectionCardActions(projection, invite) {
     const isManual = isManualPaymentReceipt(payment);
     const amountLabel = formatCurrency(paymentAmount(payment));
     const dateLabel = isManual && payment.receivedOn ? ` del ${formatDate(payment.receivedOn)}` : '';
+    if (!isManual) {
+      // Prima di poter annullarla, lo skipper deve poter anche confermarla
+      // qui: senza questo pulsante l'unico modo era uscire dalla scheda e
+      // andare in "Cassa skipper → Controlla", che è esattamente quello che
+      // il titolare ha chiesto di evitare (tutto dalla scheda persona).
+      secondaryActions.push(projectionActionTextButton('verify-pending-request', payment.id, `Conferma accredito ${amountLabel}`, '✓'));
+    }
     const label = isManual ? `Annulla versamento ${amountLabel}${dateLabel}` : `Annulla richiesta ${amountLabel}`;
     secondaryActions.push(projectionActionTextButton(
       isManual ? 'cancel-manual-receipt' : 'cancel-pending-request',
@@ -5478,6 +5485,13 @@ function renderProjectionCard(projection, { isOpen = false } = {}) {
           ? 'Quota proposta dalla dashboard'
           : 'Listino base · preventivo da completare'
       : 'Eccezione personale · importi fissi';
+  // Il blocco protegge un accordo già pagato, ma non deve diventare un
+  // vicolo cieco: se la quota registrata era sbagliata, lo skipper deve
+  // vedere subito come sbloccarla, non solo che è bloccata (caso reale
+  // Massimo Giuffrida, 25/09/2026).
+  const lockedQuotaHint = contributionVerified
+    ? ' <small>Per correggerla: annulla prima il versamento sbagliato in “Altre opzioni” qui sotto, poi la scheda si sblocca subito.</small>'
+    : '';
   const total = isExemptFromCosts
     ? 'Esente'
     : cost.hasPayableEstimate
@@ -5525,7 +5539,7 @@ function renderProjectionCard(projection, { isOpen = false } = {}) {
     projectionInvoiceLine('Starter Pack · contanti a bordo', starterPackAmount),
     projectionInvoiceLine('Cauzione rimborsabile · contanti all’imbarco', deposit),
   ].join('');
-  return `<details class="projection-row projection-card" data-projection-card="${escapeHtml(projectionCardKey(projection.id))}"${isOpen ? ' open' : ''}><summary class="projection-card-summary"><span class="projection-card-summary-person"><strong>${escapeHtml(projection.displayName)}</strong><span class="projection-row-assignment">${assignment}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small></span><span class="projection-card-summary-finance"><span>${escapeHtml(summaryLabel)}</span><strong>${escapeHtml(weekendCost)}</strong><small>${escapeHtml(summaryNote)}</small></span><span class="projection-card-summary-toggle" aria-hidden="true">⌄</span></summary><div class="projection-card-body"><div class="projection-row-person projection-card-person-detail">${cabin}</div><section class="projection-row-cost projection-invoice" aria-label="Riepilogo quote per ${escapeHtml(projection.displayName)}"><span class="projection-row-cost-label">Riepilogo della partecipazione</span><dl class="projection-invoice-lines">${invoiceLines}</dl><div class="projection-invoice-total"><span>Totale del weekend</span><strong>${escapeHtml(weekendCost)}</strong><small>Posto/cabina + assicurazione + Starter Pack</small></div><div class="projection-invoice-total projection-invoice-total-transfer"><span>Da versare allo skipper</span><strong>${escapeHtml(transferAmount)}</strong><small>Posto/cabina + assicurazione cauzione</small></div><dl class="projection-invoice-lines projection-invoice-cash-lines">${cashLines}</dl><div class="projection-invoice-total projection-invoice-total-cash"><span>Contanti da portare all’imbarco</span><strong>${escapeHtml(cashOnBoard)}</strong><small>Starter Pack + cauzione rimborsabile</small></div>${projectionPaymentBalanceMarkup(projection)}<span class="projection-row-deposit"><b>${escapeHtml(pricingSource)}</b></span></section><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(projection.displayName)}">${projectionCardActions(projection, invite)}</div></div></details>`;
+  return `<details class="projection-row projection-card" data-projection-card="${escapeHtml(projectionCardKey(projection.id))}"${isOpen ? ' open' : ''}><summary class="projection-card-summary"><span class="projection-card-summary-person"><strong>${escapeHtml(projection.displayName)}</strong><span class="projection-row-assignment">${assignment}</span><small>${escapeHtml(projectionStatusLabel(projection))}</small></span><span class="projection-card-summary-finance"><span>${escapeHtml(summaryLabel)}</span><strong>${escapeHtml(weekendCost)}</strong><small>${escapeHtml(summaryNote)}</small></span><span class="projection-card-summary-toggle" aria-hidden="true">⌄</span></summary><div class="projection-card-body"><div class="projection-row-person projection-card-person-detail">${cabin}</div><section class="projection-row-cost projection-invoice" aria-label="Riepilogo quote per ${escapeHtml(projection.displayName)}"><span class="projection-row-cost-label">Riepilogo della partecipazione</span><dl class="projection-invoice-lines">${invoiceLines}</dl><div class="projection-invoice-total"><span>Totale del weekend</span><strong>${escapeHtml(weekendCost)}</strong><small>Posto/cabina + assicurazione + Starter Pack</small></div><div class="projection-invoice-total projection-invoice-total-transfer"><span>Da versare allo skipper</span><strong>${escapeHtml(transferAmount)}</strong><small>Posto/cabina + assicurazione cauzione</small></div><dl class="projection-invoice-lines projection-invoice-cash-lines">${cashLines}</dl><div class="projection-invoice-total projection-invoice-total-cash"><span>Contanti da portare all’imbarco</span><strong>${escapeHtml(cashOnBoard)}</strong><small>Starter Pack + cauzione rimborsabile</small></div>${projectionPaymentBalanceMarkup(projection)}<span class="projection-row-deposit"><b>${escapeHtml(pricingSource)}</b>${lockedQuotaHint}</span></section><div class="projection-actions" role="group" aria-label="Azioni per ${escapeHtml(projection.displayName)}">${projectionCardActions(projection, invite)}</div></div></details>`;
 }
 
 function renderLegacyInviteCard(invite, { isOpen = false } = {}) {
@@ -6785,6 +6799,22 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     } catch (error) {
       cancelManualReceiptButton.disabled = false;
       setMessage(message, getFirestoreErrorMessage(error, 'Non riesco ad annullare questo versamento.'), true);
+    }
+    return;
+  }
+  const verifyPendingRequestButton = event.target.closest('[data-verify-pending-request]');
+  if (verifyPendingRequestButton) {
+    const payment = activePayments.find((candidate) => candidate.id === verifyPendingRequestButton.dataset.verifyPendingRequest);
+    if (!payment || !isPendingPayment(payment)) return;
+    verifyPendingRequestButton.disabled = true;
+    try {
+      await updateDoc(doc(db, 'boats', activeBoat.id, 'paymentRequests', payment.id), {
+        status: 'verified', verifiedAt: serverTimestamp(), verifiedBy: auth.currentUser.uid,
+      });
+      setMessage(message, 'Accredito confermato.');
+    } catch (error) {
+      verifyPendingRequestButton.disabled = false;
+      setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a confermare l’accredito.'), true);
     }
     return;
   }
