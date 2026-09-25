@@ -26,7 +26,6 @@ installInputNormalization();
 installTravelAutocomplete();
 const signInCard = document.querySelector('#signInCard');
 const accountCard = document.querySelector('#accountCard');
-const transferManagementLink = document.querySelector('#transferManagementLink');
 const registerSection = document.querySelector('#registra-barca');
 const dashboard = document.querySelector('#dashboard');
 const signInButton = document.querySelector('#signInButton');
@@ -322,6 +321,13 @@ let linkingLegacyInviteId = null;
 // invece di lasciare lo skipper sulla Cassa skipper senza un modo semplice
 // per tornare a Equipaggio (caso reale Luca Nacci, 25/09/2026).
 let balanceRequestReturnView = null;
+// La gestione transfer per l'organizzatore viveva come link secondario nella
+// scheda "Sessione attiva", separata dai menu della dashboard vera e propria
+// (caso reale segnalato il 25/09/2026: "devo trovarla dentro l'area
+// riservata come menu"). Ora la card/voce nella dashboard si mostra o si
+// nasconde leggendo questo flag da renderSkipperDashboardOverview(), così
+// segue lo stesso ciclo di aggiornamento di tutte le altre card.
+let isOrganizerAccount = false;
 const fleetPublicationInProgress = new Set();
 let fleetAvailabilitySyncInProgress = false;
 const SKIPPER_DASHBOARD_HASHES = Object.freeze({
@@ -621,6 +627,7 @@ function skipperDashboardIcon(kind) {
     money: '<rect x="3.5" y="5.25" width="17" height="13.5" rx="2"/><path d="M3.5 9.5h17M15.5 14.25h2.25"/>',
     boat: '<path d="M3 14.5h18l-2.25 4.25H5.25L3 14.5Z"/><path d="M12 3.5v11M12 4l5.25 7H12M11.75 6.25 7 11h4.75"/>',
     board: '<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4.5"/>',
+    transfer: '<path d="M4 8h13M13 4l4 4-4 4"/><path d="M20 16H7M11 12l-4 4 4 4"/>',
     setup: '<path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/><circle cx="12" cy="12" r="4.5"/>',
     request: '<path d="m4 4 16 8-16 8 3-8-3-8Z"/><path d="M7 12h9"/>',
     review: '<path d="M4 19.5V11M10 19.5V4.5M16 19.5V8M22 19.5H2"/>',
@@ -882,6 +889,10 @@ function setupSkipperDashboard() {
         <span class="dashboard-hub-icon">${skipperDashboardIcon('board')}</span><span class="dashboard-hub-label">Regole e bacheca</span>
         <strong data-skipper-summary="board">Carico le regole…</strong><small data-skipper-detail="board">Sicurezza, orari e comunicazioni.</small>
       </button>
+      <a id="skipperTransferHubCard" class="dashboard-hub-card dashboard-hub-card-transfer" href="transfer.html" hidden>
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('transfer')}</span><span class="dashboard-hub-label">Area transfer</span>
+        <strong>Gestione accessi</strong><small>Operatori transfer e movimenti verso l’aeroporto.</small>
+      </a>
     </div>
     <div class="dashboard-next-step"><div><span>Prossimo passo</span><strong id="skipperNextActionText">Preparo la tua panoramica.</strong></div><button id="skipperNextActionButton" class="button button-primary" type="button" data-skipper-view="crew">Apri</button></div>
   `;
@@ -892,7 +903,7 @@ function setupSkipperDashboard() {
   navigation.setAttribute('aria-label', 'Sezioni area skipper');
   navigation.innerHTML = Object.entries(SKIPPER_DASHBOARD_LABELS)
     .map(([view, label]) => `<button type="button" data-skipper-view="${view}">${view === 'overview' ? '← ' : ''}${label}</button>`)
-    .join('');
+    .join('') + '<a id="skipperTransferNavLink" href="transfer.html" hidden>Area transfer</a>';
 
   grid.before(overview, navigation);
   boatQuoteMount.append(financeOverview, costPlanPanel, contributionCatalogPanel);
@@ -1038,6 +1049,8 @@ function updateRulesEditorChangeWarning() {
 
 function renderSkipperDashboardOverview() {
   if (!skipperDashboardInitialized) return;
+  document.querySelector('#skipperTransferHubCard')?.toggleAttribute('hidden', !isOrganizerAccount);
+  document.querySelector('#skipperTransferNavLink')?.toggleAttribute('hidden', !isOrganizerAccount);
   const capacity = crewSeatLimit();
   const allocated = allocatedCrewSeatCount();
   const pendingInvites = activeInvites.filter((invite) => invite.status === 'pending').length;
@@ -2594,7 +2607,7 @@ async function publishExistingBoatToFleet(boat) {
 }
 
 function resetPrivateView() {
-  if (transferManagementLink) transferManagementLink.hidden = true;
+  isOrganizerAccount = false;
   resetSkipperDocumentCopies('idle');
   activeBoat = null;
   activeMembers = [];
@@ -8211,15 +8224,16 @@ onAuthStateChanged(auth, async (user) => {
     const eventSnapshot = await getDoc(doc(db, 'events', eventId));
     if (auth.currentUser?.uid !== user.uid) return;
     const isOrganizer = eventSnapshot.exists() && (eventSnapshot.data().organizerIds || []).includes(user.uid);
-    if (transferManagementLink) transferManagementLink.hidden = !isOrganizer;
+    isOrganizerAccount = isOrganizer;
     document.querySelector('#accountStatus').textContent = isOrganizer
-      ? 'Organizzatore configurato: qui sotto trovi anche la gestione degli accessi transfer.'
+      ? 'Organizzatore configurato: nel menu qui sotto trovi anche «Area transfer».'
       : 'Accesso skipper attivo.';
   } catch (error) {
     if (auth.currentUser?.uid !== user.uid) return;
-    if (transferManagementLink) transferManagementLink.hidden = true;
+    isOrganizerAccount = false;
     document.querySelector('#accountStatus').textContent = 'Accesso skipper attivo.';
   }
+  renderSkipperDashboardOverview();
   if (auth.currentUser?.uid !== user.uid) return;
   loadSkipperArea(user);
 });
