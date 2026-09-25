@@ -77,10 +77,10 @@
             <p class="berth-rate-heading">Listino base della barca · € per persona</p>
             <p class="field-hint">Serve come riferimento prima del preventivo economico o per un accordo manuale. Quando la Dashboard economica ha un calcolo, le nuove schede seguono quel calcolo. Una cifra diversa si usa solo dal pannello “Eccezione per questa persona”.</p>
             <div class="form-grid">
-              <label>Cabina da 2 posti · € per persona<input name="doubleCabinRate" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 250,00" /></label>
-              <label>Cabina da 1 posto · € per persona<input name="singleCabinRate" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 350,00" /></label>
-              <label>Dinette trasformabile · € per persona<input name="dinetteRate" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 180,00" /></label>
-              <label>Altro posto letto · € per persona<input name="otherBerthRate" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 200,00" /></label>
+              <label>Cabina da 2 posti · € per persona<input name="doubleCabinRate" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 250,00" /></label>
+              <label>Cabina da 1 posto · € per persona<input name="singleCabinRate" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 350,00" /></label>
+              <label>Dinette trasformabile · € per persona<input name="dinetteRate" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 180,00" /></label>
+              <label>Altro posto letto · € per persona<input name="otherBerthRate" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 200,00" /></label>
             </div>
           </div>
           <p id="berthLayoutSummary" class="field-hint" aria-live="polite"></p>
@@ -149,10 +149,10 @@
                   <p id="projectionPricingExceptionHint" class="field-hint">Attivala solo se questa persona deve avere un accordo diverso dalla quota della dashboard. Prima dell’invito la quota segue i conti della barca; quando crei l’invito, i quattro importi vengono fissati. Se i conti cambiano, aggiorna la card solo dopo esserti accordato con la persona.</p>
                   <label class="consent-field projection-custom-pricing-toggle"><input name="useCustomPricing" type="checkbox" /> Usa importi diversi soltanto per questa persona.</label>
                   <div class="form-grid">
-                    <label>Quota posto / cabina prevista · €<input name="berthAmount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 250,00" /></label>
-                    <label>Starter Pack previsto · cash a bordo · €<input name="starterPackAmount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 35,00" /></label>
-                    <label>Assicurazione per la cauzione · €<input name="protectionInsuranceAmount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 30,00" /></label>
-                    <label>Cauzione rimborsabile · €<input name="refundableDepositAmount" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 300,00" /><small class="field-hint">Da portare e regolare a bordo: non entra nel totale previsto né in una richiesta WhatsApp.</small></label>
+                    <label>Quota posto / cabina prevista · €<input name="berthAmount" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 250,00" /></label>
+                    <label>Starter Pack previsto · cash a bordo · €<input name="starterPackAmount" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 35,00" /></label>
+                    <label>Assicurazione per la cauzione · €<input name="protectionInsuranceAmount" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 30,00" /></label>
+                    <label>Cauzione rimborsabile · €<input name="refundableDepositAmount" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 300,00" /><small class="field-hint">Da portare e regolare a bordo: non entra nel totale previsto né in una richiesta WhatsApp.</small></label>
                   </div>
                 </details>
               </fieldset>
@@ -170,7 +170,7 @@
               <form id="manualReceiptForm" class="compact-form">
                 <input name="recipientId" type="hidden" />
                 <div class="form-grid">
-                  <label>Importo ricevuto · €<input name="amount" type="number" required min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 100,00" /><small id="manualReceiptInstallmentHint" class="field-hint" aria-live="polite"></small></label>
+                  <label>Importo ricevuto · €<input name="amount" type="text" required inputmode="decimal" placeholder="Es. 100,00" /><small id="manualReceiptInstallmentHint" class="field-hint" aria-live="polite"></small></label>
                   <label>Data in cui l'hai ricevuto<input name="receivedOn" type="date" required /></label>
                 </div>
                 <label>Riferimento dell'acconto<select name="allocationTarget"><option value="split">Prima quota posto, poi assicurazione</option><option value="berth">Solo quota posto / cabina</option><option value="insurance">Solo assicurazione cauzione</option></select><small class="field-hint">Serve soltanto a far tornare il saldo: Starter Pack e cauzione non entrano qui.</small></label>
@@ -441,9 +441,9 @@
           <fieldset class="cost-plan-section cost-plan-section-skipper">
             <legend>Trasferte dello skipper</legend>
             <div class="form-grid">
-              <label>Volo o treno A/R skipper · €<input form="costPlanForm" name="skipperFlightTrainCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 180,00" /></label>
-              <label>Auto skipper · carburante, pedaggi, parcheggi · €<input form="costPlanForm" name="skipperCarCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 90,00" /></label>
-              <label>Transfer locali skipper · €<input form="costPlanForm" name="skipperLocalTransferCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 45,00" /></label>
+              <label>Volo o treno A/R skipper · €<input form="costPlanForm" name="skipperFlightTrainCost" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 180,00" /></label>
+              <label>Auto skipper · carburante, pedaggi, parcheggi · €<input form="costPlanForm" name="skipperCarCost" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 90,00" /></label>
+              <label>Transfer locali skipper · €<input form="costPlanForm" name="skipperLocalTransferCost" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 45,00" /></label>
             </div>
           </fieldset>
           <p class="field-hint">Non inserire qui cene personali o altre spese che non vuoi dividere con l’equipaggio.</p>
@@ -459,25 +459,25 @@
               <legend>La barca · costi e quote da condividere</legend>
               <p class="field-hint">Queste voci descrivono il noleggio e ciò che l’equipaggio divide. Se il charter comprende già lo Starter Pack, indicane qui il valore: il sito lo scorpora dalla quota cabina senza aggiungerlo una seconda volta.</p>
               <div class="form-grid">
-              <label>Costo charter / barca · totale · €<input name="charterCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 2350,00" /><small class="field-hint">È il totale del charter, anche se include Starter Pack o accessori.</small></label>
-              <label>Altri costi già inclusi nella quota posto · €<input name="otherRecoverableCost" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 0,00" /><small class="field-hint">Per esempio un porto già certo. Per una voce da chiedere a parte (es. cambusa, cena a terra) usa invece «Extra programmati», più sotto in questa stessa sezione.</small></label>
+              <label>Costo charter / barca · totale · €<input name="charterCost" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 2350,00" /><small class="field-hint">È il totale del charter, anche se include Starter Pack o accessori.</small></label>
+              <label>Altri costi già inclusi nella quota posto · €<input name="otherRecoverableCost" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 0,00" /><small class="field-hint">Per esempio un porto già certo. Per una voce da chiedere a parte (es. cambusa, cena a terra) usa invece «Extra programmati», più sotto in questa stessa sezione.</small></label>
               <label>Ospiti paganti previsti<input name="payingParticipants" type="number" min="1" max="30" required inputmode="numeric" /><small class="field-hint">Solo chi divide i costi: skipper, co-skipper o hostess gratuiti restano fuori.</small></label>
               <label>Starter Pack · dove si trova questo costo?<select name="starterPackIncludedInCharter" required><option value="" selected>Seleziona prima di calcolare</option><option value="true">È già nel totale charter</option><option value="false">È un costo esterno al charter</option></select><small class="field-hint">È una scelta importante: se è nel charter, il suo valore viene tolto dalla quota cabina. Non è una spesa in più.</small></label>
               <label>Starter Pack · come lo calcoli<select name="starterPackRateMode"><option value="total_divided">Totale da dividere tra gli ospiti</option><option value="fixed_per_person">Quota fissa per persona</option></select><small class="field-hint">Lo Starter Pack si raccoglie sempre in contanti a bordo.</small></label>
-              <label data-starter-pack-total>Totale Starter Pack da dividere · €<input name="starterPackTotal" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 350,00" /><small class="field-hint">Viene ripartito tra gli ospiti paganti e regolato in contanti a bordo.</small></label>
-              <label data-starter-pack-fixed hidden>Starter Pack · quota fissa a persona · €<input name="starterPackFixedPrice" type="number" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 45,00" /><small class="field-hint">Ogni ospite versa questa cifra, in contanti a bordo.</small></label>
+              <label data-starter-pack-total>Totale Starter Pack da dividere · €<input name="starterPackTotal" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 350,00" /><small class="field-hint">Viene ripartito tra gli ospiti paganti e regolato in contanti a bordo.</small></label>
+              <label data-starter-pack-fixed hidden>Starter Pack · quota fissa a persona · €<input name="starterPackFixedPrice" type="text" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 45,00" /><small class="field-hint">Ogni ospite versa questa cifra, in contanti a bordo.</small></label>
               <label>Assicurazione cauzione · come la calcoli<select name="protectionInsuranceRateMode"><option value="total_divided">Totale da dividere tra gli ospiti</option><option value="fixed_per_person">Quota fissa per persona</option></select><small class="field-hint">Resta sempre separata dalla quota del posto.</small></label>
-              <label data-protection-insurance-total>Totale assicurazione da dividere · €<input name="protectionInsuranceTotal" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 270,00" /><small class="field-hint">Viene ripartito tra gli ospiti paganti.</small></label>
-              <label data-protection-insurance-fixed hidden>Assicurazione · quota fissa a persona · €<input name="protectionInsuranceFixedPrice" type="number" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 30,00" /><small class="field-hint">Ogni ospite versa questa cifra separatamente.</small></label>
-              <label>Totale cauzione rimborsabile · €<input name="refundableDepositTotal" type="number" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 3000,00" /><small class="field-hint">Da portare in contanti e restituita secondo charter.</small></label>
+              <label data-protection-insurance-total>Totale assicurazione da dividere · €<input name="protectionInsuranceTotal" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 270,00" /><small class="field-hint">Viene ripartito tra gli ospiti paganti.</small></label>
+              <label data-protection-insurance-fixed hidden>Assicurazione · quota fissa a persona · €<input name="protectionInsuranceFixedPrice" type="text" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 30,00" /><small class="field-hint">Ogni ospite versa questa cifra separatamente.</small></label>
+              <label>Totale cauzione rimborsabile · €<input name="refundableDepositTotal" type="text" min="0" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 3000,00" /><small class="field-hint">Da portare in contanti e restituita secondo charter.</small></label>
               <label>Persone che portano la cauzione<input name="depositParticipants" type="number" min="1" max="30" required inputmode="numeric" /><small class="field-hint">Parte dagli ospiti paganti. Aumentalo se anche co-skipper o hostess gratuiti devono portarla.</small></label>
               <label data-dinette-calculator>Posti dinette paganti<input name="dinettePayingParticipants" type="number" min="0" max="30" inputmode="numeric" /><small class="field-hint">Precompilati dalla configurazione barca; gli altri ospiti usano la quota cabina.</small></label>
               <label data-dinette-calculator>Prezzo dinette<select name="dinetteRateMode"><option value="percentage">Percentuale della cabina</option><option value="fixed">Prezzo fisso in euro</option></select><small class="field-hint">Scegli un solo metodo: percentuale oppure prezzo fisso.</small></label>
               <label data-dinette-calculator data-dinette-rate-percent>Quota dinette · % della cabina<input name="dinetteRatePercent" type="number" min="1" max="100" step="1" inputmode="numeric" placeholder="65" /><small class="field-hint">65% significa che la dinette costa il 65% della quota cabina.</small></label>
-              <label data-dinette-calculator data-dinette-rate-fixed hidden>Prezzo fisso dinette · €<input name="dinetteFixedPrice" type="number" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 250,00" /><small class="field-hint">Il calcolatore ricava la quota cabina dopo avere fissato il prezzo della dinette.</small></label>
+              <label data-dinette-calculator data-dinette-rate-fixed hidden>Prezzo fisso dinette · €<input name="dinetteFixedPrice" type="text" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 250,00" /><small class="field-hint">Il calcolatore ricava la quota cabina dopo avere fissato il prezzo della dinette.</small></label>
               <label>Quota cabina · come vuoi comunicarla?<select name="berthRoundingMode"><option value="automatic">Calcolo esatto al centesimo</option><option value="ceil_increment">Arrotonda sempre per eccesso</option><option value="manual_up">Scelgo io l’importo cabina</option></select><small class="field-hint">Il costo reale del charter non cambia: se chiedi una cifra più alta, il sito mostra sempre la differenza — da usare per le spese comuni della barca, non un guadagno per te.</small></label>
               <label data-berth-rounding-increment hidden>Arrotonda al prossimo<select name="berthRoundingIncrement"><option value="100">euro</option><option value="500">5 euro</option><option value="1000">10 euro</option></select><small class="field-hint">Vale per le quote calcolate. Una dinette a prezzo fisso resta al valore che hai scelto.</small></label>
-              <label data-manual-standard-berth hidden>Quota cabina scelta · €<input name="manualStandardBerthPrice" type="number" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 370,00" /><small class="field-hint" data-manual-standard-berth-hint>Non può essere inferiore al pareggio calcolato. Il riepilogo mostra l’eventuale avanzo da riallocare.</small></label>
+              <label data-manual-standard-berth hidden>Quota cabina scelta · €<input name="manualStandardBerthPrice" type="text" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 370,00" /><small class="field-hint" data-manual-standard-berth-hint>Non può essere inferiore al pareggio calcolato. Il riepilogo mostra l’eventuale avanzo da riallocare.</small></label>
               </div>
             </fieldset>
             <fieldset class="starter-pack-fieldset">
@@ -519,7 +519,7 @@
           <label>Persona / invito<select id="paymentMember" name="recipientId" required><option value="">Prima invita o aggiungi una persona</option></select></label>
           <output id="paymentBalancePreview" class="payment-balance-preview" aria-live="polite" hidden></output>
           <label>Importo riferito a<select id="paymentBerthType" name="berthType"><option value="custom">Importo libero / altra voce</option></select><small class="field-hint">Per una persona già assegnata usa «Quota assegnata alla persona»: è il prezzo fissato quando l’hai invitata. «Listino barca manuale» legge invece le tariffe attuali della barca, che possono differire se il listino è cambiato nel frattempo. Lo Starter Pack e la cauzione non compaiono qui: si regolano in contanti a bordo. Il saldo viene ridotto solo dopo un accredito verificato; una richiesta già inviata non è un pagamento.</small></label>
-          <div class="form-grid"><label>Importo in euro<input name="amount" type="number" required min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="250,00" /></label><label>Scadenza facoltativa<input name="dueDate" type="date" /></label></div>
+          <div class="form-grid"><label>Importo in euro<input name="amount" type="text" required inputmode="decimal" placeholder="250,00" /></label><label>Scadenza facoltativa<input name="dueDate" type="date" /></label></div>
           <label>Motivo della richiesta<input name="reason" required maxlength="160" placeholder="Es. Saldo quota posto" /><small class="field-hint" data-reason-lock-hint hidden>Modificato a mano: non si aggiorna più cambiando voce sopra. Cancellalo per farlo riproporre in automatico.</small></label>
           <label class="consent-field"><input name="isOptional" type="checkbox" /> Voce facoltativa, ad esempio assicurazione, cena o altra spesa.</label>
           <fieldset class="payment-method-fieldset"><legend>Metodi da proporre</legend><div id="paymentMethodOptions" class="payment-method-selector"><p class="field-hint">Salva prima almeno un metodo di incasso.</p></div></fieldset>
@@ -586,6 +586,6 @@
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="area.js?v=20260925-full-card-autonomy-v1"></script>
+  <script type="module" src="area.js?v=20260925-decimal-comma-fix-v1"></script>
 </body>
 </html>

@@ -1524,8 +1524,28 @@ function capacityAlignmentMessage(boat) {
   return `Configurazione da confermare: il layout indica ${totalBerths} persone totali, skipper incluso, quindi ${capacity} partecipanti. Apri “Modifica questa barca” e salva prima di inviare altri inviti.`;
 }
 
+// Condivisa con parseEuroAmountCents() più sotto: la virgola è il separatore
+// decimale naturale in italiano, ma un <input type="number"> la rifiuta e
+// svuota il campo senza avviso (bug reale segnalato il 25/09/2026: "15,00"
+// diventava un campo vuoto, non registrabile). Per questo tutti i campi
+// importo del sito sono <input type="text">, con la normalizzazione fatta
+// qui. Se compaiono sia virgola sia punto, l'ultimo che appare è il
+// separatore decimale e l'altro è solo delle migliaia (es. "1.234,56").
+function normalizeEuroInputString(rawValue) {
+  const trimmed = String(rawValue ?? '').trim();
+  if (!trimmed) return '';
+  const hasComma = trimmed.includes(',');
+  const hasDot = trimmed.includes('.');
+  if (hasComma && hasDot) {
+    return trimmed.lastIndexOf(',') > trimmed.lastIndexOf('.')
+      ? trimmed.replace(/\./g, '').replace(',', '.')
+      : trimmed.replace(/,/g, '');
+  }
+  return hasComma ? trimmed.replace(',', '.') : trimmed;
+}
+
 function toEuroCents(value) {
-  const rawValue = String(value ?? '').trim().replace(',', '.');
+  const rawValue = normalizeEuroInputString(value);
   if (!rawValue) return 0;
   const amount = Number(rawValue);
   return Number.isFinite(amount) && amount >= 0 && amount <= 10_000 ? Math.round(amount * 100) : 0;
@@ -2783,6 +2803,17 @@ function paymentMethodsFor(payment) {
 function paymentAmount(payment) {
   if (Number.isInteger(payment.amountCents)) return payment.amountCents / 100;
   return Number(payment.amount) || 0;
+}
+
+// Come toEuroCents() (vedi sopra), ma restituisce NaN invece di 0 quando il
+// campo è vuoto o non valido: qui serve distinguere "non ha scritto nulla /
+// ha scritto qualcosa di sbagliato" da "ha scritto zero", perché acconto e
+// richiesta di contributo non ammettono comunque un importo pari a zero.
+function parseEuroAmountCents(rawValue) {
+  const normalized = normalizeEuroInputString(rawValue);
+  if (!normalized) return NaN;
+  const value = Number(normalized);
+  return Number.isFinite(value) ? Math.round(value * 100) : NaN;
 }
 
 function paymentAmountCents(payment) {
@@ -4514,7 +4545,7 @@ function updateManualReceiptInstallmentHint() {
     hint.textContent = '';
     return;
   }
-  const amountCents = Math.round(Number(form.elements.amount.value) * 100);
+  const amountCents = parseEuroAmountCents(form.elements.amount.value);
   if (!Number.isInteger(amountCents) || amountCents < 1) {
     hint.textContent = 'Indica quanto hai ricevuto: qui sotto vedrai se verrà registrato come acconto o come saldo.';
     return;
@@ -7784,7 +7815,7 @@ manualReceiptForm.addEventListener('submit', async (event) => {
   const form = event.currentTarget;
   const recipientId = String(form.elements.recipientId.value || '');
   const projection = projectionForPaymentRecipient(recipientId);
-  const amountCents = Math.round(Number(form.elements.amount.value) * 100);
+  const amountCents = parseEuroAmountCents(form.elements.amount.value);
   const receivedOn = String(form.elements.receivedOn.value || '');
   if (!projection || projection.contributesToCosts === false) {
     setMessage(message, 'Non trovo una quota personale a cui associare questo acconto.', true);
@@ -7904,7 +7935,7 @@ paymentForm.addEventListener('submit', async (event) => {
   const recipientId = String(fields.get('recipientId') || '');
   const collectorName = String(activePaymentProfile?.collectorName || '').trim();
   const reason = String(fields.get('reason') || '').trim();
-  const amountCents = Math.round(Number(fields.get('amount')) * 100);
+  const amountCents = parseEuroAmountCents(fields.get('amount'));
   const allowedMethods = new Set(availablePaymentMethods().map((method) => method.id));
   const selectedMethodIds = fields.getAll('paymentMethod').filter((methodId) => allowedMethods.has(methodId));
   if (!collectorName || !allowedMethods.size) {
