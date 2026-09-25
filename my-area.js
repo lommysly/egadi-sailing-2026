@@ -278,9 +278,17 @@ function renderCrewDashboardShell() {
     </section>
     <div class="dashboard-next-step"><div><span>${escapeHtml(copy.nextStep)}</span><strong id="crewNextActionText">${escapeHtml(copy.boardAction)}</strong></div><button id="crewNextActionButton" class="button button-primary" type="button" data-crew-view="board">${escapeHtml(copy.nextButton)}</button></div>
   `;
+  // "Viaggio" apre una pagina separata (travel.html), non una vista della
+  // stessa dashboard come le altre tre: prima esisteva solo come riquadro
+  // nella Panoramica, quindi appena ci si allontanava (Bacheca, Quote...)
+  // l'unico modo per tornarci era passare di nuovo da "← Panoramica" — un
+  // utente di fretta non lo ritrovava (caso reale Pauline Eloff, segnalato
+  // il 25/09/2026). Ora resta raggiungibile da qui in ogni momento, come le
+  // altre sezioni.
+  const travelHref = escapeHtml(i18n?.preserveLocaleUrl?.('travel.html') || 'travel.html');
   navigation.innerHTML = Object.entries(CREW_DASHBOARD_LABELS)
     .map(([view, label]) => `<button type="button" data-crew-view="${view}">${view === 'overview' ? '← ' : ''}${escapeHtml(activeLocale() === 'en' ? ({ overview: 'Overview', profile: 'My details', money: 'Contributions', board: 'Boat and updates' }[view]) : label)}</button>`)
-    .join('');
+    .join('') + `<a href="${travelHref}">${escapeHtml(copy.travel)}</a>`;
 }
 
 function setupCrewDashboard() {
