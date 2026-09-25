@@ -170,7 +170,7 @@
               <form id="manualReceiptForm" class="compact-form">
                 <input name="recipientId" type="hidden" />
                 <div class="form-grid">
-                  <label>Importo ricevuto · €<input name="amount" type="number" required min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 100,00" /></label>
+                  <label>Importo ricevuto · €<input name="amount" type="number" required min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="Es. 100,00" /><small id="manualReceiptInstallmentHint" class="field-hint" aria-live="polite"></small></label>
                   <label>Data in cui l'hai ricevuto<input name="receivedOn" type="date" required /></label>
                 </div>
                 <label>Riferimento dell'acconto<select name="allocationTarget"><option value="split">Prima quota posto, poi assicurazione</option><option value="berth">Solo quota posto / cabina</option><option value="insurance">Solo assicurazione cauzione</option></select><small class="field-hint">Serve soltanto a far tornare il saldo: Starter Pack e cauzione non entrano qui.</small></label>
@@ -586,6 +586,6 @@
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a></div></footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="area.js?v=20260925-finance-clarity-v1"></script>
+  <script type="module" src="area.js?v=20260925-installment-hint-v1"></script>
 </body>
 </html>

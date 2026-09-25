@@ -4480,6 +4480,10 @@ function localDateForForm() {
   return date.toISOString().slice(0, 10);
 }
 
+// Tenuta a modulo così l'ascoltatore sull'importo (sotto) sa sempre a quale
+// persona/saldo riferirsi, senza dover rileggere il DOM a ogni tasto premuto.
+let manualReceiptTargetProjection = null;
+
 function openManualReceiptPanel(projection) {
   const panel = document.querySelector('#manualReceiptPanel');
   const form = document.querySelector('#manualReceiptForm');
@@ -4491,9 +4495,34 @@ function openManualReceiptPanel(projection) {
   form.elements.receivedOn.value = localDateForForm();
   person.textContent = `${projection.displayName} · quota concordata ${formatCurrency(balance.expectedCents / 100)} · saldo attuale ${formatCurrency(balance.remainingCents / 100)}.`;
   setMessage(document.querySelector('#manualReceiptMessage'), '');
+  manualReceiptTargetProjection = projection;
+  updateManualReceiptInstallmentHint();
   panel.hidden = false;
   panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
   form.elements.amount.focus({ preventScroll: true });
+}
+
+// Non esiste un campo separato "acconto o saldo": l'importo stesso decide, e
+// questo indicatore lo rende visibile subito, invece di farlo scoprire solo
+// al salvataggio (o peggio, farlo sembrare un errore quando l'importo
+// coincide col saldo residuo, come nel caso reale del 25/09/2026).
+function updateManualReceiptInstallmentHint() {
+  const hint = document.querySelector('#manualReceiptInstallmentHint');
+  const form = document.querySelector('#manualReceiptForm');
+  if (!hint || !form) return;
+  if (!manualReceiptTargetProjection) {
+    hint.textContent = '';
+    return;
+  }
+  const amountCents = Math.round(Number(form.elements.amount.value) * 100);
+  if (!Number.isInteger(amountCents) || amountCents < 1) {
+    hint.textContent = 'Indica quanto hai ricevuto: qui sotto vedrai se verrà registrato come acconto o come saldo.';
+    return;
+  }
+  const remainingCents = projectionPaymentBalance(manualReceiptTargetProjection).remainingCents;
+  hint.textContent = amountCents >= remainingCents
+    ? 'Verrà registrato come saldo: chiude il conto di questa persona.'
+    : `Verrà registrato come acconto: resterebbero ${formatCurrency((remainingCents - amountCents) / 100)} da versare.`;
 }
 
 function prepareProjectionBalanceRequest(projection) {
@@ -6574,6 +6603,7 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
   submitButton.disabled = true;
   try {
     let savedMessage;
+    let newlyCreatedProjection = null;
     if (editingProjectionId) {
       const update = {
         ...projection,
@@ -6623,8 +6653,17 @@ document.querySelector('#projectionForm').addEventListener('submit', async (even
       await setDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projectionId), created);
       retainSavedProjectionLocally(created);
       savedMessage = 'Scheda salvata: controlla il riepilogo accanto alla persona e, quando vuoi, crea l’invito WhatsApp dalla stessa riga.';
+      newlyCreatedProjection = created;
     }
     completeProjectionSave(savedMessage);
+    // Se avete già parlato e la persona ha già versato qualcosa (un acconto o
+    // l'intera quota), lo skipper deve poterlo registrare subito, prima ancora
+    // di creare e inviare il link WhatsApp — non solo in un secondo momento
+    // dalla card. Resta facoltativo: "Chiudi" non blocca né richiede nulla.
+    if (newlyCreatedProjection) {
+      openManualReceiptPanel(newlyCreatedProjection);
+      setMessage(document.querySelector('#manualReceiptMessage'), 'Facoltativo: se avete già concordato tutto, registra qui cosa ha già versato. Altrimenti chiudi pure: la scheda resta salvata e potrai creare il link quando vuoi.');
+    }
   } catch (error) {
     setMessage(message, getProjectionSaveErrorMessage(error, 'Non riesco a salvare la scheda dell’equipaggio.'), true);
   } finally {
@@ -7632,8 +7671,10 @@ contributionCatalogForm.addEventListener('submit', async (event) => {
 });
 
 const manualReceiptForm = document.querySelector('#manualReceiptForm');
+manualReceiptForm.elements.amount.addEventListener('input', updateManualReceiptInstallmentHint);
 manualReceiptForm.querySelector('[data-close-manual-receipt]').addEventListener('click', () => {
   manualReceiptForm.reset();
+  manualReceiptTargetProjection = null;
   document.querySelector('#manualReceiptPanel').hidden = true;
 });
 manualReceiptForm.addEventListener('submit', async (event) => {
@@ -7703,6 +7744,7 @@ manualReceiptForm.addEventListener('submit', async (event) => {
   try {
     await addDoc(collection(db, 'boats', activeBoat.id, 'paymentRequests'), payment);
     form.reset();
+    manualReceiptTargetProjection = null;
     document.querySelector('#manualReceiptPanel').hidden = true;
     setMessage(document.querySelector('#projectionFormMessage'), `Acconto registrato per ${projection.displayName}. Il saldo si aggiorna solo perché l'accredito è stato verificato.`);
   } catch (error) {
