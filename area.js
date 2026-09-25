@@ -5808,7 +5808,18 @@ function renderMembers() {
   }
   list.innerHTML = activeMembers.map((member) => {
     const missing = getMissingCharterFields(member);
-    const status = missing.length ? `Mancano ${missing.length} dati` : 'Pronta per il charter';
+    // "da confermare dallo skipper" (ruolo) subito seguito da "Pronta per il
+    // charter" sembra una contraddizione, anche se sono due cose diverse e
+    // indipendenti: la conferma del ruolo non blocca affatto il PDF (vedi
+    // isCharterReady/updateCharterReadiness, che non guardano roleConfirmed).
+    // "Pronta per il charter" resta solo per lo stato davvero completo, per
+    // non promettere più di quanto sia già confermato (caso reale Pauline
+    // Eloff, segnalato da Gualtiero Brazzelli il 25/09/2026).
+    const status = missing.length
+      ? `Mancano ${missing.length} dati`
+      : member.roleConfirmed === true
+        ? 'Pronta per il charter'
+        : 'Dati anagrafici completi';
     const roleStatus = roleConfirmationText(member);
     const confirmAction = member.roleConfirmed === true
       ? ''
