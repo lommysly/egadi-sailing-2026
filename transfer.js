@@ -13,6 +13,7 @@ import {
   updateDoc,
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
+import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260925-reserved-area-nav-v1';
 
 const EVENT_ID = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
@@ -886,6 +887,7 @@ async function refreshAccess() {
     render();
     return;
   }
+  simplifyReservedAreaNavigation();
 
   try {
     const [operatorSnapshot, requestSnapshot] = await Promise.all([

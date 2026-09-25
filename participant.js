@@ -12,7 +12,7 @@ import {
   startInviteActivation,
   watchForStaleScript,
   withSaveRetry,
-} from './crew-session.js?v=20260925-crewaccess-error-fix-v1';
+} from './crew-session.js?v=20260925-reserved-area-nav-v1';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
