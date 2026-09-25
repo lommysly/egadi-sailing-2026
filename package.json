@@ -1,0 +1,13 @@
+{
+  "name": "egadi-sailing-2026",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:unit": "node --test tools/*.test.mjs",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project egadi-sailing-2026 \"node --test --test-concurrency=1 tools/firestore-rules-tests/*.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.0"
+  }
+}

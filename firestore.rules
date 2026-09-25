@@ -1756,67 +1756,69 @@ service cloud.firestore {
           || methods.bankTransfer == true);
     }
 
+    // Ridotto a un solo binding let riusato (stesso pattern già in uso in
+    // hasMatchingCrewProjectionInviteAfter): la versione precedente chiamava
+    // getAfter() sullo stesso percorso paymentInstructions/default 14 volte
+    // in un'unica funzione, e sommata a hasValidCrewPaymentInstructions()
+    // (chiamata nello stesso batch sul documento gemello) superava il tetto
+    // di 1000 sotto-espressioni per richiesta, con lo stesso sintomo già
+    // documentato per la transizione proiezione→invito con cabina profonda
+    // (PERMISSION_DENIED generico, indistinguibile da un problema di
+    // connessione). Nessun cambio di cosa viene consentito o negato.
     function hasMatchingCrewPaymentInstructions(boatId) {
-      return existsAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default)
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.keys().hasAll(['schemaVersion', 'collectorName', 'paymentMethods', 'paymentDetails', 'updatedAt'])
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.keys().hasOnly(['schemaVersion', 'collectorName', 'paymentMethods', 'paymentDetails', 'updatedAt'])
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.schemaVersion == 1
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.collectorName == request.resource.data.collectorName
-        && hasValidCrewPaymentInstructionMethods(getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentMethods)
-        && hasValidPaymentDetails(getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails)
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentMethods.paypal == request.resource.data.paypalEnabled
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentMethods.satispay == request.resource.data.satispayEnabled
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentMethods.revolut == request.resource.data.revolutEnabled
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentMethods.bankTransfer == request.resource.data.bankTransferEnabled
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails.paypal
+      let existsNow = existsAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default);
+      let instructions = existsNow ? getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data : null;
+      return existsNow
+        && instructions.keys().hasAll(['schemaVersion', 'collectorName', 'paymentMethods', 'paymentDetails', 'updatedAt'])
+        && instructions.keys().hasOnly(['schemaVersion', 'collectorName', 'paymentMethods', 'paymentDetails', 'updatedAt'])
+        && instructions.schemaVersion == 1
+        && instructions.collectorName == request.resource.data.collectorName
+        && hasValidCrewPaymentInstructionMethods(instructions.paymentMethods)
+        && hasValidPaymentDetails(instructions.paymentDetails)
+        && instructions.paymentMethods.paypal == request.resource.data.paypalEnabled
+        && instructions.paymentMethods.satispay == request.resource.data.satispayEnabled
+        && instructions.paymentMethods.revolut == request.resource.data.revolutEnabled
+        && instructions.paymentMethods.bankTransfer == request.resource.data.bankTransferEnabled
+        && instructions.paymentDetails.paypal
           == (request.resource.data.paypalEnabled ? request.resource.data.paymentDetails.paypal : '')
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails.satispay
+        && instructions.paymentDetails.satispay
           == (request.resource.data.satispayEnabled ? request.resource.data.paymentDetails.satispay : '')
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails.revolut
+        && instructions.paymentDetails.revolut
           == (request.resource.data.revolutEnabled ? request.resource.data.paymentDetails.revolut : '')
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails.bankTransfer.iban
+        && instructions.paymentDetails.bankTransfer.iban
           == (request.resource.data.bankTransferEnabled ? request.resource.data.paymentDetails.bankTransfer.iban : '')
-        && getAfter(/databases/$(database)/documents/boats/$(boatId)/paymentInstructions/default).data.paymentDetails.bankTransfer.accountHolder
+        && instructions.paymentDetails.bankTransfer.accountHolder
           == (request.resource.data.bankTransferEnabled ? request.resource.data.paymentDetails.bankTransfer.accountHolder : '');
     }
 
+    // Stesso motivo e stesso pattern del binding let in
+    // hasMatchingCrewPaymentInstructions() sopra: qui la versione precedente
+    // chiamava getAfter() su collectionProfile/default 10 volte in un'unica
+    // funzione, chiamata nello stesso batch della funzione gemella sopra.
     function hasValidCrewPaymentInstructions(boatId) {
-      return existsAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default)
+      let profileExistsNow = existsAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default);
+      let profile = profileExistsNow ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data : null;
+      return profileExistsNow
         && request.resource.data.keys().hasAll(['schemaVersion', 'collectorName', 'paymentMethods', 'paymentDetails', 'updatedAt'])
         && request.resource.data.keys().hasOnly(['schemaVersion', 'collectorName', 'paymentMethods', 'paymentDetails', 'updatedAt'])
         && request.resource.data.schemaVersion == 1
-        && request.resource.data.collectorName
-          == getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.collectorName
+        && request.resource.data.collectorName == profile.collectorName
         && hasValidCrewPaymentInstructionMethods(request.resource.data.paymentMethods)
         && hasValidPaymentDetails(request.resource.data.paymentDetails)
-        && request.resource.data.paymentMethods.paypal
-          == getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paypalEnabled
-        && request.resource.data.paymentMethods.satispay
-          == getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.satispayEnabled
-        && request.resource.data.paymentMethods.revolut
-          == getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.revolutEnabled
-        && request.resource.data.paymentMethods.bankTransfer
-          == getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.bankTransferEnabled
+        && request.resource.data.paymentMethods.paypal == profile.paypalEnabled
+        && request.resource.data.paymentMethods.satispay == profile.satispayEnabled
+        && request.resource.data.paymentMethods.revolut == profile.revolutEnabled
+        && request.resource.data.paymentMethods.bankTransfer == profile.bankTransferEnabled
         && request.resource.data.paymentDetails.paypal
-          == (getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paypalEnabled
-            ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paymentDetails.paypal
-            : '')
+          == (profile.paypalEnabled ? profile.paymentDetails.paypal : '')
         && request.resource.data.paymentDetails.satispay
-          == (getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.satispayEnabled
-            ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paymentDetails.satispay
-            : '')
+          == (profile.satispayEnabled ? profile.paymentDetails.satispay : '')
         && request.resource.data.paymentDetails.revolut
-          == (getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.revolutEnabled
-            ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paymentDetails.revolut
-            : '')
+          == (profile.revolutEnabled ? profile.paymentDetails.revolut : '')
         && request.resource.data.paymentDetails.bankTransfer.iban
-          == (getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.bankTransferEnabled
-            ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paymentDetails.bankTransfer.iban
-            : '')
+          == (profile.bankTransferEnabled ? profile.paymentDetails.bankTransfer.iban : '')
         && request.resource.data.paymentDetails.bankTransfer.accountHolder
-          == (getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.bankTransferEnabled
-            ? getAfter(/databases/$(database)/documents/boats/$(boatId)/collectionProfile/default).data.paymentDetails.bankTransfer.accountHolder
-            : '')
+          == (profile.bankTransferEnabled ? profile.paymentDetails.bankTransfer.accountHolder : '')
         && request.resource.data.updatedAt == request.time;
     }
 
@@ -1989,7 +1991,10 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['contributionItemId', 'entryType', 'installmentType', 'allocation', 'receivedOn'])
         && request.resource.data.contributionItemId in ['berth_base', 'berth_double_cabin', 'berth_single_cabin', 'berth_dinette', 'berth_other', 'protection_insurance']
         && request.resource.data.entryType == 'manual_receipt'
-        && request.resource.data.installmentType == 'advance'
+        // 'balance' quando l'importo ricevuto copre l'intero saldo residuo al
+        // momento della registrazione (area.js confronta con balanceBeforeCents
+        // prima di scrivere): un acconto registrato non è sempre parziale.
+        && request.resource.data.installmentType in ['advance', 'balance']
         && request.resource.data.accountingCategory == 'cost_recovery'
         && request.resource.data.isOptional == false
         && request.resource.data.dueDate == ''

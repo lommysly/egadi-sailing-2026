@@ -55,7 +55,7 @@ Ultimo aggiornamento: 24 settembre 2026. Le caselle descrivono lo stato verifica
 
 ## Security Rules e test fittizi obbligatori
 
-- [ ] Eseguire ogni caso di `FIRESTORE_RULES_TEST_MATRIX.md` nel Playground/emulatore con soli UID, telefoni e dati fittizi.
+- [ ] Eseguire ogni caso di `FIRESTORE_RULES_TEST_MATRIX.md` nel Playground/emulatore con soli UID, telefoni e dati fittizi. **Automatizzato il 25/09/2026** (`npm run test:rules`, 459 casi, tutti superati — vedi nota "25/09/2026" in fondo alla matrice): copre tutti i casi puramente Rules. Restano da ripetere manualmente su HTTPS con account fittizi, come indicato in fondo alla matrice, la sezione "Test browser separati" (12 punti) e il caso 12 end-to-end (Cloud Functions carpooling).
 - [ ] Verificare che il flag chiuso neghi anche il client Firebase diretto, non solo l'interfaccia.
 - [ ] Test skipper: Google Sign-In, propria barca, altra barca negata, PDF, bacheca e richiesta contributo.
 - [ ] Test dossier skipper con soli dati fittizi: lo skipper completa anagrafica, documento, patente, certificato radio e stati di consegna; carica e scarica soltanto una copia fittizia della patente e una del certificato radio. Il PDF mostra la prima riga e il riepilogo documentale, senza incorporare file. Crew, organizzatore, flotta, altri skipper, estranei e `list` non possono leggere, modificare o elencare `skipperProfile/default` o le due copie Storage.

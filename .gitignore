@@ -1,8 +1,11 @@
 firebase-debug.log
 firestore-debug.log
+ui-debug.log
+storage-debug.log
 .firebase/
 .DS_Store
 .playwright-cli/
 output/
+node_modules/
 functions/node_modules/
 functions/.env*
