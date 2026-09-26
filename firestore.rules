@@ -462,46 +462,26 @@ service cloud.firestore {
         ));
     }
 
-    // Accesso operativo separato dalla Crew List: il referente usa un
-    // account Google oppure le credenziali email/password create dalla
-    // regia. L'organizzatore abilita sempre il suo UID, non un link pubblico.
-    function isTransferOperatorAccount() {
+    // Accesso operativo separato dalla Crew List: il referente usa soltanto
+    // credenziali email/password create dalla regia. Non esiste una richiesta
+    // autonoma, ne' un percorso Google da approvare per l'area transfer.
+    function isManagedTransferOperatorAccount() {
       return signedIn()
-        && request.auth.token.firebase.sign_in_provider in ['google.com', 'password']
+        && request.auth.token.firebase.sign_in_provider == 'password'
         && request.auth.token.email is string;
     }
 
     function isActiveTransferOperator() {
-      return isTransferOperatorAccount()
-        && exists(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid))
-        && get(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid)).data.role == 'transfer_operator'
-        && get(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid)).data.active == true;
-    }
-
-    function hasValidTransferAccessRequest(userId) {
-      return isTransferOperatorAccount()
-        && userId == request.auth.uid
-        && request.resource.data.keys().hasAll(['name', 'email', 'updatedAt'])
-        && request.resource.data.keys().hasOnly(['name', 'email', 'updatedAt'])
-        && isRequiredText(request.resource.data.name, 120)
-        && isRequiredText(request.resource.data.email, 160)
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.updatedAt == request.time;
-    }
-
-    function hasValidTransferOperatorRole(userId) {
-      return request.resource.data.keys().hasAll(['role', 'name', 'email', 'active', 'approvedAt', 'approvedBy', 'updatedAt'])
-        && request.resource.data.keys().hasOnly(['role', 'name', 'email', 'active', 'approvedAt', 'approvedBy', 'updatedAt'])
-        && request.resource.data.role == 'transfer_operator'
-        && request.resource.data.active == true
-        && isRequiredText(request.resource.data.name, 120)
-        && isRequiredText(request.resource.data.email, 160)
-        && exists(/databases/$(database)/documents/events/egadi-2026/transferAccessRequests/$(userId))
-        && request.resource.data.name == get(/databases/$(database)/documents/events/egadi-2026/transferAccessRequests/$(userId)).data.name
-        && request.resource.data.email == get(/databases/$(database)/documents/events/egadi-2026/transferAccessRequests/$(userId)).data.email
-        && request.resource.data.approvedAt == request.time
-        && request.resource.data.approvedBy == request.auth.uid
-        && request.resource.data.updatedAt == request.time;
+      let operatorExists = exists(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid));
+      let operator = operatorExists
+        ? get(/databases/$(database)/documents/events/egadi-2026/transferOperators/$(request.auth.uid)).data
+        : null;
+      return isManagedTransferOperatorAccount()
+        && operator != null
+        && operator.role == 'transfer_operator'
+        && operator.active == true
+        && operator.accessMode == 'managed_password'
+        && operator.authProvider == 'password';
     }
 
     function hasSafeTransferOperationUpdate() {
@@ -2230,24 +2210,21 @@ service cloud.firestore {
       allow write: if isOrganizer();
     }
 
-    // Richiesta e abilitazione sono separate: il referente conosce solo la
-    // propria richiesta e il proprio ruolo; l'organizzatore vede le richieste
-    // e puo' concedere o revocare l'accesso alla coda transfer.
+    // La collection resta solo per la pulizia di richieste storiche: nessun
+    // account puo' più crearne o aggiornarne una dal browser.
     match /events/egadi-2026/transferAccessRequests/{userId} {
-      allow get: if isPrivateAreaOpen()
-        && (isOrganizer() || (isTransferOperatorAccount() && userId == request.auth.uid));
-      allow list: if isPrivateAreaOpen() && isOrganizer();
-      allow create, update: if isPrivateAreaOpen() && hasValidTransferAccessRequest(userId);
+      allow get, list: if isPrivateAreaOpen() && isOrganizer();
+      allow create, update: if false;
       allow delete: if isPrivateAreaOpen() && isOrganizer();
     }
 
     match /events/egadi-2026/transferOperators/{userId} {
       allow get: if isPrivateAreaOpen()
-        && (isOrganizer() || (isTransferOperatorAccount() && userId == request.auth.uid));
+        && (isOrganizer() || (isManagedTransferOperatorAccount() && userId == request.auth.uid));
       allow list: if isPrivateAreaOpen() && isOrganizer();
-      allow create, update: if isPrivateAreaOpen()
-        && isOrganizer()
-        && hasValidTransferOperatorRole(userId);
+      // Gli unici create/update arrivano dalle Cloud Function Admin invocate
+      // dall'organizzatore: nessun client può auto-abilitarsi.
+      allow create, update: if false;
       allow delete: if isPrivateAreaOpen() && isOrganizer();
     }
 

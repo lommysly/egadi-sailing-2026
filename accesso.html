@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Accesso riservato per skipper e partecipanti di Egadi Sailing Experience." data-i18n-attr="content:page.access.metaDescription" />
+  <meta name="description" content="Area riservata per skipper, equipaggio e gestore transfer di Egadi Sailing Experience." data-i18n-attr="content:page.access.metaDescription" />
   <title data-i18n="page.access.documentTitle">Area riservata · Egadi Sailing Experience</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -23,7 +23,7 @@
     <section class="area-hero">
       <p class="eyebrow" data-i18n="page.access.heroEyebrow">Area riservata</p>
       <h1 data-i18n-html="page.access.heroTitle">Accedi alla tua<br /><em>area riservata.</em></h1>
-      <p data-i18n="page.access.heroText">Scegli il percorso corretto. Lo skipper è la persona responsabile della navigazione e dell’organizzazione della singola barca; chi fa parte dell’equipaggio rientra con il numero WhatsApp e il codice personale.</p>
+      <p data-i18n="page.access.heroText">Scegli come entrare: skipper, equipaggio o gestore transfer. Ogni ruolo vede soltanto gli strumenti e i dati necessari.</p>
     </section>
     <section class="access-cards" aria-label="Scegli il tuo accesso" data-i18n-attr="aria-label:page.access.cardsLabel">
       <article>
@@ -38,11 +38,11 @@
         <p data-i18n="page.access.crewText">Ti bastano il numero WhatsApp associato all’invito e il codice scelto al primo accesso. Non serve conservare il messaggio.</p>
         <a class="button button-primary" href="crew.html" data-i18n="page.access.crewAction">Entra nella mia area</a>
       </article>
-      <article>
-        <p class="eyebrow" data-i18n="page.access.transferEyebrow">Per la società transfer</p>
-        <h2 data-i18n="page.access.transferTitle">Gestisco i transfer del gruppo.</h2>
-        <p data-i18n="page.access.transferText">Se sei stato abilitato come operatore transfer o fai parte dell’organizzazione, accedi con Google per vedere e aggiornare i movimenti verso e dall’aeroporto.</p>
-        <a class="button button-primary" href="transfer.html" data-i18n="page.access.transferAction">Accedi all’area transfer</a>
+      <article id="gestore-transfer">
+        <p class="eyebrow" data-i18n="page.access.transferEyebrow">Per il gestore transfer</p>
+        <h2 data-i18n="page.access.transferTitle">Gestisco arrivi e partenze.</h2>
+        <p data-i18n="page.access.transferText">Usa l’email operativa e la password create dalla regia del viaggio. Se sei anche proprietario, puoi entrare con il tuo account Google.</p>
+        <a class="button button-primary" href="transfer.html?access=transfer" data-i18n="page.access.transferAction">Entra come gestore transfer</a>
       </article>
     </section>
     <section id="aiuto" class="section registration-preview">
@@ -62,7 +62,7 @@
   </footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="i18n-public-core.js?v=20260914-editorial3"></script>
-  <script src="i18n-public-support.js?v=20260925-transfer-access-card-v1"></script>
+  <script src="i18n-public-support.js?v=20260927-reserved-area-roles-v1"></script>
   <script src="app.js?v=20260914-en2"></script>
 </body>
 </html>

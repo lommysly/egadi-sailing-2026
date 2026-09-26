@@ -9,7 +9,6 @@ import {
   getFirestore,
   onSnapshot,
   serverTimestamp,
-  setDoc,
   updateDoc,
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -34,24 +33,21 @@ const COPY = {
     heroText: 'Questa area è riservata alla società transfer incaricata e agli organizzatori. Mostra soltanto i movimenti per i quali la persona ha dato il consenso al servizio.',
     signInEyebrow: 'Accesso protetto',
     signInTitle: 'Accedi alla gestione transfer.',
-    signInText: 'Usa l’account Google già approvato oppure l’email operativa e la password ricevute dalla regia. L’accesso non è pubblico: un organizzatore abilita prima il referente della società transfer.',
-    signInAction: 'Continua con Google',
+    signInText: 'Sei il referente transfer? Usa esclusivamente l’email operativa e la password create dalla regia del viaggio. Questo è il terzo percorso dell’Area riservata: qui non si richiedono nuovi accessi.',
+    signInAction: 'Accedi come proprietario con Google',
     emailSignInAction: 'Accedi con email e password',
+    privateArea: 'Torna all’Area riservata',
     emailLabel: 'Nome utente / email operativa',
     passwordLabel: 'Password dedicata',
-    requestEyebrow: 'Richiedi l’accesso',
-    requestTitle: 'Invia la richiesta alla regia del viaggio.',
-    requestText: 'L’organizzatore vedrà il nome e l’email del tuo account di accesso e potrà abilitarti alla gestione dei transfer. Fino all’approvazione non vedrai alcun movimento.',
-    requestAction: 'Invia richiesta di accesso',
-    refreshRequest: 'Aggiorna richiesta',
-    requestPendingTitle: 'Richiesta inviata.',
-    requestPendingText: 'L’accesso sarà attivo solo quando un organizzatore lo approverà. Puoi lasciare questa pagina e rientrare con lo stesso account di accesso.',
+    accessNotAssignedEyebrow: 'Accesso non abilitato',
+    accessNotAssignedTitle: 'Usa le credenziali create dall’organizzatore.',
+    accessNotAssignedText: 'La gestione transfer non ha registrazione né richiesta di accesso. Se sei il referente incaricato, esci e rientra con l’email operativa e la password ricevute dalla regia.',
     signedInAs: 'Account di accesso',
     signOut: 'Esci',
     waiting: 'Caricamento dell’area transfer…',
     organizationEyebrow: 'Regia del viaggio',
     organizationTitle: 'Gestisci gli accessi della società transfer.',
-    organizationText: 'Qui crei, sospendi o elimini gli account della società transfer. Ogni referente vede soltanto i movimenti per i quali i partecipanti hanno chiesto il servizio.',
+    organizationText: 'Solo tu crei, sospendi o elimini le credenziali della società transfer. Ogni referente vede soltanto i movimenti per i quali i partecipanti hanno chiesto il servizio.',
     createOperatorTitle: 'Crea o riattiva un referente transfer',
     createOperatorText: 'Scegli email e password iniziale o nuova da comunicare al referente con un canale separato. La password non verrà più mostrata qui.',
     operatorNameLabel: 'Nome del referente',
@@ -68,17 +64,22 @@ const COPY = {
     suspend: 'Sospendi',
     suspendConfirm: 'Sospendere l’accesso di {name}? Il referente non vedrà più i movimenti, ma l’account resterà disponibile per una futura riattivazione.',
     suspendSuccess: 'Accesso sospeso. Il referente non può più vedere i movimenti.',
-    revokeGoogleConfirm: 'Revocare l’accesso transfer di {name}? Il suo account Google non verrà eliminato, ma non potrà più vedere i movimenti.',
-    revokeGoogleSuccess: 'Accesso Google revocato. Il referente non può più vedere i movimenti.',
     deleteOperator: 'Elimina definitivamente',
     deleteOperatorConfirm: 'Eliminare definitivamente l’account di {name}? Questa azione non può essere annullata.',
     deleteOperatorSuccess: 'Account eliminato definitivamente.',
     manageOperatorError: 'Non è stato possibile aggiornare questo accesso. Riprova tra poco.',
-    requestsTitle: 'Richieste Google da approvare',
-    noRequests: 'Non ci sono richieste da approvare.',
-    approve: 'Approva accesso',
-    revoke: 'Revoca',
-    approved: 'Operatore abilitato',
+    legacyAccessTitle: 'Pulizia dei vecchi accessi',
+    legacyAccessText: 'Questi elementi provengono dal precedente sistema Google. Non possono più essere approvati e non danno accesso: rimuovili.',
+    legacyRequestTitle: 'Richiesta precedente non valida',
+    legacyRequestText: 'Non corrisponde a una credenziale creata dalla regia.',
+    deleteLegacyRequest: 'Elimina richiesta',
+    deleteLegacyRequestConfirm: 'Eliminare questa vecchia richiesta? Non ha mai concesso accesso transfer.',
+    deleteLegacyRequestSuccess: 'Richiesta precedente eliminata.',
+    legacyOperatorTitle: 'Accesso precedente da rimuovere',
+    legacyOperatorText: 'Non usa credenziali create dalla regia e non può più accedere ai movimenti.',
+    deleteLegacyOperator: 'Rimuovi accesso',
+    deleteLegacyOperatorConfirm: 'Rimuovere questo vecchio accesso transfer? L’account esterno non verrà eliminato.',
+    deleteLegacyOperatorSuccess: 'Vecchio accesso transfer rimosso.',
     operatorEyebrow: 'Area transfer attiva',
     operatorTitle: 'Movimenti da organizzare.',
     operatorText: 'Qui compaiono solo le tratte per cui è stato richiesto il transfer con consenso. Le scelte ancora da fare restano nell’area skipper; per queste tratte puoi organizzare mezzo, punto e orario di ritrovo.',
@@ -118,8 +119,6 @@ const COPY = {
     saveRecord: 'Salva aggiornamento',
     saved: 'Aggiornamento salvato.',
     saveError: 'Impossibile salvare l’aggiornamento. Riprova tra poco.',
-    requestSent: 'Richiesta inviata. Ora serve l’approvazione dell’organizzatore.',
-    requestError: 'Impossibile inviare la richiesta. Riprova tra poco.',
     approvalError: 'Impossibile aggiornare l’abilitazione. Riprova tra poco.',
     loadError: 'L’area transfer non è disponibile in questo momento. Riprova tra poco.',
     signInError: 'Non è stato possibile completare l’accesso Google. Riprova scegliendo l’account corretto.',
@@ -128,7 +127,6 @@ const COPY = {
     unknownDateTime: 'Orario da definire',
     sheet: 'Foglio di backup · account proprietario',
     lastUpdated: 'Aggiornato',
-    accountPending: 'In attesa di approvazione',
     panelOutboundTitle: 'Andata · verso Marsala',
     panelOutboundHint: 'Persone che arrivano in aeroporto e devono raggiungere Marsala.',
     panelReturnTitle: 'Ritorno · verso l’aeroporto',
@@ -150,24 +148,21 @@ const COPY = {
     heroText: 'This private area is for the appointed transfer company and organisers. It shows only journeys for which the traveller has consented to the service.',
     signInEyebrow: 'Protected access',
     signInTitle: 'Sign in to transfer operations.',
-    signInText: 'Use the approved Google account or the operations email and password supplied by the trip coordinators. Access is not public: an organiser must first approve the transfer contact.',
-    signInAction: 'Continue with Google',
+    signInText: 'Are you the transfer contact? Use only the operations email and password created by the trip coordinators. This is the third route from the Private area: new access cannot be requested here.',
+    signInAction: 'Sign in as owner with Google',
     emailSignInAction: 'Sign in with email and password',
+    privateArea: 'Back to Private area',
     emailLabel: 'Username / operations email',
     passwordLabel: 'Dedicated password',
-    requestEyebrow: 'Request access',
-    requestTitle: 'Send a request to the trip organisers.',
-    requestText: 'The organiser will see the name and email on your access account and can enable access to transfer operations. You cannot see journeys before approval.',
-    requestAction: 'Send access request',
-    refreshRequest: 'Update request',
-    requestPendingTitle: 'Request sent.',
-    requestPendingText: 'Access becomes active only after organiser approval. You can return with the same access account.',
+    accessNotAssignedEyebrow: 'Access not enabled',
+    accessNotAssignedTitle: 'Use credentials created by the organiser.',
+    accessNotAssignedText: 'Transfer operations have no registration or access-request route. If you are the appointed contact, sign out and use the operations email and password supplied by the trip coordinators.',
     signedInAs: 'Access account',
     signOut: 'Sign out',
     waiting: 'Loading the transfer area…',
     organizationEyebrow: 'Trip coordination',
     organizationTitle: 'Manage transfer company access.',
-    organizationText: 'Create, suspend or delete transfer-company accounts here. Each contact sees only journeys for which travellers requested the service.',
+    organizationText: 'Only you can create, suspend or delete transfer-company credentials. Each contact sees only journeys for which travellers requested the service.',
     createOperatorTitle: 'Create or reactivate a transfer contact',
     createOperatorText: 'Choose the email and initial or new password to send to the contact through a separate channel. The password will not be shown here again.',
     operatorNameLabel: 'Contact name',
@@ -184,17 +179,22 @@ const COPY = {
     suspend: 'Suspend',
     suspendConfirm: 'Suspend {name}’s access? The contact will no longer see journeys, but the account will remain available for future reactivation.',
     suspendSuccess: 'Access suspended. The contact can no longer see journeys.',
-    revokeGoogleConfirm: 'Revoke {name}’s transfer access? Their Google account will not be deleted, but they will no longer see journeys.',
-    revokeGoogleSuccess: 'Google access revoked. The contact can no longer see journeys.',
     deleteOperator: 'Delete permanently',
     deleteOperatorConfirm: 'Permanently delete {name}’s account? This action cannot be undone.',
     deleteOperatorSuccess: 'Account deleted permanently.',
     manageOperatorError: 'This access could not be updated. Please try again shortly.',
-    requestsTitle: 'Google access requests',
-    noRequests: 'There are no access requests to approve.',
-    approve: 'Approve access',
-    revoke: 'Revoke',
-    approved: 'Operator enabled',
+    legacyAccessTitle: 'Clean up previous access',
+    legacyAccessText: 'These items come from the former Google route. They can no longer be approved and grant no access: remove them.',
+    legacyRequestTitle: 'Invalid previous request',
+    legacyRequestText: 'It does not correspond to credentials created by trip coordination.',
+    deleteLegacyRequest: 'Delete request',
+    deleteLegacyRequestConfirm: 'Delete this previous request? It never granted transfer access.',
+    deleteLegacyRequestSuccess: 'Previous request deleted.',
+    legacyOperatorTitle: 'Previous access to remove',
+    legacyOperatorText: 'It does not use credentials created by trip coordination and can no longer access journeys.',
+    deleteLegacyOperator: 'Remove access',
+    deleteLegacyOperatorConfirm: 'Remove this previous transfer access? The external account will not be deleted.',
+    deleteLegacyOperatorSuccess: 'Previous transfer access removed.',
     operatorEyebrow: 'Transfer area active',
     operatorTitle: 'Journeys to arrange.',
     operatorText: 'Only journeys with a transfer request and consent appear here. Choices still to be made remain in the skipper area; use this page to organise the vehicle, meeting point and time.',
@@ -234,8 +234,6 @@ const COPY = {
     saveRecord: 'Save update',
     saved: 'Update saved.',
     saveError: 'The update could not be saved. Please try again shortly.',
-    requestSent: 'Request sent. It now needs organiser approval.',
-    requestError: 'The request could not be sent. Please try again shortly.',
     approvalError: 'The access setting could not be updated. Please try again shortly.',
     loadError: 'The transfer area is not available right now. Please try again shortly.',
     signInError: 'Google sign-in could not be completed. Please choose the correct account and try again.',
@@ -244,7 +242,6 @@ const COPY = {
     unknownDateTime: 'Time to be defined',
     sheet: 'Backup sheet · owner account',
     lastUpdated: 'Updated',
-    accountPending: 'Waiting for approval',
     panelOutboundTitle: 'Outbound · to Marsala',
     panelOutboundHint: 'People landing at the airport who need to reach Marsala.',
     panelReturnTitle: 'Return · to the airport',
@@ -268,7 +265,6 @@ const state = {
   isOrganizer: false,
   hasSkipperBoat: false,
   operator: null,
-  accessRequest: null,
   accessRequests: [],
   transferOperators: [],
   records: [],
@@ -468,16 +464,23 @@ function renderSignedInAccount() {
 }
 
 function renderSignIn() {
-  root.innerHTML = `<article class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('signInEyebrow'))}</p><h2>${escapeHtml(t('signInTitle'))}</h2><p>${escapeHtml(t('signInText'))}</p><form class="compact-form" data-transfer-email-login><label><span>${escapeHtml(t('emailLabel'))}</span><input name="email" type="email" required autocomplete="username" inputmode="email" maxlength="160" /></label><label><span>${escapeHtml(t('passwordLabel'))}</span><input name="password" type="password" required autocomplete="current-password" minlength="6" /></label><button class="button button-primary" type="submit">${escapeHtml(t('emailSignInAction'))}</button></form><div class="transfer-operator-actions"><button class="button button-ghost" type="button" data-action="sign-in">${escapeHtml(t('signInAction'))}</button></div><p class="form-message" data-message="main" role="status"></p></article>`;
+  const privateAreaUrl = `accesso.html?lang=${encodeURIComponent(locale())}#gestore-transfer`;
+  root.innerHTML = `<article class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('signInEyebrow'))}</p><h2>${escapeHtml(t('signInTitle'))}</h2><p>${escapeHtml(t('signInText'))}</p><form class="compact-form" data-transfer-email-login><label><span>${escapeHtml(t('emailLabel'))}</span><input name="email" type="email" required autocomplete="username" inputmode="email" maxlength="160" /></label><label><span>${escapeHtml(t('passwordLabel'))}</span><input name="password" type="password" required autocomplete="current-password" minlength="6" /></label><button class="button button-primary" type="submit">${escapeHtml(t('emailSignInAction'))}</button></form><div class="transfer-operator-actions"><button class="button button-ghost" type="button" data-action="sign-in-organizer">${escapeHtml(t('signInAction'))}</button><a class="button button-ghost" href="${escapeHtml(privateAreaUrl)}">← ${escapeHtml(t('privateArea'))}</a></div><p class="form-message" data-message="main" role="status"></p></article>`;
 }
 
-function renderAccessRequest() {
-  const requested = Boolean(state.accessRequest);
-  root.innerHTML = `<article class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('requestEyebrow'))}</p><h2>${escapeHtml(requested ? t('requestPendingTitle') : t('requestTitle'))}</h2><p>${escapeHtml(requested ? t('requestPendingText') : t('requestText'))}</p>${renderSignedInAccount()}<div class="transfer-operator-actions"><button class="button button-primary" type="button" data-action="request-access">${escapeHtml(requested ? t('refreshRequest') : t('requestAction'))}</button></div><p class="form-message" data-message="main" role="status"></p></article>`;
+function renderAccessNotAssigned() {
+  const privateAreaUrl = `accesso.html?lang=${encodeURIComponent(locale())}#gestore-transfer`;
+  root.innerHTML = `<article class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('accessNotAssignedEyebrow'))}</p><h2>${escapeHtml(t('accessNotAssignedTitle'))}</h2><p>${escapeHtml(t('accessNotAssignedText'))}</p><div class="transfer-operator-actions"><a class="button button-ghost" href="${escapeHtml(privateAreaUrl)}">← ${escapeHtml(t('privateArea'))}</a></div>${renderSignedInAccount()}</article>`;
 }
 
-function requestRole(request) {
-  return state.transferOperators.find((operator) => operator.id === request.id) || null;
+function isManagedPasswordAccount(operator) {
+  return operator?.role === 'transfer_operator'
+    && operator?.accessMode === 'managed_password'
+    && operator?.authProvider === 'password';
+}
+
+function isManagedPasswordOperator(operator) {
+  return isManagedPasswordAccount(operator) && operator?.active === true;
 }
 
 function operatorName(operator) {
@@ -492,20 +495,29 @@ function operatorEmail(operator) {
 
 function managedOperators() {
   return [...state.transferOperators]
-    .filter((operator) => operator?.role === 'transfer_operator' && operator.accessMode === 'managed_password')
+    .filter(isManagedPasswordAccount)
     .sort((left, right) => (dateValue(right.updatedAt)?.getTime() || 0) - (dateValue(left.updatedAt)?.getTime() || 0));
 }
 
-function renderAccessRequestRow(request) {
-  const role = requestRole(request);
+function legacyOperators() {
+  return [...state.transferOperators]
+    .filter((operator) => operator?.role === 'transfer_operator' && !isManagedPasswordAccount(operator))
+    .sort((left, right) => (dateValue(right.updatedAt)?.getTime() || 0) - (dateValue(left.updatedAt)?.getTime() || 0));
+}
+
+function legacyRequests() {
+  return [...state.accessRequests]
+    .sort((left, right) => (dateValue(right.updatedAt)?.getTime() || 0) - (dateValue(left.updatedAt)?.getTime() || 0));
+}
+
+function renderLegacyRequestRow(request) {
   const updated = formatDateTime(request.updatedAt);
-  const name = text(request.name, 120) || '—';
-  const email = text(request.email, 160) || '—';
-  const active = role?.active === true;
-  const action = active
-    ? `<button class="button button-ghost" type="button" data-action="revoke-google-access" data-request-id="${escapeHtml(request.id)}" data-operator-name="${escapeHtml(name)}">${escapeHtml(t('revoke'))}</button>`
-    : `<button class="button button-primary" type="button" data-action="approve-access" data-request-id="${escapeHtml(request.id)}">${escapeHtml(t('approve'))}</button>`;
-  return `<article class="transfer-access-request"><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(email)}${updated ? ` · ${escapeHtml(t('lastUpdated'))}: ${escapeHtml(updated)}` : ''}${active ? ` · ${escapeHtml(t('approved'))}` : ''}</span></div><div class="transfer-access-request-actions">${action}</div></article>`;
+  return `<article class="transfer-access-request"><div><strong>${escapeHtml(t('legacyRequestTitle'))}</strong><span>${escapeHtml(t('legacyRequestText'))}${updated ? ` · ${escapeHtml(t('lastUpdated'))}: ${escapeHtml(updated)}` : ''}</span></div><div class="transfer-access-request-actions"><button class="button button-ghost" type="button" data-action="delete-legacy-request" data-request-id="${escapeHtml(request.id)}">${escapeHtml(t('deleteLegacyRequest'))}</button></div></article>`;
+}
+
+function renderLegacyOperatorRow(operator) {
+  const updated = formatDateTime(operator.updatedAt || operator.approvedAt);
+  return `<article class="transfer-access-request"><div><strong>${escapeHtml(t('legacyOperatorTitle'))}</strong><span>${escapeHtml(t('legacyOperatorText'))}${updated ? ` · ${escapeHtml(t('lastUpdated'))}: ${escapeHtml(updated)}` : ''}</span></div><div class="transfer-access-request-actions"><button class="button button-ghost" type="button" data-action="delete-legacy-operator" data-operator-id="${escapeHtml(operator.id)}">${escapeHtml(t('deleteLegacyOperator'))}</button></div></article>`;
 }
 
 function renderManagedOperatorRow(operator) {
@@ -526,10 +538,12 @@ function renderOperatorCreationForm() {
 
 function renderAccessManagement() {
   const operators = managedOperators();
-  const requests = [...state.accessRequests]
-    .filter((request) => requestRole(request)?.accessMode !== 'managed_password')
-    .sort((a, b) => (dateValue(b.updatedAt)?.getTime() || 0) - (dateValue(a.updatedAt)?.getTime() || 0));
-  return `<section class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('organizationEyebrow'))}</p><h2>${escapeHtml(t('organizationTitle'))}</h2><p>${escapeHtml(t('organizationText'))}</p><div class="transfer-operator-management-section"><h3>${escapeHtml(t('createOperatorTitle'))}</h3><p>${escapeHtml(t('createOperatorText'))}</p>${renderOperatorCreationForm()}</div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('operatorsTitle'))}</h3><div class="transfer-request-list">${operators.length ? operators.map(renderManagedOperatorRow).join('') : `<p class="empty-state">${escapeHtml(t('noOperators'))}</p>`}</div></div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('requestsTitle'))}</h3><div class="transfer-request-list">${requests.length ? requests.map(renderAccessRequestRow).join('') : `<p class="empty-state">${escapeHtml(t('noRequests'))}</p>`}</div></div><p class="form-message" data-message="access-management" role="status"></p></section>`;
+  const requests = legacyRequests();
+  const oldOperators = legacyOperators();
+  const cleanup = requests.length || oldOperators.length
+    ? `<div class="transfer-operator-management-section"><h3>${escapeHtml(t('legacyAccessTitle'))}</h3><p>${escapeHtml(t('legacyAccessText'))}</p><div class="transfer-request-list">${requests.map(renderLegacyRequestRow).join('')}${oldOperators.map(renderLegacyOperatorRow).join('')}</div></div>`
+    : '';
+  return `<section class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('organizationEyebrow'))}</p><h2>${escapeHtml(t('organizationTitle'))}</h2><p>${escapeHtml(t('organizationText'))}</p><div class="transfer-operator-management-section"><h3>${escapeHtml(t('createOperatorTitle'))}</h3><p>${escapeHtml(t('createOperatorText'))}</p>${renderOperatorCreationForm()}</div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('operatorsTitle'))}</h3><div class="transfer-request-list">${operators.length ? operators.map(renderManagedOperatorRow).join('') : `<p class="empty-state">${escapeHtml(t('noOperators'))}</p>`}</div></div>${cleanup}<p class="form-message" data-message="access-management" role="status"></p></section>`;
 }
 
 function recordMatchesFilters(record) {
@@ -803,11 +817,11 @@ function render() {
     root.innerHTML = `<article class="transfer-operator-card"><p class="eyebrow">Egadi Sailing Experience</p><h2>${escapeHtml(t('loadError'))}</h2><p>${escapeHtml(state.error)}</p>${renderSignedInAccount()}</article>`;
     return;
   }
-  if (state.isOrganizer || state.operator?.active === true) {
+  if (state.isOrganizer || isManagedPasswordOperator(state.operator)) {
     renderOperatorDashboard();
     return;
   }
-  renderAccessRequest();
+  renderAccessNotAssigned();
 }
 
 function sortByUpdatedAt(documents) {
@@ -818,14 +832,15 @@ function listenToPrivateData() {
   clearSubscriptions();
   if (!state.user) return;
 
-  // L'abilitazione personale viene osservata anche quando la richiesta è in
-  // attesa: l'operatore vede l'area attiva senza dover ricaricare la pagina.
-  if (!state.isOrganizer) {
+  // Un referente creato dalla regia può essere sospeso o riattivato senza
+  // dover uscire. Le vecchie richieste e gli account Google non sono più
+  // sottoscrivibili né abilitabili da questa pagina.
+  if (!state.isOrganizer && isManagedPasswordAccount(state.operator)) {
     const ownRoleRef = doc(db, 'events', EVENT_ID, 'transferOperators', state.user.uid);
     state.unsubs.push(onSnapshot(ownRoleRef, (snapshot) => {
-      const wasActive = state.operator?.active === true;
+      const wasActive = isManagedPasswordOperator(state.operator);
       const nextOperator = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
-      const isActive = nextOperator?.active === true;
+      const isActive = isManagedPasswordOperator(nextOperator);
       state.operator = nextOperator;
       if (wasActive !== isActive) {
         if (!isActive) state.records = [];
@@ -838,7 +853,7 @@ function listenToPrivateData() {
     }));
   }
 
-  if (!state.isOrganizer && state.operator?.active !== true) return;
+  if (!state.isOrganizer && !isManagedPasswordOperator(state.operator)) return;
 
   const recordsRef = collection(db, 'events', EVENT_ID, 'transferOpsRecords');
   state.unsubs.push(onSnapshot(recordsRef, (snapshot) => {
@@ -876,7 +891,6 @@ async function refreshAccess() {
   state.isOrganizer = false;
   state.hasSkipperBoat = false;
   state.operator = null;
-  state.accessRequest = null;
   state.accessRequests = [];
   state.transferOperators = [];
   state.records = [];
@@ -890,10 +904,6 @@ async function refreshAccess() {
   simplifyReservedAreaNavigation();
 
   try {
-    const [operatorSnapshot, requestSnapshot] = await Promise.all([
-      getDoc(doc(db, 'events', EVENT_ID, 'transferOperators', state.user.uid)),
-      getDoc(doc(db, 'events', EVENT_ID, 'transferAccessRequests', state.user.uid)),
-    ]);
     // Il documento evento resta leggibile solo agli organizzatori: per un
     // referente transfer il suo rifiuto e' previsto, non e' un errore di area.
     try {
@@ -911,8 +921,15 @@ async function refreshAccess() {
     } catch (_) {
       state.hasSkipperBoat = false;
     }
-    state.operator = operatorSnapshot.exists() ? { id: operatorSnapshot.id, ...operatorSnapshot.data() } : null;
-    state.accessRequest = requestSnapshot.exists() ? { id: requestSnapshot.id, ...requestSnapshot.data() } : null;
+    try {
+      const operatorSnapshot = await getDoc(doc(db, 'events', EVENT_ID, 'transferOperators', state.user.uid));
+      state.operator = operatorSnapshot.exists() ? { id: operatorSnapshot.id, ...operatorSnapshot.data() } : null;
+    } catch (operatorError) {
+      // Un Google non organizzatore o un account equipaggio non sono un
+      // referente transfer: mostriamo l'uscita chiara, non un errore tecnico.
+      console.info('Accesso transfer senza credenziali operative.', operatorError.code || operatorError);
+      state.operator = null;
+    }
     state.loading = false;
     listenToPrivateData();
     render();
@@ -924,58 +941,36 @@ async function refreshAccess() {
   }
 }
 
-async function requestAccess() {
-  if (!state.user) return;
-  displayMessage('main', '');
-  try {
-    await setDoc(doc(db, 'events', EVENT_ID, 'transferAccessRequests', state.user.uid), {
-      name: text(state.user.displayName || state.user.email?.split('@')[0] || 'Referente transfer', 120),
-      email: text(state.user.email, 160),
-      updatedAt: serverTimestamp(),
-    });
-    await refreshAccess();
-    displayMessage('main', t('requestSent'));
-  } catch (error) {
-    console.error('Impossibile inviare la richiesta transfer.', error);
-    displayMessage('main', t('requestError'), true);
-  }
-}
-
-async function approveAccess(requestId) {
-  const request = state.accessRequests.find((candidate) => candidate.id === requestId);
-  if (!state.user || !state.isOrganizer || !request) return;
-  displayMessage('access-management', '');
-  try {
-    await setDoc(doc(db, 'events', EVENT_ID, 'transferOperators', requestId), {
-      role: 'transfer_operator',
-      name: text(request.name, 120),
-      email: text(request.email, 160),
-      active: true,
-      approvedAt: serverTimestamp(),
-      approvedBy: state.user.uid,
-      updatedAt: serverTimestamp(),
-    });
-    displayMessage('access-management', t('approved'));
-  } catch (error) {
-    console.error('Impossibile approvare l’operatore transfer.', error);
-    displayMessage('access-management', t('approvalError'), true);
-  }
-}
-
 function messageForOperator(key, name) {
   return t(key).replace('{name}', name || '—');
 }
 
-async function revokeGoogleAccess(requestId, name, button) {
+async function deleteLegacyRequest(requestId, button) {
   if (!state.user || !state.isOrganizer || !requestId) return;
-  if (!window.confirm(messageForOperator('revokeGoogleConfirm', name))) return;
+  if (!window.confirm(t('deleteLegacyRequestConfirm'))) return;
   displayMessage('access-management', '');
   if (button) button.disabled = true;
   try {
-    await deleteDoc(doc(db, 'events', EVENT_ID, 'transferOperators', requestId));
-    displayMessage('access-management', t('revokeGoogleSuccess'));
+    await deleteDoc(doc(db, 'events', EVENT_ID, 'transferAccessRequests', requestId));
+    displayMessage('access-management', t('deleteLegacyRequestSuccess'));
   } catch (error) {
-    console.error('Impossibile revocare l’accesso Google transfer.', error?.code || error);
+    console.error('Impossibile eliminare la vecchia richiesta transfer.', error?.code || error);
+    displayMessage('access-management', t('approvalError'), true);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function deleteLegacyOperator(operatorId, button) {
+  if (!state.user || !state.isOrganizer || !operatorId) return;
+  if (!window.confirm(t('deleteLegacyOperatorConfirm'))) return;
+  displayMessage('access-management', '');
+  if (button) button.disabled = true;
+  try {
+    await deleteDoc(doc(db, 'events', EVENT_ID, 'transferOperators', operatorId));
+    displayMessage('access-management', t('deleteLegacyOperatorSuccess'));
+  } catch (error) {
+    console.error('Impossibile rimuovere il vecchio accesso transfer.', error?.code || error);
     displayMessage('access-management', t('approvalError'), true);
   } finally {
     if (button) button.disabled = false;
@@ -1076,7 +1071,7 @@ document.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-action]');
   if (!button) return;
   const action = button.dataset.action;
-  if (action === 'sign-in') {
+  if (action === 'sign-in-organizer') {
     displayMessage('main', '');
     try {
       await signInWithPopup(auth, provider);
@@ -1088,9 +1083,8 @@ document.addEventListener('click', async (event) => {
   if (action === 'sign-out') {
     await signOut(auth);
   }
-  if (action === 'request-access') await requestAccess();
-  if (action === 'approve-access') await approveAccess(button.dataset.requestId);
-  if (action === 'revoke-google-access') await revokeGoogleAccess(button.dataset.requestId, button.dataset.operatorName, button);
+  if (action === 'delete-legacy-request') await deleteLegacyRequest(button.dataset.requestId, button);
+  if (action === 'delete-legacy-operator') await deleteLegacyOperator(button.dataset.operatorId, button);
   if (action === 'suspend-operator') await suspendOperator(button.dataset.operatorId, button.dataset.operatorName, button);
   if (action === 'delete-operator') await deleteOperator(button.dataset.operatorId, button.dataset.operatorName, button);
 });
