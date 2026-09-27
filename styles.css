@@ -90,7 +90,8 @@ body.menu-open { overflow:hidden; }
 .dashboard-overview h3 em { color:#9ff5ed; }
 .dashboard-overview-heading { display:grid; grid-template-columns:1fr minmax(220px,.7fr); gap:28px; align-items:end; margin-bottom:26px; }
 .dashboard-overview-heading > p { margin:0; color:rgba(255,255,255,.84); line-height:1.55; }
-.dashboard-hub { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+.dashboard-hub { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.dashboard-hub-card:last-child:nth-child(3n+1) { grid-column:1/-1; }
 .dashboard-hub-card { position:relative; display:grid; align-content:start; gap:8px; min-width:0; min-height:178px; border:1px solid rgba(255,255,255,.24); border-radius:14px; padding:18px; background:rgba(255,255,255,.1); color:white; text-align:left; text-decoration:none; cursor:pointer; transition:transform .18s ease,background .18s ease; }
 .dashboard-hub-card:hover { background:rgba(255,255,255,.18); transform:translateY(-2px); }
 .dashboard-hub-card:focus-visible { outline-color:#9ff5ed; }

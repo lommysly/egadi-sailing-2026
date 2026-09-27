@@ -874,10 +874,20 @@ function setupSkipperDashboard() {
       <p>Equipaggio e cassa skipper da una parte; barca, quote e flotta dall’altra. Apri soltanto l’area che ti serve.</p>
     </div>
     <div class="dashboard-hub" aria-label="Aree skipper">
+      <button class="dashboard-hub-card dashboard-hub-card-boat" type="button" data-skipper-view="boat">
+        <span class="dashboard-hub-status" data-skipper-status="boat" aria-label="Da completare" hidden>!</span>
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('boat')}</span><span class="dashboard-hub-label">La barca</span>
+        <strong data-skipper-summary="boat">Carico la barca…</strong><small data-skipper-detail="boat">Dati barca, posti, quote e Starter Pack.</small>
+      </button>
       <button class="dashboard-hub-card dashboard-hub-card-crew" type="button" data-skipper-view="crew">
         <span class="dashboard-hub-status" data-skipper-status="crew" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('crew')}</span><span class="dashboard-hub-label">Equipaggio</span>
         <strong data-skipper-summary="crew">Carico i posti…</strong><small data-skipper-detail="crew">Inviti, elenco per il charter e PDF.</small>
+      </button>
+      <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-skipper-view="money">
+        <span class="dashboard-hub-status" data-skipper-status="money" aria-label="Da completare" hidden>!</span>
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('money')}</span><span class="dashboard-hub-label">Cassa skipper</span>
+        <strong data-skipper-summary="money">Carico la cassa…</strong><small data-skipper-detail="money">Metodi, richieste e accrediti verificati.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-profile" type="button" data-skipper-view="profile">
         <span class="dashboard-hub-status" data-skipper-status="profile" aria-label="Da completare" hidden>!</span>
@@ -888,16 +898,6 @@ function setupSkipperDashboard() {
         <span class="dashboard-hub-status" data-skipper-status="travel" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('travel')}</span><span class="dashboard-hub-label">Arrivi e transfer</span>
         <strong data-skipper-summary="travel">Carico i tuoi spostamenti…</strong><small data-skipper-detail="travel">Andata, ritorno e richiesta transfer privata.</small>
-      </button>
-      <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-skipper-view="money">
-        <span class="dashboard-hub-status" data-skipper-status="money" aria-label="Da completare" hidden>!</span>
-        <span class="dashboard-hub-icon">${skipperDashboardIcon('money')}</span><span class="dashboard-hub-label">Cassa skipper</span>
-        <strong data-skipper-summary="money">Carico la cassa…</strong><small data-skipper-detail="money">Metodi, richieste e accrediti verificati.</small>
-      </button>
-      <button class="dashboard-hub-card dashboard-hub-card-boat" type="button" data-skipper-view="boat">
-        <span class="dashboard-hub-status" data-skipper-status="boat" aria-label="Da completare" hidden>!</span>
-        <span class="dashboard-hub-icon">${skipperDashboardIcon('boat')}</span><span class="dashboard-hub-label">La barca</span>
-        <strong data-skipper-summary="boat">Carico la barca…</strong><small data-skipper-detail="boat">Posti, quote, Starter Pack e flotta.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-board" type="button" data-skipper-view="board">
         <span class="dashboard-hub-status" data-skipper-status="board" aria-label="Da completare" hidden>!</span>
