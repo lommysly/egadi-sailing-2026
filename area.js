@@ -866,26 +866,32 @@ function setupSkipperDashboard() {
     </div>
     <div class="dashboard-hub" aria-label="Aree skipper">
       <button class="dashboard-hub-card dashboard-hub-card-crew" type="button" data-skipper-view="crew">
+        <span class="dashboard-hub-status" data-skipper-status="crew" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('crew')}</span><span class="dashboard-hub-label">Equipaggio</span>
         <strong data-skipper-summary="crew">Carico i posti…</strong><small data-skipper-detail="crew">Inviti, elenco per il charter e PDF.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-profile" type="button" data-skipper-view="profile">
+        <span class="dashboard-hub-status" data-skipper-status="profile" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('profile')}</span><span class="dashboard-hub-label">Il tuo dossier</span>
         <strong data-skipper-summary="profile">Carico i tuoi documenti…</strong><small data-skipper-detail="profile">Anagrafica, patente e certificato radio.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-travel" type="button" data-skipper-view="travel">
+        <span class="dashboard-hub-status" data-skipper-status="travel" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('travel')}</span><span class="dashboard-hub-label">Arrivi e transfer</span>
         <strong data-skipper-summary="travel">Carico i tuoi spostamenti…</strong><small data-skipper-detail="travel">Andata, ritorno e richiesta transfer privata.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-skipper-view="money">
+        <span class="dashboard-hub-status" data-skipper-status="money" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('money')}</span><span class="dashboard-hub-label">Cassa skipper</span>
         <strong data-skipper-summary="money">Carico la cassa…</strong><small data-skipper-detail="money">Metodi, richieste e accrediti verificati.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-boat" type="button" data-skipper-view="boat">
+        <span class="dashboard-hub-status" data-skipper-status="boat" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('boat')}</span><span class="dashboard-hub-label">La barca</span>
         <strong data-skipper-summary="boat">Carico la barca…</strong><small data-skipper-detail="boat">Posti, quote, Starter Pack e flotta.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-board" type="button" data-skipper-view="board">
+        <span class="dashboard-hub-status" data-skipper-status="board" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('board')}</span><span class="dashboard-hub-label">Regole e bacheca</span>
         <strong data-skipper-summary="board">Carico le regole…</strong><small data-skipper-detail="board">Sicurezza, orari e comunicazioni.</small>
       </button>
@@ -961,11 +967,20 @@ function setSkipperDashboardView(nextView) {
   if (view === 'money') setSkipperFinanceDashboardView(SKIPPER_FINANCE_VIEWS.overview);
 }
 
-function setSkipperDashboardMetric(name, value, detail) {
+function setSkipperDashboardMetric(name, value, detail, needsAttention = false) {
+  const card = document.querySelector(`.dashboard-hub-card[data-skipper-view="${name}"]`);
   const valueTarget = document.querySelector(`[data-skipper-summary="${name}"]`);
   const detailTarget = document.querySelector(`[data-skipper-detail="${name}"]`);
+  const statusTarget = document.querySelector(`[data-skipper-status="${name}"]`);
   if (valueTarget) valueTarget.textContent = value;
   if (detailTarget) detailTarget.textContent = detail;
+  // Le 7 card della Panoramica erano tutte identiche a colpo d'occhio: lo
+  // skipper doveva leggere ogni testo per capire cosa mancava ancora.
+  // Segnalato da Silvio il 27/09/2026 dopo il caso delle 4 barche senza
+  // regolamento attivo: chi non legge con attenzione pensa che sia tutto a
+  // posto. Un indicatore visivo per card rende la Panoramica una checklist.
+  card?.classList.toggle('dashboard-hub-card--attention', needsAttention);
+  if (statusTarget) statusTarget.hidden = !needsAttention;
 }
 
 function currentBriefingAcceptanceCount() {
@@ -1063,19 +1078,22 @@ function renderSkipperDashboardOverview() {
     'crew',
     capacity ? `${allocated} di ${capacity} posti` : 'Posti da configurare',
     `${completedProfiles} schede completate · ${pendingInvites} link pronti · ${projectedCrew} proiezioni`,
+    !capacity,
   );
 
+  const skipperProfileReady = isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies);
   const skipperProfileMissing = getMissingSkipperProfileFields(activeSkipperProfile, activeSkipperDocumentCopies);
   setSkipperDashboardMetric(
     'profile',
-    isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies) ? 'Dossier pronto' : 'Dossier da completare',
-    isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies)
+    skipperProfileReady ? 'Dossier pronto' : 'Dossier da completare',
+    skipperProfileReady
       ? 'Anagrafica, abilitazioni e copie private aggiornate.'
       : `${skipperProfileMissing.length} ${skipperProfileMissing.length === 1 ? 'voce da controllare' : 'voci da controllare'} per il charter.`,
+    !skipperProfileReady,
   );
 
   const travelSummary = skipperTravelDashboardSummary();
-  setSkipperDashboardMetric('travel', travelSummary.value, travelSummary.detail);
+  setSkipperDashboardMetric('travel', travelSummary.value, travelSummary.detail, travelSummary.needsAttention);
 
   const costPlan = normalizeCostPlan(activeCostPlan);
   const costModel = activeCostPlan ? costPlanQuoteModel(costPlan) : null;
@@ -1090,6 +1108,7 @@ function renderSkipperDashboardOverview() {
     'money',
     collectionMethods ? `${pendingPayments} richieste da verificare` : 'Metodi da configurare',
     `${collectionMethods} metodi attivi · costi skipper ${formatCurrency(skipperRecoverableCents / 100)} · ${formatCurrency(cashTotals.verifiedCents / 100)} verificati.`,
+    !collectionMethods,
   );
 
   const totalBerths = declaredTotalBerths(activeBoat);
@@ -1104,13 +1123,16 @@ function renderSkipperDashboardOverview() {
     automaticPricingReady
       ? `${totalBerths} posti totali · quota cabina ${formatCurrency(costModel.standardBerthCents / 100)} · ${fleetVisibility}`
       : `${effectiveParticipantCapacity(activeBoat)} posti per partecipanti · ${pricingMessage || fleetVisibility}`,
+    !automaticPricingReady,
   );
 
   const currentAcceptanceCount = currentBriefingAcceptanceCount();
+  const boardRulesActive = Boolean(activeBriefing?.rulesText);
   setSkipperDashboardMetric(
     'board',
-    activeBriefing?.rulesText ? 'Regole attive' : 'Regole da attivare',
+    boardRulesActive ? 'Regole attive' : 'Regole da attivare',
     `${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} comunicazioni pubblicate`,
+    !boardRulesActive,
   );
 
   renderSkipperFinanceOverview();
@@ -1118,11 +1140,11 @@ function renderSkipperDashboardOverview() {
   const nextActionText = document.querySelector('#skipperNextActionText');
   const nextActionButton = document.querySelector('#skipperNextActionButton');
   if (!nextActionText || !nextActionButton) return;
-  if (!isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies)) {
+  if (!skipperProfileReady) {
     nextActionText.textContent = 'Completa prima il tuo dossier charter: dati, abilitazioni e le due copie private richieste devono essere pronti.';
     nextActionButton.textContent = 'Apri il mio dossier';
     nextActionButton.dataset.skipperView = 'profile';
-  } else if (!activeBriefing?.rulesText) {
+  } else if (!boardRulesActive) {
     nextActionText.textContent = 'Attiva prima le regole di bordo: è il passaggio che permette all’equipaggio di leggere e confermare il patto della barca.';
     nextActionButton.textContent = 'Apri le regole';
     nextActionButton.dataset.skipperView = 'board';
@@ -5148,7 +5170,7 @@ function skipperTravelDashboardSummary() {
   if (offers.length) details.push('Passaggio auto preparato ' + (offers.length === 2 ? 'per andata e ritorno' : offers[0] === 'outbound' ? 'all’andata' : 'al ritorno') + ' · il sito non ha pubblicato contatti.');
   const travelDetail = details.join(' ');
   if (!outboundSaved && !returnSaved) {
-    return { value: 'Viaggio da inserire', detail: 'Aggiungi andata e ritorno quando hai gli orari.' };
+    return { value: 'Viaggio da inserire', detail: 'Aggiungi andata e ritorno quando hai gli orari.', needsAttention: true };
   }
   if (!outboundDetailed && !returnDetailed) {
     return { value: 'Bozza di viaggio salvata', detail: 'Puoi completarla con calma, una tratta alla volta.' };
