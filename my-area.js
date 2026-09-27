@@ -1,5 +1,5 @@
 import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { auth, crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260925-reserved-area-nav-v1';
+import { auth, crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260927-hide-reserved-footer-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
 
@@ -151,6 +151,7 @@ function crewDashboardIcon(kind) {
     board: '<path d="M3 14.5h18l-2.25 4.25H5.25L3 14.5Z"/><path d="M12 3.5v11M12 4l5.25 7H12M11.75 6.25 7 11h4.75"/>',
     activity: '<path d="M4 12h3l2-5 3 10 2-5h6"/>',
     travel: '<path d="m3 13 18-8-8 18-2.4-7.6L3 13Z"/><path d="m10.6 15.4 4.1-4.1"/>',
+    cabin: '<path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M4 20h16M9 20v-6h6v6"/>',
   };
   return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths[kind] || paths.activity}</svg>`;
 }
@@ -171,6 +172,10 @@ function crewDashboardCopy() {
       moneyDetail: 'The invitation summary, cash on board and later confirmations.',
       profile: 'Charter details',
       profileDetail: 'Personal details requested before boarding.',
+      cabin: 'My cabin',
+      cabinLoading: 'Checking…',
+      cabinDetail: 'The skipper assigns cabins; ask them if you have not seen it yet.',
+      cabinUnassigned: 'Not assigned yet',
       travel: 'Arrivals and departures',
       travelStatus: 'Plan your journey',
       travelDetail: 'Flight, transfer or car ride: save it here.',
@@ -208,6 +213,10 @@ function crewDashboardCopy() {
     moneyDetail: 'Il riepilogo dell’invito, i contanti a bordo e le conferme successive.',
     profile: 'Dati per il charter',
     profileDetail: 'Dati personali richiesti prima dell’imbarco.',
+    cabin: 'La mia cabina',
+    cabinLoading: 'Controllo…',
+    cabinDetail: 'L’assegnazione la fa lo skipper; chiedi a lui se non la vedi ancora.',
+    cabinUnassigned: 'Non ancora assegnata',
     travel: 'Arrivi e partenze',
     travelStatus: 'Organizza il viaggio',
     travelDetail: 'Volo, transfer o passaggio auto: salvalo qui.',
@@ -251,23 +260,32 @@ function renderCrewDashboardShell() {
       <p>${escapeHtml(copy.description)}</p>
     </div>
     <div class="dashboard-hub" aria-label="${escapeHtml(copy.eyebrow)}">
-      <button class="dashboard-hub-card dashboard-hub-card-board" type="button" data-crew-view="board">
-        <span class="dashboard-hub-icon">${crewDashboardIcon('board')}</span><span class="dashboard-hub-label">${escapeHtml(copy.board)}</span>
-        <strong data-crew-summary="board">${escapeHtml(copy.briefingReady)}</strong><small data-crew-detail="board">${escapeHtml(copy.boardDetail)}</small>
-      </button>
-      <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-crew-view="money">
-        <span class="dashboard-hub-icon">${crewDashboardIcon('money')}</span><span class="dashboard-hub-label">${escapeHtml(copy.money)}</span>
-        <strong data-crew-summary="money">${escapeHtml(copy.noPayments)}</strong><small data-crew-detail="money">${escapeHtml(copy.moneyDetail)}</small>
-      </button>
       <button class="dashboard-hub-card dashboard-hub-card-crew" type="button" data-crew-view="profile">
+        <span class="dashboard-hub-status" data-crew-status="profile" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${crewDashboardIcon('profile')}</span><span class="dashboard-hub-label">${escapeHtml(copy.profile)}</span>
         <strong data-crew-summary="profile">${escapeHtml(copy.profileReady)}</strong><small data-crew-detail="profile">${escapeHtml(copy.profileDetail)}</small>
       </button>
       <a class="dashboard-hub-card dashboard-hub-card-travel" href="${escapeHtml(i18n?.preserveLocaleUrl?.('travel.html') || 'travel.html')}">
+        <span class="dashboard-hub-status" data-crew-status="travel" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${crewDashboardIcon('travel')}</span><span class="dashboard-hub-label">${escapeHtml(copy.travel)}</span>
         <strong data-crew-summary="travel">${escapeHtml(copy.travelStatus)}</strong><small data-crew-detail="travel">${escapeHtml(copy.travelDetail)}</small>
       </a>
-      <article class="dashboard-hub-card dashboard-hub-card-activity crew-dashboard-activity-card">
+      <article class="dashboard-hub-card dashboard-hub-card-cabin dashboard-hub-card--static">
+        <span class="dashboard-hub-status" data-crew-status="cabin" aria-label="Da assegnare" hidden>!</span>
+        <span class="dashboard-hub-icon">${crewDashboardIcon('cabin')}</span><span class="dashboard-hub-label">${escapeHtml(copy.cabin)}</span>
+        <strong data-crew-summary="cabin">${escapeHtml(copy.cabinLoading)}</strong><small data-crew-detail="cabin">${escapeHtml(copy.cabinDetail)}</small>
+      </article>
+      <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-crew-view="money">
+        <span class="dashboard-hub-status" data-crew-status="money" aria-label="Da completare" hidden>!</span>
+        <span class="dashboard-hub-icon">${crewDashboardIcon('money')}</span><span class="dashboard-hub-label">${escapeHtml(copy.money)}</span>
+        <strong data-crew-summary="money">${escapeHtml(copy.noPayments)}</strong><small data-crew-detail="money">${escapeHtml(copy.moneyDetail)}</small>
+      </button>
+      <button class="dashboard-hub-card dashboard-hub-card-board" type="button" data-crew-view="board">
+        <span class="dashboard-hub-status" data-crew-status="board" aria-label="Da completare" hidden>!</span>
+        <span class="dashboard-hub-icon">${crewDashboardIcon('board')}</span><span class="dashboard-hub-label">${escapeHtml(copy.board)}</span>
+        <strong data-crew-summary="board">${escapeHtml(copy.briefingReady)}</strong><small data-crew-detail="board">${escapeHtml(copy.boardDetail)}</small>
+      </button>
+      <article class="dashboard-hub-card dashboard-hub-card-activity dashboard-hub-card--static">
         <span class="dashboard-hub-icon">${crewDashboardIcon('activity')}</span><span class="dashboard-hub-label">${escapeHtml(copy.activity)}</span>
         <strong data-crew-summary="activity">${escapeHtml(copy.briefingReady)}</strong><small data-crew-detail="activity">${escapeHtml(copy.activityDetail)}</small>
       </article>
@@ -389,11 +407,19 @@ function setCrewDashboardView(nextView) {
   });
 }
 
-function setCrewDashboardMetric(name, value, detail) {
+function setCrewDashboardMetric(name, value, detail, needsAttention = false) {
+  const card = document.querySelector(`.dashboard-hub-card[data-crew-view="${name}"], .dashboard-hub-card-${name}`);
   const valueTarget = document.querySelector(`[data-crew-summary="${name}"]`);
   const detailTarget = document.querySelector(`[data-crew-detail="${name}"]`);
+  const statusTarget = document.querySelector(`[data-crew-status="${name}"]`);
   if (valueTarget) valueTarget.textContent = value;
   if (detailTarget) detailTarget.textContent = detail;
+  // Stesso linguaggio visivo introdotto in area.js per lo skipper (bordo
+  // ambra + pallino "!"): anche l'equipaggio deve capire a colpo d'occhio
+  // cosa manca, non solo leggendo il testo di ogni card (richiesta di
+  // Silvio, 27/09/2026 — "una visione cognitiva di quello che hanno scritto").
+  card?.classList.toggle('dashboard-hub-card--attention', needsAttention);
+  if (statusTarget) statusTarget.hidden = !needsAttention;
 }
 
 function paymentActivitySummary(pendingPayments, verifiedPayments, pendingPaymentCents, verifiedPaymentCents) {
@@ -577,16 +603,27 @@ function renderCrewDashboardOverview() {
     copy.announcements
       .replace('{count}', String(announcements))
       .replace('{suffix}', crewPluralSuffix(announcements, 'e', 'i')),
+    !briefingReady,
   );
+  const moneyNeedsAttention = onlineContribution.hasTarget && !onlineContribution.isExempt && onlineContribution.remainingCents > 0;
   setCrewDashboardMetric(
     'money',
     moneyValue,
     moneyDetail,
+    moneyNeedsAttention,
   );
-  setCrewDashboardMetric('profile', profileReady ? copy.profileReady : copy.profileWaiting, copy.profileDetail);
+  setCrewDashboardMetric('profile', profileReady ? copy.profileReady : copy.profileWaiting, copy.profileDetail, !profileReady);
   const outboundProgress = crewTravelProgress('outbound');
   const returnProgress = crewTravelProgress('return');
-  setCrewDashboardMetric('travel', copy.travel, `${outboundProgress.label} · ${returnProgress.label}`);
+  const travelNeedsAttention = ['waiting', 'attention'].includes(outboundProgress.tone) || ['waiting', 'attention'].includes(returnProgress.tone);
+  setCrewDashboardMetric('travel', copy.travel, `${outboundProgress.label} · ${returnProgress.label}`, travelNeedsAttention);
+  const cabinAssigned = Boolean(activeProjection?.berthType);
+  setCrewDashboardMetric(
+    'cabin',
+    cabinAssigned ? projectionBerthLabel() : copy.cabinUnassigned,
+    copy.cabinDetail,
+    !cabinAssigned,
+  );
   const readyItems = [profileReady, briefingReady].filter(Boolean).length;
   setCrewDashboardMetric(
     'activity',

@@ -222,9 +222,26 @@ body.menu-open { overflow:hidden; }
 .profile-summary div { display:grid; gap:2px; padding-bottom:10px; border-bottom:1px solid var(--line); }
 .profile-summary dt { color:rgba(17,45,56,.62); font:500 .68rem "DM Mono",monospace; letter-spacing:.04em; text-transform:uppercase; }
 .profile-summary dd { margin:0; line-height:1.4; }
-.member-row,.payment-row,.invite-row,.projection-row,.transfer-access-request { display:flex; justify-content:space-between; gap:16px; padding:13px 0; border-top:1px solid var(--line); font-size:.84rem; }
-.member-row strong,.payment-row strong,.invite-row strong,.projection-row strong,.transfer-access-request strong { display:block; }
-.member-row span,.payment-row span,.invite-row span,.projection-row span,.transfer-access-request span { display:block; margin-top:3px; color:rgba(17,45,56,.7); }
+.payment-row,.invite-row,.projection-row,.transfer-access-request { display:flex; justify-content:space-between; gap:16px; padding:13px 0; border-top:1px solid var(--line); font-size:.84rem; }
+.payment-row strong,.invite-row strong,.projection-row strong,.transfer-access-request strong { display:block; }
+.payment-row span,.invite-row span,.projection-row span,.transfer-access-request span { display:block; margin-top:3px; color:rgba(17,45,56,.7); }
+/* Crew List / foglio charter: prima riusava .member-row (righe di testo nude,
+   "sembra un foglio di Excel" — Silvio, 27/09/2026). Card a sé, con stato
+   a colpo d'occhio invece di leggere ogni riga per capire cosa manca. */
+.crew-member-card { display:flex; align-items:center; gap:14px; padding:14px 16px; border:1px solid var(--line); border-left:4px solid var(--line); border-radius:12px; background:white; }
+.crew-member-card--missing { border-left-color:#c2410c; }
+.crew-member-card--pending { border-left-color:rgba(17,45,56,.3); }
+.crew-member-card--ready { border-left-color:#1c8a4c; }
+.crew-member-avatar { display:grid; flex:0 0 auto; width:40px; height:40px; place-items:center; border-radius:50%; background:var(--sand); color:var(--ink); font:600 1.05rem "Fraunces",serif; }
+.crew-member-info { flex:1 1 auto; min-width:0; display:grid; gap:3px; }
+.crew-member-info strong { font-size:.98rem; overflow-wrap:anywhere; }
+.crew-member-role { color:rgba(17,45,56,.65); font-size:.78rem; }
+.crew-member-status { justify-self:start; padding:2px 10px; border-radius:999px; font:700 .68rem "DM Mono",monospace; letter-spacing:.02em; background:rgba(17,45,56,.08); color:rgba(17,45,56,.7); }
+.crew-member-card--missing .crew-member-status { background:#fdece3; color:#9a3412; }
+.crew-member-card--ready .crew-member-status { background:#d7f5df; color:#1c6b3a; }
+.member-actions { display:flex; flex:0 0 auto; align-items:center; gap:8px; }
+.crew-member-card .member-actions .button { padding:0 14px; min-height:36px; }
+@media (max-width:640px) { .crew-member-card { flex-wrap:wrap; } .member-actions { flex-basis:100%; justify-content:flex-end; } }
 .transfer-access-request { flex-wrap:wrap; }
 .projection-row small { display:block; margin-top:7px; color:var(--sun-deep); font:700 .67rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
 .projection-row { display:grid; grid-template-columns:minmax(170px,.8fr) minmax(260px,1.35fr); grid-template-areas:"person cost" "actions actions"; align-items:start; gap:16px; padding:18px 0; }
@@ -573,8 +590,8 @@ body.menu-open { overflow:hidden; }
 .participant-finance-acceptance { margin-top:12px; padding:12px 13px; border-radius:10px; background:#e0f4f1; color:#16494f; font-size:.8rem; line-height:1.45; }
 .participant-finance-acceptance strong { display:block; margin-bottom:3px; }
 .participant-finance-acceptance a { color:#075d69; font-weight:700; text-decoration-thickness:1px; text-underline-offset:3px; }
-.crew-dashboard-activity-card { cursor:default; }
-.crew-dashboard-activity-card:hover { background:rgba(255,255,255,.1); transform:none; }
+.dashboard-hub-card--static { cursor:default; }
+.dashboard-hub-card--static:hover { background:rgba(255,255,255,.1); transform:none; }
 .crew-activity-timeline { margin-top:20px; padding:18px; border:1px solid rgba(255,255,255,.22); border-radius:14px; background:rgba(0,0,0,.12); }
 .crew-activity-timeline-heading { display:flex; align-items:end; justify-content:space-between; gap:16px; }
 .crew-activity-timeline-heading .eyebrow { margin:0; }
@@ -815,7 +832,7 @@ body.menu-open { overflow:hidden; }
 /* Il resto della cruscotto operatore (intestazione, riepilogo numerico,
    filtri, gestione accessi) non aveva nessuno stile: stessa causa delle
    schede movimento sopra, stesso rimedio — riusare i contenitori già
-   collaudati altrove (dashboard-panel, member-row) invece di inventarne
+   collaudati altrove (dashboard-panel, payment-row) invece di inventarne
    di nuovi. */
 .transfer-operator-toolbar { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:24px; }
 .transfer-operator-toolbar h2 { margin:6px 0 8px; font:600 clamp(2rem,4vw,3rem)/1 "Fraunces",serif; letter-spacing:-.04em; }

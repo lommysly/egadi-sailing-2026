@@ -11,7 +11,7 @@ import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-acces
 import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
-import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260925-reserved-area-nav-v1';
+import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260927-hide-reserved-footer-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -4958,6 +4958,8 @@ function resetMemberForm() {
   editingMemberId = null;
   document.querySelector('#memberSubmitButton').textContent = 'Aggiungi persona';
   document.querySelector('#cancelMemberEdit').hidden = true;
+  const manualEntryPanel = form.closest('details');
+  if (manualEntryPanel) manualEntryPanel.open = false;
 }
 
 function resetProjectionForm() {
@@ -5950,11 +5952,18 @@ function renderMembers() {
       : member.roleConfirmed === true
         ? 'Pronta per il charter'
         : 'Dati anagrafici completi';
+    // Tre stati distinti a colpo d'occhio invece di una riga di testo unica:
+    // rosso quando manca un dato richiesto dal charter, ambra quando i dati
+    // ci sono ma il ruolo va ancora confermato, verde solo a posto davvero
+    // (stessa logica del pallino introdotto in Panoramica il 27/09/2026,
+    // applicata qui dove Silvio l'ha segnalato come "un foglio di Excel").
+    const statusTone = missing.length ? 'missing' : member.roleConfirmed === true ? 'ready' : 'pending';
     const roleStatus = roleConfirmationText(member);
     const confirmAction = member.roleConfirmed === true
       ? ''
       : `<button class="text-button" type="button" data-confirm-member-role="${escapeHtml(member.id)}">Conferma ruolo</button>`;
-    return `<article class="member-row"><div><strong>${escapeHtml(memberName(member))}</strong><span>${escapeHtml(roleStatus)} · ${escapeHtml(status)}</span></div><div class="member-actions">${confirmAction}<button class="text-button" type="button" data-edit-member="${escapeHtml(member.id)}">Modifica</button></div></article>`;
+    const initial = escapeHtml(memberName(member).trim().charAt(0).toUpperCase() || '?');
+    return `<article class="crew-member-card crew-member-card--${statusTone}"><span class="crew-member-avatar" aria-hidden="true">${initial}</span><div class="crew-member-info"><strong>${escapeHtml(memberName(member))}</strong><span class="crew-member-role">${escapeHtml(roleStatus)}</span><span class="crew-member-status">${escapeHtml(status)}</span></div><div class="member-actions">${confirmAction}<button class="button button-ghost" type="button" data-edit-member="${escapeHtml(member.id)}">Modifica</button></div></article>`;
   }).join('');
   renderPaymentRecipientOptions();
   renderCapacityStatus();
@@ -7350,6 +7359,11 @@ document.querySelector('#memberList').addEventListener('click', async (event) =>
   editingMemberId = member.id;
   document.querySelector('#memberSubmitButton').textContent = 'Salva modifiche';
   document.querySelector('#cancelMemberEdit').hidden = false;
+  // Il form vive dentro il pannello a fisarmonica "solo eccezione": se resta
+  // chiuso, il form si popola comunque ma è invisibile e sembra che
+  // "Modifica" non faccia nulla (caso reale, 27/09/2026).
+  const manualEntryPanel = form.closest('details');
+  if (manualEntryPanel) manualEntryPanel.open = true;
   form.scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 

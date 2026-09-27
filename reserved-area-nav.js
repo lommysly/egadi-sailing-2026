@@ -9,10 +9,18 @@
 // area.js (skipper) e transfer.js (gestore transfer).
 export function simplifyReservedAreaNavigation() {
   const nav = document.querySelector('#primary-menu');
-  if (!nav || nav.dataset.reservedAreaSimplified === 'true') return;
-  nav.dataset.reservedAreaSimplified = 'true';
-  const isEnglish = document.documentElement.lang === 'en';
-  const label = isEnglish ? 'Public website' : 'Sito pubblico';
-  const href = isEnglish ? 'index.html?lang=en' : 'index.html';
-  nav.innerHTML = `<a href="${href}">${label}</a>`;
+  if (nav && nav.dataset.reservedAreaSimplified !== 'true') {
+    nav.dataset.reservedAreaSimplified = 'true';
+    const isEnglish = document.documentElement.lang === 'en';
+    const label = isEnglish ? 'Public website' : 'Sito pubblico';
+    const href = isEnglish ? 'index.html?lang=en' : 'index.html';
+    nav.innerHTML = `<a href="${href}">${label}</a>`;
+  }
+  // Il piede di pagina del sito pubblico (Flottiglia, Passage Plan, Il film,
+  // il logo che riporta a index.html...) restava identico anche dentro
+  // l'area riservata: proprio i link "Arrivi & partenze" lì in fondo, con lo
+  // stesso nome della sezione privata ma diversi, facevano uscire dall'area
+  // per sbaglio (richiesta esplicita del titolare, 27/09/2026). L'unica via
+  // di uscita resta il link "Sito pubblico" nel menu sopra.
+  document.querySelector('.site-footer')?.setAttribute('hidden', '');
 }
