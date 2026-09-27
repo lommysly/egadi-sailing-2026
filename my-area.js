@@ -2096,24 +2096,13 @@ function renderBoardingGate() {
     gate.dataset.rulesContext = '';
     gate.dataset.rulesVersion = '';
     gate.dataset.fullRulesRead = '';
-    status.textContent = translate('crew.flow.briefingRequiredForArea', 'Il briefing di sicurezza è obbligatorio prima di accedere alla tua area di bordo.');
-    return;
-  }
-
-  if (activeLocale() === 'en' && !hasOfficialEnglishBriefing() && !hasAcceptedCurrentBriefing()) {
-    stopDashboardSubscriptions();
-    dashboard.hidden = true;
-    gate.hidden = false;
-    briefing.hidden = true;
-    waiting.hidden = false;
-    waiting.textContent = translate('crew.flow.officialEnglishWaiting', 'The skipper has not yet published the official English version of the safety briefing. Please ask for it before accepting the rules in English.');
-    acknowledgement.checked = false;
-    acknowledgement.disabled = true;
-    acceptButton.disabled = true;
-    gate.dataset.rulesContext = '';
-    gate.dataset.rulesVersion = '';
-    gate.dataset.fullRulesRead = '';
-    status.textContent = translate('crew.flow.officialEnglishRequired', 'An official English safety briefing is required before you can continue in English.');
+    if (hasItalianBriefing() && activeLocale() === 'en') {
+      waiting.textContent = translate('crew.flow.officialEnglishWaiting', 'The skipper has not yet published the official English version of the safety briefing. Please ask for it before accepting the rules in English.');
+      status.textContent = translate('crew.flow.officialEnglishRequired', 'An official English safety briefing is required before you can continue in English.');
+    } else {
+      waiting.textContent = translate('crew.flow.briefingWaiting', 'Lo skipper deve ancora pubblicare il briefing di sicurezza e le regole di bordo…');
+      status.textContent = translate('crew.flow.briefingRequiredForArea', 'Il briefing di sicurezza è obbligatorio prima di accedere alla tua area di bordo.');
+    }
     return;
   }
 
