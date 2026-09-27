@@ -98,6 +98,14 @@ body.menu-open { overflow:hidden; }
 .dashboard-hub-card--attention:hover { background:rgba(255,183,3,.24); }
 .dashboard-hub-status { position:absolute; top:14px; right:14px; display:grid; width:24px; height:24px; place-items:center; border-radius:50%; background:#ffb703; color:#402c00; font:800 .85rem "DM Sans",sans-serif; box-shadow:0 2px 6px rgba(2,43,58,.35); }
 .dashboard-hub-status[hidden] { display:none; }
+.skipper-checklist-dialog { width:min(560px,calc(100% - 36px)); }
+.skipper-checklist-list { display:grid; gap:12px; margin-top:22px; }
+.skipper-checklist-item { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 16px; border:1px solid rgba(255,183,3,.55); border-radius:12px; background:#fff7e6; }
+.skipper-checklist-item div { display:grid; gap:2px; }
+.skipper-checklist-item strong { font:600 1.02rem "Fraunces",serif; }
+.skipper-checklist-item span { color:var(--ink); opacity:.75; font-size:.85rem; line-height:1.4; }
+.skipper-checklist-item .button { flex:0 0 auto; min-height:40px; padding:0 16px; }
+@media (max-width:520px) { .skipper-checklist-item { flex-direction:column; align-items:stretch; } .skipper-checklist-item .button { width:100%; } }
 .dashboard-hub-icon { display:grid; width:36px; height:36px; place-items:center; border-radius:50%; background:rgba(159,245,237,.18); }
 .dashboard-hub-icon svg { width:21px; stroke:currentColor; fill:none; stroke-width:1.7; }
 .dashboard-hub-label { color:#9ff5ed; font:700 .72rem "DM Mono",monospace; letter-spacing:.06em; text-transform:uppercase; }

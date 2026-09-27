@@ -328,6 +328,15 @@ let balanceRequestReturnView = null;
 // nasconde leggendo questo flag da renderSkipperDashboardOverview(), così
 // segue lo stesso ciclo di aggiornamento di tutte le altre card.
 let isOrganizerAccount = false;
+// Il pallino d'attenzione sulle card della Panoramica (27/09/2026) da solo
+// "non dice molto", come confermato da Silvio dopo aver visto la propria
+// barca già completa senza badge: un'icona isolata non spiega cosa manca né
+// dove andare. Il pop-up riepiloga i punti ancora aperti trovati durante il
+// render più recente. Se non manca nulla non appare nulla, per non abituare
+// lo skipper a chiuderlo senza leggerlo (vanificherebbe l'avviso proprio nei
+// casi come le 4 barche senza regolamento).
+let pendingChecklistIssues = [];
+let skipperChecklistDialogTimer = null;
 const fleetPublicationInProgress = new Set();
 let fleetAvailabilitySyncInProgress = false;
 const SKIPPER_DASHBOARD_HASHES = Object.freeze({
@@ -981,6 +990,7 @@ function setSkipperDashboardMetric(name, value, detail, needsAttention = false) 
   // posto. Un indicatore visivo per card rende la Panoramica una checklist.
   card?.classList.toggle('dashboard-hub-card--attention', needsAttention);
   if (statusTarget) statusTarget.hidden = !needsAttention;
+  if (needsAttention) pendingChecklistIssues.push({ view: name, label: SKIPPER_DASHBOARD_LABELS[name] || name, value, detail });
 }
 
 function currentBriefingAcceptanceCount() {
@@ -1064,6 +1074,7 @@ function updateRulesEditorChangeWarning() {
 
 function renderSkipperDashboardOverview() {
   if (!skipperDashboardInitialized) return;
+  pendingChecklistIssues = [];
   document.querySelector('#skipperTransferHubCard')?.toggleAttribute('hidden', !isOrganizerAccount);
   document.querySelector('#skipperTransferNavLink')?.toggleAttribute('hidden', !isOrganizerAccount);
   const capacity = crewSeatLimit();
@@ -1134,6 +1145,7 @@ function renderSkipperDashboardOverview() {
     `${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} comunicazioni pubblicate`,
     !boardRulesActive,
   );
+  scheduleSkipperChecklistDialogCheck();
 
   renderSkipperFinanceOverview();
   renderSkipperCashOverview();
@@ -1166,6 +1178,77 @@ function renderSkipperDashboardOverview() {
     nextActionButton.dataset.skipperView = 'crew';
   }
 }
+
+function scheduleSkipperChecklistDialogCheck() {
+  if (skipperChecklistDialogTimer) return;
+  // Alla primissima apertura molte sottoscrizioni Firestore non hanno ancora
+  // risposto: aspettare che si assestino evita di annunciare "manca tutto"
+  // per un attimo mentre i dati veri stanno ancora arrivando dal server.
+  skipperChecklistDialogTimer = window.setTimeout(() => {
+    skipperChecklistDialogTimer = null;
+    maybeShowSkipperChecklistDialog();
+  }, 1500);
+}
+
+function skipperChecklistDialogStorageKey() {
+  return `egadi-skipper-checklist-seen:${activeBoat?.id || 'unknown'}`;
+}
+
+function maybeShowSkipperChecklistDialog() {
+  const dialog = document.querySelector('#skipperChecklistDialog');
+  if (!dialog || dialog.open || !pendingChecklistIssues.length) return;
+  try {
+    // Una volta per sessione di navigazione: non deve ricomparire ad ogni
+    // apertura della Panoramica, altrimenti diventa un fastidio da chiudere
+    // senza leggere invece di un avviso utile.
+    if (window.sessionStorage.getItem(skipperChecklistDialogStorageKey()) === 'true') return;
+  } catch {
+    // Storage non disponibile (es. navigazione privata): meglio mostrarlo lo
+    // stesso piuttosto che rischiare che lo skipper non lo veda mai.
+  }
+  const list = document.querySelector('#skipperChecklistList');
+  if (list) {
+    list.replaceChildren(...pendingChecklistIssues.map((issue) => {
+      const item = document.createElement('div');
+      item.className = 'skipper-checklist-item';
+      const copy = document.createElement('div');
+      const heading = document.createElement('strong');
+      heading.textContent = issue.label;
+      const detail = document.createElement('span');
+      detail.textContent = issue.detail || issue.value;
+      copy.append(heading, detail);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'button button-primary';
+      button.dataset.skipperView = issue.view;
+      button.textContent = 'Apri';
+      item.append(copy, button);
+      return item;
+    }));
+  }
+  dialog.showModal();
+  try {
+    window.sessionStorage.setItem(skipperChecklistDialogStorageKey(), 'true');
+  } catch {
+    // Vedi sopra: se non riusciamo a ricordarlo va bene lo stesso, l'importante
+    // è che sia comparso adesso.
+  }
+}
+
+document.querySelector('#skipperChecklistDialog')?.addEventListener('click', (event) => {
+  const dialog = event.currentTarget;
+  if (event.target.closest('[data-dialog-close]')) {
+    dialog.close();
+    return;
+  }
+  const button = event.target.closest('[data-skipper-view]');
+  if (!button) return;
+  const view = button.dataset.skipperView;
+  dialog.close();
+  if (!SKIPPER_DASHBOARD_HASHES[view]) return;
+  balanceRequestReturnView = null;
+  window.location.hash = `#${SKIPPER_DASHBOARD_HASHES[view]}`;
+});
 
 function contributionConfigSummary(itemId, { deposit = false } = {}) {
   const item = contributionCatalog().find((candidate) => candidate.id === itemId);
