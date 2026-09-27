@@ -968,7 +968,12 @@ function setSkipperDashboardView(nextView) {
     panel.hidden = view === 'overview' || panel.dataset.skipperPanel !== view;
   });
   if (capacityStatus) capacityStatus.hidden = !['overview', 'crew'].includes(view);
-  if (editBoatButton) editBoatButton.hidden = !['overview', 'boat'].includes(view);
+  // Prima restava visibile anche in Panoramica, come pulsante isolato sopra
+  // le card: l'unica azione fuori dal container-checklist (caso reale,
+  // 27/09/2026: "il pulsante modifica barca non potrebbe essere un
+  // container come gli altri?"). Ora si trova solo dentro "La barca", che è
+  // già raggiungibile dalla sua card in Panoramica.
+  if (editBoatButton) editBoatButton.hidden = view !== 'boat';
   document.querySelectorAll('#skipperDashboardNavigation [data-skipper-view]').forEach((button) => {
     const current = button.dataset.skipperView === view;
     button.toggleAttribute('aria-current', current);
