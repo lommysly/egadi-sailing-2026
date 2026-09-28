@@ -337,6 +337,10 @@ let isOrganizerAccount = false;
 // casi come le 4 barche senza regolamento).
 let pendingChecklistIssues = [];
 let skipperChecklistDialogTimer = null;
+// Il prezzo del transfer aeroporto <-> Marsala (richiesta del titolare,
+// 28/09/2026): senza questo dato la scelta "Transfer organizzato" sembrava
+// gratuita anche nel viaggio personale dello skipper.
+let activeTransferPricing = null;
 const fleetPublicationInProgress = new Set();
 let fleetAvailabilitySyncInProgress = false;
 const SKIPPER_DASHBOARD_HASHES = Object.freeze({
@@ -5309,6 +5313,16 @@ function updateSkipperTravelMode(form) {
   updateSkipperTravelTransferHint(form);
 }
 
+// Stessa logica e stesso dato di travel.js (equipaggio): il transfer non è
+// gratuito, e il minimo fatturabile si applica anche viaggiando da soli.
+function skipperTransferPriceNote(terminalAirport) {
+  if (!activeTransferPricing) return '';
+  const perPersonCents = terminalAirport === 'PMO' ? activeTransferPricing.pmoPricePerPersonCents : activeTransferPricing.tpsPricePerPersonCents;
+  if (!Number.isFinite(perPersonCents)) return '';
+  const minimum = Number.isInteger(activeTransferPricing.minimumBillablePersons) ? activeTransferPricing.minimumBillablePersons : 1;
+  return ` Il transfer non è gratuito: ${formatCurrency(perPersonCents / 100)} a persona, minimo ${minimum} persone fatturate (${formatCurrency((perPersonCents * minimum) / 100)} anche da solo). Il costo esatto te lo conferma la società transfer quando organizza il gruppo.`;
+}
+
 function updateSkipperTravelTransferHint(form) {
   const modeInput = form?.elements.namedItem('transportMode');
   const hint = form?.querySelector('[data-travel-transfer-hint]');
@@ -5345,9 +5359,9 @@ function updateSkipperTravelTransferHint(form) {
   } else if (plan === 'transfer' && !airportReady) {
     hint.textContent = 'Per il transfer scegli prima l’aeroporto reale: Trapani · TPS oppure Palermo · PMO.';
   } else if (plan === 'transfer' && transferConsent?.checked !== true) {
-    hint.textContent = 'Conferma il consenso: al salvataggio la società incaricata riceverà solo i dati necessari a organizzare il transfer.';
+    hint.textContent = 'Conferma il consenso: al salvataggio la società incaricata riceverà solo i dati necessari a organizzare il transfer.' + skipperTransferPriceNote(airport);
   } else if (plan === 'transfer') {
-    hint.textContent = 'Al salvataggio la richiesta entrerà nella coda della società transfer, con i soli dati necessari a contattarti e organizzare il mezzo.';
+    hint.textContent = 'Al salvataggio la richiesta entrerà nella coda della società transfer, con i soli dati necessari a contattarti e organizzare il mezzo.' + skipperTransferPriceNote(airport);
   } else if (plan === 'independent') {
     hint.textContent = 'Hai segnato che ti organizzi autonomamente: nessun contatto viene condiviso.';
   } else if (plan === 'ride_offer' && !airportReady) {
@@ -6143,6 +6157,15 @@ function subscribeToBoat(boat) {
   const boatContextChanged = activeBoat?.id !== boat.id;
   const documentsNeedInitialLoad = Object.values(activeSkipperDocumentCopies).some((copy) => copy.state === 'idle');
   activeBoat = boat;
+  // Una tantum: il prezzo cambia raramente, non serve un ascolto in diretta.
+  void getDoc(doc(db, 'events', 'egadi-2026', 'transferPricing', 'default')).then((snapshot) => {
+    activeTransferPricing = snapshot.exists() ? snapshot.data() : null;
+    updateSkipperTravelTransferHint(document.querySelector('[data-skipper-travel-leg="outbound"]'));
+    updateSkipperTravelTransferHint(document.querySelector('[data-skipper-travel-leg="return"]'));
+  }).catch((error) => {
+    console.info('Prezzo transfer non disponibile.', error?.code || error);
+    activeTransferPricing = null;
+  });
   if (boatContextChanged || documentsNeedInitialLoad) {
     resetSkipperDocumentCopies('checking');
     void refreshSkipperDocumentCopies(boat.id);

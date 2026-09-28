@@ -22,6 +22,7 @@ let currentTransferOperationStatus = {};
 let currentPersistedLegs = {};
 let transferProgressLoaded = false;
 let transferProgressReadError = false;
+let activeTransferPricing = null;
 
 function isEnglish() {
   return window.EgadiI18n?.getLocale?.() === 'en';
@@ -564,6 +565,7 @@ function renderLegForm(direction, rawLeg) {
         <legend>${copy.airportTransferDirection[direction]}</legend>
         <p class="field-hint">${copy.airportTransferHint}</p>
         <label>${copy.airportChoiceLabel}<select name="airportMarsalaChoice"><option value="">${copy.airportChoiceNone}</option><option value="transfer">${copy.airportChoiceTransfer}</option><option value="independent">${copy.airportChoiceIndependent}</option><option value="ride_offer">${copy.airportChoiceRideOffer}</option></select></label>
+        <p class="field-hint transfer-price-note" data-transfer-price-note hidden></p>
         <label class="consent-field" data-transfer-consent hidden><input name="transferOperatorConsent" type="checkbox" /><span>${copy.operatorConsent}</span></label>
       </fieldset>
       <fieldset class="skipper-transfer-fieldset" data-travel-step-panel="carpool">
@@ -622,6 +624,25 @@ function autoSelectAirportTransferChoice(form) {
   choiceField.value = 'transfer';
 }
 
+function formatEuro(cents) {
+  return new Intl.NumberFormat(isEnglish() ? 'en-GB' : 'it-IT', { style: 'currency', currency: 'EUR' }).format((cents || 0) / 100);
+}
+
+// Il transfer non è gratuito: senza questo avviso la scelta "Transfer
+// organizzato" sembrava senza costi (segnalato dal titolare, 28/09/2026). Il
+// minimo fatturabile si applica anche viaggiando da soli: lo diciamo esplicito
+// per non far scoprire il costo pieno solo a richiesta confermata.
+function transferPriceNote(terminalAirport) {
+  if (!activeTransferPricing) return '';
+  const perPersonCents = terminalAirport === 'PMO' ? activeTransferPricing.pmoPricePerPersonCents : activeTransferPricing.tpsPricePerPersonCents;
+  if (!Number.isFinite(perPersonCents)) return '';
+  const minimum = Number.isInteger(activeTransferPricing.minimumBillablePersons) ? activeTransferPricing.minimumBillablePersons : 1;
+  const minimumTotalCents = perPersonCents * minimum;
+  return isEnglish()
+    ? `The transfer is not free: ${formatEuro(perPersonCents)} per person, minimum ${minimum} people billed (${formatEuro(minimumTotalCents)} even if you travel alone). The transfer company will confirm the exact cost once your group is organised.`
+    : `Il transfer non è gratuito: ${formatEuro(perPersonCents)} a persona, minimo ${minimum} persone fatturate (${formatEuro(minimumTotalCents)} anche se viaggi da solo). Il costo esatto te lo conferma la società transfer quando organizza il gruppo.`;
+}
+
 function updateConditionalFields(form) {
   autoSelectAirportTransferChoice(form);
   const airportChoice = inputValue(form, 'airportMarsalaChoice');
@@ -635,6 +656,13 @@ function updateConditionalFields(form) {
   transferConsent.hidden = !needsTransferConsent;
   if (!needsTransferConsent) field(form, 'transferOperatorConsent').checked = false;
   const direction = form.closest('[data-travel-direction]')?.dataset.travelDirection;
+  const priceNote = form.querySelector('[data-transfer-price-note]');
+  if (priceNote) {
+    const terminalAirport = (direction === 'return' ? inputValue(form, 'originAirport') : inputValue(form, 'destinationAirport')).toUpperCase();
+    const noteText = needsTransferConsent ? transferPriceNote(terminalAirport) : '';
+    priceNote.textContent = noteText;
+    priceNote.hidden = !noteText;
+  }
   const summary = form.querySelector('[data-travel-connection-summary]');
   if (direction && summary) {
     const copy = copyForLocale();
@@ -1000,6 +1028,17 @@ async function openTravelWorkspace(session) {
   if (!isAcceptedBriefing(briefing, acceptance, user.uid)) {
     showBlocked(copy.blockedBriefing);
     return;
+  }
+  try {
+    // Il transfer non è gratuito: senza questo dato la scelta "Transfer
+    // organizzato" sembrava senza costi (segnalato dal titolare, 28/09/2026).
+    // Un mancato aggiornamento in diretta qui non è critico: il prezzo
+    // cambia raramente e si aggiorna comunque al prossimo caricamento.
+    const pricingSnapshot = await getDoc(doc(db, 'events', 'egadi-2026', 'transferPricing', 'default'));
+    activeTransferPricing = pricingSnapshot.exists() ? pricingSnapshot.data() : null;
+  } catch (error) {
+    console.info('Prezzo transfer non disponibile.', error?.code || error);
+    activeTransferPricing = null;
   }
   try {
     await loadLegs();

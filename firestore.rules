@@ -2218,6 +2218,29 @@ service cloud.firestore {
       allow delete: if isPrivateAreaOpen() && isOrganizer();
     }
 
+    // Il transfer aeroporto <-> Marsala non è gratuito: il prezzo va comunicato
+    // a chi lo richiede (skipper ed equipaggio), ma solo l'organizzatore può
+    // fissarlo o correggerlo — può cambiare da un anno all'altro (richiesta
+    // del titolare, 28/09/2026).
+    function isValidTransferPricing() {
+      return request.resource.data.keys().hasOnly(['tpsPricePerPersonCents', 'pmoPricePerPersonCents', 'minimumBillablePersons', 'updatedAt', 'updatedBy'])
+        && request.resource.data.tpsPricePerPersonCents is int && request.resource.data.tpsPricePerPersonCents >= 0
+        && request.resource.data.pmoPricePerPersonCents is int && request.resource.data.pmoPricePerPersonCents >= 0
+        && request.resource.data.minimumBillablePersons is int && request.resource.data.minimumBillablePersons >= 1
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    match /events/egadi-2026/transferPricing/default {
+      // Leggibile da chiunque abbia già superato l'accesso privato (skipper,
+      // equipaggio, organizzatore): è un'informazione da mostrare prima di
+      // richiedere il transfer, non un dato riservato a un ruolo solo.
+      allow get: if isPrivateAreaOpen() && signedIn();
+      allow list: if false;
+      allow create, update: if isPrivateAreaOpen() && isOrganizer() && isValidTransferPricing();
+      allow delete: if false;
+    }
+
     match /events/egadi-2026/transferOperators/{userId} {
       allow get: if isPrivateAreaOpen()
         && (isOrganizer() || (isManagedTransferOperatorAccount() && userId == request.auth.uid));

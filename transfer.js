@@ -9,6 +9,7 @@ import {
   getFirestore,
   onSnapshot,
   serverTimestamp,
+  setDoc,
   updateDoc,
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -48,6 +49,15 @@ const COPY = {
     organizationEyebrow: 'Regia del viaggio',
     organizationTitle: 'Gestisci gli accessi della società transfer.',
     organizationText: 'Solo tu crei, sospendi o elimini le credenziali della società transfer. Ogni referente vede soltanto i movimenti per i quali i partecipanti hanno chiesto il servizio.',
+    pricingTitle: 'Prezzo del transfer',
+    pricingText: 'Il transfer non è gratuito: skipper ed equipaggio lo vedono prima di richiederlo. Il minimo fatturabile si applica anche a chi viaggia da solo (es. 3 persone minimo a 10€ = 30€ anche per una sola persona).',
+    pricingTpsLabel: 'Prezzo a persona · Trapani (TPS)',
+    pricingPmoLabel: 'Prezzo a persona · Palermo (PMO)',
+    pricingMinimumLabel: 'Minimo persone fatturabili',
+    pricingSave: 'Salva prezzo',
+    pricingSaved: 'Prezzo del transfer aggiornato.',
+    pricingError: 'Non è stato possibile salvare il prezzo. Controlla i valori e riprova.',
+    pricingUpdated: 'Ultimo aggiornamento: {date}.',
     createOperatorTitle: 'Crea o riattiva un referente transfer',
     createOperatorText: 'Scegli email e password iniziale o nuova da comunicare al referente con un canale separato. La password non verrà più mostrata qui.',
     operatorNameLabel: 'Nome del referente',
@@ -163,6 +173,15 @@ const COPY = {
     organizationEyebrow: 'Trip coordination',
     organizationTitle: 'Manage transfer company access.',
     organizationText: 'Only you can create, suspend or delete transfer-company credentials. Each contact sees only journeys for which travellers requested the service.',
+    pricingTitle: 'Transfer price',
+    pricingText: 'The transfer is not free: skipper and crew see it before requesting it. The minimum billable applies even travelling alone (e.g. minimum 3 people at €10 = €30 even for one person).',
+    pricingTpsLabel: 'Price per person · Trapani (TPS)',
+    pricingPmoLabel: 'Price per person · Palermo (PMO)',
+    pricingMinimumLabel: 'Minimum billable people',
+    pricingSave: 'Save price',
+    pricingSaved: 'Transfer price updated.',
+    pricingError: 'The price could not be saved. Check the values and try again.',
+    pricingUpdated: 'Last updated: {date}.',
     createOperatorTitle: 'Create or reactivate a transfer contact',
     createOperatorText: 'Choose the email and initial or new password to send to the contact through a separate channel. The password will not be shown here again.',
     operatorNameLabel: 'Contact name',
@@ -267,6 +286,7 @@ const state = {
   operator: null,
   accessRequests: [],
   transferOperators: [],
+  transferPricing: null,
   records: [],
   loading: true,
   error: '',
@@ -294,6 +314,34 @@ function escapeHtml(value = '') {
 
 function text(value, maxLength = 180) {
   return String(value ?? '').trim().slice(0, maxLength);
+}
+
+// Stesso motivo del pattern già usato in area.js: con type="number" alcuni
+// browser/lingue interpretano la virgola come separatore delle migliaia e
+// svuotano il campo. Tutti gli importi del sito restano <input type="text">
+// con questa normalizzazione manuale (fix reale, 25/09/2026).
+function normalizeEuroInputString(rawValue) {
+  const trimmed = String(rawValue ?? '').trim();
+  if (!trimmed) return '';
+  const hasComma = trimmed.includes(',');
+  const hasDot = trimmed.includes('.');
+  if (hasComma && hasDot) {
+    return trimmed.lastIndexOf(',') > trimmed.lastIndexOf('.')
+      ? trimmed.replace(/\./g, '').replace(',', '.')
+      : trimmed.replace(/,/g, '');
+  }
+  return hasComma ? trimmed.replace(',', '.') : trimmed;
+}
+
+function toEuroCents(value) {
+  const rawValue = normalizeEuroInputString(value);
+  if (!rawValue) return 0;
+  const amount = Number(rawValue);
+  return Number.isFinite(amount) && amount >= 0 && amount <= 1000 ? Math.round(amount * 100) : 0;
+}
+
+function euroInputValue(cents) {
+  return Number.isFinite(cents) && cents > 0 ? (cents / 100).toFixed(2) : '';
 }
 
 function optionalTime(value) {
@@ -536,6 +584,12 @@ function renderOperatorCreationForm() {
   return `<form class="compact-form" data-create-transfer-operator><label><span>${escapeHtml(t('operatorNameLabel'))}</span><input name="name" type="text" required autocomplete="name" maxlength="120" /></label><label><span>${escapeHtml(t('operatorEmailLabel'))}</span><input name="email" type="email" required autocomplete="username" inputmode="email" maxlength="160" /></label><label data-wide><span>${escapeHtml(t('temporaryPasswordLabel'))}</span><input name="temporaryPassword" type="password" required autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="temporary-password-help" /><small id="temporary-password-help">${escapeHtml(t('temporaryPasswordHelp'))}</small></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('createOperator'))}</button><p class="form-message" data-message="operator-create" role="status"></p></div></form>`;
 }
 
+function renderPricingForm() {
+  const pricing = state.transferPricing;
+  const updated = pricing ? formatDateTime(pricing.updatedAt) : '';
+  return `<div class="transfer-operator-management-section"><h3>${escapeHtml(t('pricingTitle'))}</h3><p>${escapeHtml(t('pricingText'))}</p><form class="compact-form" data-transfer-pricing-form><label><span>${escapeHtml(t('pricingTpsLabel'))}</span><input name="tpsPrice" type="text" inputmode="decimal" required value="${escapeHtml(euroInputValue(pricing?.tpsPricePerPersonCents))}" placeholder="Es. 10,00" /></label><label><span>${escapeHtml(t('pricingPmoLabel'))}</span><input name="pmoPrice" type="text" inputmode="decimal" required value="${escapeHtml(euroInputValue(pricing?.pmoPricePerPersonCents))}" placeholder="Es. 20,00" /></label><label><span>${escapeHtml(t('pricingMinimumLabel'))}</span><input name="minimumPersons" type="text" inputmode="numeric" required value="${escapeHtml(pricing?.minimumBillablePersons ? String(pricing.minimumBillablePersons) : '3')}" placeholder="3" /></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('pricingSave'))}</button><p class="form-message" data-message="pricing" role="status"></p></div></form>${updated ? `<p class="field-hint">${escapeHtml(t('pricingUpdated').replace('{date}', updated))}</p>` : ''}</div>`;
+}
+
 function renderAccessManagement() {
   const operators = managedOperators();
   const requests = legacyRequests();
@@ -543,7 +597,7 @@ function renderAccessManagement() {
   const cleanup = requests.length || oldOperators.length
     ? `<div class="transfer-operator-management-section"><h3>${escapeHtml(t('legacyAccessTitle'))}</h3><p>${escapeHtml(t('legacyAccessText'))}</p><div class="transfer-request-list">${requests.map(renderLegacyRequestRow).join('')}${oldOperators.map(renderLegacyOperatorRow).join('')}</div></div>`
     : '';
-  return `<section class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('organizationEyebrow'))}</p><h2>${escapeHtml(t('organizationTitle'))}</h2><p>${escapeHtml(t('organizationText'))}</p><div class="transfer-operator-management-section"><h3>${escapeHtml(t('createOperatorTitle'))}</h3><p>${escapeHtml(t('createOperatorText'))}</p>${renderOperatorCreationForm()}</div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('operatorsTitle'))}</h3><div class="transfer-request-list">${operators.length ? operators.map(renderManagedOperatorRow).join('') : `<p class="empty-state">${escapeHtml(t('noOperators'))}</p>`}</div></div>${cleanup}<p class="form-message" data-message="access-management" role="status"></p></section>`;
+  return `<section class="transfer-operator-card"><p class="eyebrow">${escapeHtml(t('organizationEyebrow'))}</p><h2>${escapeHtml(t('organizationTitle'))}</h2><p>${escapeHtml(t('organizationText'))}</p>${renderPricingForm()}<div class="transfer-operator-management-section"><h3>${escapeHtml(t('createOperatorTitle'))}</h3><p>${escapeHtml(t('createOperatorText'))}</p>${renderOperatorCreationForm()}</div><div class="transfer-operator-management-section"><h3>${escapeHtml(t('operatorsTitle'))}</h3><div class="transfer-request-list">${operators.length ? operators.map(renderManagedOperatorRow).join('') : `<p class="empty-state">${escapeHtml(t('noOperators'))}</p>`}</div></div>${cleanup}<p class="form-message" data-message="access-management" role="status"></p></section>`;
 }
 
 function recordMatchesFilters(record) {
@@ -881,6 +935,14 @@ function listenToPrivateData() {
     state.error = t('loadError');
     render();
   }));
+  const pricingRef = doc(db, 'events', EVENT_ID, 'transferPricing', 'default');
+  state.unsubs.push(onSnapshot(pricingRef, (snapshot) => {
+    state.transferPricing = snapshot.exists() ? snapshot.data() : null;
+    render();
+  }, () => {
+    state.error = t('loadError');
+    render();
+  }));
 }
 
 async function refreshAccess() {
@@ -893,6 +955,7 @@ async function refreshAccess() {
   state.operator = null;
   state.accessRequests = [];
   state.transferOperators = [];
+  state.transferPricing = null;
   state.records = [];
   render();
 
@@ -974,6 +1037,36 @@ async function deleteLegacyOperator(operatorId, button) {
     displayMessage('access-management', t('approvalError'), true);
   } finally {
     if (button) button.disabled = false;
+  }
+}
+
+async function saveTransferPricing(form) {
+  if (!state.user || !state.isOrganizer) return;
+  const values = new FormData(form);
+  const tpsPricePerPersonCents = toEuroCents(values.get('tpsPrice'));
+  const pmoPricePerPersonCents = toEuroCents(values.get('pmoPrice'));
+  const minimumBillablePersons = Math.round(Number(normalizeEuroInputString(values.get('minimumPersons'))));
+  const submit = form.querySelector('button[type="submit"]');
+  if (!Number.isInteger(minimumBillablePersons) || minimumBillablePersons < 1) {
+    displayMessage('pricing', t('pricingError'), true);
+    return;
+  }
+  displayMessage('pricing', '');
+  if (submit) submit.disabled = true;
+  try {
+    await setDoc(doc(db, 'events', EVENT_ID, 'transferPricing', 'default'), {
+      tpsPricePerPersonCents,
+      pmoPricePerPersonCents,
+      minimumBillablePersons,
+      updatedAt: serverTimestamp(),
+      updatedBy: state.user.uid,
+    });
+    displayMessage('pricing', t('pricingSaved'));
+  } catch (error) {
+    console.error('Impossibile salvare il prezzo del transfer.', error?.code || error);
+    displayMessage('pricing', t('pricingError'), true);
+  } finally {
+    if (submit) submit.disabled = false;
   }
 }
 
@@ -1122,6 +1215,12 @@ document.addEventListener('submit', (event) => {
   const filterForm = event.target.closest('[data-filter-form]');
   if (filterForm) {
     event.preventDefault();
+    return;
+  }
+  const pricingForm = event.target.closest('[data-transfer-pricing-form]');
+  if (pricingForm) {
+    event.preventDefault();
+    saveTransferPricing(pricingForm);
     return;
   }
   const createOperatorForm = event.target.closest('[data-create-transfer-operator]');

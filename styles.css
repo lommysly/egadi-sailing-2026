@@ -110,6 +110,7 @@ body.menu-open { overflow:hidden; }
 .blast-brand-note p { margin:0; color:rgba(255,255,255,.82); font-size:.82rem; line-height:1.55; }
 .blast-brand-note strong { color:#5eead4; }
 @media (max-width:640px) { .blast-brand-note { margin:24px 16px 32px; } }
+.transfer-price-note { margin:2px 0 4px; padding:10px 12px; border-radius:10px; border:1px solid rgba(194,65,12,.3); background:#fdece3; color:#9a3412; }
 .skipper-checklist-dialog { width:min(560px,calc(100% - 36px)); }
 .skipper-checklist-list { display:grid; gap:12px; margin-top:22px; }
 .skipper-checklist-item { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 16px; border:1px solid rgba(255,183,3,.55); border-radius:12px; background:#fff7e6; }
