@@ -10,6 +10,7 @@ import {
 import { doc, getDoc, initializeFirestore, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { createCrewInviteIdentity, isCrewPin, isInviteCode, phoneFingerprintFor } from './crew-identity.js';
+import { matchesCurrentInviteSession } from './crew-invite-session.js?v=20260928-invite-return-v1';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-brand-v1';
 
@@ -123,7 +124,7 @@ export function crewAccessErrorMessage(error, { activation = false } = {}) {
     ? translate('crew.errors.activationCredentials', 'Non riesco ad attivare questo invito. Verifica numero e codice oppure chiedi allo skipper un nuovo link.')
     : translate('crew.errors.invalidCredentials', 'Numero o codice personale non corretti.');
   if (error.code === 'access-not-active') return activation
-    ? translate('crew.errors.activationUnavailable', 'Questo invito non è più disponibile. Chiedi allo skipper di generare un nuovo link.')
+    ? translate('crew.errors.activationUnavailable', 'Questo invito è scaduto, è stato sostituito oppure è già stato attivato. Se hai già un codice, entra con numero e codice; altrimenti chiedi allo skipper un nuovo link.')
     : translate('crew.errors.accessInactive', 'Non risulta un accesso attivo con questo numero. Apri il link WhatsApp ricevuto dallo skipper.');
   return translate('crew.errors.completeAccess', 'Non riesco a completare l’accesso. Controlla la connessione e riprova.');
 }
@@ -316,16 +317,53 @@ export async function signInCrew({ phone, pin }) {
   }
 }
 
-export function startInviteActivation({ onOpening, onReady, onInvalid }) {
+export function startInviteActivation({ onOpening, onReady, onInvalid, onActiveSession }) {
   if (!canUsePrivateArea()) {
     onOpening(privateAreaBlockMessage(), true);
-    return;
+    return () => {};
   }
   if (!hasValidInviteParameters) {
     onInvalid();
-    return;
+    return () => {};
   }
-  onReady();
+
+  let settled = false;
+  let unsubscribe = () => {};
+  const settle = (callback, payload) => {
+    if (settled) return;
+    settled = true;
+    // onAuthStateChanged puo' notificare subito lo stato iniziale; rimandare
+    // la chiusura al microtask evita di lasciare un listener aperto.
+    Promise.resolve().then(() => unsubscribe());
+    callback?.(payload);
+  };
+
+  unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (settled) return;
+    if (!user || user.isAnonymous || !user.email) {
+      settle(onReady);
+      return;
+    }
+
+    onOpening('Controllo se hai gia attivato il tuo accesso…');
+    try {
+      const access = await readCrewAccess(user);
+      if (matchesCurrentInviteSession({ access, boatId, inviteId, accessKey })) {
+        simplifyReservedAreaNavigation();
+        settle(onActiveSession || onReady, access);
+        return;
+      }
+    } catch {
+      // Se non e' l'invitato di questo link (o la sessione non e' piu'
+      // valida), non esponiamo dati e manteniamo il normale primo accesso.
+    }
+    settle(onReady);
+  });
+
+  return () => {
+    settled = true;
+    unsubscribe();
+  };
 }
 
 export function startCrewAreaSession({ onOpening, onReady, onInvalid }) {

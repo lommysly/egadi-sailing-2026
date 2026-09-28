@@ -1,6 +1,6 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 24 settembre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+Ultimo aggiornamento: 28 settembre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
 
 ## Sito pubblico e contenuti
 
@@ -45,6 +45,7 @@ Ultimo aggiornamento: 24 settembre 2026. Le caselle descrivono lo stato verifica
 
 - [x] Sorgente locale: primo accesso dal link WhatsApp, conferma del numero e scelta di un codice personale di sei cifre.
 - [x] Sorgente locale: ingresso successivo da `crew.html` con numero WhatsApp + codice, senza Google, email o SMS.
+- [x] Sorgente locale: riaprendo il medesimo link dalla sessione autenticata del destinatario, rientro diretto nella sua area; da una sessione diversa il link non mostra dati e offre solo l'ingresso con numero + codice.
 - [x] Sorgente locale: scadenza del link a 14 giorni e riemissione sullo stesso invito, con revoca del precedente UID e conservazione di scheda/richieste/PDF.
 - [x] Sorgente locale: un numero WhatsApp può avere una sola barca attiva nell'evento; il secondo invito viene bloccato dopo l'attivazione.
 - [x] Sorgente locale: nessun PIN viene scritto in Firestore, Crew List o browser.
