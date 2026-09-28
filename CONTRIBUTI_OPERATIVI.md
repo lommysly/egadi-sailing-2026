@@ -1,14 +1,14 @@
 # Procedura contributi tra amici
 
-Questa procedura serve a raccogliere quote o spese condivise senza trasformare il sito in un sistema di pagamento. Il sito non riceve denaro, non crea o valida link di pagamento, non salva coordinate, carte o credenziali e non determina chi ha pagato.
+Questa procedura serve a raccogliere quote o spese condivise senza trasformare il sito in un sistema di pagamento. Il sito non riceve denaro e non conferma automaticamente gli accrediti. Salva soltanto i metodi e le istruzioni di incasso scelti dallo skipper, le richieste organizzative e lo stato verificato manualmente; non salva carte, password, OTP o credenziali dei provider.
 
 ## Flusso skipper
 
-1. Configura una volta il nome di chi riceve i contributi e abilita uno o più tag: PayPal, Satispay, Revolut, bonifico.
+1. Configura una volta il nome di chi riceve i contributi, abilita uno o più metodi — PayPal, Satispay, Revolut o bonifico — e salva i relativi dettagli. L'equipaggio della stessa barca vede nell'area riservata soltanto la copia ridotta dei metodi abilitati.
 2. Crea o seleziona l'invito personale della persona.
 3. Inserisci importo, causale, scadenza facoltativa, eventuale flag facoltativo e uno o più metodi tra quelli configurati.
-4. Aggiungi, solo nel campo del messaggio, eventuali link, alias o coordinate che scegli di condividere; quel testo non viene salvato nel sito.
-5. Premi “Crea richiesta e apri WhatsApp”, controlla il testo e invialo personalmente.
+4. Controlla i dettagli di incasso già salvati nel profilo: il messaggio WhatsApp e l'area riservata della persona usano gli stessi dati, senza creare una seconda copia modificabile nella richiesta.
+5. Premi “Crea richiesta e apri WhatsApp”, controlla il testo e invialo personalmente. WhatsApp è un promemoria: la persona può ritrovare le stesse istruzioni nella propria area riservata.
 6. La persona effettua il contributo fuori dal sito con il metodo scelto e avvisa lo skipper.
 7. Controlla l'accredito reale nell'app o nel conto del metodo scelto.
 8. Solo dopo quel controllo premi “Conferma accredito”. Per correggere una richiesta, annullala e creane una nuova.
@@ -28,6 +28,10 @@ Questa procedura serve a raccogliere quote o spese condivise senza trasformare i
 
 Non usare mai il click su un link, uno screenshot o una promessa di pagamento come prova dell'accredito. Se una quota cambia, annullare la richiesta e crearne una nuova invece di reinterpretare un pagamento già verificato.
 
+## Registro dei versamenti al charter
+
+Il registro `charterPayments` è separato dalle richieste all'equipaggio. Lo skipper vi annota acconto, saldo o altro versamento verso il charter, con importo, stato, date, metodo, riferimento e una nota breve. Soltanto gli stati `paid` e `confirmed` riducono il residuo; `planned` è un promemoria. Una riga errata va portata a `cancelled`: resta visibile ma non altera i totali. Il registro è leggibile solo dallo skipper della barca, non contiene coordinate o allegati del charter e non può essere cancellato dall'interfaccia; non inserirvi dati personali dell'equipaggio.
+
 ## Dati da non inserire
 
-Non inserire nel sito password, codici OTP, credenziali dei provider, dati di carte, IBAN completi, alias, link di pagamento o screenshot di movimenti. Nel sito restano soltanto nome di chi incassa e tag dei metodi; i dettagli sono una comunicazione WhatsApp diretta e non ricompaiono dopo un reload.
+Non inserire nel sito password, codici OTP, credenziali dei provider, dati di carte o screenshot di movimenti. IBAN, intestatario, link PayPal/Satispay e link o Revtag Revolut possono essere salvati soltanto nel profilo di incasso dedicato e vengono mostrati nell'area riservata ai partecipanti della stessa barca. Non copiarli nelle richieste, nel piano quote, nel preventivo o nel registro dei versamenti al charter.

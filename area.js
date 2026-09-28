@@ -275,6 +275,7 @@ let activeMembers = [];
 // questa è l'unica vista server-side pensata apposta per lui.
 let activeCrewTravelStatus = [];
 let activePayments = [];
+let activeCharterPayments = [];
 let googleSignInInProgress = false;
 const paymentPrivateMessageCache = new Map();
 let activeInvites = [];
@@ -295,6 +296,7 @@ let stopBoatSubscription = null;
 let stopMemberSubscription = null;
 let stopCrewTravelStatusSubscription = null;
 let stopPaymentSubscription = null;
+let stopCharterPaymentSubscription = null;
 let stopPaymentProfileSubscription = null;
 let stopContributionPlanSubscription = null;
 let stopCostPlanSubscription = null;
@@ -310,6 +312,7 @@ let creatingBoat = false;
 let editingBoatId = null;
 let editingMemberId = null;
 let editingProjectionId = null;
+let editingCharterPaymentId = null;
 // Una quota già comunicata non deve cambiare mentre si aggiorna il posto.
 // Questo stato apre invece, in modo esplicito, l'unico percorso che consente
 // di rivedere l'accordo economico della persona.
@@ -345,21 +348,23 @@ const fleetPublicationInProgress = new Set();
 let fleetAvailabilitySyncInProgress = false;
 const SKIPPER_DASHBOARD_HASHES = Object.freeze({
   overview: 'skipper-panorama',
-  crew: 'skipper-equipaggio',
-  profile: 'skipper-profilo',
-  travel: 'skipper-viaggio',
-  money: 'skipper-conti',
   boat: 'skipper-barca',
-  board: 'skipper-bacheca',
+  crew: 'skipper-equipaggio',
+  money: 'skipper-conti',
+  charter: 'skipper-charter',
+  operations: 'skipper-viaggio',
+});
+const SKIPPER_DASHBOARD_HASH_ALIASES = Object.freeze({
+  'skipper-profilo': 'charter',
+  'skipper-bacheca': 'operations',
 });
 const SKIPPER_DASHBOARD_LABELS = Object.freeze({
   overview: 'Panoramica',
-  crew: 'Equipaggio',
-  profile: 'Il tuo dossier',
-  travel: 'Arrivi e transfer',
-  money: 'Cassa skipper',
   boat: 'La barca',
-  board: 'Regole e avvisi',
+  crew: 'Equipaggio',
+  money: 'Conti',
+  charter: 'Charter e documenti',
+  operations: 'Viaggio e comunicazioni',
 });
 const BRIEFING_RULE_FIELDS = Object.freeze([
   'rulesTitle',
@@ -379,10 +384,13 @@ const BRIEFING_TRIP_FIELDS = Object.freeze([
 ]);
 const SKIPPER_FINANCE_VIEWS = Object.freeze({
   overview: 'overview',
+  plan: 'plan',
   setup: 'setup',
   request: 'request',
   review: 'review',
 });
+const CHARTER_PAYMENT_KINDS = new Set(['deposit', 'balance', 'other']);
+const CHARTER_PAYMENT_STATUSES = new Set(['planned', 'paid', 'confirmed', 'cancelled']);
 let skipperDashboardView = 'overview';
 let skipperDashboardInitialized = false;
 let skipperFinanceDashboardInitialized = false;
@@ -629,14 +637,16 @@ async function downloadSkipperDocumentCopy(documentKey, messageTarget = document
 function skipperDashboardViewFromHash() {
   const hash = window.location.hash.replace(/^#/, '');
   return Object.entries(SKIPPER_DASHBOARD_HASHES)
-    .find(([, value]) => value === hash)?.[0] || 'overview';
+    .find(([, value]) => value === hash)?.[0]
+    || SKIPPER_DASHBOARD_HASH_ALIASES[hash]
+    || 'overview';
 }
 
 function skipperDashboardIcon(kind) {
   const paths = {
     crew: '<path d="M8.5 11.25a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7 1.25a2.5 2.5 0 1 0 0-5"/><path d="M2.75 18.5a5.75 5.75 0 0 1 11.5 0M14.25 13.25a5 5 0 0 1 3 4.6"/>',
-    profile: '<circle cx="12" cy="8" r="3.25"/><path d="M5.25 20a6.75 6.75 0 0 1 13.5 0M17.5 4.5l1 1 1.75-1.75"/>',
-    travel: '<path d="m3 13 18-8-6.4 7.9L12 20l-1.55-6.15L3 13Z"/><path d="m10.45 13.85 4.15-.95"/>',
+    charter: '<circle cx="12" cy="8" r="3.25"/><path d="M5.25 20a6.75 6.75 0 0 1 13.5 0M17.5 4.5l1 1 1.75-1.75"/>',
+    operations: '<path d="m3 13 18-8-6.4 7.9L12 20l-1.55-6.15L3 13Z"/><path d="m10.45 13.85 4.15-.95"/>',
     money: '<rect x="3.5" y="5.25" width="17" height="13.5" rx="2"/><path d="M3.5 9.5h17M15.5 14.25h2.25"/>',
     boat: '<path d="M3 14.5h18l-2.25 4.25H5.25L3 14.5Z"/><path d="M12 3.5v11M12 4l5.25 7H12M11.75 6.25 7 11h4.75"/>',
     board: '<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4.5"/>',
@@ -672,7 +682,7 @@ function financeDashboardBackButton() {
   button.type = 'button';
   button.className = 'text-button finance-dashboard-back';
   button.dataset.financeView = SKIPPER_FINANCE_VIEWS.overview;
-  button.textContent = '← Cassa skipper';
+  button.textContent = '← Conti';
   return button;
 }
 
@@ -703,6 +713,218 @@ function createFinanceDashboardPanel({ view, eyebrow, title, lead }) {
   return { panel, content, titleTarget };
 }
 
+function charterPaymentKindLabel(kind) {
+  return ({ deposit: 'Acconto al charter', balance: 'Saldo al charter', other: 'Altro versamento al charter' })[kind] || 'Versamento al charter';
+}
+
+function charterPaymentStatusLabel(status) {
+  return ({ planned: 'Da versare', paid: 'Versato', confirmed: 'Ricevuto dal charter', cancelled: 'Annullato' })[status] || 'Da verificare';
+}
+
+function normalizeCharterPayment(id, payment = {}) {
+  return {
+    id,
+    amountCents: Number.isInteger(payment.amountCents) && payment.amountCents > 0 ? payment.amountCents : 0,
+    paymentKind: CHARTER_PAYMENT_KINDS.has(payment.paymentKind) ? payment.paymentKind : 'other',
+    status: CHARTER_PAYMENT_STATUSES.has(payment.status) ? payment.status : 'planned',
+    dueOn: /^\d{4}-\d{2}-\d{2}$/.test(String(payment.dueOn || '')) ? payment.dueOn : '',
+    paidOn: /^\d{4}-\d{2}-\d{2}$/.test(String(payment.paidOn || '')) ? payment.paidOn : '',
+    method: String(payment.method || '').trim().slice(0, 80),
+    reference: String(payment.reference || '').trim().slice(0, 160),
+    note: String(payment.note || '').trim().slice(0, 400),
+  };
+}
+
+function charterPaymentTotals() {
+  const charterCents = normalizeCostPlan(activeCostPlan).charterCents;
+  const paidCents = activeCharterPayments
+    .filter((payment) => payment.status === 'paid' || payment.status === 'confirmed')
+    .reduce((total, payment) => total + payment.amountCents, 0);
+  const plannedCents = activeCharterPayments
+    .filter((payment) => payment.status === 'planned')
+    .reduce((total, payment) => total + payment.amountCents, 0);
+  return {
+    charterCents,
+    paidCents,
+    plannedCents,
+    remainingCents: Math.max(0, charterCents - paidCents),
+    differenceCents: paidCents - charterCents,
+  };
+}
+
+function resetCharterPaymentForm() {
+  editingCharterPaymentId = null;
+  const form = document.querySelector('#charterPaymentForm');
+  if (!form) return;
+  form.reset();
+  form.elements.paymentKind.value = 'deposit';
+  form.elements.status.value = 'planned';
+  form.elements.paidOn.required = false;
+  const submitButton = form.querySelector('button[type="submit"]');
+  if (submitButton) submitButton.textContent = 'Registra versamento al charter';
+  const cancelButton = form.querySelector('[data-charter-payment-cancel]');
+  if (cancelButton) cancelButton.hidden = true;
+  setMessage(document.querySelector('#charterPaymentMessage'), '');
+}
+
+function renderCharterPayments() {
+  const summary = document.querySelector('#charterLedgerSummary');
+  const list = document.querySelector('#charterPaymentList');
+  if (!summary || !list) return;
+  const totals = charterPaymentTotals();
+  const residualDetail = !totals.charterCents
+    ? 'Inserisci prima il costo totale nel Preventivo.'
+    : totals.differenceCents > 0
+      ? `${formatCurrency(totals.differenceCents / 100)} versati oltre il costo registrato: controlla gli importi.`
+      : totals.remainingCents
+        ? 'Scende soltanto quando registri un versamento come pagato o confermato.'
+        : 'Il costo charter registrato risulta coperto.';
+  summary.innerHTML = `
+    <article><span>Costo charter</span><strong>${escapeHtml(totals.charterCents ? formatCurrency(totals.charterCents / 100) : 'Da definire')}</strong><small>È il totale salvato nel preventivo della barca.</small></article>
+    <article><span>Già versato al charter</span><strong>${escapeHtml(formatCurrency(totals.paidCents / 100))}</strong><small>Somma dei movimenti segnati come versati o confermati.</small></article>
+    <article><span>Resta da versare</span><strong>${escapeHtml(totals.charterCents ? formatCurrency(totals.remainingCents / 100) : 'Da calcolare')}</strong><small>${escapeHtml(residualDetail)}</small></article>
+    <article><span>Pagamenti pianificati</span><strong>${escapeHtml(formatCurrency(totals.plannedCents / 100))}</strong><small>Promemoria futuri: non riducono ancora il residuo.</small></article>
+  `;
+  if (!activeCharterPayments.length) {
+    list.innerHTML = '<p class="empty-state">Nessun versamento al charter registrato. Puoi inserire ora acconto, saldo o una scadenza futura.</p>';
+    return;
+  }
+  list.innerHTML = activeCharterPayments.map((payment) => {
+    const date = payment.paidOn || payment.dueOn;
+    const dateLabel = payment.paidOn ? 'Versato il' : payment.dueOn ? 'Scadenza' : '';
+    const details = [
+      payment.method,
+      payment.reference,
+      date && dateLabel ? `${dateLabel} ${formatDate(date)}` : '',
+    ].filter(Boolean).join(' · ');
+    return `<article class="charter-payment-card">
+      <div><span>${escapeHtml(charterPaymentKindLabel(payment.paymentKind))}</span><strong>${escapeHtml(formatCurrency(payment.amountCents / 100))}</strong><small>${escapeHtml(`${charterPaymentStatusLabel(payment.status)}${details ? ` · ${details}` : ''}`)}</small>${payment.note ? `<p>${escapeHtml(payment.note)}</p>` : ''}</div>
+      <div class="charter-payment-card-actions"><button type="button" class="text-button" data-charter-payment-edit="${escapeHtml(payment.id)}">Modifica</button></div>
+    </article>`;
+  }).join('');
+}
+
+function createCharterLedgerPanel() {
+  const existing = document.querySelector('#charterLedgerPanel');
+  if (existing) return existing;
+  const panel = document.createElement('section');
+  panel.id = 'charterLedgerPanel';
+  panel.className = 'charter-ledger-panel';
+  panel.innerHTML = `
+    <div class="charter-crew-workspace-heading"><div><p class="eyebrow">Uscite verso il charter</p><h5>Quanto hai già versato e quanto manca</h5></div><p>Questo registro è separato dai contributi ricevuti dall’equipaggio. Il costo totale resta quello del preventivo; qui annoti soltanto i movimenti reali verso il charter.</p></div>
+    <div id="charterLedgerSummary" class="charter-ledger-summary" aria-live="polite"></div>
+    <details class="skipper-cost-panel"><summary><span>Aggiungi o modifica un versamento</span><small>Acconto, saldo o scadenza</small></summary>
+      <form id="charterPaymentForm" class="compact-form charter-ledger-form">
+        <div class="form-grid">
+          <label>Importo · €<input name="amount" type="text" required inputmode="decimal" placeholder="Es. 1175,00" /></label>
+          <label>Tipo<select name="paymentKind" required><option value="deposit">Acconto al charter</option><option value="balance">Saldo al charter</option><option value="other">Altro versamento</option></select></label>
+          <label>Stato<select name="status" required><option value="planned">Da versare</option><option value="paid">Versato</option><option value="confirmed">Ricevuto dal charter</option><option value="cancelled">Annullato</option></select></label>
+          <label>Scadenza<input name="dueOn" type="date" /></label>
+          <label>Data del versamento<input name="paidOn" type="date" /></label>
+          <label>Metodo<input name="method" maxlength="80" placeholder="Es. bonifico" /></label>
+        </div>
+        <label>Riferimento / causale<input name="reference" maxlength="160" placeholder="Es. acconto Karibu · contratto 123" /></label>
+        <label>Nota privata<textarea name="note" maxlength="400" placeholder="Es. ricevuta inviata al charter"></textarea></label>
+        <div class="form-actions"><button class="button button-ghost" type="submit">Registra versamento al charter</button><button class="text-button" type="button" data-charter-payment-cancel hidden>Annulla modifica</button><p id="charterPaymentMessage" class="form-message" role="status" aria-live="polite"></p></div>
+      </form>
+    </details>
+    <div id="charterPaymentList" class="charter-payment-list" aria-live="polite"></div>
+  `;
+  const form = panel.querySelector('#charterPaymentForm');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = panel.querySelector('#charterPaymentMessage');
+    if (blockPrivateAction(message) || !activeBoat || !auth.currentUser) return;
+    const fields = new FormData(form);
+    const amountCents = parseEuroAmountCents(fields.get('amount'));
+    const paymentKind = String(fields.get('paymentKind') || '');
+    const status = String(fields.get('status') || '');
+    const dueOn = String(fields.get('dueOn') || '');
+    const paidOn = String(fields.get('paidOn') || '');
+    if (!Number.isInteger(amountCents) || amountCents < 1 || amountCents > 1_000_000) {
+      setMessage(message, 'Inserisci un importo maggiore di zero e non superiore a 10.000 €.', true);
+      return;
+    }
+    if (!CHARTER_PAYMENT_KINDS.has(paymentKind) || !CHARTER_PAYMENT_STATUSES.has(status)) {
+      setMessage(message, 'Controlla tipo e stato del versamento.', true);
+      return;
+    }
+    if ((status === 'paid' || status === 'confirmed') && !paidOn) {
+      setMessage(message, 'Indica la data del versamento prima di segnarlo come pagato.', true);
+      return;
+    }
+    if (status === 'planned' && paidOn) {
+      setMessage(message, 'Un pagamento ancora da versare non può avere una data di versamento.', true);
+      return;
+    }
+    const payload = {
+      amountCents,
+      paymentKind,
+      status,
+      dueOn,
+      paidOn,
+      method: String(fields.get('method') || '').trim().slice(0, 80),
+      reference: String(fields.get('reference') || '').trim().slice(0, 160),
+      note: String(fields.get('note') || '').trim().slice(0, 400),
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser.uid,
+    };
+    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    try {
+      const payments = collection(db, 'boats', activeBoat.id, 'charterPayments');
+      let successMessage = '';
+      if (editingCharterPaymentId) {
+        await updateDoc(doc(payments, editingCharterPaymentId), payload);
+        successMessage = 'Versamento al charter aggiornato.';
+      } else {
+        await addDoc(payments, {
+          ...payload,
+          createdAt: serverTimestamp(),
+          createdBy: auth.currentUser.uid,
+        });
+        successMessage = 'Versamento al charter registrato.';
+      }
+      resetCharterPaymentForm();
+      setMessage(message, successMessage);
+    } catch (error) {
+      setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a salvare questo versamento al charter.'), true);
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+  form.elements.status.addEventListener('change', () => {
+    const paidStatus = form.elements.status.value === 'paid' || form.elements.status.value === 'confirmed';
+    form.elements.paidOn.required = paidStatus;
+    if (form.elements.status.value === 'planned') form.elements.paidOn.value = '';
+  });
+  panel.addEventListener('click', (event) => {
+    if (event.target.closest('[data-charter-payment-cancel]')) {
+      resetCharterPaymentForm();
+      return;
+    }
+    const editButton = event.target.closest('[data-charter-payment-edit]');
+    if (!editButton) return;
+    const payment = activeCharterPayments.find((candidate) => candidate.id === editButton.dataset.charterPaymentEdit);
+    if (!payment) return;
+    editingCharterPaymentId = payment.id;
+    form.elements.amount.value = euroInputValue(payment.amountCents);
+    form.elements.paymentKind.value = payment.paymentKind;
+    form.elements.status.value = payment.status;
+    form.elements.dueOn.value = payment.dueOn;
+    form.elements.paidOn.value = payment.paidOn;
+    form.elements.method.value = payment.method;
+    form.elements.reference.value = payment.reference;
+    form.elements.note.value = payment.note;
+    form.elements.paidOn.required = payment.status === 'paid' || payment.status === 'confirmed';
+    form.querySelector('button[type="submit"]').textContent = 'Aggiorna versamento al charter';
+    form.querySelector('[data-charter-payment-cancel]').hidden = false;
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  renderCharterPayments();
+  return panel;
+}
+
 function setupSkipperFinanceDashboard() {
   if (skipperFinanceDashboardInitialized) return;
   const moneyPanel = document.querySelector('#paymentProfileForm')?.closest('.dashboard-panel');
@@ -710,18 +932,15 @@ function setupSkipperFinanceDashboard() {
   const skipperRecoverableCostPanel = document.querySelector('#skipperRecoverableCostPanel');
   const paymentForm = document.querySelector('#paymentForm');
   const paymentList = document.querySelector('#paymentList');
-  if (!moneyPanel || !paymentProfileForm || !paymentForm || !paymentList) return;
-
-  const initialChildren = Array.from(moneyPanel.children);
-  const paymentProfileIndex = initialChildren.indexOf(paymentProfileForm);
-  const paymentFormIndex = initialChildren.indexOf(paymentForm);
-  const profileIntro = initialChildren.slice(0, paymentProfileIndex);
-  const requestIntro = initialChildren.slice(paymentProfileIndex + 1, paymentFormIndex);
+  const financeOverview = document.querySelector('#skipperFinanceOverview');
+  const costPlanPanel = document.querySelector('#costPlanPanel');
+  const contributionCatalogPanel = document.querySelector('#contributionCatalogPanel');
+  if (!moneyPanel || !paymentProfileForm || !paymentForm || !paymentList || !financeOverview || !costPlanPanel || !contributionCatalogPanel) return;
 
   const financeDashboard = document.createElement('section');
   financeDashboard.id = 'skipperFinanceDashboard';
   financeDashboard.className = 'skipper-finance-dashboard-shell';
-  financeDashboard.setAttribute('aria-label', 'Cassa skipper');
+  financeDashboard.setAttribute('aria-label', 'Conti della barca');
 
   const overviewPanel = document.createElement('section');
   overviewPanel.id = 'skipperFinancePanel-overview';
@@ -732,22 +951,28 @@ function setupSkipperFinanceDashboard() {
   overviewHeading.className = 'finance-dashboard-panel-heading';
   const overviewEyebrow = document.createElement('p');
   overviewEyebrow.className = 'eyebrow';
-  overviewEyebrow.textContent = 'Cassa privata dello skipper';
+  overviewEyebrow.textContent = 'Conti della barca';
   const overviewTitle = document.createElement('h4');
-  overviewTitle.textContent = 'La cassa skipper, un passaggio alla volta.';
+  overviewTitle.textContent = 'Entrate e uscite, senza confonderle.';
   const overviewLead = document.createElement('p');
   overviewLead.className = 'panel-lead';
-  overviewLead.textContent = 'Qui scegli i metodi di incasso, prepari messaggi personali e segni i contributi che hai verificato. Preventivo e quote restano nella sezione La barca.';
+  overviewLead.textContent = 'Prima definisci il preventivo e i pagamenti al charter; poi imposti i metodi, prepari le richieste e controlli soltanto gli accrediti realmente ricevuti.';
   overviewHeading.append(overviewEyebrow, overviewTitle, overviewLead);
 
   const hub = document.createElement('div');
   hub.className = 'dashboard-hub finance-dashboard-hub';
-  hub.setAttribute('aria-label', 'Azioni della cassa skipper');
+  hub.setAttribute('aria-label', 'Azioni dei conti della barca');
   hub.append(
     financeDashboardCard({
+      view: SKIPPER_FINANCE_VIEWS.plan,
+      title: 'Preventivo',
+      detail: 'Quote, spese e versamenti reali al charter.',
+      icon: 'review',
+    }),
+    financeDashboardCard({
       view: SKIPPER_FINANCE_VIEWS.setup,
-      title: 'Imposta',
-      detail: 'Costi skipper e metodi privati di incasso.',
+      title: 'Metodi',
+      detail: 'Coordinate private con cui ricevere le quote.',
       icon: 'setup',
     }),
     financeDashboardCard({
@@ -765,34 +990,39 @@ function setupSkipperFinanceDashboard() {
   );
   overviewPanel.append(overviewHeading, hub);
 
+  const planPanel = createFinanceDashboardPanel({
+    view: SKIPPER_FINANCE_VIEWS.plan,
+    eyebrow: '1 · Preventivo e uscite',
+    title: 'Quanto costa la barca e quanto hai già versato',
+    lead: 'Qui definisci le quote da dividere, gli extra e i costi dello skipper. Subito sotto registri separatamente acconti e saldi già inviati al charter.',
+  });
   const setupPanel = createFinanceDashboardPanel({
     view: SKIPPER_FINANCE_VIEWS.setup,
-    eyebrow: '1 · Imposta',
-    title: 'Costi skipper e metodi di incasso',
-    lead: 'Qui tieni le tue trasferte e i metodi con cui ricevere i contributi. L’equipaggio non vede questi dettagli; preventivo e quote restano nella sezione La barca.',
+    eyebrow: '2 · Metodi',
+    title: 'Come ricevere le quote',
+    lead: 'Salva una volta i metodi che vuoi proporre. L’equipaggio vede soltanto quelli attivi nella propria area; il sito non riceve denaro.',
   });
   const requestPanel = createFinanceDashboardPanel({
     view: SKIPPER_FINANCE_VIEWS.request,
-    eyebrow: '2 · Richiedi',
+    eyebrow: '3 · Richiedi',
     title: 'Prepara una richiesta',
     lead: 'Scegli persona, importo, causale e metodo. WhatsApp apre il messaggio già pronto; il pagamento resta fuori dal sito.',
   });
   const reviewPanel = createFinanceDashboardPanel({
     view: SKIPPER_FINANCE_VIEWS.review,
-    eyebrow: '3 · Controlla',
+    eyebrow: '4 · Controlla',
     title: 'Segui richieste e accrediti',
     lead: 'Rivedi richieste e accrediti. Il preventivo della barca resta separato: qui una richiesta non diventa mai un incasso finché non la verifichi davvero.',
   });
 
-  const profileLead = profileIntro.find((element) => element.classList.contains('panel-lead'));
-  const requestLead = requestIntro.find((element) => element.classList.contains('panel-lead'));
-  profileIntro.filter((element) => element !== profileLead).forEach((element) => element.remove());
-  requestIntro
-    .filter((element) => element !== requestLead && element !== skipperRecoverableCostPanel)
-    .forEach((element) => element.remove());
-  if (profileLead) setupPanel.content.append(profileLead);
-  setupPanel.content.append(paymentProfileForm, ...(skipperRecoverableCostPanel ? [skipperRecoverableCostPanel] : []));
-  if (requestLead) requestPanel.content.append(requestLead);
+  planPanel.content.append(
+    financeOverview,
+    costPlanPanel,
+    ...(skipperRecoverableCostPanel ? [skipperRecoverableCostPanel] : []),
+    contributionCatalogPanel,
+    createCharterLedgerPanel(),
+  );
+  setupPanel.content.append(paymentProfileForm);
   requestPanel.content.append(paymentForm);
   const cashOverview = document.createElement('section');
   cashOverview.id = 'skipperCashOverview';
@@ -804,11 +1034,8 @@ function setupSkipperFinanceDashboard() {
   reviewMessage.setAttribute('role', 'status');
   reviewMessage.setAttribute('aria-live', 'polite');
   reviewPanel.content.append(cashOverview, reviewMessage, paymentList);
-  Array.from(moneyPanel.children)
-    .filter((element) => element.classList.contains('board-divider'))
-    .forEach((element) => element.remove());
-
-  financeDashboard.append(overviewPanel, setupPanel.panel, requestPanel.panel, reviewPanel.panel);
+  Array.from(moneyPanel.children).forEach((element) => element.remove());
+  financeDashboard.append(overviewPanel, planPanel.panel, setupPanel.panel, requestPanel.panel, reviewPanel.panel);
   moneyPanel.append(financeDashboard);
 
   financeDashboard.addEventListener('click', (event) => {
@@ -843,6 +1070,26 @@ function setSkipperFinanceDashboardView(nextView, { focus = false } = {}) {
   }
 }
 
+function setupCharterCrewWorkspace(crewPanel, charterPanel) {
+  if (!crewPanel || !charterPanel || document.querySelector('#charterCrewWorkspace')) return;
+  const manualEntry = crewPanel.querySelector('details.manual-entry');
+  const combinedSummary = crewPanel.querySelector('details.invite-and-charter-summary');
+  const charterExport = combinedSummary?.querySelector('.charter-export');
+  const memberList = combinedSummary?.querySelector('#memberList');
+  const combinedSummaryLabel = combinedSummary?.querySelector(':scope > summary');
+  if (!manualEntry || !combinedSummary || !charterExport || !memberList) return;
+
+  if (combinedSummaryLabel) combinedSummaryLabel.textContent = '2 · Inviti personali';
+  const workspace = document.createElement('section');
+  workspace.id = 'charterCrewWorkspace';
+  workspace.className = 'charter-crew-workspace';
+  const heading = document.createElement('div');
+  heading.className = 'charter-crew-workspace-heading';
+  heading.innerHTML = '<div><p class="eyebrow">Crew List</p><h4>Elenco equipaggio e PDF per il charter</h4></div><p>Qui controlli le anagrafiche confermate, completi soltanto le eccezioni manuali e generi il foglio da consegnare insieme al dossier skipper.</p>';
+  workspace.append(heading, charterExport, memberList, manualEntry);
+  charterPanel.append(workspace);
+}
+
 function setupSkipperDashboard() {
   if (skipperDashboardInitialized) return;
   const grid = dashboard?.querySelector('.dashboard-grid');
@@ -856,14 +1103,18 @@ function setupSkipperDashboard() {
   const costPlanPanel = document.querySelector('#costPlanPanel');
   const contributionCatalogPanel = document.querySelector('#contributionCatalogPanel');
   const boardPanel = document.querySelector('#briefingForm')?.closest('.dashboard-panel');
-  if (!dashboard || !grid || !crewPanel || !profilePanel || !travelPanel || !moneyPanel || !boatPanel || !boatQuoteMount || !financeOverview || !costPlanPanel || !contributionCatalogPanel || !boardPanel) return;
+  const crewTravelOverview = document.querySelector('#crewTravelOverview');
+  if (!dashboard || !grid || !crewPanel || !profilePanel || !travelPanel || !moneyPanel || !boatPanel || !financeOverview || !costPlanPanel || !contributionCatalogPanel || !boardPanel) return;
 
   crewPanel.dataset.skipperPanel = 'crew';
-  profilePanel.dataset.skipperPanel = 'profile';
-  travelPanel.dataset.skipperPanel = 'travel';
+  profilePanel.dataset.skipperPanel = 'charter';
+  travelPanel.dataset.skipperPanel = 'operations';
   moneyPanel.dataset.skipperPanel = 'money';
   boatPanel.dataset.skipperPanel = 'boat';
-  boardPanel.dataset.skipperPanel = 'board';
+  boardPanel.dataset.skipperPanel = 'operations';
+
+  setupCharterCrewWorkspace(crewPanel, profilePanel);
+  if (crewTravelOverview) travelPanel.append(crewTravelOverview);
 
   const overview = document.createElement('section');
   overview.id = 'skipperDashboardOverview';
@@ -875,38 +1126,33 @@ function setupSkipperDashboard() {
         <p class="eyebrow">Area skipper</p>
         <h3>Gestisci il viaggio,<br /><em>una cosa alla volta.</em></h3>
       </div>
-      <p>Equipaggio e cassa skipper da una parte; barca, quote e flotta dall’altra. Apri soltanto l’area che ti serve.</p>
+      <p>Scafo, persone, conti, documenti e viaggio sono separati. Apri soltanto l’area che ti serve: ogni scheda ti dice cosa è pronto e cosa manca.</p>
     </div>
     <div class="dashboard-hub" aria-label="Aree skipper">
       <button class="dashboard-hub-card dashboard-hub-card-boat" type="button" data-skipper-view="boat">
         <span class="dashboard-hub-status" data-skipper-status="boat" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('boat')}</span><span class="dashboard-hub-label">La barca</span>
-        <strong data-skipper-summary="boat">Carico la barca…</strong><small data-skipper-detail="boat">Dati barca, posti, quote e Starter Pack.</small>
+        <strong data-skipper-summary="boat">Carico la barca…</strong><small data-skipper-detail="boat">Scafo, posti letto, bagni e visibilità in flotta.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-crew" type="button" data-skipper-view="crew">
         <span class="dashboard-hub-status" data-skipper-status="crew" aria-label="Da completare" hidden>!</span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('crew')}</span><span class="dashboard-hub-label">Equipaggio</span>
-        <strong data-skipper-summary="crew">Carico i posti…</strong><small data-skipper-detail="crew">Inviti, elenco per il charter e PDF.</small>
+        <strong data-skipper-summary="crew">Carico i posti…</strong><small data-skipper-detail="crew">Piano persone, ruoli, cabine e inviti.</small>
       </button>
       <button class="dashboard-hub-card dashboard-hub-card-money" type="button" data-skipper-view="money">
         <span class="dashboard-hub-status" data-skipper-status="money" aria-label="Da completare" hidden>!</span>
-        <span class="dashboard-hub-icon">${skipperDashboardIcon('money')}</span><span class="dashboard-hub-label">Cassa skipper</span>
-        <strong data-skipper-summary="money">Carico la cassa…</strong><small data-skipper-detail="money">Metodi, richieste e accrediti verificati.</small>
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('money')}</span><span class="dashboard-hub-label">Conti</span>
+        <strong data-skipper-summary="money">Carico i conti…</strong><small data-skipper-detail="money">Preventivo, entrate equipaggio e uscite verso il charter.</small>
       </button>
-      <button class="dashboard-hub-card dashboard-hub-card-profile" type="button" data-skipper-view="profile">
-        <span class="dashboard-hub-status" data-skipper-status="profile" aria-label="Da completare" hidden>!</span>
-        <span class="dashboard-hub-icon">${skipperDashboardIcon('profile')}</span><span class="dashboard-hub-label">Il tuo dossier</span>
-        <strong data-skipper-summary="profile">Carico i tuoi documenti…</strong><small data-skipper-detail="profile">Anagrafica, patente e certificato radio.</small>
+      <button class="dashboard-hub-card dashboard-hub-card-charter" type="button" data-skipper-view="charter">
+        <span class="dashboard-hub-status" data-skipper-status="charter" aria-label="Da completare" hidden>!</span>
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('charter')}</span><span class="dashboard-hub-label">Charter e documenti</span>
+        <strong data-skipper-summary="charter">Carico dossier e Crew List…</strong><small data-skipper-detail="charter">Documenti skipper, anagrafiche equipaggio e PDF.</small>
       </button>
-      <button class="dashboard-hub-card dashboard-hub-card-travel" type="button" data-skipper-view="travel">
-        <span class="dashboard-hub-status" data-skipper-status="travel" aria-label="Da completare" hidden>!</span>
-        <span class="dashboard-hub-icon">${skipperDashboardIcon('travel')}</span><span class="dashboard-hub-label">Arrivi e transfer</span>
-        <strong data-skipper-summary="travel">Carico i tuoi spostamenti…</strong><small data-skipper-detail="travel">Andata, ritorno e richiesta transfer privata.</small>
-      </button>
-      <button class="dashboard-hub-card dashboard-hub-card-board" type="button" data-skipper-view="board">
-        <span class="dashboard-hub-status" data-skipper-status="board" aria-label="Da completare" hidden>!</span>
-        <span class="dashboard-hub-icon">${skipperDashboardIcon('board')}</span><span class="dashboard-hub-label">Regole e bacheca</span>
-        <strong data-skipper-summary="board">Carico le regole…</strong><small data-skipper-detail="board">Sicurezza, orari e comunicazioni.</small>
+      <button class="dashboard-hub-card dashboard-hub-card-operations" type="button" data-skipper-view="operations">
+        <span class="dashboard-hub-status" data-skipper-status="operations" aria-label="Da completare" hidden>!</span>
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('operations')}</span><span class="dashboard-hub-label">Viaggio e comunicazioni</span>
+        <strong data-skipper-summary="operations">Carico viaggio e regole…</strong><small data-skipper-detail="operations">Transfer, regole di bordo, orari e bacheca.</small>
       </button>
       <a id="skipperTransferHubCard" class="dashboard-hub-card dashboard-hub-card-transfer" href="transfer.html" hidden>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('transfer')}</span><span class="dashboard-hub-label">Area transfer</span>
@@ -925,7 +1171,7 @@ function setupSkipperDashboard() {
     .join('') + '<a id="skipperTransferNavLink" href="transfer.html" hidden>Area transfer</a>';
 
   grid.before(overview, navigation);
-  boatQuoteMount.append(financeOverview, costPlanPanel, contributionCatalogPanel);
+  if (boatQuoteMount) boatQuoteMount.hidden = true;
   setupSkipperFinanceDashboard();
   dashboard.addEventListener('click', (event) => {
     const button = event.target.closest('[data-skipper-view]');
@@ -1093,66 +1339,87 @@ function renderSkipperDashboardOverview() {
   // solo activeMembers.length gonfiava "schede completate" con chi aveva
   // salvato dati parziali (stesso bug di projectionStatusLabel sopra).
   const completedProfiles = activeMembers.filter((member) => isCharterReady(member)).length;
+  const incompleteProfiles = activeMembers.length - completedProfiles;
   const projectedCrew = activeProjections.length;
   setSkipperDashboardMetric(
     'crew',
     capacity ? `${allocated} di ${capacity} posti` : 'Posti da configurare',
-    `${completedProfiles} schede completate · ${pendingInvites} link pronti · ${projectedCrew} proiezioni`,
+    `${projectedCrew} persone pianificate · ${pendingInvites} link pronti · ${completedProfiles} anagrafiche complete`,
     !capacity,
   );
 
   const skipperProfileReady = isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies);
   const skipperProfileMissing = getMissingSkipperProfileFields(activeSkipperProfile, activeSkipperDocumentCopies);
-  setSkipperDashboardMetric(
-    'profile',
-    skipperProfileReady ? 'Dossier pronto' : 'Dossier da completare',
+  const boatPdfReady = isBoatReadyForPdf(activeBoat);
+  const charterOverCapacity = Boolean(activeBoat && activeMembers.length > crewSeatLimit());
+  const charterPackageReady = Boolean(
     skipperProfileReady
-      ? 'Anagrafica, abilitazioni e copie private aggiornate.'
-      : `${skipperProfileMissing.length} ${skipperProfileMissing.length === 1 ? 'voce da controllare' : 'voci da controllare'} per il charter.`,
-    !skipperProfileReady,
+    && boatPdfReady
+    && activeMembers.length
+    && !incompleteProfiles
+    && !charterOverCapacity,
+  );
+  const charterDetail = !skipperProfileReady
+    ? `${skipperProfileMissing.length} ${skipperProfileMissing.length === 1 ? 'voce da controllare' : 'voci da controllare'} nel dossier skipper · ${completedProfiles} anagrafiche equipaggio complete.`
+    : !boatPdfReady
+      ? 'Completa bandiera e comandante della barca prima di generare il PDF.'
+      : charterOverCapacity
+        ? `La Crew List supera i ${crewSeatLimit()} posti partecipanti configurati.`
+        : !activeMembers.length
+          ? 'Nessuna anagrafica equipaggio completa: il PDF resta in attesa.'
+          : incompleteProfiles
+            ? `${completedProfiles} anagrafiche complete · ${incompleteProfiles} ${incompleteProfiles === 1 ? 'da completare' : 'da completare'} prima del PDF.`
+            : `${completedProfiles} anagrafiche equipaggio complete · PDF pronto.`;
+  setSkipperDashboardMetric(
+    'charter',
+    charterPackageReady ? 'Dossier e Crew List pronti' : 'Dossier o Crew List da completare',
+    charterDetail,
+    !charterPackageReady,
   );
 
   const travelSummary = skipperTravelDashboardSummary();
-  setSkipperDashboardMetric('travel', travelSummary.value, travelSummary.detail, travelSummary.needsAttention);
+  const currentAcceptanceCount = currentBriefingAcceptanceCount();
+  const boardRulesActive = Boolean(activeBriefing?.rulesText);
+  const crewTravelPendingCount = activeMembers.filter((member) => {
+    const status = crewTravelStatusFor(member.id);
+    return ['outbound', 'return'].some((direction) => CREW_TRAVEL_NEEDS_REMINDER.has(crewTravelLegState(status, direction)));
+  }).length;
+  const operationsNeedAttention = travelSummary.needsAttention || !boardRulesActive || crewTravelPendingCount > 0;
+  setSkipperDashboardMetric(
+    'operations',
+    !travelSummary.needsAttention && boardRulesActive && crewTravelPendingCount
+      ? `${crewTravelPendingCount} ${crewTravelPendingCount === 1 ? 'persona da sollecitare' : 'persone da sollecitare'}`
+      : operationsNeedAttention ? 'Da completare' : 'Viaggio impostato',
+    `${travelSummary.detail} · ${crewTravelPendingCount ? `${crewTravelPendingCount} ${crewTravelPendingCount === 1 ? 'persona deve completare il viaggio' : 'persone devono completare il viaggio'}` : 'equipaggio aggiornato'} · ${boardRulesActive ? 'regole attive' : 'regole da attivare'} · ${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} avvisi`,
+    operationsNeedAttention,
+  );
 
   const costPlan = normalizeCostPlan(activeCostPlan);
   const costModel = activeCostPlan ? costPlanQuoteModel(costPlan) : null;
   const pricingMessage = costModel ? automaticCostPlanPricingMessage(costModel) : '';
   const automaticPricingReady = Boolean(costModel && !pricingMessage);
-  const targetCents = automaticPricingReady ? costModel.berthRecoveryCents : 0;
   const cashTotals = paymentTotalsForDashboard(paymentAmountCents);
   const pendingPayments = activePayments.filter(isPendingPayment).length;
   const collectionMethods = availablePaymentMethods().length;
   const skipperRecoverableCents = costPlan.skipperFlightTrainCents + costPlan.skipperCarCents + costPlan.skipperLocalTransferCents;
+  const charterTotals = charterPaymentTotals();
   setSkipperDashboardMetric(
     'money',
-    collectionMethods ? `${pendingPayments} richieste da verificare` : 'Metodi da configurare',
-    `${collectionMethods} metodi attivi · costi skipper ${formatCurrency(skipperRecoverableCents / 100)} · ${formatCurrency(cashTotals.verifiedCents / 100)} verificati.`,
-    !collectionMethods,
+    automaticPricingReady ? `${formatCurrency(cashTotals.verifiedCents / 100)} ricevuti` : 'Preventivo da completare',
+    `${pendingPayments} richieste da verificare · ${formatCurrency(charterTotals.paidCents / 100)} versati al charter · ${charterTotals.charterCents ? `${formatCurrency(charterTotals.remainingCents / 100)} da versare` : 'costo charter da definire'} · costi skipper ${formatCurrency(skipperRecoverableCents / 100)}.`,
+    !automaticPricingReady || !collectionMethods,
   );
 
   const totalBerths = declaredTotalBerths(activeBoat);
+  const bathroomCount = normalizeBerthLayout(activeBoat?.berthLayout).bathroomCount;
   const fleetVisibility = activeBoat?.fleetShowAvailability === false
     ? 'Posti liberi privati nella flotta.'
     : 'Partecipazione e posti liberi pubblicati nella flotta.';
   setSkipperDashboardMetric(
     'boat',
-    automaticPricingReady
-      ? `${formatCurrency(targetCents / 100)} quote posto da recuperare`
-      : totalBerths ? 'Completa il preventivo' : 'Configura la barca',
-    automaticPricingReady
-      ? `${totalBerths} posti totali · quota cabina ${formatCurrency(costModel.standardBerthCents / 100)} · ${fleetVisibility}`
-      : `${effectiveParticipantCapacity(activeBoat)} posti per partecipanti · ${pricingMessage || fleetVisibility}`,
-    !automaticPricingReady,
-  );
-
-  const currentAcceptanceCount = currentBriefingAcceptanceCount();
-  const boardRulesActive = Boolean(activeBriefing?.rulesText);
-  setSkipperDashboardMetric(
-    'board',
-    boardRulesActive ? 'Regole attive' : 'Regole da attivare',
-    `${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} comunicazioni pubblicate`,
-    !boardRulesActive,
+    activeBoat?.name ? `${activeBoat.name} · ${activeBoat.model}` : 'Configura la barca',
+    `${totalBerths || 0} posti totali · ${bathroomCount || 0} bagni · ${effectiveParticipantCapacity(activeBoat)} posti partecipanti · ${fleetVisibility}`,
+    !totalBerths || !bathroomCount,
   );
   scheduleSkipperChecklistDialogCheck();
 
@@ -1161,26 +1428,42 @@ function renderSkipperDashboardOverview() {
   const nextActionText = document.querySelector('#skipperNextActionText');
   const nextActionButton = document.querySelector('#skipperNextActionButton');
   if (!nextActionText || !nextActionButton) return;
-  if (!skipperProfileReady) {
+  if (!totalBerths || !bathroomCount) {
+    nextActionText.textContent = 'Controlla prima la scheda della barca: posti letto e bagni devono descrivere lo scafo reale.';
+    nextActionButton.textContent = 'Apri la barca';
+    nextActionButton.dataset.skipperView = 'boat';
+  } else if (!skipperProfileReady) {
     nextActionText.textContent = 'Completa prima il tuo dossier charter: dati, abilitazioni e le due copie private richieste devono essere pronti.';
-    nextActionButton.textContent = 'Apri il mio dossier';
-    nextActionButton.dataset.skipperView = 'profile';
+    nextActionButton.textContent = 'Apri charter e documenti';
+    nextActionButton.dataset.skipperView = 'charter';
   } else if (!boardRulesActive) {
     nextActionText.textContent = 'Attiva prima le regole di bordo: è il passaggio che permette all’equipaggio di leggere e confermare il patto della barca.';
     nextActionButton.textContent = 'Apri le regole';
-    nextActionButton.dataset.skipperView = 'board';
+    nextActionButton.dataset.skipperView = 'operations';
   } else if (!automaticPricingReady) {
-    nextActionText.textContent = 'Completa prima il preventivo della barca: costi, quote e Starter Pack devono essere chiari prima delle richieste personali.';
+    nextActionText.textContent = 'Completa il preventivo: costi, quote e Starter Pack devono essere chiari prima delle richieste personali.';
     nextActionButton.textContent = 'Apri preventivo';
-    nextActionButton.dataset.skipperView = 'boat';
+    nextActionButton.dataset.skipperView = 'money';
   } else if (!collectionMethods) {
     nextActionText.textContent = 'Configura almeno un metodo di incasso prima di creare richieste personali.';
-    nextActionButton.textContent = 'Apri la cassa';
+    nextActionButton.textContent = 'Apri i metodi';
     nextActionButton.dataset.skipperView = 'money';
   } else if (!allocated) {
     nextActionText.textContent = 'La barca è configurata. Ora puoi riservare il primo posto.';
     nextActionButton.textContent = 'Invita una persona';
     nextActionButton.dataset.skipperView = 'crew';
+  } else if (!activeMembers.length) {
+    nextActionText.textContent = 'I posti sono riservati, ma nessuna anagrafica equipaggio è ancora completa. Controlla inviti e accessi.';
+    nextActionButton.textContent = 'Controlla equipaggio';
+    nextActionButton.dataset.skipperView = 'crew';
+  } else if (charterOverCapacity) {
+    nextActionText.textContent = 'La Crew List supera la capienza partecipanti: correggi prima i posti della barca.';
+    nextActionButton.textContent = 'Controlla la barca';
+    nextActionButton.dataset.skipperView = 'boat';
+  } else if (incompleteProfiles) {
+    nextActionText.textContent = `${incompleteProfiles} ${incompleteProfiles === 1 ? 'anagrafica deve' : 'anagrafiche devono'} essere completata prima del PDF per il charter.`;
+    nextActionButton.textContent = 'Controlla Crew List';
+    nextActionButton.dataset.skipperView = 'charter';
   } else {
     nextActionText.textContent = 'Tutto è aggiornato. Scegli cosa vuoi fare adesso.';
     nextActionButton.textContent = 'Gestisci equipaggio';
@@ -1419,14 +1702,14 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
     ? financeAllocationText(insuranceTargetCents, projectedInsuranceCents, insurancePayments.requestedCents, insurancePayments.verifiedCents, { hasTarget: true })
     : 'Nessuna assicurazione cauzione è stata aggiunta al preventivo.';
   overview.innerHTML = `
-    <div class="finance-overview-heading"><p class="eyebrow">Preventivo della barca</p><p>Qui gli importi sono totali, tranne la quota cabina che è per persona. Le richieste personali e gli accrediti si controllano nella <strong>Cassa skipper</strong>. Una richiesta WhatsApp non è un incasso: il residuo scende soltanto dopo la verifica manuale.</p></div>
+    <div class="finance-overview-heading"><p class="eyebrow">Preventivo della barca</p><p>Qui gli importi sono totali, tranne la quota cabina che è per persona. Richieste, accrediti dell’equipaggio e versamenti al charter restano nella stessa sezione <strong>Conti</strong>, ma in riquadri distinti. Una richiesta WhatsApp non è un incasso.</p></div>
     <div class="finance-overview-grid">
       <article class="finance-overview-card"><span>Quote da organizzare · totale</span><strong>${escapeHtml(automaticPricingReady ? formatCurrency(totalContributionTargetCents / 100) : 'Da completare')}</strong><small>${escapeHtml(coverageDetail)}</small></article>
       <article class="finance-overview-card"><span>Quote posto da richiedere · totale</span><strong>${escapeHtml(automaticPricingReady ? formatCurrency(onlineRecoveryTargetCents / 100) : 'Da completare')}</strong><small>${escapeHtml(`${onlineRecoveryDetail} Costi reali attraverso i posti: ${formatCurrency(berthCostTargetCents / 100)}.`)}</small></article>
       <article class="finance-overview-card"><span>Posto cabina standard · persona</span><strong>${escapeHtml(breakEven)}</strong><small>${escapeHtml(breakEvenDetail)}</small></article>
       <article class="finance-overview-card finance-overview-card-extras"><span>${escapeHtml(starterTitle)}</span><strong>${escapeHtml(starterValue)}</strong><small>${escapeHtml(starterDetail)}</small></article>
       <article class="finance-overview-card finance-overview-card-extras"><span>Assicurazione cauzione · totale</span><strong>${escapeHtml(insuranceValue)}</strong><small>${escapeHtml(insuranceDetail)}</small></article>
-      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile · totale cash</span><strong>${escapeHtml(hasPlan ? formatCurrency(depositTargetCents / 100) : 'Da definire')}</strong><small>${escapeHtml(financeAllocationText(depositTargetCents, projectedDepositCashCents, 0, 0, { cash: true, hasTarget: hasPlan }))} <a class="rules-reference-link" href="#skipper-bacheca">Leggi la regola sulla cauzione</a></small></article>
+      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile · totale cash</span><strong>${escapeHtml(hasPlan ? formatCurrency(depositTargetCents / 100) : 'Da definire')}</strong><small>${escapeHtml(financeAllocationText(depositTargetCents, projectedDepositCashCents, 0, 0, { cash: true, hasTarget: hasPlan }))} <a class="rules-reference-link" href="#skipper-viaggio">Leggi la regola sulla cauzione</a></small></article>
     </div>
   `;
 }
@@ -1441,9 +1724,9 @@ function renderSkipperCashOverview() {
   const verifiedPayments = activePayments.filter((payment) => payment.status === 'verified').length;
   const collectionMethods = availablePaymentMethods().length;
   overview.innerHTML = `
-    <div class="finance-overview-heading"><p class="eyebrow">Cassa skipper</p><p>I totali qui sotto sommano tutto il movimento della barca: le tue richieste personali, gli acconti equipaggio registrati in «La barca» e le segnalazioni spontanee. Il preventivo — quanto costa a testa — resta nella sezione <strong>La barca</strong>.</p></div>
+    <div class="finance-overview-heading"><p class="eyebrow">Contributi dell’equipaggio</p><p>I totali qui sotto riguardano soltanto richieste e accrediti delle persone. Non comprendono i versamenti fatti al charter, che trovi in “Preventivo”, né una richiesta diventa incasso finché non la verifichi.</p></div>
     <div class="finance-overview-grid skipper-cash-overview-grid">
-      <article class="finance-overview-card"><span>Costi skipper da recuperare</span><strong>${escapeHtml(formatCurrency(skipperRecoverableCents / 100))}</strong><small>${escapeHtml(skipperRecoverableCents ? 'Volo o treno, auto e transfer locali: al salvataggio incidono sulle quote nella sezione La barca.' : 'Se li vuoi ripartire, inserisci qui volo o treno, auto e transfer locali.')}</small></article>
+      <article class="finance-overview-card"><span>Costi skipper da recuperare</span><strong>${escapeHtml(formatCurrency(skipperRecoverableCents / 100))}</strong><small>${escapeHtml(skipperRecoverableCents ? 'Volo o treno, auto e transfer locali: incidono sul preventivo e sulle quote proposte.' : 'Se li vuoi ripartire, inserisci volo o treno, auto e transfer locali nel Preventivo.')}</small></article>
       <article class="finance-overview-card"><span>Metodi pronti</span><strong>${escapeHtml(collectionMethods ? `${collectionMethods} attivi` : 'Da configurare')}</strong><small>${escapeHtml(collectionMethods ? 'I dettagli restano privati e vengono aggiunti solo al messaggio WhatsApp della persona scelta.' : 'Configura almeno un metodo prima di preparare una richiesta personale.')}</small></article>
       <article class="finance-overview-card"><span>Richieste in attesa</span><strong>${escapeHtml(formatCurrency(totals.pendingCents / 100))}</strong><small>${escapeHtml(`${pendingPayments} ${pendingPayments === 1 ? 'richiesta da verificare' : 'richieste da verificare'}. Una richiesta inviata non è un pagamento.`)}</small></article>
       <article class="finance-overview-card finance-overview-card-projection"><span>Accrediti verificati</span><strong>${escapeHtml(formatCurrency(totals.verifiedCents / 100))}</strong><small>${escapeHtml(`${verifiedPayments} ${verifiedPayments === 1 ? 'accredito registrato' : 'accrediti registrati'} · richieste preparate: ${formatCurrency(totals.requestedCents / 100)}.`)}</small></article>
@@ -2708,7 +2991,9 @@ function resetPrivateView() {
   resetSkipperDocumentCopies('idle');
   activeBoat = null;
   activeMembers = [];
+  activeCrewTravelStatus = [];
   activePayments = [];
+  activeCharterPayments = [];
   paymentPrivateMessageCache.clear();
   activeInvites = [];
   activeProjections = [];
@@ -2725,6 +3010,8 @@ function resetPrivateView() {
   editingBoatId = null;
   editingMemberId = null;
   editingProjectionId = null;
+  editingCharterPaymentId = null;
+  resetCharterPaymentForm();
   linkingLegacyInviteId = null;
   fleetPublicationInProgress.clear();
   fleetAvailabilitySyncInProgress = false;
@@ -2732,6 +3019,7 @@ function resetPrivateView() {
   stopMemberSubscription?.();
   stopCrewTravelStatusSubscription?.();
   stopPaymentSubscription?.();
+  stopCharterPaymentSubscription?.();
   stopPaymentProfileSubscription?.();
   stopContributionPlanSubscription?.();
   stopCostPlanSubscription?.();
@@ -2745,7 +3033,9 @@ function resetPrivateView() {
   Object.values(stopSkipperTravelSubscriptions).forEach((unsubscribe) => unsubscribe?.());
   stopBoatSubscription = null;
   stopMemberSubscription = null;
+  stopCrewTravelStatusSubscription = null;
   stopPaymentSubscription = null;
+  stopCharterPaymentSubscription = null;
   stopPaymentProfileSubscription = null;
   stopContributionPlanSubscription = null;
   stopCostPlanSubscription = null;
@@ -3442,6 +3732,7 @@ function renderCostPlan(plan) {
   renderPaymentBerthOptions();
   applyProjectionBerthPreset();
   renderSkipperFinanceOverview(activeCostPlan);
+  renderCharterPayments();
   renderSkipperDashboardOverview();
 }
 
@@ -6198,6 +6489,7 @@ function subscribeToBoat(boat) {
   stopMemberSubscription?.();
   stopCrewTravelStatusSubscription?.();
   stopPaymentSubscription?.();
+  stopCharterPaymentSubscription?.();
   stopPaymentProfileSubscription?.();
   stopContributionPlanSubscription?.();
   stopCostPlanSubscription?.();
@@ -6209,6 +6501,11 @@ function subscribeToBoat(boat) {
   stopSkipperProfileSubscription?.();
   stopSkipperProfileDraftSubscription?.();
   Object.values(stopSkipperTravelSubscriptions).forEach((unsubscribe) => unsubscribe?.());
+  activeCharterPayments = [];
+  activeCrewTravelStatus = [];
+  editingCharterPaymentId = null;
+  resetCharterPaymentForm();
+  renderCharterPayments();
   stopSkipperProfileSubscription = onSnapshot(doc(db, 'boats', boat.id, 'skipperProfile', SKIPPER_PROFILE_ID), (snapshot) => {
     renderSkipperProfile(snapshot.exists() ? snapshot.data() : null);
   }, () => {
@@ -6236,9 +6533,11 @@ function subscribeToBoat(boat) {
   stopCrewTravelStatusSubscription = onSnapshot(collection(db, 'boats', boat.id, 'crewTravelStatus'), (snapshot) => {
     activeCrewTravelStatus = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
     renderCrewTravelOverview();
+    renderSkipperDashboardOverview();
   }, () => {
     activeCrewTravelStatus = [];
     renderCrewTravelOverview();
+    renderSkipperDashboardOverview();
   });
   stopPaymentProfileSubscription = onSnapshot(doc(db, 'boats', boat.id, 'collectionProfile', PAYMENT_PROFILE_ID), (snapshot) => {
     renderPaymentProfile(snapshot.exists() ? snapshot.data() : null);
@@ -6265,6 +6564,16 @@ function subscribeToBoat(boat) {
     setMessage(document.querySelector('#contributionCatalogMessage'), 'Impossibile leggere la composizione delle quote.', true);
   });
   stopPaymentSubscription = onSnapshot(query(collection(db, 'boats', boat.id, 'paymentRequests'), orderBy('createdAt', 'desc')), renderPayments, () => setMessage(paymentReviewMessageTarget(), 'Impossibile leggere le richieste.', true));
+  stopCharterPaymentSubscription = onSnapshot(query(collection(db, 'boats', boat.id, 'charterPayments'), orderBy('createdAt', 'desc')), (snapshot) => {
+    activeCharterPayments = snapshot.docs.map((item) => normalizeCharterPayment(item.id, item.data()));
+    renderCharterPayments();
+    renderSkipperDashboardOverview();
+  }, () => {
+    activeCharterPayments = [];
+    renderCharterPayments();
+    renderSkipperDashboardOverview();
+    setMessage(document.querySelector('#charterPaymentMessage'), 'Non riesco a leggere i versamenti al charter.', true);
+  });
   stopInviteSubscription = onSnapshot(collection(db, 'boats', boat.id, 'invites'), (snapshot) => {
     activeInvites = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).sort((first, second) => String(first.displayName || '').localeCompare(String(second.displayName || ''), 'it'));
     renderInvites();

@@ -12,6 +12,6 @@ test('l’area skipper usa un solo accesso Google popup, senza redirect mobile',
   assert.doesNotMatch(script, /signInWithRedirect/);
   assert.doesNotMatch(script, /getRedirectResult/);
   assert.doesNotMatch(script, /shouldUseGoogleRedirect/);
-  assert.match(page, /area\.js\?v=20260928-google-popup-v1/);
+  assert.match(page, /area\.js\?v=20260928-skipper-categories-v1/);
   assert.doesNotMatch(page, /signInRedirectButton/);
 });

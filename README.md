@@ -17,7 +17,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - `passage-plan.html`: unica pagina pubblica per meteo e Passage Plan, alimentata da `passage-plan-data.js` e dalla sua edizione inglese editoriale `passage-plan-data-en.js`.
 - `arrivi-partenze.html`: sezione pubblica che spiega le quattro tratte, la finestra di match ±2 ore e la visibilità controllata dei contatti; non raccoglie dati in pagina.
 - `film.html` e `VIDEO_STORYBOARD.md`: storyboard del film; nessun filmato di terzi viene incorporato senza licenza.
-- `area.html`: area skipper con Google Sign-In, una barca per skipper, piano equipaggio privato, dossier charter privato dello skipper, Crew List, PDF, bacheca, inviti WhatsApp, profilo privato di incasso, dashboard economica, piano quote a dieci voci e richieste di contributo con messaggio WhatsApp diretto.
+- `area.html`: area skipper con Google Sign-In e cinque ambienti operativi: **La barca** (scafo e sistemazioni), **Equipaggio** (posti e inviti), **Conti** (preventivo, contributi ricevuti e versamenti al charter), **Charter e documenti** (dossier skipper, Crew List e PDF), **Viaggio e comunicazioni** (spostamenti, regole, orari e bacheca).
 - `participant.html`: primo accesso dal link WhatsApp; la persona conferma il suo numero e sceglie il proprio codice di 6 cifre, poi completa i dati necessari alla Crew List.
 - `crew.html`: ingresso quotidiano dell'equipaggio con numero WhatsApp e codice personale.
 - `my-area.html`: area personale con scheda, bacheca, regole e richieste dedicate.
@@ -141,6 +141,11 @@ boats/{skipperUid}
     starterPackDescription, protectionInsuranceDescription,
     refundableDepositDescription
     updatedAt, updatedBy
+  charterPayments/{paymentId}
+    amountCents, paymentKind: deposit | balance | other
+    status: planned | paid | confirmed, dueOn, paidOn
+    method, reference, note
+    createdAt, createdBy, updatedAt, updatedBy
   paymentRequests/{requestId}
     recipientId, memberId, payerInviteId, contributionItemId, amountCents, currency, reason, accountingCategory, isOptional, dueDate
     collectorId, collectorName, paymentMethods, status, createdAt, createdBy
@@ -192,7 +197,7 @@ Per le nuove schede, il prezzo del posto arriva dalla **Dashboard economica**: c
 
 Per le sistemazioni in cabina doppia, la proiezione può indicare una cabina numerata (`Cabina doppia 1`, `Cabina doppia 2` e così via) derivata dalla configurazione privata della barca. Due persone con lo stesso gruppo condividono la cabina; il sito non salva un doppio collegamento fra persone, così uno spostamento non può lasciare una coppia incoerente. L'interfaccia non consente più di due persone nello stesso gruppo e impedisce di ridurre il numero di cabine finché restano assegnazioni fuori configurazione. È un controllo operativo lato skipper: prima di lavorare da più schede contemporanee si aggiorna l'area, come per la capienza complessiva.
 
-La **cauzione rimborsabile** resta sempre una voce distinta, da portare o regolare in loco secondo charter e skipper. Non entra nel totale da chiedere via WhatsApp, non viene classificata come contributo, non entra nella Cassa skipper e non può diventare un pagamento remoto dal sito.
+La **cauzione rimborsabile** resta sempre una voce distinta, da portare o regolare in loco secondo charter e skipper. Non entra nel totale da chiedere via WhatsApp, non viene classificata come contributo ricevuto e non può diventare un pagamento remoto dal sito.
 
 Solo dopo una scelta esplicita dello skipper la proiezione diventa un invito WhatsApp. La successiva richiesta personale è facoltativa: serve solo per un promemoria, un saldo aggiornato o un extra, non per ripetere l’invito iniziale. Nessuna di queste azioni crea automaticamente un incasso o un pagamento verificato. Se la persona modifica dati o ruolo nella propria scheda, la Crew List conserva la sua dichiarazione aggiornata; la proiezione resta il piano iniziale dello skipper e non sostituisce i dati richiesti dal charter.
 
@@ -233,6 +238,8 @@ Lo skipper non rientra nei partecipanti paganti: nel modello operativo non paga 
 
 Il documento `costPlan/default` è leggibile e modificabile soltanto dallo skipper della relativa barca. Organizzatore, equipaggio, altri skipper e web pubblico non hanno accesso; non è cancellabile dall'area skipper. La procedura amministrativa di conservazione e cancellazione deve quindi essere definita prima dell'uso reale.
 
+Il registro `charterPayments` non modifica il costo del charter e non si somma agli accrediti dell'equipaggio. Ogni riga è un acconto, saldo o altro versamento reale verso il charter, con importo, stato, date e riferimento; soltanto `paid` e `confirmed` riducono il residuo mostrato. Le righe `planned` sono promemoria di scadenza; una riga errata passa a `cancelled`, resta nella cronologia e non incide sui totali. È privato allo skipper associato, non è leggibile dall'organizzatore o dall'equipaggio e non può essere cancellato dall'interfaccia: una correzione aggiorna la stessa riga lasciando invariata l'origine.
+
 ## Verifiche manuali ancora necessarie
 
 Prima di inserire l'equipaggio reale, usare soltanto account, nomi, numeri, importi e metodi fittizi e registrare l'esito nella matrice di test.
@@ -267,6 +274,6 @@ Nel Google Sheet privato le schede aggiornate automaticamente sono **Arrivi** e 
 3. Con autorizzazione del titolare dell'11 settembre 2026 sono stati attivati insieme `PRIVATE_AREA_ENABLED=true` e `privateAreaEnabled: true`.
 4. Il primo utilizzo deve partire dallo skipper: Google, verifica della barca `Karibu`, poi un invito personale a una persona alla volta.
 5. Restano da completare e formalizzare i punti in `PRIVACY_DA_COMPLETARE.md`, in particolare contatto, tempi di conservazione e procedura di cancellazione.
-6. Prima di pubblicare una modifica a `area.js`, eseguire `node --test tools/area-projection-guards.test.mjs`, aprire `area.html` in una sessione anonima e controllare l’assenza di errori JavaScript prima della prova con Google. Su telefono e desktop l’accesso skipper apre Google nella sua finestra; se il browser interno di WhatsApp la blocca, aprire l’area direttamente in Safari o Chrome e riprovare.
+6. Prima di pubblicare una modifica a `area.js`, eseguire `node --check area.js`, `npm run test:unit` e, quando cambiano dati o autorizzazioni, `npm run test:rules`; aprire poi `area.html` in una sessione anonima e controllare l’assenza di errori JavaScript prima della prova con Google. Su telefono e desktop l’accesso skipper apre Google nella sua finestra; se il browser interno di WhatsApp la blocca, aprire l’area direttamente in Safari o Chrome e riprovare.
 
 L'invito resta obbligatorio: l'apertura dell'area non crea una registrazione pubblica libera.

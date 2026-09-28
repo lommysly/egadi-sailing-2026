@@ -1802,6 +1802,43 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
+    // Registro privato dei versamenti dovuti o effettuati al charter. Ogni
+    // riga resta nella sola cassa dello skipper: non e' una richiesta rivolta
+    // all'equipaggio e non contiene coordinate o allegati del charter.
+    function hasValidCharterPaymentPayload() {
+      return request.resource.data.keys().hasAll(['amountCents', 'paymentKind', 'status', 'dueOn', 'paidOn', 'method', 'reference', 'note', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['amountCents', 'paymentKind', 'status', 'dueOn', 'paidOn', 'method', 'reference', 'note', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && request.resource.data.amountCents is int
+        && request.resource.data.amountCents >= 1
+        && request.resource.data.amountCents <= 1000000
+        && request.resource.data.paymentKind in ['deposit', 'balance', 'other']
+        && request.resource.data.status in ['planned', 'paid', 'confirmed', 'cancelled']
+        && isOptionalIsoDate(request.resource.data.dueOn)
+        && isOptionalIsoDate(request.resource.data.paidOn)
+        && ((request.resource.data.status == 'planned' && request.resource.data.paidOn == '')
+          || (request.resource.data.status in ['paid', 'confirmed'] && isIsoDate(request.resource.data.paidOn))
+          || request.resource.data.status == 'cancelled')
+        && isBoundedText(request.resource.data.method, 80)
+        && isBoundedText(request.resource.data.reference, 160)
+        && isBoundedText(request.resource.data.note, 400)
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.createdBy is string
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    function isValidCharterPaymentCreate() {
+      return hasValidCharterPaymentPayload()
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+    }
+
+    function isValidCharterPaymentUpdate() {
+      return hasValidCharterPaymentPayload()
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy;
+    }
+
     function inviteExists(boatId, inviteId) {
       return exists(/databases/$(database)/documents/boats/$(boatId)/invites/$(inviteId));
     }
@@ -2609,6 +2646,20 @@ service cloud.firestore {
             ? hasValidSkipperCostPlanV7()
             : (!isSkipperCostPlanV7(resource.data)
               && hasValidSkipperCostPlanV6()));
+        allow delete: if false;
+      }
+
+      // Registro dei pagamenti verso il charter: più righe private per
+      // acconto, saldo o altre voci. Anche l'organizzatore resta escluso;
+      // l'associazione skipperId della barca è l'unica autorizzazione.
+      match /charterPayments/{paymentId} {
+        allow read: if isPrivateAreaOpen() && isSkipper(boatId);
+        allow create: if isPrivateAreaOpen()
+          && isSkipper(boatId)
+          && isValidCharterPaymentCreate();
+        allow update: if isPrivateAreaOpen()
+          && isSkipper(boatId)
+          && isValidCharterPaymentUpdate();
         allow delete: if false;
       }
 

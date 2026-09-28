@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:unit": "node --test tools/*.test.mjs",
+    "test:unit": "node --test tools/*.test.mjs functions/sheet-status.test.js",
     "test:rules": "firebase emulators:exec --only firestore,storage --project egadi-sailing-2026 \"node --test --test-concurrency=1 tools/firestore-rules-tests/*.test.mjs\""
   },
   "devDependencies": {
