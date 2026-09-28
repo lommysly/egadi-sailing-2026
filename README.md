@@ -21,6 +21,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - `participant.html`: primo accesso dal link WhatsApp; la persona conferma il suo numero e sceglie il proprio codice di 6 cifre, poi completa i dati necessari alla Crew List.
 - `crew.html`: ingresso quotidiano dell'equipaggio con numero WhatsApp e codice personale.
 - `my-area.html`: area personale con scheda, bacheca, regole e richieste dedicate.
+- `reserved-area-nav.js`: navigazione semplificata dopo l’accesso e modulo editoriale That’s A Blast, con inviti alla Beta che aprono in una nuova scheda senza interrompere un’operazione privata.
 - `crew-pdf.js`: foglio A4 orizzontale da salvare in PDF per charter / eventuali controlli, con skipper nella Crew List e riepilogo privato di patente/certificato radio; non esporta CSV né incorpora le copie dei documenti.
 - `storage.rules` e `storage-cors.json`: archivio Firebase Storage privato per patente nautica e certificato radio dello skipper; non esiste un archivio documenti dell’equipaggio.
 - `FIRESTORE_RULES_TEST_MATRIX.md`, `CHECKLIST_PUBBLICAZIONE.md` e `PRIVACY_DA_COMPLETARE.md`: tracciabilità dei controlli, delle verifiche da completare e delle decisioni privacy da formalizzare.

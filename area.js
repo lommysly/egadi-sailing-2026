@@ -11,7 +11,7 @@ import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-acces
 import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
-import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-brand-v1';
+import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-experience-v1';
 
 watchForStaleScript(import.meta.url);
 

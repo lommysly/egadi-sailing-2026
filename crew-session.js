@@ -12,7 +12,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { createCrewInviteIdentity, isCrewPin, isInviteCode, phoneFingerprintFor } from './crew-identity.js';
 import { matchesCurrentInviteSession } from './crew-invite-session.js?v=20260928-invite-return-v1';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
-import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-brand-v1';
+import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-experience-v1';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);

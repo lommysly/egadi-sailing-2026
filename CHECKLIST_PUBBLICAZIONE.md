@@ -98,6 +98,7 @@ Ultimo aggiornamento: 28 settembre 2026. Le caselle descrivono lo stato verifica
 ## Apertura effettuata
 
 - [x] Commit pubblicato, build GitHub Pages e dominio HTTPS riletti.
+- [x] Nelle aree riservate è visibile un modulo editoriale That’s A Blast: chiarisce che Egadi è un Blast, racconta le utilità reali dell’app e apre sito/Beta in una nuova scheda senza far uscire l’utente dall’operazione in corso.
 - [x] Con conferma esplicita del titolare, impostati insieme `PRIVATE_AREA_ENABLED=true` nel sorgente e `privateAreaEnabled: true` nel documento evento.
 - [ ] Eseguire il test live conclusivo con skipper e una crew autorizzata, poi controllare che non esistano dati test indesiderati.
 - [ ] Test regolamento a comparsa (25/09/2026, segnalato da Silvio su telefono stretto): con un account fittizio non ancora in regola, verificare che "Apri il regolamento" apra un `<dialog>` a schermo pieno su telefono e centrato su desktop, che la lettura scorra fino in fondo abilitando la dichiarazione, che il pulsante "✕" e il tasto Esc chiudano senza perdere lo stato di lettura raggiunto, e che riaprendo il dialog lo scroll riparta da dove interrotto. Ripetere su `participant.html` (prima registrazione) e `my-area.html` (rientro), in italiano e inglese. Verificato con contenuto reale in locale (screenshot mobile e desktop) il 25/09/2026; resta da ripetere live con account fittizio.
