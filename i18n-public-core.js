@@ -123,6 +123,10 @@
           calloutEyebrow: 'For anyone bringing their own boat',
           calloutTitle: 'Have a boat?<br />Register it for the flotilla.',
           calloutAction: 'Go to skipper area',
+          blastEyebrow: 'The app behind the project',
+          blastTitle: 'Egadi is a Blast.<br />Meet the app that makes it possible.',
+          blastText: 'Group chat, shared provisions, expenses and rides, all in one place: that is what <strong>That’s A Blast</strong> does, in open beta on iPhone and Android.',
+          blastAction: 'Join the That’s A Blast beta →',
         },
         fleet: {
           metaDescription: 'The Egadi Sailing Experience flotilla: participating boats, their skippers and any availability each boat chooses to make public.',

@@ -23,4 +23,36 @@ export function simplifyReservedAreaNavigation() {
   // per sbaglio (richiesta esplicita del titolare, 27/09/2026). L'unica via
   // di uscita resta il link "Sito pubblico" nel menu sopra.
   document.querySelector('.site-footer')?.setAttribute('hidden', '');
+  insertBlastBrandNote();
+}
+
+// Egadi Sailing Experience è di fatto un "Blast" gestito qui in anteprima,
+// in attesa che l'app That's A Blast possa coprirlo del tutto (richiesta del
+// titolare, 28/09/2026): un piccolo richiamo al brand, senza link cliccabile
+// (l'area riservata non deve invitare a uscire mentre si sta compilando
+// qualcosa — quello resta solo sul sito pubblico).
+function insertBlastBrandNote() {
+  if (document.querySelector('.blast-brand-note')) return;
+  const isEnglish = document.documentElement.lang === 'en';
+  const text = isEnglish
+    ? 'Egadi Sailing Experience is a Blast. You are managing it here as a preview — the <strong>That’s A Blast</strong> app already does this and much more: group chat, shared provisions, expenses and rides, all in one place.'
+    : 'Egadi Sailing Experience è un Blast. Lo stai gestendo qui in anteprima — l’app <strong>That’s A Blast</strong> fa già questo e molto di più: chat di gruppo, cambusa condivisa, spese e passaggi, tutto in un unico posto.';
+  const note = document.createElement('aside');
+  note.className = 'blast-brand-note';
+  note.innerHTML = `
+    <svg viewBox="0 0 200 200" width="26" height="26" aria-hidden="true">
+      <defs>
+        <linearGradient id="blastA" x1="175" y1="15" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#20C9BA" stop-opacity="0"/><stop offset="30%" stop-color="#20C9BA" stop-opacity=".55"/><stop offset="100%" stop-color="#20C9BA"/></linearGradient>
+        <linearGradient id="blastB" x1="20" y1="170" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#7B61FF" stop-opacity="0"/><stop offset="38%" stop-color="#7B61FF" stop-opacity=".5"/><stop offset="100%" stop-color="#20C9BA" stop-opacity=".92"/></linearGradient>
+        <linearGradient id="blastC" x1="15" y1="68" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#20C9BA" stop-opacity="0"/><stop offset="44%" stop-color="#20C9BA" stop-opacity=".36"/><stop offset="100%" stop-color="#20C9BA" stop-opacity=".8"/></linearGradient>
+      </defs>
+      <path d="M 175 15 C 192 68,148 88,100 100" stroke="url(#blastA)" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <path d="M 22 172 C 28 126,62 110,100 100" stroke="url(#blastB)" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+      <path d="M 15 68 C 38 46,72 66,100 100" stroke="url(#blastC)" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="8" fill="#20C9BA"/>
+      <circle cx="100" cy="100" r="3" fill="#FFFFFF"/>
+    </svg>
+    <p>${text}</p>
+  `;
+  document.body.append(note);
 }

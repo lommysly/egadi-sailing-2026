@@ -37,6 +37,9 @@ body.menu-open { overflow:hidden; }
 .section-icon { display:grid; place-items:center; width:44px; height:44px; margin-bottom:14px; border-radius:50%; background:var(--sun-deep); color:white; }
 .section-icon svg { width:22px; height:22px; }
 .callout .section-icon { margin-left:auto; margin-right:auto; background:var(--sun); }
+.callout-blast .section-icon { background:#0b1418; }
+.callout-blast p:not(.eyebrow) { max-width:560px; margin:0 auto 30px; opacity:.85; }
+.callout-blast strong { color:#5eead4; }
 .fleet-visual-skipper .section-icon { margin:0 auto 14px; background:var(--sun); }
 .storyboard-note .section-icon { background:var(--sun); }
 .transfer-operator .section-icon,.transfer-next-step .section-icon { background:var(--sun); }.section h2 { font-size:clamp(3rem,6vw,6.4rem); }.passage-section { display:grid; grid-template-columns:.8fr 1.2fr; gap:10vw; background:#d8f4f1; }.passage-intro { padding-top:30px; }.passage-intro > p { max-width:570px; font-size:1.22rem; line-height:1.6; }.safety-note { margin:30px 0 48px; display:flex; gap:10px; font-size:.86rem; line-height:1.5; }.safety-note span { color:var(--sun); font-size:1.3rem; }.days { margin:0; padding:0; list-style:none; border-top:1px solid var(--line); }.days li { display:grid; grid-template-columns:70px 1fr; gap:18px; padding:27px 0; border-bottom:1px solid var(--line); }.day-number { color:var(--sun); font:500 1rem "DM Mono", monospace; }.day-label { margin:0 0 5px; font:.67rem "DM Mono", monospace; color:rgba(7,59,76,.68); text-transform:uppercase; }.days h3 { margin:0; font:600 clamp(1.65rem,3vw,2.45rem)/1 "Fraunces", serif; letter-spacing:-.04em; }.days p:last-child { margin:11px 0 0; max-width:600px; line-height:1.55; }
@@ -99,6 +102,14 @@ body.menu-open { overflow:hidden; }
 .dashboard-hub-card--attention:hover { background:rgba(255,183,3,.24); }
 .dashboard-hub-status { position:absolute; top:14px; right:14px; display:grid; width:24px; height:24px; place-items:center; border-radius:50%; background:#ffb703; color:#402c00; font:800 .85rem "DM Sans",sans-serif; box-shadow:0 2px 6px rgba(2,43,58,.35); }
 .dashboard-hub-status[hidden] { display:none; }
+/* Egadi è un "Blast" gestito qui in anteprima (richiesta del titolare,
+   28/09/2026): un piccolo richiamo al brand dell'app in fondo alle pagine
+   dell'area riservata, senza link cliccabile — vedi reserved-area-nav.js. */
+.blast-brand-note { display:flex; align-items:flex-start; gap:14px; max-width:900px; margin:32px auto 40px; padding:16px 20px; border-radius:14px; background:#0b1418; border:1px solid rgba(32,201,186,.35); }
+.blast-brand-note svg { flex:0 0 auto; margin-top:2px; }
+.blast-brand-note p { margin:0; color:rgba(255,255,255,.82); font-size:.82rem; line-height:1.55; }
+.blast-brand-note strong { color:#5eead4; }
+@media (max-width:640px) { .blast-brand-note { margin:24px 16px 32px; } }
 .skipper-checklist-dialog { width:min(560px,calc(100% - 36px)); }
 .skipper-checklist-list { display:grid; gap:12px; margin-top:22px; }
 .skipper-checklist-item { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 16px; border:1px solid rgba(255,183,3,.55); border-radius:12px; background:#fff7e6; }

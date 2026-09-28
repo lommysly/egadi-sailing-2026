@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260928-crew-checklist-v1" />
+  <link rel="stylesheet" href="styles.css?v=20260928-blast-brand-v1" />
   <link rel="stylesheet" href="home-visual.css?v=20260919-countdown" />
 </head>
 <body class="home-page">
@@ -195,15 +195,36 @@
       <h2 data-i18n-html="page.index.calloutTitle">Hai una barca?<br />Registrala per la flottiglia.</h2>
       <a class="button button-light" href="area.html#accesso" data-i18n="page.index.calloutAction">Vai all’area skipper</a>
     </section>
+
+    <section class="section callout callout-blast">
+      <span class="section-icon" aria-hidden="true">
+        <svg viewBox="0 0 200 200">
+          <defs>
+            <linearGradient id="blastHomeA" x1="175" y1="15" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#20C9BA" stop-opacity="0"/><stop offset="30%" stop-color="#20C9BA" stop-opacity=".55"/><stop offset="100%" stop-color="#20C9BA"/></linearGradient>
+            <linearGradient id="blastHomeB" x1="20" y1="170" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#7B61FF" stop-opacity="0"/><stop offset="38%" stop-color="#7B61FF" stop-opacity=".5"/><stop offset="100%" stop-color="#20C9BA" stop-opacity=".92"/></linearGradient>
+            <linearGradient id="blastHomeC" x1="15" y1="68" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#20C9BA" stop-opacity="0"/><stop offset="44%" stop-color="#20C9BA" stop-opacity=".36"/><stop offset="100%" stop-color="#20C9BA" stop-opacity=".8"/></linearGradient>
+          </defs>
+          <path d="M 175 15 C 192 68,148 88,100 100" stroke="url(#blastHomeA)" stroke-width="8" fill="none" stroke-linecap="round"/>
+          <path d="M 22 172 C 28 126,62 110,100 100" stroke="url(#blastHomeB)" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+          <path d="M 15 68 C 38 46,72 66,100 100" stroke="url(#blastHomeC)" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <circle cx="100" cy="100" r="8" fill="#20C9BA"/>
+          <circle cx="100" cy="100" r="3" fill="#FFFFFF"/>
+        </svg>
+      </span>
+      <p class="eyebrow" data-i18n="page.index.blastEyebrow">L’app dietro il progetto</p>
+      <h2 data-i18n-html="page.index.blastTitle">Egadi è un Blast.<br />Scopri l’app che lo rende possibile.</h2>
+      <p data-i18n-html="page.index.blastText">Chat di gruppo, cambusa condivisa, spese e passaggi in un unico posto: è quello che fa <strong>That’s A Blast</strong>, in beta aperta su iPhone e Android.</p>
+      <a class="button button-primary" href="https://thatsablast.it/beta#form" target="_blank" rel="noopener noreferrer" data-i18n="page.index.blastAction">Entra nella Beta di That’s A Blast →</a>
+    </section>
   </main>
 
   <footer class="site-footer">
     <div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a><p data-i18n="page.shared.footerDates">8—11 ottobre 2026 · Marsala</p></div>
-    <div><a href="index.html" data-i18n="page.shared.navJourney">Il viaggio</a><a href="flotta.html" data-i18n="page.shared.navFleet">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html" data-i18n="page.shared.navArrivalsDepartures">Arrivi &amp; partenze</a><a href="film.html" data-i18n="page.shared.navFilm">Il film</a><a href="accesso.html" data-i18n="page.shared.navPrivateArea">Area riservata</a><a href="privacy.html" data-i18n="page.shared.navPrivacy">Privacy e dati</a></div>
+    <div><a href="index.html" data-i18n="page.shared.navJourney">Il viaggio</a><a href="flotta.html" data-i18n="page.shared.navFleet">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html" data-i18n="page.shared.navArrivalsDepartures">Arrivi &amp; partenze</a><a href="film.html" data-i18n="page.shared.navFilm">Il film</a><a href="accesso.html" data-i18n="page.shared.navPrivateArea">Area riservata</a><a href="privacy.html" data-i18n="page.shared.navPrivacy">Privacy e dati</a><a href="https://thatsablast.it/beta#form" target="_blank" rel="noopener noreferrer">Prova la Beta ↗</a></div>
   </footer>
   <script src="home-motion.js?v=20260911-motion1"></script>
   <script src="i18n.js?v=20260914-en2"></script>
-  <script src="i18n-public-core.js?v=20260919-passage-t19b"></script>
+  <script src="i18n-public-core.js?v=20260928-blast-brand-v1"></script>
   <script src="i18n-public-support.js?v=20260927-reserved-area-roles-v1"></script>
   <script src="app.js?v=20260914-en2"></script>
   <script src="countdown.js?v=20260919-departure2"></script>
