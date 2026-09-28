@@ -55,7 +55,7 @@ test('tutte le pagine caricano il nuovo CSS versionato e area usa il nuovo JS', 
   assert.equal(htmlFiles.length, 13);
   for (const name of htmlFiles) {
     const source = readFileSync(new URL(name, rootUrl), 'utf8');
-    assert.match(source, /styles\.css\?v=20260928-mobile-layout-v2/, `${name}: versione CSS non aggiornata`);
+    assert.match(source, /styles\.css\?v=20260928-mobile-layout-v3/, `${name}: versione CSS non aggiornata`);
   }
   assert.match(areaHtml, /area\.js\?v=20260928-mobile-layout-v1/);
 });
@@ -74,6 +74,9 @@ test('il layout mobile non comprime pagamenti e pannelli annidati', () => {
   assert.match(styles, /\.dashboard-hub \{ grid-template-columns:minmax\(0,1fr\); \}/);
   assert.match(styles, /\.finance-dashboard-panel \{ min-width:0; padding:16px 12px;/);
   assert.match(styles, /\.visually-hidden\.visually-hidden \{ position:absolute; width:1px; min-width:1px;/);
+  assert.match(styles, /\.projection-card-summary-person \{ display:grid; gap:3px; \}/);
+  assert.match(styles, /\.site-header \.brand > span:not\(\.brand-mark\) \{ display:none; \}/);
+  assert.doesNotMatch(styles, /\.site-header \.brand span \{ display:none; \}/);
   assert.match(areaSource, /navigation\.scrollTo\(\{ left: Math\.max\(0, targetLeft\), behavior: 'auto' \}\)/);
   assert.match(styles, /\.skipper-checklist-dialog \{ max-height:calc\(100dvh - 24px\);/);
 });
