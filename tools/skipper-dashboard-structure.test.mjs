@@ -55,13 +55,24 @@ test('tutte le pagine caricano il nuovo CSS versionato e area usa il nuovo JS', 
   assert.equal(htmlFiles.length, 13);
   for (const name of htmlFiles) {
     const source = readFileSync(new URL(name, rootUrl), 'utf8');
-    assert.match(source, /styles\.css\?v=20260928-skipper-categories-v1/, `${name}: versione CSS non aggiornata`);
+    assert.match(source, /styles\.css\?v=20260928-mobile-layout-v1/, `${name}: versione CSS non aggiornata`);
   }
-  assert.match(areaHtml, /area\.js\?v=20260928-skipper-categories-v1/);
+  assert.match(areaHtml, /area\.js\?v=20260928-mobile-layout-v1/);
 });
 
 test('la pagina conserva ID statici univoci dopo il riordino dei pannelli', () => {
   const ids = [...areaHtml.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
   const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
   assert.deepEqual([...new Set(duplicates)], []);
+});
+
+test('il layout mobile non comprime pagamenti e pannelli annidati', () => {
+  assert.match(styles, /@media \(max-width:640px\) \{ \.payment-row \{ display:grid; grid-template-columns:minmax\(0,1fr\);/);
+  assert.match(styles, /\.payment-status \{ text-align:left; white-space:normal; \}/);
+  assert.match(styles, /@media \(max-width:430px\) \{ \.area-main \{ padding-right:14px; padding-left:14px; \}/);
+  assert.match(styles, /\.dashboard-hub \{ grid-template-columns:minmax\(0,1fr\); \}/);
+  assert.match(styles, /\.finance-dashboard-panel \{ min-width:0; padding:16px 12px;/);
+  assert.match(styles, /\.visually-hidden\.visually-hidden \{ position:absolute; width:1px; min-width:1px;/);
+  assert.match(areaSource, /navigation\.scrollTo\(\{ left: Math\.max\(0, targetLeft\), behavior: 'auto' \}\)/);
+  assert.match(styles, /\.skipper-checklist-dialog \{ max-height:calc\(100dvh - 24px\);/);
 });

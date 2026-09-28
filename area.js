@@ -1224,10 +1224,21 @@ function setSkipperDashboardView(nextView) {
   // container come gli altri?"). Ora si trova solo dentro "La barca", che è
   // già raggiungibile dalla sua card in Panoramica.
   if (editBoatButton) editBoatButton.hidden = view !== 'boat';
+  let currentNavigationButton = null;
   document.querySelectorAll('#skipperDashboardNavigation [data-skipper-view]').forEach((button) => {
     const current = button.dataset.skipperView === view;
     button.toggleAttribute('aria-current', current);
+    if (current) currentNavigationButton = button;
   });
+  // Su telefono la navigazione è una fascia orizzontale: porta sempre in
+  // vista la sezione corrente senza spostare verticalmente la pagina.
+  if (currentNavigationButton && navigation.scrollWidth > navigation.clientWidth) {
+    window.requestAnimationFrame(() => {
+      const targetLeft = currentNavigationButton.offsetLeft
+        - ((navigation.clientWidth - currentNavigationButton.offsetWidth) / 2);
+      navigation.scrollTo({ left: Math.max(0, targetLeft), behavior: 'auto' });
+    });
+  }
   if (view === 'money') setSkipperFinanceDashboardView(SKIPPER_FINANCE_VIEWS.overview);
 }
 
