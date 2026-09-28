@@ -58,9 +58,9 @@ function copyForLocale() {
         return: { eyebrow: 'Return', title: 'From Marsala', lead: 'Add the return journey independently when you know the timing; it does not block the outbound trip.' },
       },
       statusDraft: 'Personal draft',
-      statusDraftTransfer: 'Draft · transfer selected',
+      statusDraftTransfer: 'Draft · paid transfer selected',
       statusReady: 'Travel details confirmed',
-      statusReadyTransfer: 'Travel confirmed · transfer requested',
+      statusReadyTransfer: 'Travel confirmed · paid transfer requested',
       statusReadyNoTransfer: 'Travel confirmed · no transfer requested',
       statusReadyPending: 'Travel confirmed · transfer not specified',
       stepNavLabel: 'Sections of this journey',
@@ -92,14 +92,14 @@ function copyForLocale() {
       bulkyLuggage: 'I am travelling with bulky luggage.',
       airportTransfer: 'Airport ↔ Marsala connection',
       airportTransferDirection: { outbound: 'From the airport to Marsala', return: 'From Marsala to the airport' },
-      airportTransferHint: 'The organised connection works only through Trapani (TPS) or Palermo (PMO). You can change your mind at any time, even after confirming — including cancelling a transfer you already requested: just come back here, change the choice and save again.',
+      airportTransferHint: 'The organised transfer is a paid service, available only through Trapani (TPS) or Palermo (PMO). You can change your mind at any time, even after confirming: come back here, change the choice and save again.',
       airportChoiceLabel: 'How will you make this connection?',
       airportChoiceNone: 'I do not need to indicate it yet',
-      airportChoiceTransfer: 'I would like the organised transfer',
+      airportChoiceTransfer: 'I would like the organised transfer · paid service',
       airportChoiceIndependent: 'I will arrange it independently',
       airportChoiceRideOffer: 'I can offer a car ride',
-      airportChoiceSummary: { '': 'Connection not chosen yet', transfer: 'Organised transfer selected', independent: 'Travelling independently', ride_offer: 'Offering a car ride' },
-      airportChoiceNeedsConsent: 'Organised transfer selected · consent still needed',
+      airportChoiceSummary: { '': 'Connection not chosen yet', transfer: 'Paid organised transfer selected', independent: 'Travelling independently', ride_offer: 'Offering a car ride' },
+      airportChoiceNeedsConsent: 'Paid organised transfer selected · consent still needed',
       operatorConsent: 'I agree that the organiser and the appointed transfer company may use these travel details and my contact information only to arrange the airport ↔ Marsala connection. The operational record is also backed up in the organisers’ private Google Sheet.',
       carpool: 'Carpool with other participants',
       carpoolHint: 'Optional. It can be used for any journey where a car ride is useful.',
@@ -143,7 +143,7 @@ function copyForLocale() {
       draftSaved: 'Draft saved. You can come back and complete it whenever you like.',
       draftSavedTransfer: 'Draft saved with your transfer choice. The coordinator can see it as a trip still to complete.',
       draftSavedTransferNeedsAirport: 'Draft saved with transfer selected. Add Trapani (TPS) or Palermo (PMO) so the coordinator can use this request.',
-      readySavedTransfer: 'Trip saved and organised transfer requested. The coordinator may now arrange this connection.',
+      readySavedTransfer: 'Trip saved and paid organised transfer requested. The coordinator may now arrange this connection and will confirm the exact fare.',
       readySavedNoTransfer: 'Trip saved. No organised transfer was requested for this journey.',
       readySavedJourneyOnly: 'Trip saved.',
       saving: 'Saving…',
@@ -200,9 +200,9 @@ function copyForLocale() {
     stepConnection: 'Collegamento aeroporto',
     stepCarpool: 'Passaggio auto',
     statusDraft: 'Bozza personale',
-    statusDraftTransfer: 'Bozza · transfer selezionato',
+    statusDraftTransfer: 'Bozza · transfer a pagamento selezionato',
     statusReady: 'Informazioni confermate',
-    statusReadyTransfer: 'Viaggio confermato · transfer richiesto',
+    statusReadyTransfer: 'Viaggio confermato · transfer a pagamento richiesto',
     statusReadyNoTransfer: 'Viaggio confermato · nessun transfer richiesto',
     statusReadyPending: 'Viaggio confermato · transfer non indicato',
     details: 'Dettagli del viaggio',
@@ -230,14 +230,14 @@ function copyForLocale() {
     bulkyLuggage: 'Viaggio con un bagaglio ingombrante.',
     airportTransfer: 'Collegamento aeroporto ↔ Marsala',
     airportTransferDirection: { outbound: 'Dall’aeroporto a Marsala', return: 'Da Marsala all’aeroporto' },
-    airportTransferHint: 'Il collegamento organizzato è disponibile soltanto da/per Trapani (TPS) o Palermo (PMO). Puoi cambiare idea in qualsiasi momento, anche dopo aver confermato — compreso annullare un transfer già richiesto: torna qui, cambia la scelta e salva di nuovo.',
+    airportTransferHint: 'Il transfer organizzato è un servizio a pagamento, disponibile soltanto da/per Trapani (TPS) o Palermo (PMO). Puoi cambiare idea anche dopo la conferma: torna qui, modifica la scelta e salva di nuovo.',
     airportChoiceLabel: 'Come farai questo collegamento?',
     airportChoiceNone: 'Non devo ancora indicarlo',
-    airportChoiceTransfer: 'Vorrei il transfer organizzato',
+    airportChoiceTransfer: 'Vorrei il transfer organizzato · servizio a pagamento',
     airportChoiceIndependent: 'Mi organizzo in autonomia',
     airportChoiceRideOffer: 'Posso offrire un passaggio in auto',
-    airportChoiceSummary: { '': 'Collegamento ancora da scegliere', transfer: 'Transfer organizzato selezionato', independent: 'Ti organizzi in autonomia', ride_offer: 'Offri un passaggio in auto' },
-    airportChoiceNeedsConsent: 'Transfer selezionato · manca il consenso',
+    airportChoiceSummary: { '': 'Collegamento ancora da scegliere', transfer: 'Transfer organizzato a pagamento selezionato', independent: 'Ti organizzi in autonomia', ride_offer: 'Offri un passaggio in auto' },
+    airportChoiceNeedsConsent: 'Transfer a pagamento selezionato · manca il consenso',
     operatorConsent: 'Acconsento che organizzazione e società transfer incaricata usino questi dati di viaggio e il mio contatto solo per organizzare il collegamento aeroporto ↔ Marsala. La registrazione operativa viene inoltre riportata nel foglio Google privato dell’organizzazione.',
     carpool: 'Passaggi auto con altri partecipanti',
     carpoolHint: 'È facoltativo: serve per qualsiasi tratto in cui un passaggio in auto può essere utile.',
@@ -281,7 +281,7 @@ function copyForLocale() {
     draftSaved: 'Bozza salvata. Puoi tornare qui e completarla quando vuoi.',
     draftSavedTransfer: 'Bozza salvata con transfer selezionato. Il coordinatore potrà vederla come viaggio ancora da completare.',
     draftSavedTransferNeedsAirport: 'Bozza salvata con transfer selezionato. Indica Trapani (TPS) o Palermo (PMO) perché il coordinatore possa usare la richiesta.',
-    readySavedTransfer: 'Viaggio salvato e transfer organizzato richiesto. Il coordinatore potrà organizzare questo collegamento.',
+    readySavedTransfer: 'Viaggio salvato e transfer organizzato a pagamento richiesto. Il coordinatore potrà organizzare il collegamento e confermerà il costo esatto.',
     readySavedNoTransfer: 'Viaggio salvato. Per questa tratta non hai richiesto un transfer organizzato.',
     readySavedJourneyOnly: 'Viaggio salvato.',
     saving: 'Salvataggio…',
@@ -676,10 +676,16 @@ function formatEuro(cents) {
 // minimo fatturabile si applica anche viaggiando da soli: lo diciamo esplicito
 // per non far scoprire il costo pieno solo a richiesta confermata.
 function transferPriceNote(terminalAirport) {
-  if (!activeTransferPricing) return '';
-  const perPersonCents = terminalAirport === 'PMO' ? activeTransferPricing.pmoPricePerPersonCents : activeTransferPricing.tpsPricePerPersonCents;
-  if (!Number.isFinite(perPersonCents)) return '';
-  const minimum = Number.isInteger(activeTransferPricing.minimumBillablePersons) ? activeTransferPricing.minimumBillablePersons : 1;
+  const fallback = isEnglish()
+    ? 'The organised transfer is a paid service. The transfer company will confirm the exact fare before final arrangements.'
+    : 'Il transfer organizzato è un servizio a pagamento. La società transfer confermerà il costo esatto prima dell’organizzazione definitiva.';
+  if (!TERMINAL_AIRPORTS.has(terminalAirport) || !activeTransferPricing) return fallback;
+  const perPersonCents = terminalAirport === 'PMO'
+    ? activeTransferPricing.pmoPricePerPersonCents
+    : activeTransferPricing.tpsPricePerPersonCents;
+  if (!Number.isFinite(perPersonCents) || perPersonCents <= 0) return fallback;
+  if (!Number.isInteger(activeTransferPricing.minimumBillablePersons) || activeTransferPricing.minimumBillablePersons <= 0) return fallback;
+  const minimum = activeTransferPricing.minimumBillablePersons;
   const minimumTotalCents = perPersonCents * minimum;
   return isEnglish()
     ? `The transfer is not free: ${formatEuro(perPersonCents)} per person, minimum ${minimum} people billed (${formatEuro(minimumTotalCents)} even if you travel alone). The transfer company will confirm the exact cost once your group is organised.`
@@ -809,10 +815,12 @@ function renderTransferProgress(card, direction, leg, copy) {
   else if (operational === 'planned') key = 'planning';
   else if (['confirmed', 'completed', 'cancelled'].includes(operational)) key = operational;
   const [title, detail] = copy.transferProgress[key];
+  const terminalAirport = String(direction === 'return' ? leg.originAirport || '' : leg.destinationAirport || '').toUpperCase();
+  const paidServiceDetail = transferPriceNote(terminalAirport);
   const icon = key === 'confirmed' || key === 'completed' ? '✓' : key === 'cancelled' || key === 'draft' ? '!' : '•';
   target.hidden = false;
   target.className = `crew-transfer-progress crew-transfer-progress--${key}`;
-  target.innerHTML = `<span class="crew-transfer-progress-icon" aria-hidden="true">${icon}</span><div><p class="eyebrow">${copy.transferProgress.eyebrow}</p><strong>${title}</strong><span>${detail}</span></div>`;
+  target.innerHTML = `<span class="crew-transfer-progress-icon" aria-hidden="true">${icon}</span><div><p class="eyebrow">${copy.transferProgress.eyebrow}</p><strong>${title}</strong><span>${detail} ${paidServiceDetail}</span></div>`;
 }
 
 function applySavedLegState(card, message, direction, leg, copy) {

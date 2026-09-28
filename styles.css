@@ -577,6 +577,25 @@ body.menu-open { overflow:hidden; }
 .finance-dashboard-panel-content .skipper-finance-overview,.finance-dashboard-panel-content .payment-list { margin:0; }
 .finance-dashboard-back { justify-self:start; margin:0 0 3px; color:var(--sun-deep); }
 .finance-dashboard-hub-panel .finance-dashboard-back { color:#9ff5ed; }
+.dashboard-panel.skipper-subdashboard-host { grid-column:1 / -1; padding:0; background:transparent; }
+.skipper-subdashboard-shell { grid-column:1 / -1; display:grid; gap:16px; min-width:0; }
+.skipper-subdashboard-overview { margin:0; }
+.skipper-subdashboard-hub { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.skipper-subdashboard-card { min-height:154px; border-color:rgba(159,245,237,.32); }
+.skipper-subdashboard-panel { min-width:0; scroll-margin-top:150px; }
+.skipper-subdashboard-back { display:inline-flex; min-height:44px; align-items:center; justify-self:start; margin:0 0 18px; color:var(--sun-deep); }
+.skipper-subdashboard-section-heading { margin-bottom:18px; }
+.skipper-subdashboard-section-heading .eyebrow,.skipper-subdashboard-section-heading .panel-lead { margin-bottom:8px; }
+.skipper-charter-delivery-view { min-width:0; scroll-margin-top:150px; }
+.skipper-charter-delivery-view > .skipper-subdashboard-back { margin-left:2px; }
+.boat-workspace-actions { display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px 16px; align-items:center; margin:18px 0; }
+.boat-workspace-actions .field-hint,.boat-workspace-actions .form-message { margin:0; }
+.boat-workspace-actions .form-message { grid-column:1 / -1; }
+.boat-form-edit-panel { min-width:0; margin:18px 0 26px; padding-top:20px; border-top:1px solid var(--line); scroll-margin-top:150px; }
+.boat-form-edit-heading { display:grid; gap:8px; margin-bottom:20px; }
+.boat-form-edit-heading .eyebrow,.boat-form-edit-heading h4,.boat-form-edit-heading .panel-lead { margin:0; }
+#boatFormEditMount .private-form { max-width:none; margin:0; padding:0; background:transparent; }
+#costPlanPanel,#paymentProfileForm,#charterCrewWorkspace,#skipperProfileStatus,#projectionList,#regolamento-di-bordo,#crewTravelOverview { scroll-margin-top:150px; }
 #charterCrewWorkspace.charter-crew-workspace { grid-column:1 / -1; display:grid; gap:18px; min-width:0; }
 .charter-crew-workspace-heading { display:grid; grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr); gap:16px; align-items:end; padding:20px; border:1px solid rgba(8,123,138,.2); border-radius:15px; background:linear-gradient(140deg,#eafbfa 0%,#f8fffe 100%); }
 .charter-crew-workspace-heading .eyebrow { margin:0 0 7px; }
@@ -778,6 +797,11 @@ body.menu-open { overflow:hidden; }
 .transfer-status div { padding:18px; border-radius:14px; background:var(--ink); color:white; }
 .transfer-status span { display:block; margin-bottom:7px; color:#9fc8c5; font:.64rem "DM Mono",monospace; letter-spacing:.08em; text-transform:uppercase; }
 .transfer-status strong { font:600 1.05rem/1.25 "Fraunces",serif; }
+.transfer-paid-notice { display:grid; grid-template-columns:auto minmax(0,1fr); gap:18px; align-items:start; margin:18px 0 0; padding:24px 26px; border:1px solid rgba(8,123,138,.3); border-radius:16px; background:linear-gradient(135deg,#e7fbf8 0%,#fff7e6 100%); color:var(--ink); }
+.transfer-paid-notice-icon { display:grid; width:48px; height:48px; place-items:center; border-radius:50%; background:var(--sun-deep); color:white; font:700 1.35rem "DM Sans",sans-serif; }
+.transfer-paid-notice .eyebrow { margin:0 0 7px; color:var(--sun-deep); }
+.transfer-paid-notice h2 { margin:0; font:600 clamp(1.55rem,3vw,2.3rem)/1 "Fraunces",serif; letter-spacing:-.035em; }
+.transfer-paid-notice p:last-child { max-width:780px; margin:12px 0 0; line-height:1.55; }
 .transfer-introduction { display:grid; grid-template-columns:.9fr 1.1fr; gap:9vw; align-items:end; margin:72px 0 34px; }
 .transfer-introduction h2,.transfer-fields h2,.transfer-consent h2,.transfer-next-step h2 { margin:0; font:600 clamp(2.8rem,5vw,5.5rem)/.92 "Fraunces",serif; letter-spacing:-.06em; }
 .transfer-introduction > p { max-width:620px; margin:0; font-size:1.12rem; line-height:1.62; }
@@ -812,6 +836,7 @@ body.menu-open { overflow:hidden; }
 .transfer-next-step h2 em { color:#9ff5ed; }
 .transfer-next-step p:not(.eyebrow) { max-width:730px; margin:28px 0 34px; color:rgba(255,255,255,.86); font-size:1.05rem; line-height:1.62; }
 @media (max-width:800px) { .transfer-status,.transfer-leg-grid,.transfer-introduction,.transfer-operator,.transfer-fields,.transfer-consent { grid-template-columns:1fr; }.transfer-introduction { gap:25px; margin-top:52px; }.transfer-leg-grid article { min-height:0; }.transfer-leg-grid article > span { margin-bottom:32px; }.transfer-operator,.transfer-fields,.transfer-consent,.transfer-next-step { padding:32px 24px; } }
+@media (max-width:430px) { .transfer-paid-notice { grid-template-columns:minmax(0,1fr); gap:12px; padding:20px 18px; }.transfer-paid-notice-icon { width:40px; height:40px; font-size:1.1rem; } }
 
 /* Dashboard operatore transfer (transfer.html/transfer.js): lo stile di base
    vive nel <style> inline di transfer.html (preesistente, vince sempre la
@@ -1043,3 +1068,18 @@ body.menu-open { overflow:hidden; }
 .briefing-recap .briefing-practical-note--dashboard::before,.briefing-recap .briefing-practical-note--dashboard strong { color:var(--sun-deep); }
 
 @media (max-width:800px) { .rules-scroll-region { max-height:none; overflow:visible; padding:15px; }.rules-summary-card { padding:18px 18px 18px 54px; }.rules-summary-card--keypoints::before { top:18px; left:17px; }.briefing-practical-note { padding-left:52px; }.briefing-practical-note::before { left:16px; }.rules-section-card { grid-template-columns:32px minmax(0,1fr); gap:11px; padding:15px; }.rules-section-icon { width:32px; height:32px; font-size:1rem; }.rules-section-heading { font-size:1.08rem; } }
+
+@media (max-width:640px) {
+  .skipper-subdashboard-hub { grid-template-columns:minmax(0,1fr); }
+  .skipper-subdashboard-card { min-height:112px; }
+  .boat-workspace-actions { grid-template-columns:minmax(0,1fr); align-items:start; }
+  .boat-workspace-actions .button { width:100%; }
+  .boat-workspace-actions .form-message { grid-column:auto; }
+}
+
+@media (max-width:430px) {
+  .skipper-subdashboard-shell { gap:12px; }
+  .skipper-subdashboard-back { width:100%; justify-content:flex-start; margin-bottom:12px; }
+  .skipper-charter-delivery-view .charter-delivery-panel { margin-top:0; }
+  .boat-form-edit-panel { margin-top:14px; padding-top:16px; }
+}

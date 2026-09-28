@@ -389,11 +389,35 @@ const SKIPPER_FINANCE_VIEWS = Object.freeze({
   request: 'request',
   review: 'review',
 });
+const SKIPPER_CHARTER_VIEWS = Object.freeze({
+  overview: 'overview',
+  dossier: 'dossier',
+  crew: 'crew',
+  delivery: 'delivery',
+});
+const SKIPPER_CHARTER_HASHES = Object.freeze({
+  dossier: 'skipper-dossier',
+  crew: 'skipper-crew-list',
+  delivery: 'skipper-consegna-charter',
+});
+const SKIPPER_OPERATIONS_VIEWS = Object.freeze({
+  overview: 'overview',
+  personal: 'personal',
+  crew: 'crew',
+  rules: 'rules',
+});
+const SKIPPER_OPERATIONS_HASHES = Object.freeze({
+  personal: 'skipper-viaggio-personale',
+  crew: 'skipper-viaggi-equipaggio',
+  rules: 'regolamento-di-bordo',
+});
 const CHARTER_PAYMENT_KINDS = new Set(['deposit', 'balance', 'other']);
 const CHARTER_PAYMENT_STATUSES = new Set(['planned', 'paid', 'confirmed', 'cancelled']);
 let skipperDashboardView = 'overview';
 let skipperDashboardInitialized = false;
 let skipperFinanceDashboardInitialized = false;
+let skipperCharterDashboardInitialized = false;
+let skipperOperationsDashboardInitialized = false;
 
 function setMessage(element, message, isError = false) {
   element.textContent = message;
@@ -634,12 +658,36 @@ async function downloadSkipperDocumentCopy(documentKey, messageTarget = document
   }
 }
 
-function skipperDashboardViewFromHash() {
+function skipperDashboardDestinationFromHash() {
   const hash = window.location.hash.replace(/^#/, '');
-  return Object.entries(SKIPPER_DASHBOARD_HASHES)
+  const charterView = Object.entries(SKIPPER_CHARTER_HASHES)
+    .find(([, value]) => value === hash)?.[0];
+  if (charterView) return { view: 'charter', charterView };
+  const operationsView = Object.entries(SKIPPER_OPERATIONS_HASHES)
+    .find(([, value]) => value === hash)?.[0];
+  if (operationsView) return { view: 'operations', operationsView };
+  if (hash === 'skipper-profilo') return { view: 'charter', charterView: SKIPPER_CHARTER_VIEWS.dossier };
+  if (hash === 'skipper-bacheca') return { view: 'operations', operationsView: SKIPPER_OPERATIONS_VIEWS.rules };
+  const view = Object.entries(SKIPPER_DASHBOARD_HASHES)
     .find(([, value]) => value === hash)?.[0]
     || SKIPPER_DASHBOARD_HASH_ALIASES[hash]
     || 'overview';
+  return { view };
+}
+
+function skipperDashboardViewFromHash() {
+  return skipperDashboardDestinationFromHash().view;
+}
+
+function applySkipperDashboardHash() {
+  const destination = skipperDashboardDestinationFromHash();
+  setSkipperDashboardView(destination.view);
+  if (destination.view === 'charter') {
+    setSkipperCharterDashboardView(destination.charterView || SKIPPER_CHARTER_VIEWS.overview);
+  }
+  if (destination.view === 'operations') {
+    setSkipperOperationsDashboardView(destination.operationsView || SKIPPER_OPERATIONS_VIEWS.overview);
+  }
 }
 
 function skipperDashboardIcon(kind) {
@@ -1070,6 +1118,61 @@ function setSkipperFinanceDashboardView(nextView, { focus = false } = {}) {
   }
 }
 
+function skipperSubdashboardCard({ scope, view, title, detail, icon, controls = '' }) {
+  const button = document.createElement('button');
+  button.className = 'dashboard-hub-card skipper-subdashboard-card';
+  button.type = 'button';
+  button.setAttribute(`data-${scope}-view`, view);
+  button.setAttribute('aria-controls', controls || `skipper-${scope}-panel-${view}`);
+
+  const iconTarget = document.createElement('span');
+  iconTarget.className = 'dashboard-hub-icon';
+  iconTarget.innerHTML = skipperDashboardIcon(icon);
+  const label = document.createElement('span');
+  label.className = 'dashboard-hub-label';
+  label.textContent = title;
+  const description = document.createElement('small');
+  description.textContent = detail;
+  button.append(iconTarget, label, description);
+  return button;
+}
+
+function skipperSubdashboardBackButton(scope, label) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'text-button skipper-subdashboard-back';
+  button.setAttribute(`data-${scope}-view`, 'overview');
+  button.textContent = `← ${label}`;
+  return button;
+}
+
+function skipperSubdashboardOverview({ scope, eyebrow, title, lead, cards }) {
+  const panel = document.createElement('section');
+  panel.id = `skipper-${scope}-panel-overview`;
+  panel.className = 'dashboard-overview skipper-subdashboard-overview';
+  panel.setAttribute(`data-${scope}-panel`, 'overview');
+
+  const heading = document.createElement('div');
+  heading.className = 'dashboard-overview-heading';
+  const titleGroup = document.createElement('div');
+  const eyebrowTarget = document.createElement('p');
+  eyebrowTarget.className = 'eyebrow';
+  eyebrowTarget.textContent = eyebrow;
+  const titleTarget = document.createElement('h3');
+  titleTarget.tabIndex = -1;
+  titleTarget.textContent = title;
+  titleGroup.append(eyebrowTarget, titleTarget);
+  const leadTarget = document.createElement('p');
+  leadTarget.textContent = lead;
+  heading.append(titleGroup, leadTarget);
+
+  const hub = document.createElement('div');
+  hub.className = 'dashboard-hub skipper-subdashboard-hub';
+  cards.forEach((card) => hub.append(skipperSubdashboardCard({ scope, ...card })));
+  panel.append(heading, hub);
+  return panel;
+}
+
 function setupCharterCrewWorkspace(crewPanel, charterPanel) {
   if (!crewPanel || !charterPanel || document.querySelector('#charterCrewWorkspace')) return;
   const manualEntry = crewPanel.querySelector('details.manual-entry');
@@ -1079,15 +1182,243 @@ function setupCharterCrewWorkspace(crewPanel, charterPanel) {
   const combinedSummaryLabel = combinedSummary?.querySelector(':scope > summary');
   if (!manualEntry || !combinedSummary || !charterExport || !memberList) return;
 
-  if (combinedSummaryLabel) combinedSummaryLabel.textContent = '2 · Inviti personali';
+  const canonicalPdfButton = charterExport.querySelector('#generatePdfButton');
+  const duplicatePdfButton = document.querySelector('[data-charter-delivery-pdf]');
+  if (canonicalPdfButton && duplicatePdfButton && canonicalPdfButton !== duplicatePdfButton) {
+    canonicalPdfButton.dataset.charterDeliveryPdf = '';
+    canonicalPdfButton.className = 'text-button';
+    canonicalPdfButton.textContent = 'Apri e salva PDF';
+    duplicatePdfButton.replaceWith(canonicalPdfButton);
+  }
+
+  if (combinedSummaryLabel) combinedSummaryLabel.textContent = 'Inviti personali archiviati';
   const workspace = document.createElement('section');
   workspace.id = 'charterCrewWorkspace';
   workspace.className = 'charter-crew-workspace';
   const heading = document.createElement('div');
   heading.className = 'charter-crew-workspace-heading';
-  heading.innerHTML = '<div><p class="eyebrow">Crew List</p><h4>Elenco equipaggio e PDF per il charter</h4></div><p>Qui controlli le anagrafiche confermate, completi soltanto le eccezioni manuali e generi il foglio da consegnare insieme al dossier skipper.</p>';
-  workspace.append(heading, charterExport, memberList, manualEntry);
+  heading.innerHTML = '<div><p class="eyebrow">Crew List</p><h4>Controlla le anagrafiche dell’equipaggio</h4></div><p>Qui verifichi chi è pronto per il foglio del charter e completi soltanto le eccezioni manuali. Il PDF si prepara nel passo finale “Consegna”.</p>';
+  charterExport.hidden = true;
+  workspace.append(heading, memberList, manualEntry, charterExport);
   charterPanel.append(workspace);
+}
+
+function setupSkipperCharterDashboard(charterPanel) {
+  if (skipperCharterDashboardInitialized || !charterPanel) return;
+  const workspace = document.querySelector('#charterCrewWorkspace');
+  const profileForm = document.querySelector('#skipperProfileForm');
+  const deliveryPanel = document.querySelector('#charterDeliveryPanel');
+  if (!workspace || !profileForm || !deliveryPanel) return;
+
+  deliveryPanel.remove();
+  const dossierNodes = Array.from(charterPanel.children).filter((child) => child !== workspace);
+  const shell = document.createElement('section');
+  shell.id = 'skipperCharterDashboard';
+  shell.className = 'skipper-subdashboard-shell';
+  shell.setAttribute('aria-label', 'Charter e documenti');
+
+  const overview = skipperSubdashboardOverview({
+    scope: 'charter',
+    eyebrow: 'Charter e documenti',
+    title: 'Tre passi, nello stesso ordine del lavoro.',
+    lead: 'Prima completi il tuo dossier, poi controlli la Crew List e infine prepari i file da consegnare al charter.',
+    cards: [
+      { view: 'dossier', title: '1 · Dossier skipper', detail: 'Anagrafica, abilitazioni e copie private.', icon: 'charter' },
+      { view: 'crew', title: '2 · Crew List', detail: 'Anagrafiche equipaggio ed eventuali eccezioni.', icon: 'crew' },
+      { view: 'delivery', title: '3 · Consegna', detail: 'Un solo PDF, copie e messaggio al charter.', icon: 'board' },
+    ],
+  });
+
+  const dossierPanel = document.createElement('section');
+  dossierPanel.id = 'skipper-charter-panel-dossier';
+  dossierPanel.className = 'dashboard-panel skipper-subdashboard-panel';
+  dossierPanel.dataset.charterPanel = SKIPPER_CHARTER_VIEWS.dossier;
+  dossierPanel.hidden = true;
+  dossierPanel.append(skipperSubdashboardBackButton('charter', 'Charter e documenti'), ...dossierNodes);
+  dossierPanel.querySelector('h3')?.setAttribute('tabindex', '-1');
+
+  const crewPanel = document.createElement('section');
+  crewPanel.id = 'skipper-charter-panel-crew';
+  crewPanel.className = 'dashboard-panel skipper-subdashboard-panel';
+  crewPanel.dataset.charterPanel = SKIPPER_CHARTER_VIEWS.crew;
+  crewPanel.hidden = true;
+  crewPanel.append(skipperSubdashboardBackButton('charter', 'Charter e documenti'), workspace);
+  crewPanel.querySelector('h4')?.setAttribute('tabindex', '-1');
+
+  const deliveryView = document.createElement('section');
+  deliveryView.id = 'skipper-charter-panel-delivery';
+  deliveryView.className = 'skipper-subdashboard-panel skipper-charter-delivery-view';
+  deliveryView.dataset.charterPanel = SKIPPER_CHARTER_VIEWS.delivery;
+  deliveryView.hidden = true;
+  deliveryPanel.querySelector('h4')?.setAttribute('tabindex', '-1');
+  deliveryView.append(skipperSubdashboardBackButton('charter', 'Charter e documenti'), deliveryPanel);
+
+  shell.append(overview, dossierPanel, crewPanel, deliveryView);
+  charterPanel.classList.add('skipper-subdashboard-host');
+  charterPanel.replaceChildren(shell);
+  shell.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-charter-view]');
+    if (!button || !shell.contains(button)) return;
+    const view = button.dataset.charterView;
+    const hash = view === SKIPPER_CHARTER_VIEWS.overview
+      ? SKIPPER_DASHBOARD_HASHES.charter
+      : SKIPPER_CHARTER_HASHES[view];
+    if (hash && window.location.hash !== `#${hash}`) history.pushState(null, '', `#${hash}`);
+    setSkipperCharterDashboardView(view, { focus: true });
+  });
+  skipperCharterDashboardInitialized = true;
+  setSkipperCharterDashboardView(SKIPPER_CHARTER_VIEWS.overview);
+}
+
+function setSkipperCharterDashboardView(nextView, { focus = false } = {}) {
+  if (!skipperCharterDashboardInitialized) return;
+  const view = SKIPPER_CHARTER_VIEWS[nextView] ? nextView : SKIPPER_CHARTER_VIEWS.overview;
+  const shell = document.querySelector('#skipperCharterDashboard');
+  if (!shell) return;
+  shell.querySelectorAll('[data-charter-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.charterPanel !== view;
+  });
+  shell.querySelectorAll('[data-charter-view]').forEach((button) => {
+    button.toggleAttribute('aria-current', button.dataset.charterView === view && view !== SKIPPER_CHARTER_VIEWS.overview);
+  });
+  if (focus) {
+    shell.querySelector(`[data-charter-panel="${view}"] h3, [data-charter-panel="${view}"] h4`)?.focus({ preventScroll: true });
+  }
+}
+
+function setupSkipperOperationsDashboard(travelPanel, boardPanel, crewTravelOverview, grid) {
+  if (skipperOperationsDashboardInitialized || !travelPanel || !boardPanel || !grid) return;
+  const shell = document.createElement('section');
+  shell.id = 'skipperOperationsShell';
+  shell.className = 'skipper-subdashboard-shell skipper-operations-shell';
+  shell.dataset.skipperPanel = 'operations';
+  shell.setAttribute('aria-label', 'Viaggio e comunicazioni');
+
+  const overview = skipperSubdashboardOverview({
+    scope: 'operations',
+    eyebrow: 'Viaggio e comunicazioni',
+    title: 'Apri solo ciò che devi organizzare.',
+    lead: 'I tuoi spostamenti, quelli dell’equipaggio e le regole di bordo restano separati: così ogni aggiornamento finisce nel posto giusto.',
+    cards: [
+      { view: 'personal', title: 'Il mio viaggio', detail: 'Andata, ritorno e transfer dello skipper.', icon: 'operations', controls: 'skipperTravelPanel' },
+      { view: 'crew', title: 'Viaggi equipaggio', detail: 'Conferme, richieste transfer e solleciti.', icon: 'transfer' },
+      { view: 'rules', title: 'Regole e avvisi', detail: 'Regolamento, orari e comunicazioni di bordo.', icon: 'board', controls: 'regolamento-di-bordo' },
+    ],
+  });
+
+  delete travelPanel.dataset.skipperPanel;
+  travelPanel.dataset.operationsPanel = SKIPPER_OPERATIONS_VIEWS.personal;
+  travelPanel.prepend(skipperSubdashboardBackButton('operations', 'Viaggio e comunicazioni'));
+  travelPanel.querySelector('h3')?.setAttribute('tabindex', '-1');
+
+  const crewPanel = document.createElement('section');
+  crewPanel.id = 'skipper-operations-panel-crew';
+  crewPanel.className = 'dashboard-panel skipper-subdashboard-panel';
+  crewPanel.dataset.operationsPanel = SKIPPER_OPERATIONS_VIEWS.crew;
+  crewPanel.hidden = true;
+  const crewHeading = document.createElement('div');
+  crewHeading.className = 'skipper-subdashboard-section-heading';
+  crewHeading.innerHTML = '<p class="eyebrow">Viaggi equipaggio</p><h3>Chi ha confermato e chi va aiutato</h3><p class="panel-lead">Qui trovi soltanto lo stato operativo delle persone della tua barca e i solleciti necessari.</p>';
+  crewHeading.querySelector('h3')?.setAttribute('tabindex', '-1');
+  crewPanel.append(skipperSubdashboardBackButton('operations', 'Viaggio e comunicazioni'), crewHeading);
+  if (crewTravelOverview) crewPanel.append(crewTravelOverview);
+
+  delete boardPanel.dataset.skipperPanel;
+  boardPanel.dataset.operationsPanel = SKIPPER_OPERATIONS_VIEWS.rules;
+  boardPanel.prepend(skipperSubdashboardBackButton('operations', 'Viaggio e comunicazioni'));
+  boardPanel.querySelector('h3')?.setAttribute('tabindex', '-1');
+
+  grid.insertBefore(shell, travelPanel);
+  shell.append(overview, travelPanel, crewPanel, boardPanel);
+  shell.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-operations-view]');
+    if (!button || !shell.contains(button)) return;
+    const view = button.dataset.operationsView;
+    const hash = view === SKIPPER_OPERATIONS_VIEWS.overview
+      ? SKIPPER_DASHBOARD_HASHES.operations
+      : SKIPPER_OPERATIONS_HASHES[view];
+    if (hash && window.location.hash !== `#${hash}`) history.pushState(null, '', `#${hash}`);
+    setSkipperOperationsDashboardView(view, { focus: true });
+  });
+  skipperOperationsDashboardInitialized = true;
+  setSkipperOperationsDashboardView(SKIPPER_OPERATIONS_VIEWS.overview);
+}
+
+function setSkipperOperationsDashboardView(nextView, { focus = false } = {}) {
+  if (!skipperOperationsDashboardInitialized) return;
+  const view = SKIPPER_OPERATIONS_VIEWS[nextView] ? nextView : SKIPPER_OPERATIONS_VIEWS.overview;
+  const shell = document.querySelector('#skipperOperationsShell');
+  if (!shell) return;
+  shell.querySelectorAll('[data-operations-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.operationsPanel !== view;
+  });
+  shell.querySelectorAll('[data-operations-view]').forEach((button) => {
+    button.toggleAttribute('aria-current', button.dataset.operationsView === view && view !== SKIPPER_OPERATIONS_VIEWS.overview);
+  });
+  if (focus) {
+    shell.querySelector(`[data-operations-panel="${view}"] h3, [data-operations-panel="${view}"] h4`)?.focus({ preventScroll: true });
+  }
+}
+
+const SKIPPER_DESTINATION_DATA_KEYS = Object.freeze([
+  'financeView',
+  'charterView',
+  'operationsView',
+  'skipperTarget',
+  'skipperAction',
+]);
+
+function setSkipperButtonDestination(button, destination) {
+  if (!button) return;
+  SKIPPER_DESTINATION_DATA_KEYS.forEach((key) => { delete button.dataset[key]; });
+  button.dataset.skipperView = destination.view;
+  if (destination.financeView) button.dataset.financeView = destination.financeView;
+  if (destination.charterView) button.dataset.charterView = destination.charterView;
+  if (destination.operationsView) button.dataset.operationsView = destination.operationsView;
+  if (destination.targetId) button.dataset.skipperTarget = destination.targetId;
+  if (destination.action) button.dataset.skipperAction = destination.action;
+}
+
+function skipperDestinationHash(button) {
+  const view = button.dataset.skipperView;
+  if (view === 'charter' && SKIPPER_CHARTER_HASHES[button.dataset.charterView]) {
+    return SKIPPER_CHARTER_HASHES[button.dataset.charterView];
+  }
+  if (view === 'operations' && SKIPPER_OPERATIONS_HASHES[button.dataset.operationsView]) {
+    return SKIPPER_OPERATIONS_HASHES[button.dataset.operationsView];
+  }
+  return SKIPPER_DASHBOARD_HASHES[view];
+}
+
+function focusSkipperDestination(targetId) {
+  if (!targetId) return;
+  const target = document.getElementById(targetId);
+  if (!target || target.hidden) return;
+  const details = target.closest('details');
+  if (details) details.open = true;
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const focusTarget = target.matches('h2, h3, h4') ? target : target.querySelector('h2, h3, h4');
+  if (focusTarget) {
+    focusTarget.tabIndex = -1;
+    focusTarget.focus({ preventScroll: true });
+  }
+}
+
+function openSkipperDestination(button) {
+  const view = button?.dataset.skipperView;
+  if (!SKIPPER_DASHBOARD_HASHES[view]) return;
+  balanceRequestReturnView = null;
+  const nextHash = skipperDestinationHash(button);
+  if (nextHash && window.location.hash !== `#${nextHash}`) history.pushState(null, '', `#${nextHash}`);
+  setSkipperDashboardView(view);
+  if (view === 'money') setSkipperFinanceDashboardView(button.dataset.financeView || SKIPPER_FINANCE_VIEWS.overview);
+  if (view === 'charter') setSkipperCharterDashboardView(button.dataset.charterView || SKIPPER_CHARTER_VIEWS.overview);
+  if (view === 'operations') setSkipperOperationsDashboardView(button.dataset.operationsView || SKIPPER_OPERATIONS_VIEWS.overview);
+  if (button.dataset.skipperAction === 'open-boat-editor') openBoatEdit({ updateHash: false });
+  if (button.dataset.skipperAction === 'new-participant') startNewProjection();
+  if (button.dataset.skipperTarget) {
+    window.requestAnimationFrame(() => focusSkipperDestination(button.dataset.skipperTarget));
+  }
 }
 
 function setupSkipperDashboard() {
@@ -1108,13 +1439,13 @@ function setupSkipperDashboard() {
 
   crewPanel.dataset.skipperPanel = 'crew';
   profilePanel.dataset.skipperPanel = 'charter';
-  travelPanel.dataset.skipperPanel = 'operations';
   moneyPanel.dataset.skipperPanel = 'money';
   boatPanel.dataset.skipperPanel = 'boat';
-  boardPanel.dataset.skipperPanel = 'operations';
 
   setupCharterCrewWorkspace(crewPanel, profilePanel);
-  if (crewTravelOverview) travelPanel.append(crewTravelOverview);
+  setupSkipperCharterDashboard(profilePanel);
+  setupSkipperOperationsDashboard(travelPanel, boardPanel, crewTravelOverview, grid);
+  setupBoatWorkspace(boatPanel);
 
   const overview = document.createElement('section');
   overview.id = 'skipperDashboardOverview';
@@ -1176,22 +1507,12 @@ function setupSkipperDashboard() {
   dashboard.addEventListener('click', (event) => {
     const button = event.target.closest('[data-skipper-view]');
     if (!button || !dashboard.contains(button)) return;
-    const view = button.dataset.skipperView;
-    if (!SKIPPER_DASHBOARD_HASHES[view]) return;
-    // Un clic esplicito su una sezione conta come "lo skipper sa dove vuole
-    // andare": non deve più tornare da solo a Equipaggio dopo, altrimenti un
-    // invio successivo e scollegato lo riporterebbe indietro a sorpresa.
-    balanceRequestReturnView = null;
-    const nextHash = `#${SKIPPER_DASHBOARD_HASHES[view]}`;
-    if (window.location.hash === nextHash) {
-      setSkipperDashboardView(view);
-    } else {
-      window.location.hash = nextHash;
-    }
+    openSkipperDestination(button);
   });
-  window.addEventListener('hashchange', () => setSkipperDashboardView(skipperDashboardViewFromHash()));
+  window.addEventListener('hashchange', applySkipperDashboardHash);
+  window.addEventListener('popstate', applySkipperDashboardHash);
   skipperDashboardInitialized = true;
-  setSkipperDashboardView(skipperDashboardViewFromHash());
+  applySkipperDashboardHash();
   renderSkipperDashboardOverview();
 }
 
@@ -1240,9 +1561,11 @@ function setSkipperDashboardView(nextView) {
     });
   }
   if (view === 'money') setSkipperFinanceDashboardView(SKIPPER_FINANCE_VIEWS.overview);
+  if (view === 'charter') setSkipperCharterDashboardView(SKIPPER_CHARTER_VIEWS.overview);
+  if (view === 'operations') setSkipperOperationsDashboardView(SKIPPER_OPERATIONS_VIEWS.overview);
 }
 
-function setSkipperDashboardMetric(name, value, detail, needsAttention = false) {
+function setSkipperDashboardMetric(name, value, detail, needsAttention = false, destination = {}) {
   const card = document.querySelector(`.dashboard-hub-card[data-skipper-view="${name}"]`);
   const valueTarget = document.querySelector(`[data-skipper-summary="${name}"]`);
   const detailTarget = document.querySelector(`[data-skipper-detail="${name}"]`);
@@ -1256,7 +1579,21 @@ function setSkipperDashboardMetric(name, value, detail, needsAttention = false) 
   // posto. Un indicatore visivo per card rende la Panoramica una checklist.
   card?.classList.toggle('dashboard-hub-card--attention', needsAttention);
   if (statusTarget) statusTarget.hidden = !needsAttention;
-  if (needsAttention) pendingChecklistIssues.push({ view: name, label: SKIPPER_DASHBOARD_LABELS[name] || name, value, detail });
+  if (needsAttention) {
+    pendingChecklistIssues.push({
+      view: destination.view || name,
+      label: SKIPPER_DASHBOARD_LABELS[name] || name,
+      value,
+      detail,
+      ...destination,
+    });
+  }
+}
+
+function setSkipperNextAction(textTarget, button, { text, label, ...destination }) {
+  textTarget.textContent = text;
+  button.textContent = label;
+  setSkipperButtonDestination(button, destination);
 }
 
 function currentBriefingAcceptanceCount() {
@@ -1357,6 +1694,7 @@ function renderSkipperDashboardOverview() {
     capacity ? `${allocated} di ${capacity} posti` : 'Posti da configurare',
     `${projectedCrew} persone pianificate · ${pendingInvites} link pronti · ${completedProfiles} anagrafiche complete`,
     !capacity,
+    { view: 'boat', action: 'open-boat-editor', targetId: 'boatFormEditPanel' },
   );
 
   const skipperProfileReady = isSkipperProfileCharterReady(activeSkipperProfile, activeSkipperDocumentCopies);
@@ -1386,6 +1724,9 @@ function renderSkipperDashboardOverview() {
     charterPackageReady ? 'Dossier e Crew List pronti' : 'Dossier o Crew List da completare',
     charterDetail,
     !charterPackageReady,
+    !skipperProfileReady || !boatPdfReady
+      ? { view: 'charter', charterView: 'dossier', targetId: 'skipperProfileStatus' }
+      : { view: 'charter', charterView: 'crew', targetId: 'charterCrewWorkspace' },
   );
 
   const travelSummary = skipperTravelDashboardSummary();
@@ -1403,6 +1744,11 @@ function renderSkipperDashboardOverview() {
       : operationsNeedAttention ? 'Da completare' : 'Viaggio impostato',
     `${travelSummary.detail} · ${crewTravelPendingCount ? `${crewTravelPendingCount} ${crewTravelPendingCount === 1 ? 'persona deve completare il viaggio' : 'persone devono completare il viaggio'}` : 'equipaggio aggiornato'} · ${boardRulesActive ? 'regole attive' : 'regole da attivare'} · ${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} avvisi`,
     operationsNeedAttention,
+    travelSummary.needsAttention
+      ? { view: 'operations', operationsView: 'personal', targetId: 'skipperTravelPanel' }
+      : !boardRulesActive
+        ? { view: 'operations', operationsView: 'rules', targetId: 'regolamento-di-bordo' }
+        : { view: 'operations', operationsView: 'crew', targetId: 'crewTravelOverview' },
   );
 
   const costPlan = normalizeCostPlan(activeCostPlan);
@@ -1419,6 +1765,9 @@ function renderSkipperDashboardOverview() {
     automaticPricingReady ? `${formatCurrency(cashTotals.verifiedCents / 100)} ricevuti` : 'Preventivo da completare',
     `${pendingPayments} richieste da verificare · ${formatCurrency(charterTotals.paidCents / 100)} versati al charter · ${charterTotals.charterCents ? `${formatCurrency(charterTotals.remainingCents / 100)} da versare` : 'costo charter da definire'} · costi skipper ${formatCurrency(skipperRecoverableCents / 100)}.`,
     !automaticPricingReady || !collectionMethods,
+    !automaticPricingReady
+      ? { view: 'money', financeView: 'plan', targetId: 'costPlanPanel' }
+      : { view: 'money', financeView: 'setup', targetId: 'paymentProfileForm' },
   );
 
   const totalBerths = declaredTotalBerths(activeBoat);
@@ -1431,6 +1780,7 @@ function renderSkipperDashboardOverview() {
     activeBoat?.name ? `${activeBoat.name} · ${activeBoat.model}` : 'Configura la barca',
     `${totalBerths || 0} posti totali · ${bathroomCount || 0} bagni · ${effectiveParticipantCapacity(activeBoat)} posti partecipanti · ${fleetVisibility}`,
     !totalBerths || !bathroomCount,
+    { view: 'boat', action: 'open-boat-editor', targetId: 'boatFormEditPanel' },
   );
   scheduleSkipperChecklistDialogCheck();
 
@@ -1440,45 +1790,83 @@ function renderSkipperDashboardOverview() {
   const nextActionButton = document.querySelector('#skipperNextActionButton');
   if (!nextActionText || !nextActionButton) return;
   if (!totalBerths || !bathroomCount) {
-    nextActionText.textContent = 'Controlla prima la scheda della barca: posti letto e bagni devono descrivere lo scafo reale.';
-    nextActionButton.textContent = 'Apri la barca';
-    nextActionButton.dataset.skipperView = 'boat';
+    setSkipperNextAction(nextActionText, nextActionButton, {
+      text: 'Controlla prima la scheda della barca: posti letto e bagni devono descrivere lo scafo reale.',
+      label: 'Apri la barca',
+      view: 'boat',
+      action: 'open-boat-editor',
+      targetId: 'boatFormEditPanel',
+    });
   } else if (!skipperProfileReady) {
-    nextActionText.textContent = 'Completa prima il tuo dossier charter: dati, abilitazioni e le due copie private richieste devono essere pronti.';
-    nextActionButton.textContent = 'Apri charter e documenti';
-    nextActionButton.dataset.skipperView = 'charter';
+    setSkipperNextAction(nextActionText, nextActionButton, {
+      text: 'Completa prima il tuo dossier charter: dati, abilitazioni e le due copie private richieste devono essere pronti.',
+      label: 'Apri il dossier skipper',
+      view: 'charter',
+      charterView: 'dossier',
+      targetId: 'skipperProfileStatus',
+    });
   } else if (!boardRulesActive) {
-    nextActionText.textContent = 'Attiva prima le regole di bordo: è il passaggio che permette all’equipaggio di leggere e confermare il patto della barca.';
-    nextActionButton.textContent = 'Apri le regole';
-    nextActionButton.dataset.skipperView = 'operations';
+    setSkipperNextAction(nextActionText, nextActionButton, {
+      text: 'Attiva prima le regole di bordo: è il passaggio che permette all’equipaggio di leggere e confermare il patto della barca.',
+      label: 'Apri le regole',
+      view: 'operations',
+      operationsView: 'rules',
+      targetId: 'regolamento-di-bordo',
+    });
   } else if (!automaticPricingReady) {
-    nextActionText.textContent = 'Completa il preventivo: costi, quote e Starter Pack devono essere chiari prima delle richieste personali.';
-    nextActionButton.textContent = 'Apri preventivo';
-    nextActionButton.dataset.skipperView = 'money';
+    setSkipperNextAction(nextActionText, nextActionButton, {
+      text: 'Completa il preventivo: costi, quote e Starter Pack devono essere chiari prima delle richieste personali.',
+      label: 'Apri preventivo',
+      view: 'money',
+      financeView: 'plan',
+      targetId: 'costPlanPanel',
+    });
   } else if (!collectionMethods) {
-    nextActionText.textContent = 'Configura almeno un metodo di incasso prima di creare richieste personali.';
-    nextActionButton.textContent = 'Apri i metodi';
-    nextActionButton.dataset.skipperView = 'money';
+    setSkipperNextAction(nextActionText, nextActionButton, {
+      text: 'Configura almeno un metodo di incasso prima di creare richieste personali.',
+      label: 'Apri i metodi',
+      view: 'money',
+      financeView: 'setup',
+      targetId: 'paymentProfileForm',
+    });
   } else if (!allocated) {
-    nextActionText.textContent = 'La barca è configurata. Ora puoi riservare il primo posto.';
-    nextActionButton.textContent = 'Invita una persona';
-    nextActionButton.dataset.skipperView = 'crew';
+    setSkipperNextAction(nextActionText, nextActionButton, {
+      text: 'La barca è configurata. Ora puoi riservare il primo posto.',
+      label: 'Nuovo partecipante',
+      view: 'crew',
+      action: 'new-participant',
+      targetId: 'projectionEditor',
+    });
   } else if (!activeMembers.length) {
-    nextActionText.textContent = 'I posti sono riservati, ma nessuna anagrafica equipaggio è ancora completa. Controlla inviti e accessi.';
-    nextActionButton.textContent = 'Controlla equipaggio';
-    nextActionButton.dataset.skipperView = 'crew';
+    setSkipperNextAction(nextActionText, nextActionButton, {
+      text: 'I posti sono riservati, ma nessuna anagrafica equipaggio è ancora completa. Controlla inviti e accessi.',
+      label: 'Controlla equipaggio',
+      view: 'crew',
+      targetId: 'projectionList',
+    });
   } else if (charterOverCapacity) {
-    nextActionText.textContent = 'La Crew List supera la capienza partecipanti: correggi prima i posti della barca.';
-    nextActionButton.textContent = 'Controlla la barca';
-    nextActionButton.dataset.skipperView = 'boat';
+    setSkipperNextAction(nextActionText, nextActionButton, {
+      text: 'La Crew List supera la capienza partecipanti: correggi prima i posti della barca.',
+      label: 'Controlla la barca',
+      view: 'boat',
+      action: 'open-boat-editor',
+      targetId: 'boatFormEditPanel',
+    });
   } else if (incompleteProfiles) {
-    nextActionText.textContent = `${incompleteProfiles} ${incompleteProfiles === 1 ? 'anagrafica deve' : 'anagrafiche devono'} essere completata prima del PDF per il charter.`;
-    nextActionButton.textContent = 'Controlla Crew List';
-    nextActionButton.dataset.skipperView = 'charter';
+    setSkipperNextAction(nextActionText, nextActionButton, {
+      text: `${incompleteProfiles} ${incompleteProfiles === 1 ? 'anagrafica deve' : 'anagrafiche devono'} essere completata prima del PDF per il charter.`,
+      label: 'Controlla Crew List',
+      view: 'charter',
+      charterView: 'crew',
+      targetId: 'charterCrewWorkspace',
+    });
   } else {
-    nextActionText.textContent = 'Tutto è aggiornato. Scegli cosa vuoi fare adesso.';
-    nextActionButton.textContent = 'Gestisci equipaggio';
-    nextActionButton.dataset.skipperView = 'crew';
+    setSkipperNextAction(nextActionText, nextActionButton, {
+      text: 'Tutto è aggiornato. Scegli cosa vuoi fare adesso.',
+      label: 'Gestisci equipaggio',
+      view: 'crew',
+      targetId: 'projectionList',
+    });
   }
 }
 
@@ -1523,7 +1911,7 @@ function maybeShowSkipperChecklistDialog() {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'button button-primary';
-      button.dataset.skipperView = issue.view;
+      setSkipperButtonDestination(button, issue);
       button.textContent = 'Apri';
       item.append(copy, button);
       return item;
@@ -1546,11 +1934,8 @@ document.querySelector('#skipperChecklistDialog')?.addEventListener('click', (ev
   }
   const button = event.target.closest('[data-skipper-view]');
   if (!button) return;
-  const view = button.dataset.skipperView;
   dialog.close();
-  if (!SKIPPER_DASHBOARD_HASHES[view]) return;
-  balanceRequestReturnView = null;
-  window.location.hash = `#${SKIPPER_DASHBOARD_HASHES[view]}`;
+  openSkipperDestination(button);
 });
 
 function contributionConfigSummary(itemId, { deposit = false } = {}) {
@@ -1720,7 +2105,7 @@ function renderSkipperFinanceOverview(planOverride = activeCostPlan) {
       <article class="finance-overview-card"><span>Posto cabina standard · persona</span><strong>${escapeHtml(breakEven)}</strong><small>${escapeHtml(breakEvenDetail)}</small></article>
       <article class="finance-overview-card finance-overview-card-extras"><span>${escapeHtml(starterTitle)}</span><strong>${escapeHtml(starterValue)}</strong><small>${escapeHtml(starterDetail)}</small></article>
       <article class="finance-overview-card finance-overview-card-extras"><span>Assicurazione cauzione · totale</span><strong>${escapeHtml(insuranceValue)}</strong><small>${escapeHtml(insuranceDetail)}</small></article>
-      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile · totale cash</span><strong>${escapeHtml(hasPlan ? formatCurrency(depositTargetCents / 100) : 'Da definire')}</strong><small>${escapeHtml(financeAllocationText(depositTargetCents, projectedDepositCashCents, 0, 0, { cash: true, hasTarget: hasPlan }))} <a class="rules-reference-link" href="#skipper-viaggio">Leggi la regola sulla cauzione</a></small></article>
+      <article class="finance-overview-card finance-overview-card-deposit"><span>Cauzione rimborsabile · totale cash</span><strong>${escapeHtml(hasPlan ? formatCurrency(depositTargetCents / 100) : 'Da definire')}</strong><small>${escapeHtml(financeAllocationText(depositTargetCents, projectedDepositCashCents, 0, 0, { cash: true, hasTarget: hasPlan }))} <a class="rules-reference-link" href="#regolamento-di-bordo">Leggi la regola sulla cauzione</a></small></article>
     </div>
   `;
 }
@@ -3076,6 +3461,8 @@ function resetPrivateView() {
   const skipperTravelStatus = document.querySelector('#skipperTravelStatus');
   if (skipperTravelStatus) skipperTravelStatus.replaceChildren();
   document.querySelectorAll('[id^="skipperTravel"][id$="Message"]').forEach((message) => setMessage(message, ''));
+  restoreBoatFormForRegistration();
+  resetBoatForm(null);
   dashboard.hidden = true;
   registerSection.hidden = true;
   renderSkipperDashboardOverview();
@@ -5364,6 +5751,71 @@ function setBoatFormDefaults(user) {
   renderBerthLayoutSummary();
 }
 
+function ensureBoatRegistrationMount() {
+  let mount = document.querySelector('#boatFormRegistrationMount');
+  const form = document.querySelector('#boatForm');
+  if (!mount && form) {
+    mount = document.createElement('div');
+    mount.id = 'boatFormRegistrationMount';
+    form.before(mount);
+    mount.append(form);
+  }
+  return mount;
+}
+
+function restoreBoatFormForRegistration() {
+  const form = document.querySelector('#boatForm');
+  const mount = ensureBoatRegistrationMount();
+  if (form && mount && form.parentElement !== mount) mount.append(form);
+  const editor = document.querySelector('#boatFormEditPanel');
+  if (editor) editor.hidden = true;
+}
+
+function setupBoatWorkspace(boatPanel) {
+  if (!boatPanel || document.querySelector('#boatFormEditPanel')) return;
+  const form = document.querySelector('#boatForm');
+  const editButton = document.querySelector('#editBoatButton');
+  const fleetForm = document.querySelector('#fleetProfileForm');
+  if (!form || !editButton || !fleetForm) return;
+  ensureBoatRegistrationMount();
+
+  const intro = document.createElement('div');
+  intro.className = 'boat-workspace-actions';
+  const copy = document.createElement('p');
+  copy.className = 'field-hint';
+  copy.textContent = 'Apri la scheda completa solo quando devi cambiare scafo, cabine, bagni, posti letto o listino base.';
+  const message = document.createElement('p');
+  message.id = 'boatPanelMessage';
+  message.className = 'form-message';
+  message.setAttribute('role', 'status');
+  message.setAttribute('aria-live', 'polite');
+  editButton.textContent = 'Modifica dati e sistemazioni';
+  intro.append(editButton, copy, message);
+
+  const editor = document.createElement('section');
+  editor.id = 'boatFormEditPanel';
+  editor.className = 'boat-form-edit-panel';
+  editor.hidden = true;
+  const heading = document.createElement('div');
+  heading.className = 'boat-form-edit-heading';
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'eyebrow';
+  eyebrow.textContent = 'Scheda completa della barca';
+  const title = document.createElement('h4');
+  title.tabIndex = -1;
+  title.textContent = 'Scafo, sistemazioni e listino base';
+  const lead = document.createElement('p');
+  lead.className = 'panel-lead';
+  lead.textContent = 'Aggiorna qui i dati reali della barca. I conti economici restano nella sezione Conti.';
+  heading.append(eyebrow, title, lead);
+  const editMount = document.createElement('div');
+  editMount.id = 'boatFormEditMount';
+  editMount.append(form);
+  editor.append(heading, editMount);
+  boatPanel.insertBefore(intro, fleetForm);
+  boatPanel.insertBefore(editor, fleetForm);
+}
+
 function resetBoatForm(user) {
   const form = document.querySelector('#boatForm');
   form.reset();
@@ -5375,9 +5827,17 @@ function resetBoatForm(user) {
   renderBerthLayoutSummary();
 }
 
-function openBoatEdit() {
+function openBoatEdit({ updateHash = true } = {}) {
   if (!activeBoat) return;
+  if (updateHash && window.location.hash !== `#${SKIPPER_DASHBOARD_HASHES.boat}`) {
+    history.pushState(null, '', `#${SKIPPER_DASHBOARD_HASHES.boat}`);
+  }
+  setSkipperDashboardView('boat');
   const form = document.querySelector('#boatForm');
+  const editor = document.querySelector('#boatFormEditPanel');
+  const editMount = document.querySelector('#boatFormEditMount');
+  if (!form || !editor || !editMount) return;
+  if (form.parentElement !== editMount) editMount.append(form);
   form.reset();
   for (const [field, value] of Object.entries(activeBoat)) {
     const input = form.elements.namedItem(field);
@@ -5393,9 +5853,11 @@ function openBoatEdit() {
   editingBoatId = activeBoat.id;
   document.querySelector('#boatSubmitButton').textContent = 'Salva modifiche';
   document.querySelector('#cancelBoatEdit').hidden = false;
-  dashboard.hidden = true;
-  registerSection.hidden = false;
-  registerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setMessage(document.querySelector('#boatFormMessage'), '');
+  setMessage(document.querySelector('#boatPanelMessage'), '');
+  editor.hidden = false;
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  editor.querySelector('h4')?.focus({ preventScroll: true });
 }
 
 function renderSkipperProfile(profile) {
@@ -6477,7 +6939,7 @@ function subscribeToBoat(boat) {
   registerSection.hidden = true;
   dashboard.hidden = false;
   setupSkipperDashboard();
-  setSkipperDashboardView(skipperDashboardViewFromHash());
+  applySkipperDashboardHash();
   document.querySelector('#boatTitle').textContent = boat.name;
   const berthTotals = berthLayoutTotals(boat.berthLayout);
   const totalBerths = declaredTotalBerths(boat);
@@ -6624,10 +7086,13 @@ function loadSkipperArea(user) {
       subscribeToBoat({ id: snapshot.id, ...snapshot.data() });
     } else {
       activeBoat = null;
+      restoreBoatFormForRegistration();
+      resetBoatForm(user);
       dashboard.hidden = true;
       registerSection.hidden = false;
     }
   }, (error) => {
+    restoreBoatFormForRegistration();
     registerSection.hidden = false;
     // Per un nuovo skipper l'assenza del documento è prevista: mostra subito
     // la registrazione. Gli altri errori restano espliciti ma non tecnici.
@@ -6655,13 +7120,16 @@ async function startGoogleSignIn() {
 signInButton.addEventListener('click', () => startGoogleSignIn());
 
 document.querySelector('#signOutButton').addEventListener('click', () => signOut(auth));
-document.querySelector('#editBoatButton').addEventListener('click', openBoatEdit);
+document.querySelector('#editBoatButton').addEventListener('click', () => openBoatEdit());
 document.querySelector('#cancelBoatEdit').addEventListener('click', () => {
   creatingBoat = false;
   resetBoatForm(auth.currentUser);
   if (activeBoat) {
     registerSection.hidden = true;
     dashboard.hidden = false;
+    const editor = document.querySelector('#boatFormEditPanel');
+    if (editor) editor.hidden = true;
+    setMessage(document.querySelector('#boatPanelMessage'), 'Modifica annullata: i dati pubblicati non sono cambiati.');
   }
 });
 
@@ -6734,13 +7202,15 @@ boatForm.addEventListener('submit', async (event) => {
       creatingBoat = false;
       resetBoatForm(user);
       subscribeToBoat(activeBoat);
-      setMessage(document.querySelector('#boatFormMessage'), 'Dati della barca aggiornati e partecipazione alla flotta pubblicata.');
+      const editor = document.querySelector('#boatFormEditPanel');
+      if (editor) editor.hidden = true;
+      setMessage(document.querySelector('#boatPanelMessage'), 'Dati della barca aggiornati e partecipazione alla flotta pubblicata.');
     } else {
       activeBoat = await saveBoatAndPublicFleet(user.uid, {}, boatData, true);
       creatingBoat = false;
       subscribeToBoat(activeBoat);
       resetBoatForm(user);
-      setMessage(document.querySelector('#boatFormMessage'), 'Barca registrata e partecipazione alla flotta pubblicata.');
+      setMessage(document.querySelector('#boatPanelMessage'), 'Barca registrata e partecipazione alla flotta pubblicata.');
     }
   } catch (error) {
     setMessage(document.querySelector('#boatFormMessage'), getFirestoreErrorMessage(error, 'Non riesco a registrare la barca. Riprova tra poco.'), true);
@@ -7797,12 +8267,6 @@ document.querySelector('#announcementForm').addEventListener('submit', async (ev
   }
 });
 document.querySelector('#generatePdfButton').addEventListener('click', () => {
-  const memberMessage = document.querySelector('#memberFormMessage');
-  if (blockPrivateAction(memberMessage)) return;
-  openCharterPdf(memberMessage);
-});
-
-document.querySelector('[data-charter-delivery-pdf]')?.addEventListener('click', () => {
   const message = document.querySelector('#charterDeliveryMessage');
   if (blockPrivateAction(message)) return;
   openCharterPdf(message);

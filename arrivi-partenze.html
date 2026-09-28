@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260928-mobile-layout-v3" />
+  <link rel="stylesheet" href="styles.css?v=20260928-skipper-flow-v1" />
 </head>
 <body class="area-page">
   <a class="skip-link" href="#main-content" data-i18n="page.shared.skipToContent">Vai al contenuto principale</a>
@@ -34,6 +34,15 @@
       <div><span data-i18n="page.travel.statusDestination">Destinazione</span><strong data-i18n="page.travel.statusDestinationValue">Porto di Marsala</strong></div>
     </section>
 
+    <section class="transfer-paid-notice" role="note" aria-labelledby="transferPaidTitle">
+      <span class="transfer-paid-notice-icon" aria-hidden="true">€</span>
+      <div>
+        <p class="eyebrow" data-i18n="page.travel.paidEyebrow">Prima di richiederlo</p>
+        <h2 id="transferPaidTitle" data-i18n="page.travel.paidTitle">Il transfer organizzato è un servizio a pagamento.</h2>
+        <p data-i18n="page.travel.paidText">La richiesta non genera un addebito automatico. La tariffa dipende dall’aeroporto e dal numero di persone del gruppo; la società transfer confermerà il costo esatto prima dell’organizzazione definitiva.</p>
+      </div>
+    </section>
+
     <section class="transfer-introduction">
       <div>
         <span class="section-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="4" y="7" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 7V5.5A1.5 1.5 0 0 1 9 4h2a1.5 1.5 0 0 1 1.5 1.5V7" stroke="currentColor" stroke-width="1.6"/><path d="M4 10.5h12" stroke="currentColor" stroke-width="1.6"/></svg></span>
@@ -48,10 +57,10 @@
         <span>01</span><p class="eyebrow" data-i18n="page.travel.leg1Eyebrow">Passaggio tra amici</p><h3 data-i18n-html="page.travel.leg1Title">Città di partenza<br />→ aeroporto</h3><p data-i18n="page.travel.leg1Text">Trova qualcuno nella tua zona diretto allo stesso aeroporto. Non è un servizio di trasporto: vi sentite e vi accordate tra voi.</p>
       </article>
       <article>
-        <span>02</span><p class="eyebrow" data-i18n="page.travel.leg2Eyebrow">Transfer Sicilia</p><h3 data-i18n-html="page.travel.leg2Title">Aeroporto<br />→ Marsala</h3><p data-i18n="page.travel.leg2Text">Da Trapani o Palermo fino al porto. Se scegli il transfer organizzato e dai il consenso, la società incaricata riceve soltanto i dati necessari per formare il gruppo.</p>
+        <span>02</span><p class="eyebrow" data-i18n="page.travel.leg2Eyebrow">Transfer Sicilia</p><h3 data-i18n-html="page.travel.leg2Title">Aeroporto<br />→ Marsala</h3><p data-i18n="page.travel.leg2Text">Da Trapani o Palermo fino al porto. È un servizio a pagamento: se lo richiedi e dai il consenso, la società incaricata riceve soltanto i dati necessari per formare il gruppo e confermarti il costo.</p>
       </article>
       <article>
-        <span>03</span><p class="eyebrow" data-i18n="page.travel.leg3Eyebrow">Transfer Sicilia</p><h3 data-i18n-html="page.travel.leg3Title">Marsala<br />→ aeroporto</h3><p data-i18n="page.travel.leg3Text">Il rientro si calcola a ritroso dall’orario del volo. Chi deve partire prima può determinare il ritrovo del gruppo.</p>
+        <span>03</span><p class="eyebrow" data-i18n="page.travel.leg3Eyebrow">Transfer Sicilia</p><h3 data-i18n-html="page.travel.leg3Title">Marsala<br />→ aeroporto</h3><p data-i18n="page.travel.leg3Text">Anche il rientro organizzato è a pagamento e si calcola a ritroso dall’orario del volo. Chi deve partire prima può determinare il ritrovo del gruppo.</p>
       </article>
       <article>
         <span>04</span><p class="eyebrow" data-i18n="page.travel.leg4Eyebrow">Passaggio tra amici</p><h3 data-i18n-html="page.travel.leg4Title">Aeroporto<br />→ città di arrivo</h3><p data-i18n="page.travel.leg4Text">Un’ultima coincidenza tra chi torna verso la stessa zona, senza coinvolgere l’operatore del transfer siciliano.</p>
@@ -114,7 +123,7 @@
   </footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="i18n-public-core.js?v=20260928-blast-brand-v1"></script>
-  <script src="i18n-public-support.js?v=20260927-reserved-area-roles-v1"></script>
+  <script src="i18n-public-support.js?v=20260928-transfer-paid-v1"></script>
   <script src="app.js?v=20260914-en2"></script>
 </body>
 </html>

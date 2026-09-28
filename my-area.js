@@ -23,6 +23,7 @@ let activeCrewPayments = [];
 let activeCrewAnnouncements = [];
 let activePaymentInstructions = null;
 let activeCrewTravelStatus = null;
+let activeTransferPricing = null;
 let crewTravelStatusLoaded = false;
 let crewTravelStatusReadError = false;
 let stopPaymentSubscription = null;
@@ -126,7 +127,7 @@ function staticContributionDescription(itemId, starterPackItems = []) {
     protection_insurance: localized('Separata dalla quota del posto.', 'Separate from the berth contribution.'),
     provisions: localized('Cambusa da dividere tra chi partecipa.', 'Provisions are shared among participants.'),
     fuel: localized('Si calcola sul gasolio effettivamente consumato.', 'It is calculated on fuel actually used.'),
-    transfer: localized('Transfer aeroporto ↔ porto, andata e ritorno: sempre fuori dallo Starter Pack.', 'Airport ↔ port transfers, both ways: always outside the Starter Pack.'),
+    transfer: localized('Servizio a pagamento. Il transfer aeroporto ↔ porto, andata e ritorno, è sempre fuori dallo Starter Pack.', 'Paid service. Airport ↔ port transfers, both ways, are always outside the Starter Pack.'),
     shore_dinner: localized('Solo se viene organizzata una cena a terra.', 'Only if a dinner ashore is organised.'),
     mooring_fee: localized('Solo se porto, ormeggio o boa non sono già inclusi.', 'Only if port, mooring or buoy costs are not already included.'),
     refundable_deposit: localized('Contanti all’imbarco; restituzione dopo il check-out del charter, salvo danni da definire.', 'Cash at boarding; returned after the charter check-out, unless damage needs to be assessed.'),
@@ -528,14 +529,40 @@ function crewTravelProgress(direction) {
   const operation = activeCrewTravelStatus?.[`${direction}OperationStatus`];
   const item = (tone, label, detail) => ({ tone, label: `${name} · ${label}`, detail });
   if (!travelState || travelState === 'missing') return item('attention', localized('da inserire', 'not added yet'), localized('Apri Arrivi e partenze per aggiungere questa tratta.', 'Open Arrivals and departures to add this journey.'));
-  if (travelState === 'draft') return item('attention', localized('bozza salvata', 'draft saved'), localized('Puoi completarla quando conosci gli orari.', 'Complete it when you know the times.'));
+  if (travelState === 'draft') return item(
+    'attention',
+    localized('bozza salvata', 'draft saved'),
+    transferState === 'requested'
+      ? `${localized('Puoi completarla quando conosci gli orari.', 'Complete it when you know the times.')} ${crewTransferPaidNote()}`
+      : localized('Puoi completarla quando conosci gli orari.', 'Complete it when you know the times.'),
+  );
   if (transferState === 'not_requested') return item('complete', localized('senza transfer organizzato', 'no organised transfer'), localized('Hai scelto di organizzare il collegamento autonomamente.', 'You chose to arrange this connection yourself.'));
   if (transferState !== 'requested') return item('attention', localized('collegamento da scegliere', 'connection to choose'), localized('Se vuoi il transfer, selezionalo in questa tratta e dai il consenso.', 'If you need a transfer, select it for this journey and give your consent.'));
-  if (operation === 'planned') return item('update', localized('transfer in organizzazione', 'transfer being arranged'), localized('Il gestore sta preparando il collegamento.', 'The organiser is preparing the connection.'));
-  if (operation === 'confirmed') return item('complete', localized('transfer confermato', 'transfer confirmed'), localized('Il gestore ha confermato il collegamento; chiedigli i dettagli del ritrovo.', 'The organiser confirmed the connection; ask them for meeting details.'));
-  if (operation === 'completed') return item('complete', localized('transfer concluso', 'transfer completed'), localized('Il gestore ha segnato il collegamento come concluso.', 'The organiser marked the connection as completed.'));
+  if (operation === 'planned') return item('update', localized('transfer in organizzazione', 'transfer being arranged'), `${localized('Il gestore sta preparando il collegamento.', 'The organiser is preparing the connection.')} ${crewTransferPaidNote()}`);
+  if (operation === 'confirmed') return item('complete', localized('transfer confermato', 'transfer confirmed'), `${localized('Il gestore ha confermato il collegamento; chiedigli i dettagli del ritrovo.', 'The organiser confirmed the connection; ask them for meeting details.')} ${crewTransferPaidNote()}`);
+  if (operation === 'completed') return item('complete', localized('transfer concluso', 'transfer completed'), `${localized('Il gestore ha segnato il collegamento come concluso.', 'The organiser marked the connection as completed.')} ${crewTransferPaidNote()}`);
   if (operation === 'cancelled') return item('attention', localized('transfer annullato', 'transfer cancelled'), localized('Contatta lo skipper prima di partire.', 'Contact your skipper before travelling.'));
-  return item('waiting', localized('transfer richiesto', 'transfer requested'), localized('Richiesta salvata; il gestore non l’ha ancora confermata.', 'Request saved; the organiser has not confirmed it yet.'));
+  return item('waiting', localized('transfer richiesto', 'transfer requested'), `${localized('Richiesta salvata; il gestore non l’ha ancora confermata.', 'Request saved; the organiser has not confirmed it yet.')} ${crewTransferPaidNote()}`);
+}
+
+function crewTransferPaidNote() {
+  const fallback = localized(
+    'Il transfer organizzato è a pagamento; il gestore confermerà il costo esatto.',
+    'The organised transfer is a paid service; the organiser will confirm the exact fare.',
+  );
+  const tpsCents = activeTransferPricing?.tpsPricePerPersonCents;
+  const pmoCents = activeTransferPricing?.pmoPricePerPersonCents;
+  if (!Number.isFinite(tpsCents) || tpsCents <= 0 || !Number.isFinite(pmoCents) || pmoCents <= 0) return fallback;
+  if (!Number.isInteger(activeTransferPricing?.minimumBillablePersons) || activeTransferPricing.minimumBillablePersons <= 0) return fallback;
+  const minimum = activeTransferPricing.minimumBillablePersons;
+  return localized(
+    `Servizio a pagamento: Trapani ${formatCurrency(tpsCents / 100)} a persona, Palermo ${formatCurrency(pmoCents / 100)} a persona; minimo ${minimum} persone fatturate. Il gestore confermerà il tuo importo esatto.`,
+    `Paid service: Trapani ${formatCurrency(tpsCents / 100)} per person, Palermo ${formatCurrency(pmoCents / 100)} per person; minimum ${minimum} people billed. The organiser will confirm your exact fare.`,
+  );
+}
+
+function crewHasPaidTransferRequest() {
+  return ['outbound', 'return'].some((direction) => activeCrewTravelStatus?.[`${direction}Transfer`] === 'requested');
 }
 
 function renderCrewDashboardOverview() {
@@ -620,7 +647,11 @@ function renderCrewDashboardOverview() {
   // nuova azione della persona: il bordo ambra resta soltanto per ciò che
   // l'equipaggio deve ancora completare o correggere.
   const travelNeedsAttention = crewTravelNeedsAttention(outboundProgress, returnProgress);
-  setCrewDashboardMetric('travel', copy.travel, `${outboundProgress.label} · ${returnProgress.label}`, travelNeedsAttention);
+  const travelDetail = [
+    `${outboundProgress.label} · ${returnProgress.label}`,
+    crewHasPaidTransferRequest() ? crewTransferPaidNote() : '',
+  ].filter(Boolean).join(' · ');
+  setCrewDashboardMetric('travel', copy.travel, travelDetail, travelNeedsAttention);
   const cabinAssigned = Boolean(activeProjection?.berthType);
   setCrewDashboardMetric(
     'cabin',
@@ -1570,6 +1601,7 @@ function clearPersonalDashboard() {
   activeCrewAnnouncements = [];
   activePaymentInstructions = null;
   activeCrewTravelStatus = null;
+  activeTransferPricing = null;
   crewTravelStatusLoaded = false;
   crewTravelStatusReadError = false;
   ['#participantProfileSummary', '#participantPaymentList', '#participantFinanceSummary', '#boardingSchedule', '#participantSchedule', '#boardingRulesSummary', '#boardingRulesText', '#participantRulesSummary', '#participantRulesText', '#participantAnnouncementList', '#participantContributionIncluded', '#participantContributionSeparate'].forEach((selector) => {
@@ -2089,6 +2121,17 @@ function startDashboardSubscriptions() {
   }
 }
 
+async function loadCrewTransferPricing() {
+  try {
+    const snapshot = await getDoc(doc(db, 'events', 'egadi-2026', 'transferPricing', 'default'));
+    activeTransferPricing = snapshot.exists() ? snapshot.data() : null;
+  } catch (error) {
+    console.info('Tariffe transfer non disponibili nella panoramica equipaggio.', error?.code || error);
+    activeTransferPricing = null;
+  }
+  renderCrewDashboardOverview();
+}
+
 function renderDashboardBriefing() {
   const empty = document.querySelector('#participantBriefingEmpty');
   const briefing = document.querySelector('#participantBriefing');
@@ -2270,6 +2313,7 @@ startCrewAreaSession({
   onInvalid: showInvalid,
   onReady: async ({ invite }) => {
     activeInvite = invite;
+    void loadCrewTransferPricing();
     const member = await getDoc(doc(db, 'boats', invite.boatId, 'members', invite.id));
     if (!member.exists()) {
       window.location.replace(profileUrl({ edit: true }));
