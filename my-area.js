@@ -1,5 +1,6 @@
 import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { auth, crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260928-blast-experience-v1';
+import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-state.js?v=20260928-crew-flow-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
 
@@ -526,7 +527,7 @@ function crewTravelProgress(direction) {
   const transferState = activeCrewTravelStatus?.[`${direction}Transfer`];
   const operation = activeCrewTravelStatus?.[`${direction}OperationStatus`];
   const item = (tone, label, detail) => ({ tone, label: `${name} · ${label}`, detail });
-  if (!travelState || travelState === 'missing') return item('waiting', localized('da inserire', 'not added yet'), localized('Apri Arrivi e partenze per aggiungere questa tratta.', 'Open Arrivals and departures to add this journey.'));
+  if (!travelState || travelState === 'missing') return item('attention', localized('da inserire', 'not added yet'), localized('Apri Arrivi e partenze per aggiungere questa tratta.', 'Open Arrivals and departures to add this journey.'));
   if (travelState === 'draft') return item('attention', localized('bozza salvata', 'draft saved'), localized('Puoi completarla quando conosci gli orari.', 'Complete it when you know the times.'));
   if (transferState === 'not_requested') return item('complete', localized('senza transfer organizzato', 'no organised transfer'), localized('Hai scelto di organizzare il collegamento autonomamente.', 'You chose to arrange this connection yourself.'));
   if (transferState !== 'requested') return item('attention', localized('collegamento da scegliere', 'connection to choose'), localized('Se vuoi il transfer, selezionalo in questa tratta e dai il consenso.', 'If you need a transfer, select it for this journey and give your consent.'));
@@ -615,7 +616,10 @@ function renderCrewDashboardOverview() {
   setCrewDashboardMetric('profile', profileReady ? copy.profileReady : copy.profileWaiting, copy.profileDetail, !profileReady);
   const outboundProgress = crewTravelProgress('outbound');
   const returnProgress = crewTravelProgress('return');
-  const travelNeedsAttention = ['waiting', 'attention'].includes(outboundProgress.tone) || ['waiting', 'attention'].includes(returnProgress.tone);
+  // Una richiesta transfer già salvata è in attesa del gestore, non di una
+  // nuova azione della persona: il bordo ambra resta soltanto per ciò che
+  // l'equipaggio deve ancora completare o correggere.
+  const travelNeedsAttention = crewTravelNeedsAttention(outboundProgress, returnProgress);
   setCrewDashboardMetric('travel', copy.travel, `${outboundProgress.label} · ${returnProgress.label}`, travelNeedsAttention);
   const cabinAssigned = Boolean(activeProjection?.berthType);
   setCrewDashboardMetric(
@@ -1935,7 +1939,10 @@ function clearBoardingRulesGateState() {
 function updateBoardingAcceptState() {
   const acknowledgement = document.querySelector('#rulesAcknowledgement');
   const acceptButton = document.querySelector('#acceptRulesButton');
-  const canConfirm = canAcceptCurrentLocaleBriefing() && !hasAcceptedCurrentBriefing();
+  const fullRulesRead = document.querySelector('#boardingRulesGate').dataset.fullRulesRead === 'true';
+  const canConfirm = canAcceptCurrentLocaleBriefing()
+    && canConfirmCrewBriefing({ requiresFullRulesRead: briefingRequiresFullRulesRead(), fullRulesRead })
+    && !hasAcceptedCurrentBriefing();
   acknowledgement.disabled = !canConfirm;
   if (!canConfirm) acknowledgement.checked = false;
   acceptButton.disabled = !(canConfirm && acknowledgement.checked);
@@ -2218,6 +2225,11 @@ document.querySelector('#boardingGateStatus').setAttribute('aria-live', 'polite'
 
 document.querySelector('#acceptRulesButton').addEventListener('click', async () => {
   if (!canAcceptCurrentLocaleBriefing() || !activeInvite || !auth.currentUser) return;
+  const fullRulesRead = document.querySelector('#boardingRulesGate').dataset.fullRulesRead === 'true';
+  if (!canConfirmCrewBriefing({ requiresFullRulesRead: briefingRequiresFullRulesRead(), fullRulesRead })) {
+    setMessage(document.querySelector('#participantRulesMessage'), translate('crew.flow.scrollToEnd', 'Passo 1 di 2: apri il regolamento e scorri fino alla fine. Poi si attiva la dichiarazione qui sotto.'), true);
+    return;
+  }
   if (!document.querySelector('#rulesAcknowledgement').checked) {
     setMessage(document.querySelector('#participantRulesMessage'), translate('crew.flow.confirmReadFirst', 'Conferma di aver letto il regolamento di bordo prima di proseguire.'), true);
     return;

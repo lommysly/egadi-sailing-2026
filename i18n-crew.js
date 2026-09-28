@@ -185,8 +185,8 @@
         },
         flow: {
           titleFallback: 'Dati richiesti dal charter',
-          scrollToEnd: 'Leggi il regolamento completo. Quando hai finito, seleziona qui sotto la dichiarazione di lettura.',
-          fullRulesSeen: 'Regolamento di bordo visualizzato. Se lo hai letto, puoi confermare la dichiarazione.',
+          scrollToEnd: 'Passo 1 di 2: apri il regolamento e scorri fino alla fine. Poi si attiva la dichiarazione qui sotto.',
+          fullRulesSeen: 'Passo 2 di 2: regolamento visualizzato. Ora seleziona la dichiarazione qui sotto e continua.',
           officialEnglishWaiting: 'Lo skipper non ha ancora pubblicato la versione inglese ufficiale del briefing di sicurezza. Chiedila prima di accettare le regole in inglese.',
           officialEnglishRequired: 'Per proseguire in inglese serve il briefing di sicurezza ufficiale in inglese.',
           briefingWaiting: 'Lo skipper deve ancora pubblicare il briefing di sicurezza e le regole di bordo: non è un problema del tuo accesso, manca ancora questo passaggio dal suo lato. Scrivigli nella stessa chat WhatsApp da cui hai ricevuto l’invito e chiedigli di attivarlo — questa pagina si aggiorna da sola, senza bisogno di ricaricarla, appena lo pubblica.',
@@ -421,8 +421,8 @@
         },
         flow: {
           titleFallback: 'Details requested by the charter company',
-          scrollToEnd: 'Read the complete board rules. When you are ready, select the reading declaration below.',
-          fullRulesSeen: 'You have viewed the board rules. If you have read them, you can confirm the declaration.',
+          scrollToEnd: 'Step 1 of 2: open the board rules and scroll to the end. The declaration below will then become available.',
+          fullRulesSeen: 'Step 2 of 2: you have viewed the board rules. Now select the declaration below and continue.',
           officialEnglishWaiting: 'The skipper has not yet published the official English version of the safety briefing. Please ask for it before accepting the rules in English.',
           officialEnglishRequired: 'An official English safety briefing is required before you can continue in English.',
           briefingWaiting: 'Your skipper has not yet published the safety briefing and board rules — this is not a problem with your access, it is a step still missing on their side. Message them in the same WhatsApp chat where you received your invitation and ask them to publish it: this page updates itself automatically, with no need to reload, as soon as they do.',

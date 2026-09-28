@@ -23,6 +23,7 @@ let currentPersistedLegs = {};
 let transferProgressLoaded = false;
 let transferProgressReadError = false;
 let activeTransferPricing = null;
+let currentBlockedKind = 'default';
 
 function isEnglish() {
   return window.EgadiI18n?.getLocale?.() === 'en';
@@ -424,9 +425,7 @@ function applyPageCopy(copy) {
   document.querySelector('#travelOpeningEyebrow').textContent = copy.openingEyebrow;
   document.querySelector('#travelOpeningTitle').textContent = copy.openingTitle;
   document.querySelector('#travelOpeningMessage').textContent = copy.openingMessage;
-  document.querySelector('#travelBlockedEyebrow').textContent = copy.blockedEyebrow;
-  document.querySelector('#travelBlockedTitle').textContent = copy.blockedTitle;
-  document.querySelector('#travelBlockedLink').textContent = copy.backToArea;
+  renderBlockedPresentation(copy);
   document.querySelector('#travelWorkspaceEyebrow').textContent = copy.workspaceEyebrow;
   document.querySelector('#travelWorkspaceTitle').textContent = copy.workspaceTitle;
   document.querySelector('#travelWorkspaceLead').textContent = copy.workspaceLead;
@@ -434,7 +433,6 @@ function applyPageCopy(copy) {
   document.querySelector('#travelFlowTitle').textContent = copy.flowTitle;
   document.querySelector('#backToMyArea').textContent = copy.backToArea;
   document.querySelector('#backToMyArea').href = personalAreaUrl();
-  document.querySelector('#travelBlockedLink').href = personalAreaUrl();
   document.querySelector('#travelFlowSteps').replaceChildren(...copy.flow.map(([step, title, description]) => {
     const item = document.createElement('div');
     const label = document.createElement('span');
@@ -448,18 +446,63 @@ function applyPageCopy(copy) {
   }));
 }
 
+function blockedPresentation(copy) {
+  if (currentBlockedKind === 'login') {
+    return {
+      eyebrow: isEnglish() ? 'Personal access' : 'Accesso personale',
+      title: isEnglish() ? 'Sign back into your area.' : 'Rientra nella tua area.',
+      action: isEnglish() ? 'Sign in with phone and code' : 'Accedi con numero e codice',
+      href: crewAccessUrl(),
+    };
+  }
+  if (currentBlockedKind === 'profile') {
+    return {
+      eyebrow: isEnglish() ? 'One step first' : 'Prima un ultimo passo',
+      title: isEnglish() ? 'Complete your charter details.' : 'Completa i dati per il charter.',
+      action: isEnglish() ? 'Complete my details' : 'Completa i miei dati',
+      href: profileUrl({ edit: true }),
+    };
+  }
+  if (currentBlockedKind === 'briefing') {
+    return {
+      eyebrow: copy.blockedEyebrow,
+      title: isEnglish() ? 'Read the briefing before continuing.' : 'Leggi il briefing prima di proseguire.',
+      action: isEnglish() ? 'Open my area' : 'Apri la mia area',
+      href: personalAreaUrl(),
+    };
+  }
+  return {
+    eyebrow: copy.blockedEyebrow,
+    title: copy.blockedTitle,
+    action: copy.backToArea,
+    href: personalAreaUrl(),
+  };
+}
+
+function renderBlockedPresentation(copy) {
+  const presentation = blockedPresentation(copy);
+  document.querySelector('#travelBlockedEyebrow').textContent = presentation.eyebrow;
+  document.querySelector('#travelBlockedTitle').textContent = presentation.title;
+  const link = document.querySelector('#travelBlockedLink');
+  link.textContent = presentation.action;
+  link.href = presentation.href;
+}
+
 function showOpening(message, isError = false) {
+  currentBlockedKind = 'default';
   document.querySelector('#travelWorkspace').hidden = true;
   document.querySelector('#travelBlocked').hidden = true;
   document.querySelector('#travelOpening').hidden = false;
   setMessage(document.querySelector('#travelOpeningMessage'), message, isError);
 }
 
-function showBlocked(message) {
+function showBlocked(message, { kind = 'default', isError = true } = {}) {
+  currentBlockedKind = kind;
   document.querySelector('#travelWorkspace').hidden = true;
   document.querySelector('#travelOpening').hidden = true;
   document.querySelector('#travelBlocked').hidden = false;
-  setMessage(document.querySelector('#travelBlockedMessage'), message, true);
+  renderBlockedPresentation(copyForLocale());
+  setMessage(document.querySelector('#travelBlockedMessage'), message, isError);
 }
 
 function isAcceptedBriefing(briefing, acceptance, userId) {
@@ -1015,18 +1058,17 @@ async function openTravelWorkspace(session) {
   ]);
   const copy = copyForLocale();
   if (!memberSnapshot.exists()) {
-    showBlocked(copy.blockedNoProfile);
-    document.querySelector('#travelBlockedLink').href = profileUrl({ edit: true });
+    showBlocked(copy.blockedNoProfile, { kind: 'profile', isError: false });
     return;
   }
   const briefing = briefingSnapshot.exists() ? briefingSnapshot.data() : null;
   if (!briefing || !text(briefing.rulesText)) {
-    showBlocked(copy.blockedNoBriefing);
+    showBlocked(copy.blockedNoBriefing, { kind: 'briefing', isError: false });
     return;
   }
   const acceptance = acceptanceSnapshot.exists() ? acceptanceSnapshot.data() : null;
   if (!isAcceptedBriefing(briefing, acceptance, user.uid)) {
-    showBlocked(copy.blockedBriefing);
+    showBlocked(copy.blockedBriefing, { kind: 'briefing', isError: false });
     return;
   }
   try {
@@ -1059,8 +1101,7 @@ startCrewAreaSession({
   onOpening: (message, isError) => showOpening(message || copyForLocale().openingMessage, isError),
   onInvalid: (error) => {
     const copy = copyForLocale();
-    showBlocked(error ? crewAccessErrorMessage(error) : copy.invalidAccess);
-    document.querySelector('#travelBlockedLink').href = crewAccessUrl();
+    showBlocked(error ? crewAccessErrorMessage(error) : copy.invalidAccess, { kind: 'login' });
   },
   onReady: async (session) => {
     try {

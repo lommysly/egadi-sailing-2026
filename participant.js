@@ -14,6 +14,7 @@ import {
   withSaveRetry,
 } from './crew-session.js?v=20260928-blast-experience-v1';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
+import { canConfirmCrewBriefing } from './crew-flow-state.js?v=20260928-crew-flow-v1';
 import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
@@ -238,7 +239,10 @@ function clearPreRegistrationRulesGate() {
 function updatePreRegistrationAcceptState() {
   const acknowledgement = document.querySelector('#preRegistrationAcknowledgement');
   const acceptButton = document.querySelector('#preRegistrationAcceptButton');
-  const canConfirm = hasPublishedBriefing() && !hasAcceptedCurrentBriefing();
+  const fullRulesRead = document.querySelector('#preRegistrationBriefing').dataset.fullRulesRead === 'true';
+  const canConfirm = hasPublishedBriefing()
+    && canConfirmCrewBriefing({ requiresFullRulesRead: briefingRequiresFullRulesRead(), fullRulesRead })
+    && !hasAcceptedCurrentBriefing();
   acknowledgement.disabled = !canConfirm;
   if (!canConfirm) acknowledgement.checked = false;
   acceptButton.disabled = !(canConfirm && acknowledgement.checked);
@@ -768,6 +772,11 @@ document.querySelector('#preRegistrationBriefingStatus').setAttribute('aria-live
 
 document.querySelector('#preRegistrationAcceptButton').addEventListener('click', async () => {
   if (!hasPublishedBriefing() || !activeInvite || !auth.currentUser) return;
+  const fullRulesRead = document.querySelector('#preRegistrationBriefing').dataset.fullRulesRead === 'true';
+  if (!canConfirmCrewBriefing({ requiresFullRulesRead: briefingRequiresFullRulesRead(), fullRulesRead })) {
+    setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.scrollToEnd', 'Passo 1 di 2: apri il regolamento e scorri fino alla fine. Poi si attiva la dichiarazione qui sotto.'), true);
+    return;
+  }
   if (!document.querySelector('#preRegistrationAcknowledgement').checked) {
     setMessage(document.querySelector('#preRegistrationMessage'), translate('crew.flow.confirmReadFirst', 'Conferma di aver letto il regolamento di bordo prima di proseguire.'), true);
     return;
