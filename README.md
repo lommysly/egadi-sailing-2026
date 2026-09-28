@@ -7,7 +7,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 - Il sito pubblico è raggiungibile su `https://egadi.thatsablast.it/`.
 - Il sito usa un solo sorgente bilingue IT / EN: il selettore conserva lingua, query e hash. L'inglese è copy editoriale scritto e revisionato nel progetto, non un widget Google Translate o una traduzione al volo.
 - L'area privata è attiva su HTTPS per autorizzazione esplicita del titolare: skipper con Google, equipaggio solo tramite invito WhatsApp personale e codice di sei cifre.
-- L’area skipper può essere aperta senza selezionare alcuna scheda equipaggio: l’inizializzazione dell’accesso Google non dipende dalla lettura delle quote.
+- L’area skipper può essere aperta senza selezionare alcuna scheda equipaggio: l’inizializzazione dell’accesso Google non dipende dalla lettura delle quote. Google si apre nella sua finestra anche su telefono: il reindirizzamento forzato non è usato, perché può essere bloccato dai browser mobili su un dominio custom.
 - `PRIVATE_AREA_ENABLED` nel sorgente e `events/egadi-2026.privateAreaEnabled` in Firestore sono entrambi `true`. Per una chiusura di emergenza basta riportare uno dei due a `false`; per coerenza operativa vanno riportati entrambi a `false`.
 - Google ed Email/Password sono attivi; email-link e SMS non sono usati. Il dominio `egadi.thatsablast.it` è autorizzato in Firebase Authentication.
 
@@ -265,6 +265,6 @@ Nel Google Sheet privato le schede aggiornate automaticamente sono **Arrivi** e 
 3. Con autorizzazione del titolare dell'11 settembre 2026 sono stati attivati insieme `PRIVATE_AREA_ENABLED=true` e `privateAreaEnabled: true`.
 4. Il primo utilizzo deve partire dallo skipper: Google, verifica della barca `Karibu`, poi un invito personale a una persona alla volta.
 5. Restano da completare e formalizzare i punti in `PRIVACY_DA_COMPLETARE.md`, in particolare contatto, tempi di conservazione e procedura di cancellazione.
-6. Prima di pubblicare una modifica a `area.js`, eseguire `node --test tools/area-projection-guards.test.mjs`, aprire `area.html` in una sessione anonima e controllare l’assenza di errori JavaScript prima della prova con Google. Su telefono l’accesso Google usa il reindirizzamento e torna automaticamente al sito; su desktop usa la finestra Google e offre il recupero «Accedi senza popup» se quella finestra viene chiusa.
+6. Prima di pubblicare una modifica a `area.js`, eseguire `node --test tools/area-projection-guards.test.mjs`, aprire `area.html` in una sessione anonima e controllare l’assenza di errori JavaScript prima della prova con Google. Su telefono e desktop l’accesso skipper apre Google nella sua finestra; se il browser interno di WhatsApp la blocca, aprire l’area direttamente in Safari o Chrome e riprovare.
 
 L'invito resta obbligatorio: l'apertura dell'area non crea una registrazione pubblica libera.
