@@ -4809,8 +4809,12 @@ function projectionStatusLabel(projection) {
       : 'Accesso attivo · dati charter da completare';
     return `${accessStatus}${paymentNote}`;
   }
+  const expiresAt = invite.expiresAt?.toDate ? formatDateTime(invite.expiresAt) : '';
   const expired = invite.expiresAt?.toDate && invite.expiresAt.toDate() < new Date();
-  return `${expired ? 'Invito scaduto · genera un nuovo link' : 'Link pronto da inviare'}${paymentNote}`;
+  if (expired) {
+    return `Invito scaduto${expiresAt ? ` il ${expiresAt}` : ''} · genera un nuovo link${paymentNote}`;
+  }
+  return `Link pronto · scade il ${expiresAt || 'termine non disponibile'}${paymentNote}`;
 }
 
 function crewSeatLimit() {

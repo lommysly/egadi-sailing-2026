@@ -47,6 +47,7 @@ Ultimo aggiornamento: 28 settembre 2026. Le caselle descrivono lo stato verifica
 - [x] Sorgente locale: ingresso successivo da `crew.html` con numero WhatsApp + codice, senza Google, email o SMS.
 - [x] Sorgente locale: riaprendo il medesimo link dalla sessione autenticata del destinatario, rientro diretto nella sua area; da una sessione diversa il link non mostra dati e offre solo l'ingresso con numero + codice.
 - [x] Sorgente locale: scadenza del link a 14 giorni e riemissione sullo stesso invito, con revoca del precedente UID e conservazione di scheda/richieste/PDF.
+- [x] Sorgente locale: ogni card invito mostra data e ora di scadenza; oltre il termine indica esplicitamente che occorre generare un nuovo link.
 - [x] Sorgente locale: un numero WhatsApp può avere una sola barca attiva nell'evento; il secondo invito viene bloccato dopo l'attivazione.
 - [x] Sorgente locale: nessun PIN viene scritto in Firestore, Crew List o browser.
 - [ ] Pubblicare e testare le bozze private: skipper e invitato devono poter sospendere la compilazione senza dati completi; la bozza non può comparire in Crew List, PDF, capienza, flotta, pagamenti o bacheca e la riemissione dell'invito non deve esporla a un nuovo destinatario.
