@@ -2379,7 +2379,11 @@ service cloud.firestore {
         || (isGoogleSkipperAccount() && boatId == request.auth.uid
           && (!exists(/databases/$(database)/documents/boats/$(boatId))
             || get(/databases/$(database)/documents/boats/$(boatId)).data.skipperId == request.auth.uid)));
-      allow list: if false;
+      // L'organizzatore vede già ogni singola barca con `get` senza alcuna
+      // restrizione sul contenuto: `list` non espone nulla di nuovo, serve
+      // solo a costruire il riepilogo transfer per barca senza conoscere in
+      // anticipo ogni boatId (richiesta del titolare, 29/09/2026).
+      allow list: if isPrivateAreaOpen() && isOrganizer();
       allow create: if isPrivateAreaOpen() && isGoogleSkipperAccount() && boatId == request.auth.uid && request.resource.data.skipperId == request.auth.uid && hasValidPrivateBoatCapacity();
       // Nemmeno l'organizzatore può riassociare temporaneamente uno skipper
       // cambiando skipperId: quel legame protegge anche il dossier privato.

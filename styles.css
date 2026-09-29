@@ -942,8 +942,11 @@ body.menu-open { overflow:hidden; }
 .transfer-boat-stats { margin-bottom:24px; }
 .transfer-boat-stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:16px; }
 .transfer-boat-stat { padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:var(--paper); }
-.transfer-boat-stat strong { display:block; margin-bottom:4px; font:600 1.05rem "Fraunces",serif; }
-.transfer-boat-stat span { color:rgba(17,45,56,.68); font-size:.84rem; }
+.transfer-boat-stat strong { display:block; margin-bottom:2px; font:600 1.05rem "Fraunces",serif; }
+.transfer-boat-stat small { display:block; margin-bottom:8px; color:rgba(17,45,56,.55); font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; }
+.transfer-boat-stat span { display:block; margin-top:4px; color:rgba(17,45,56,.68); font-size:.84rem; }
+.transfer-boat-stat--pending { border-color:rgba(194,65,12,.35); background:#fdece3; }
+.transfer-boat-stat-flag { display:inline-block; margin-top:8px; padding:3px 9px; border-radius:999px; background:#c2410c; color:white; font:700 .68rem "DM Mono",monospace; letter-spacing:.02em; }
 
 .transfer-operator-card { padding:22px; border-radius:16px; background:var(--paper); margin-bottom:20px; }
 .transfer-operator-card:last-child { margin-bottom:0; }

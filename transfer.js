@@ -121,8 +121,13 @@ const COPY = {
     allBoats: 'Tutte le barche',
     boatStatsEyebrow: 'Riepilogo per barca',
     boatStatsTitle: 'Chi ha scelto il transfer, barca per barca',
-    boatStatOf: 'su',
-    boatStatRequested: 'hanno scelto il transfer',
+    boatStatsSummary: '{boats} barche · {members} persone registrate · {outbound} hanno chiesto il transfer in andata, {return} al ritorno.',
+    boatStatSkipper: 'Skipper {name}',
+    boatStatOnBoard: 'persone registrate',
+    boatStatRequestedShort: 'transfer',
+    boatStatIndependentShort: 'in autonomia',
+    boatStatPendingShort: 'da sollecitare',
+    boatStatFollowUp: 'Contatta lo skipper: qualcuno non ha ancora deciso',
     filterSearch: 'Cerca per nome, aeroporto o volo',
     noRecords: 'Non ci sono movimenti con questi filtri.',
     direction: 'Tratta',
@@ -252,8 +257,13 @@ const COPY = {
     allBoats: 'All boats',
     boatStatsEyebrow: 'Boat by boat',
     boatStatsTitle: 'Who chose the transfer, boat by boat',
-    boatStatOf: 'of',
-    boatStatRequested: 'chose the transfer',
+    boatStatsSummary: '{boats} boats · {members} registered people · {outbound} requested the outbound transfer, {return} the return.',
+    boatStatSkipper: 'Skipper {name}',
+    boatStatOnBoard: 'registered people',
+    boatStatRequestedShort: 'transfer',
+    boatStatIndependentShort: 'on their own',
+    boatStatPendingShort: 'to follow up',
+    boatStatFollowUp: 'Contact the skipper: someone has not decided yet',
     filterSearch: 'Search name, airport or flight',
     noRecords: 'There are no journeys matching these filters.',
     direction: 'Journey',
@@ -318,6 +328,12 @@ const state = {
   // "non riesco a controllare chi ha fatto e cosa ha fatto" senza un filtro
   // e una statistica per barca).
   boatMemberCounts: {},
+  // Elenco completo delle barche (richiede `list` su boats, solo organizzatore)
+  // e stato dettagliato di viaggio per barca (crewTravelStatus), per capire
+  // quali skipper non hanno ancora fatto compilare il transfer al loro
+  // equipaggio (richiesta del titolare, 29/09/2026).
+  allBoats: [],
+  boatTravelStatus: {},
 };
 
 function locale() {
@@ -871,32 +887,94 @@ async function ensureBoatMemberCounts(boatIds) {
   render();
 }
 
-// Persone uniche (non record: ognuna ha fino a due record, andata e ritorno)
-// con almeno una tratta a transfer attivo per quella barca. Calcolato su
-// tutti i record, non su quelli già filtrati dalla toolbar: la statistica
-// per barca resta un riepilogo assoluto, il filtro sotto serve solo a
-// restringere l'elenco dei movimenti.
-function boatTransferRequesterCount(boatId) {
-  const requesters = new Set();
-  state.records.forEach((record) => {
-    if (record.boatId !== boatId) return;
-    if (record.recordState && record.recordState !== 'active') return;
-    requesters.add(record.inviteId);
+// L'unica lista completa e affidabile delle barche: i record (transferOpsRecords)
+// esistono solo per chi ha già aperto il modulo viaggio, quindi una barca
+// completamente ferma non comparirebbe mai — proprio il caso che Silvio deve
+// individuare per sollecitare lo skipper (richiesta del 29/09/2026). L'elenco
+// completo richiede `list` su boats, permesso solo all'organizzatore.
+async function ensureAllBoatsLoaded() {
+  if (!state.isOrganizer || state.allBoats.length) return;
+  try {
+    const snapshot = await getDocs(collection(db, 'boats'));
+    state.allBoats = snapshot.docs
+      .map((entry) => ({ id: entry.id, name: entry.data()?.name || entry.id, skipperName: entry.data()?.skipperName || '' }))
+      .sort((first, second) => first.name.localeCompare(second.name, 'it'));
+    render();
+  } catch (error) {
+    console.info('Elenco barche non disponibile.', error?.code || error);
+  }
+}
+
+// Stato dettagliato per persona e per tratta (richiesto/autonomo/non deciso),
+// molto più preciso di transferOpsRecords: quella collezione non distingue
+// "si arrangia da solo" da "non ha ancora deciso" (entrambi diventano un
+// record "revoked" senza altri dati) — crewTravelStatus sì, ed è già
+// leggibile in list dall'organizzatore per qualunque barca.
+async function ensureBoatTravelStatus(boatIds) {
+  const missing = boatIds.filter((boatId) => !(boatId in state.boatTravelStatus));
+  if (!missing.length) return;
+  await Promise.all(missing.map(async (boatId) => {
+    try {
+      const snapshot = await getDocs(collection(db, 'boats', boatId, 'crewTravelStatus'));
+      state.boatTravelStatus[boatId] = snapshot.docs.map((entry) => entry.data());
+    } catch (error) {
+      console.info('Stato viaggio non disponibile per questa barca.', boatId, error?.code || error);
+      state.boatTravelStatus[boatId] = [];
+    }
+  }));
+  render();
+}
+
+// Per ogni tratta: quante persone hanno chiesto il transfer, quante si
+// arrangiano da sole, quante restano da sollecitare (non hanno ancora
+// deciso, oppure non hanno mai aperto il modulo viaggio).
+function boatTravelBreakdown(boatId) {
+  const statuses = state.boatTravelStatus[boatId] || [];
+  const total = state.boatMemberCounts[boatId];
+  const countFor = (key) => ({
+    requested: statuses.filter((entry) => entry[key] === 'requested').length,
+    independent: statuses.filter((entry) => entry[key] === 'not_requested').length,
   });
-  return requesters.size;
+  const outbound = countFor('outboundTransfer');
+  const inbound = countFor('returnTransfer');
+  const pendingFor = (counted) => Number.isInteger(total) ? Math.max(0, total - counted.requested - counted.independent) : null;
+  return {
+    total,
+    outbound: { ...outbound, pending: pendingFor(outbound) },
+    return: { ...inbound, pending: pendingFor(inbound) },
+  };
 }
 
 function renderBoatStats() {
-  const boats = knownBoats();
-  if (!boats.length) return '';
-  void ensureBoatMemberCounts(boats.map((boat) => boat.id));
-  const cards = boats.map((boat) => {
-    const requested = boatTransferRequesterCount(boat.id);
-    const total = state.boatMemberCounts[boat.id];
-    const totalText = Number.isInteger(total) ? String(total) : '…';
-    return `<article class="transfer-boat-stat"><strong>${escapeHtml(boat.name)}</strong><span>${requested} ${escapeHtml(t('boatStatOf'))} ${totalText} ${escapeHtml(t('boatStatRequested'))}</span></article>`;
+  if (!state.allBoats.length) return '';
+  const boatIds = state.allBoats.map((boat) => boat.id);
+  void ensureBoatMemberCounts(boatIds);
+  void ensureBoatTravelStatus(boatIds);
+  const totals = { members: 0, outboundRequested: 0, outboundPending: 0, returnRequested: 0, returnPending: 0 };
+  const cards = state.allBoats.map((boat) => {
+    const breakdown = boatTravelBreakdown(boat.id);
+    if (Number.isInteger(breakdown.total)) totals.members += breakdown.total;
+    totals.outboundRequested += breakdown.outbound.requested;
+    totals.returnRequested += breakdown.return.requested;
+    if (Number.isInteger(breakdown.outbound.pending)) totals.outboundPending += breakdown.outbound.pending;
+    if (Number.isInteger(breakdown.return.pending)) totals.returnPending += breakdown.return.pending;
+    const needsFollowUp = (breakdown.outbound.pending || 0) > 0 || (breakdown.return.pending || 0) > 0;
+    const totalText = Number.isInteger(breakdown.total) ? String(breakdown.total) : '…';
+    const legLine = (label, leg) => `<span>${escapeHtml(label)}: ${leg.requested} ${escapeHtml(t('boatStatRequestedShort'))} · ${leg.independent} ${escapeHtml(t('boatStatIndependentShort'))} · ${Number.isInteger(leg.pending) ? leg.pending : '…'} ${escapeHtml(t('boatStatPendingShort'))}</span>`;
+    return `<article class="transfer-boat-stat${needsFollowUp ? ' transfer-boat-stat--pending' : ''}">
+      <strong>${escapeHtml(boat.name)}</strong>
+      <small>${boat.skipperName ? escapeHtml(t('boatStatSkipper').replace('{name}', boat.skipperName)) : ''} · ${totalText} ${escapeHtml(t('boatStatOnBoard'))}</small>
+      ${legLine(t('inbound'), breakdown.outbound)}
+      ${legLine(t('outbound'), breakdown.return)}
+      ${needsFollowUp ? `<span class="transfer-boat-stat-flag">${escapeHtml(t('boatStatFollowUp'))}</span>` : ''}
+    </article>`;
   }).join('');
-  return `<section class="transfer-operator-card transfer-boat-stats" aria-label="${escapeHtml(t('boatStatsTitle'))}"><p class="eyebrow">${escapeHtml(t('boatStatsEyebrow'))}</p><h2>${escapeHtml(t('boatStatsTitle'))}</h2><div class="transfer-boat-stat-grid">${cards}</div></section>`;
+  const summary = `<p class="field-hint">${escapeHtml(t('boatStatsSummary')
+    .replace('{boats}', String(state.allBoats.length))
+    .replace('{members}', String(totals.members))
+    .replace('{outbound}', String(totals.outboundRequested))
+    .replace('{return}', String(totals.returnRequested)))}</p>`;
+  return `<section class="transfer-operator-card transfer-boat-stats" aria-label="${escapeHtml(t('boatStatsTitle'))}"><p class="eyebrow">${escapeHtml(t('boatStatsEyebrow'))}</p><h2>${escapeHtml(t('boatStatsTitle'))}</h2>${summary}<div class="transfer-boat-stat-grid">${cards}</div></section>`;
 }
 
 function boatFilterOptions() {
@@ -1036,6 +1114,8 @@ async function refreshAccess() {
   state.transferPricing = null;
   state.records = [];
   state.boatMemberCounts = {};
+  state.allBoats = [];
+  state.boatTravelStatus = {};
   render();
 
   if (!state.user) {
@@ -1052,6 +1132,7 @@ async function refreshAccess() {
       const eventSnapshot = await getDoc(doc(db, 'events', EVENT_ID));
       state.event = eventSnapshot.exists() ? eventSnapshot.data() : null;
       state.isOrganizer = Boolean(state.event?.organizerIds?.includes(state.user.uid));
+      if (state.isOrganizer) void ensureAllBoatsLoaded();
     } catch (eventError) {
       console.info('Accesso transfer senza privilegi organizzatore.', eventError.code || eventError);
       state.event = null;
