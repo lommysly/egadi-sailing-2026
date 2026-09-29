@@ -223,6 +223,15 @@ body.menu-open { overflow:hidden; }
    mai il volo o l'orario, che restano privati alla persona. */
 .crew-travel-overview { margin:22px 0 30px; padding:20px; border-radius:14px; background:#f7fffe; border:1px solid rgba(8,123,138,.19); }
 .crew-travel-overview h4 { margin:4px 0 6px; font:600 1.25rem/1.05 "Fraunces",serif; letter-spacing:-.02em; }
+.crew-travel-groups { display:grid; gap:22px; margin-top:18px; }
+.crew-travel-group { min-width:0; }
+.crew-travel-group + .crew-travel-group { padding-top:20px; border-top:1px solid rgba(8,123,138,.18); }
+.crew-travel-group-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
+.crew-travel-group-heading h5 { margin:0 0 4px; font:600 1rem/1.15 "Fraunces",serif; }
+.crew-travel-group-heading p { max-width:62ch; margin:0; color:#416b6d; font-size:.78rem; line-height:1.45; }
+.crew-travel-group-heading > strong { display:grid; place-items:center; min-width:34px; height:34px; padding:0 9px; border-radius:999px; background:#dff6f3; color:#075f6b; font:700 .78rem "DM Mono",monospace; }
+.crew-travel-group--waiting .crew-travel-group-heading > strong { background:#ffe6b3; color:#7a4a00; }
+.crew-travel-group-empty { margin:12px 0 0; padding:11px 13px; border-radius:10px; background:rgba(255,255,255,.64); color:#416b6d; font-size:.78rem; }
 .crew-travel-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,320px)); justify-content:start; align-items:stretch; gap:12px; margin-top:16px; }
 .crew-travel-card { --crew-travel-card-bg:#f3f5f5; --crew-travel-card-border:#66757a; display:grid; grid-template-rows:auto 1fr auto; gap:15px; width:100%; min-height:196px; padding:16px; border:1px solid var(--crew-travel-card-border); border-radius:15px; background:var(--crew-travel-card-bg); }
 .crew-travel-card--attention { --crew-travel-card-bg:#fff5dc; --crew-travel-card-border:#806000; }
@@ -247,6 +256,7 @@ body.menu-open { overflow:hidden; }
 .crew-travel-card-no-contact { margin:0; }
 @media (max-width:560px) {
   .crew-travel-overview { padding:0; border:0; background:transparent; }
+  .crew-travel-group-heading { align-items:center; }
   .crew-travel-list { grid-template-columns:minmax(0,320px); }
   .crew-travel-card { min-height:0; }
 }

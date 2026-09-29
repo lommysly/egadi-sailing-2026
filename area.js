@@ -12,7 +12,7 @@ import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-experience-v1';
-import { crewTravelCardPresentation, crewTravelCardPriority } from './crew-flow-state.js?v=20260929-skipper-transfer-cards-v1';
+import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20260929-skipper-transfer-lists-v2';
 
 watchForStaleScript(import.meta.url);
 
@@ -1321,8 +1321,18 @@ function setupSkipperOperationsDashboard(travelPanel, boardPanel, crewTravelOver
   crewHeading.className = 'skipper-subdashboard-section-heading';
   crewHeading.innerHTML = '<p class="eyebrow">Viaggi equipaggio</p><h3>Chi ha confermato e chi va aiutato</h3><p class="panel-lead">Qui trovi soltanto lo stato operativo delle persone della tua barca e i solleciti necessari.</p>';
   crewHeading.querySelector('h3')?.setAttribute('tabindex', '-1');
-  crewPanel.append(skipperSubdashboardBackButton('operations', 'Viaggio e comunicazioni'), crewHeading);
-  if (crewTravelOverview) crewPanel.append(crewTravelOverview);
+  const operationsCrewTravelOverview = document.createElement('section');
+  operationsCrewTravelOverview.id = 'crewTravelOverviewOperations';
+  operationsCrewTravelOverview.className = 'crew-travel-overview';
+  operationsCrewTravelOverview.dataset.crewTravelOverview = '';
+  operationsCrewTravelOverview.setAttribute('aria-live', 'polite');
+  operationsCrewTravelOverview.hidden = true;
+  if (crewTravelOverview) crewTravelOverview.dataset.crewTravelOverview = '';
+  crewPanel.append(
+    skipperSubdashboardBackButton('operations', 'Viaggio e comunicazioni'),
+    crewHeading,
+    operationsCrewTravelOverview,
+  );
 
   delete boardPanel.dataset.skipperPanel;
   boardPanel.dataset.operationsPanel = SKIPPER_OPERATIONS_VIEWS.rules;
@@ -1733,23 +1743,22 @@ function renderSkipperDashboardOverview() {
   const travelSummary = skipperTravelDashboardSummary();
   const currentAcceptanceCount = currentBriefingAcceptanceCount();
   const boardRulesActive = Boolean(activeBriefing?.rulesText);
-  const crewTravelPendingCount = activeMembers.filter((member) => {
-    const status = crewTravelStatusFor(member.id);
-    return ['outbound', 'return'].some((direction) => CREW_TRAVEL_NEEDS_REMINDER.has(crewTravelLegState(status, direction)));
-  }).length;
+  const crewTravelCards = crewTravelOverviewCards();
+  const crewTravelPendingCount = crewTravelCards.filter((card) => card.group === 'waiting').length;
+  const crewTravelSubmittedCount = crewTravelCards.length - crewTravelPendingCount;
   const operationsNeedAttention = travelSummary.needsAttention || !boardRulesActive || crewTravelPendingCount > 0;
   setSkipperDashboardMetric(
     'operations',
     !travelSummary.needsAttention && boardRulesActive && crewTravelPendingCount
       ? `${crewTravelPendingCount} ${crewTravelPendingCount === 1 ? 'persona da sollecitare' : 'persone da sollecitare'}`
       : operationsNeedAttention ? 'Da completare' : 'Viaggio impostato',
-    `${travelSummary.detail} · ${crewTravelPendingCount ? `${crewTravelPendingCount} ${crewTravelPendingCount === 1 ? 'persona deve completare il viaggio' : 'persone devono completare il viaggio'}` : 'equipaggio aggiornato'} · ${boardRulesActive ? 'regole attive' : 'regole da attivare'} · ${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} avvisi`,
+    `${travelSummary.detail} · ${crewTravelPendingCount ? `${crewTravelPendingCount} ${crewTravelPendingCount === 1 ? 'persona deve completare il viaggio' : 'persone devono completare il viaggio'}` : 'nessuno in attesa'} · ${crewTravelSubmittedCount} ${crewTravelSubmittedCount === 1 ? 'scelta già comunicata' : 'scelte già comunicate'} · ${boardRulesActive ? 'regole attive' : 'regole da attivare'} · ${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} avvisi`,
     operationsNeedAttention,
     travelSummary.needsAttention
       ? { view: 'operations', operationsView: 'personal', targetId: 'skipperTravelPanel' }
       : !boardRulesActive
         ? { view: 'operations', operationsView: 'rules', targetId: 'regolamento-di-bordo' }
-        : { view: 'operations', operationsView: 'crew', targetId: 'crewTravelOverview' },
+        : { view: 'operations', operationsView: 'crew', targetId: 'crewTravelOverviewOperations' },
   );
 
   const costPlan = normalizeCostPlan(activeCostPlan);
@@ -6666,20 +6675,50 @@ function crewTravelContactUrl(member) {
   return selectWhatsappUrl(whatsappLinks(number, crewTravelContactMessage(member)), 'preferred');
 }
 
+function crewTravelMembers() {
+  return activeMembers.filter((member) => {
+    const invite = inviteForRecipient(member.id);
+    return invite && invite.status !== 'revoked';
+  });
+}
+
+function crewTravelOverviewCards() {
+  return crewTravelMembers().map((member) => {
+    const status = crewTravelStatusFor(member.id);
+    const legStates = {
+      outbound: crewTravelLegState(status, 'outbound'),
+      return: crewTravelLegState(status, 'return'),
+    };
+    const needsReminder = CREW_TRAVEL_NEEDS_REMINDER.has(legStates.outbound)
+      || CREW_TRAVEL_NEEDS_REMINDER.has(legStates.return);
+    const presentation = crewTravelCardPresentation(legStates);
+    return {
+      member,
+      legStates,
+      needsReminder,
+      presentation,
+      group: crewTravelOverviewGroup(legStates),
+    };
+  }).sort((first, second) => {
+    const groupOrder = first.group === second.group ? 0 : first.group === 'waiting' ? -1 : 1;
+    const stateOrder = crewTravelCardPriority(first.presentation.tone) - crewTravelCardPriority(second.presentation.tone);
+    return groupOrder || stateOrder || memberName(first.member).localeCompare(memberName(second.member), 'it', { sensitivity: 'base' });
+  });
+}
+
 // "Direttore d'orchestra": lo skipper vede a colpo d'occhio chi ha ancora
 // andata o ritorno da confermare e può sollecitare subito su WhatsApp,
 // invece di scoprirlo solo quando manca un transfer da organizzare (vedi
 // il bug reale del 22/09/2026 con una persona rimasta invisibile in bozza).
 function renderCrewTravelOverview() {
-  const section = document.querySelector('#crewTravelOverview');
-  if (!section) return;
-  const travelMembers = activeMembers.filter((member) => {
-    const invite = inviteForRecipient(member.id);
-    return invite && invite.status !== 'revoked';
-  });
-  if (!travelMembers.length) {
-    section.hidden = true;
-    section.innerHTML = '';
+  const sections = Array.from(document.querySelectorAll('[data-crew-travel-overview]'));
+  if (!sections.length) return;
+  const cards = crewTravelOverviewCards();
+  if (!cards.length) {
+    sections.forEach((section) => {
+      section.hidden = true;
+      section.innerHTML = '';
+    });
     return;
   }
   const legBadge = (legStates, direction) => {
@@ -6687,21 +6726,7 @@ function renderCrewTravelOverview() {
     const label = direction === 'outbound' ? 'Andata' : 'Ritorno';
     return `<span class="crew-travel-leg crew-travel-leg--${legStates[direction]}"><span aria-hidden="true">${info.icon}</span>${escapeHtml(label)} · ${escapeHtml(info.text)}</span>`;
   };
-  const cards = travelMembers.map((member) => {
-    const status = crewTravelStatusFor(member.id);
-    const legStates = {
-      outbound: crewTravelLegState(status, 'outbound'),
-      return: crewTravelLegState(status, 'return'),
-    };
-    const needsReminder = CREW_TRAVEL_NEEDS_REMINDER.has(legStates.outbound) || CREW_TRAVEL_NEEDS_REMINDER.has(legStates.return);
-    const presentation = crewTravelCardPresentation(legStates);
-    return { member, legStates, needsReminder, presentation };
-  }).sort((first, second) => {
-    const stateOrder = crewTravelCardPriority(first.presentation.tone) - crewTravelCardPriority(second.presentation.tone);
-    return stateOrder || memberName(first.member).localeCompare(memberName(second.member), 'it', { sensitivity: 'base' });
-  });
-  const pendingCount = cards.filter((card) => card.needsReminder).length;
-  const rows = cards.map(({ member, legStates, needsReminder, presentation }) => {
+  const renderCard = ({ member, legStates, needsReminder, presentation }) => {
     const useReminder = needsReminder && presentation.tone !== 'cancelled';
     const contactUrl = useReminder ? crewTravelReminderUrl(member, legStates) : crewTravelContactUrl(member);
     const actionLabel = useReminder
@@ -6712,12 +6737,39 @@ function renderCrewTravelOverview() {
       : '<span class="field-hint crew-travel-card-no-contact">Numero WhatsApp non disponibile</span>';
     const initial = escapeHtml(memberName(member).trim().charAt(0).toUpperCase() || '?');
     return `<article class="crew-travel-card crew-travel-card--${escapeHtml(presentation.tone)}"><header class="crew-travel-card-heading"><span class="crew-travel-card-avatar" aria-hidden="true">${initial}</span><span class="crew-travel-card-person"><strong>${escapeHtml(memberName(member))}</strong><small>${escapeHtml(presentation.label)}</small></span></header><div class="crew-travel-card-legs">${legBadge(legStates, 'outbound')}${legBadge(legStates, 'return')}</div><div class="crew-travel-card-action">${action}</div></article>`;
-  }).join('');
-  section.hidden = false;
-  const heading = pendingCount
-    ? `<h4>${pendingCount} ${pendingCount === 1 ? 'persona deve ancora completare' : 'persone devono ancora completare'} andata o ritorno</h4><p class="panel-lead">“Transfer da scegliere” significa che il viaggio è salvato, ma manca la scelta del collegamento con Marsala. Nella gestione transfer compaiono solo le richieste con consenso. Puoi inviare un promemoria su WhatsApp.</p>`
-    : '<h4>Andata e ritorno compilati</h4><p class="panel-lead">Controlla qui se il transfer è soltanto richiesto, in organizzazione o confermato dal gestore.</p>';
-  section.innerHTML = `<p class="eyebrow">Viaggio equipaggio</p>${heading}<div class="crew-travel-list">${rows}</div>`;
+  };
+  const waitingCards = cards.filter((card) => card.group === 'waiting');
+  const submittedCards = cards.filter((card) => card.group === 'submitted');
+  const renderGroup = ({ key, title, detail, entries, emptyText }) => `
+    <section class="crew-travel-group crew-travel-group--${key}" data-crew-travel-group="${key}">
+      <header class="crew-travel-group-heading">
+        <div><h5>${escapeHtml(title)}</h5><p>${escapeHtml(detail)}</p></div>
+        <strong aria-label="${entries.length} persone">${entries.length}</strong>
+      </header>
+      ${entries.length
+        ? `<div class="crew-travel-list">${entries.map(renderCard).join('')}</div>`
+        : `<p class="crew-travel-group-empty">${escapeHtml(emptyText)}</p>`}
+    </section>`;
+  const heading = waitingCards.length
+    ? `<h4>${waitingCards.length} ${waitingCards.length === 1 ? 'persona è ancora in attesa' : 'persone sono ancora in attesa'}</h4><p class="panel-lead">Sotto trovi separatamente chi deve completare e chi ha già comunicato la propria scelta. I badge indicano lo stato di andata e ritorno.</p>`
+    : '<h4>Tutti hanno comunicato andata e ritorno</h4><p class="panel-lead">Le card mostrano se il transfer è richiesto, in organizzazione, confermato oppure non necessario.</p>';
+  const markup = `<p class="eyebrow">Viaggio equipaggio</p>${heading}<div class="crew-travel-groups">${renderGroup({
+    key: 'waiting',
+    title: 'In attesa di completamento',
+    detail: 'Queste persone devono ancora completare almeno una tratta o scegliere il collegamento con Marsala.',
+    entries: waitingCards,
+    emptyText: 'Nessuna persona in attesa.',
+  })}${renderGroup({
+    key: 'submitted',
+    title: 'Scelta già comunicata',
+    detail: 'Qui trovi chi ha richiesto il transfer, chi è già in gestione e chi ha scelto di muoversi in autonomia.',
+    entries: submittedCards,
+    emptyText: 'Nessuna scelta ancora comunicata.',
+  })}</div>`;
+  sections.forEach((section) => {
+    section.hidden = false;
+    section.innerHTML = markup;
+  });
 }
 
 function renderMembers() {

@@ -35,12 +35,23 @@ test('ogni contatto valido dispone di WhatsApp diretto con testo contestuale', (
 });
 
 test('solo chi dispone di un invito personale entra nelle card viaggio', () => {
-  assert.match(source, /const travelMembers = activeMembers\.filter/);
+  assert.match(source, /function crewTravelMembers\(\)/);
   assert.match(source, /return invite && invite\.status !== 'revoked'/);
+  assert.equal((source.match(/crewTravelOverviewCards\(\)/g) || []).length >= 3, true);
   assert.match(source, /renderInvites\(\)[\s\S]*renderCrewTravelOverview\(\)/);
 });
 
+test('l’elenco resta visibile in Equipaggio e in Viaggi equipaggio con due gruppi espliciti', () => {
+  assert.match(html, /id="crewTravelOverview"[^>]*data-crew-travel-overview/);
+  assert.match(source, /operationsCrewTravelOverview\.id = 'crewTravelOverviewOperations'/);
+  assert.match(source, /querySelectorAll\('\[data-crew-travel-overview\]'\)/);
+  assert.match(source, /data-crew-travel-group="\$\{key\}"/);
+  assert.match(source, /In attesa di completamento/);
+  assert.match(source, /Scelta già comunicata/);
+  assert.match(source, /Nessuna persona in attesa/);
+});
+
 test('area skipper forza il caricamento della versione aggiornata', () => {
-  assert.match(html, /styles\.css\?v=20260929-skipper-transfer-cards-v1/);
-  assert.match(html, /area\.js\?v=20260929-skipper-transfer-cards-v1/);
+  assert.match(html, /styles\.css\?v=20260929-skipper-transfer-lists-v2/);
+  assert.match(html, /area\.js\?v=20260929-skipper-transfer-lists-v2/);
 });

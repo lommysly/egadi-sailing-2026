@@ -4,6 +4,7 @@ import {
   canConfirmCrewBriefing,
   crewTravelCardPresentation,
   crewTravelCardPriority,
+  crewTravelOverviewGroup,
   crewTravelNeedsAttention,
 } from '../crew-flow-state.js';
 
@@ -12,6 +13,14 @@ test('una richiesta transfer salvata non accende un allarme per l’equipaggio',
     { tone: 'waiting', label: 'Andata · transfer richiesto' },
     { tone: 'waiting', label: 'Rientro · transfer richiesto' },
   ), false);
+});
+
+test('l’elenco skipper separa chi deve completare da chi ha già comunicato la scelta', () => {
+  assert.equal(crewTravelOverviewGroup({ outbound: 'missing', return: 'no_transfer' }), 'waiting');
+  assert.equal(crewTravelOverviewGroup({ outbound: 'transfer_ready', return: 'draft' }), 'waiting');
+  assert.equal(crewTravelOverviewGroup({ outbound: 'transfer_ready', return: 'no_transfer' }), 'submitted');
+  assert.equal(crewTravelOverviewGroup({ outbound: 'transfer_confirmed', return: 'transfer_completed' }), 'submitted');
+  assert.equal(crewTravelOverviewGroup({ outbound: 'no_transfer', return: 'no_transfer' }), 'submitted');
 });
 
 test('una tratta da inserire o da correggere resta visibile come prossimo passo', () => {

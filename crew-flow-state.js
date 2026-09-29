@@ -37,6 +37,16 @@ export function crewTravelCardPriority(tone) {
   }[tone] ?? 5;
 }
 
+// Nell'area skipper le persone restano divise in due elenchi semplici:
+// chi deve ancora completare almeno una tratta e chi ha già comunicato
+// entrambe le scelte. I badge della card spiegano poi se il transfer e
+// richiesto, in gestione, concluso oppure non richiesto.
+export function crewTravelOverviewGroup(legStates = {}) {
+  return ['missing', 'draft', 'transfer_pending'].some((state) => (
+    legStates.outbound === state || legStates.return === state
+  )) ? 'waiting' : 'submitted';
+}
+
 // Quando lo skipper richiede la lettura completa, la dichiarazione si abilita
 // soltanto dopo che la finestra del regolamento ha raggiunto la fine.
 export function canConfirmCrewBriefing({ requiresFullRulesRead, fullRulesRead }) {

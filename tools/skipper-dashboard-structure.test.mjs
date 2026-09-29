@@ -130,8 +130,9 @@ test('Viaggio e comunicazioni separa i tre flussi dentro una sola categoria oper
     assert.match(operationsSetup, new RegExp(`\\{ view: '${view}', title:`));
     assert.match(operationsSetup, new RegExp(`${panel}\\.dataset\\.operationsPanel = SKIPPER_OPERATIONS_VIEWS\\.${view}`));
   }
-  assert.match(operationsSetup, /crewPanel\.append\(skipperSubdashboardBackButton\('operations', 'Viaggio e comunicazioni'\), crewHeading\)/);
-  assert.match(operationsSetup, /if \(crewTravelOverview\) crewPanel\.append\(crewTravelOverview\)/);
+  assert.match(operationsSetup, /operationsCrewTravelOverview\.id = 'crewTravelOverviewOperations'/);
+  assert.match(operationsSetup, /operationsCrewTravelOverview\.dataset\.crewTravelOverview = ''/);
+  assert.match(operationsSetup, /if \(crewTravelOverview\) crewTravelOverview\.dataset\.crewTravelOverview = ''/);
   assert.match(operationsSetup, /shell\.append\(overview, travelPanel, crewPanel, boardPanel\)/);
   assert.match(operationsSetup, /history\.pushState\(null, '', `#\$\{hash\}`\)/);
 
@@ -260,7 +261,7 @@ test('le azioni della panoramica aprono direttamente il pannello utile', () => {
     /\{ view: 'charter', charterView: 'crew', targetId: 'charterCrewWorkspace' \}/,
     /\{ view: 'operations', operationsView: 'personal', targetId: 'skipperTravelPanel' \}/,
     /\{ view: 'operations', operationsView: 'rules', targetId: 'regolamento-di-bordo' \}/,
-    /\{ view: 'operations', operationsView: 'crew', targetId: 'crewTravelOverview' \}/,
+    /\{ view: 'operations', operationsView: 'crew', targetId: 'crewTravelOverviewOperations' \}/,
     /\{ view: 'money', financeView: 'plan', targetId: 'costPlanPanel' \}/,
     /\{ view: 'money', financeView: 'setup', targetId: 'paymentProfileForm' \}/,
   ]) {
@@ -280,9 +281,9 @@ test('tutte le pagine caricano il nuovo CSS versionato e area usa il nuovo JS', 
   assert.equal(htmlFiles.length, 13);
   for (const name of htmlFiles) {
     const source = readFileSync(new URL(name, rootUrl), 'utf8');
-    assert.match(source, /styles\.css\?v=20260929-skipper-transfer-cards-v1/, `${name}: versione CSS non aggiornata`);
+    assert.match(source, /styles\.css\?v=20260929-skipper-transfer-lists-v2/, `${name}: versione CSS non aggiornata`);
   }
-  assert.match(areaHtml, /area\.js\?v=20260929-skipper-transfer-cards-v1/);
+  assert.match(areaHtml, /area\.js\?v=20260929-skipper-transfer-lists-v2/);
 });
 
 test('la pagina conserva ID statici univoci dopo il riordino dei pannelli', () => {

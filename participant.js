@@ -14,7 +14,7 @@ import {
   withSaveRetry,
 } from './crew-session.js?v=20260928-blast-experience-v1';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
-import { canConfirmCrewBriefing } from './crew-flow-state.js?v=20260929-skipper-transfer-cards-v1';
+import { canConfirmCrewBriefing } from './crew-flow-state.js?v=20260929-skipper-transfer-lists-v2';
 import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
