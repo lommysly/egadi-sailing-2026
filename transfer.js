@@ -645,6 +645,10 @@ function recordContactMarkup(record) {
   const items = [];
   if (phone) items.push(`<a href="tel:${escapeHtml(phone.replace(/[^+0-9]/g, ''))}">${escapeHtml(phone)}</a>`);
   if (email) items.push(`<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`);
+  const waUrl = whatsappUrl(phone, whatsappMessage(record));
+  if (waUrl) {
+    items.push(`<a class="button button-whatsapp transfer-whatsapp-action" href="${escapeHtml(waUrl)}" target="_blank" rel="noopener noreferrer"><span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${escapeHtml(t('whatsappContact'))}</a>`);
+  }
   return items.join('<br />');
 }
 
@@ -652,15 +656,30 @@ function recordDetail(label, value, className = '') {
   return `<div${className ? ` class="${className}"` : ''}><dt>${escapeHtml(label)}</dt><dd>${value || '—'}</dd></div>`;
 }
 
-function whatsappUrl(phone) {
-  const digits = phone.replace(/[^0-9]/g, '');
-  return digits ? `https://wa.me/${digits}` : '';
+function whatsappIconSvg() {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.6a8 8 0 0 1-11.8 7L4 20l1.4-4.1A8 8 0 1 1 20 11.6Z"></path><path d="M9 8.5c.3 2.4 2.1 4.2 4.5 4.8l1.2-1 2 .9c.2.1.3.4.2.6-.6 1.3-1.7 2-3.1 2-3.6 0-6.6-3-6.6-6.6 0-1.4.7-2.6 2-3.1.3-.1.5 0 .6.2l.9 2-1.7 1.2Z"></path></svg>';
+}
+
+function whatsappMessage(record) {
+  const name = participantName(record);
+  const route = routeLabel(record);
+  const schedule = formatSchedule(record);
+  return locale() === 'en'
+    ? `Hi ${name}, I’m contacting you about your Egadi Sailing Experience transfer: ${route}, ${schedule}.`
+    : `Ciao ${name}, ti contatto per il transfer di Egadi Sailing Experience: ${route}, ${schedule}.`;
+}
+
+function whatsappUrl(phone, message = '') {
+  const digits = String(phone || '').replace(/[^0-9]/g, '');
+  if (digits.length < 8 || digits.length > 15) return '';
+  const query = message ? `?text=${encodeURIComponent(message)}` : '';
+  return `https://wa.me/${digits}${query}`;
 }
 
 function renderDraftNotice(record) {
   if (record.legState !== 'draft') return '';
   const phone = contactPhone(record);
-  const waUrl = phone ? whatsappUrl(phone) : '';
+  const waUrl = whatsappUrl(phone, whatsappMessage(record));
   const action = waUrl ? ` <a href="${escapeHtml(waUrl)}" target="_blank" rel="noopener">${escapeHtml(t('whatsappContact'))}</a>` : '';
   return `<p class="transfer-record-draft-notice">${escapeHtml(t('draftNotice'))}${action}</p>`;
 }
@@ -687,7 +706,7 @@ function renderRecord(record) {
   const suggestedDepartureDetail = suggestedDeparture
     ? recordDetail(t('suggestedDepartureLabel'), `${escapeHtml(suggestedDeparture)}<small>${escapeHtml(t('suggestedDepartureHint'))}</small>`)
     : '';
-  return `<details class="transfer-record" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span></span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${suggestedDepartureDetail}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details>`;
+  return `<details class="transfer-record transfer-record--${escapeHtml(displayStatus)}" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span></span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${suggestedDepartureDetail}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details>`;
 }
 
 // Oltre questo intervallo fra un orario e il successivo (già ordinati), la
