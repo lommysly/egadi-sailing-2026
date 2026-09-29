@@ -14,6 +14,11 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-experience-v1';
+import {
+  groupTransferRecords,
+  recordClusterMinutes,
+  suggestedMarsalaDeparture,
+} from './transfer-ordering.js?v=20260929-transfer-timeline-v1';
 
 const EVENT_ID = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
@@ -138,10 +143,11 @@ const COPY = {
     sheet: 'Foglio di backup · account proprietario',
     lastUpdated: 'Aggiornato',
     panelOutboundTitle: 'Andata · verso Marsala',
-    panelOutboundHint: 'Persone che arrivano in aeroporto e devono raggiungere Marsala.',
+    panelOutboundHint: 'Prima le date più vicine; per ogni aeroporto trovi in alto chi deve essere raggiunto per primo.',
     panelReturnTitle: 'Ritorno · verso l’aeroporto',
-    panelReturnHint: 'Persone che partono da Marsala e devono raggiungere l’aeroporto.',
+    panelReturnHint: 'Prima le date più vicine; per ogni aeroporto trovi in alto chi deve partire da Marsala per primo.',
     airportUnknown: 'Aeroporto da definire',
+    dateUnknown: 'Data da definire',
     flightArrival: 'Orario di arrivo del volo',
     flightDeparture: 'Orario di partenza del volo',
     meetingPointPlaceholderOutbound: 'Es. Uscita Arrivi, Aeroporto di {airport}',
@@ -262,10 +268,11 @@ const COPY = {
     sheet: 'Backup sheet · owner account',
     lastUpdated: 'Updated',
     panelOutboundTitle: 'Outbound · to Marsala',
-    panelOutboundHint: 'People landing at the airport who need to reach Marsala.',
+    panelOutboundHint: 'Nearest dates first; for each airport, the first person to collect is shown at the top.',
     panelReturnTitle: 'Return · to the airport',
-    panelReturnHint: 'People leaving Marsala who need to reach the airport.',
+    panelReturnHint: 'Nearest dates first; for each airport, the first person who must leave Marsala is shown at the top.',
     airportUnknown: 'Airport to be defined',
+    dateUnknown: 'Date to be defined',
     flightArrival: 'Flight arrival time',
     flightDeparture: 'Flight departure time',
     meetingPointPlaceholderOutbound: 'E.g. Arrivals exit, {airport} Airport',
@@ -683,13 +690,6 @@ function renderRecord(record) {
   return `<details class="transfer-record" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span></span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${suggestedDepartureDetail}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details>`;
 }
 
-// Tempi di percorrenza Marsala↔aeroporto e margine di arrivo, confermati dal
-// titolare il 22/09/2026: servono a calcolare a che ora il van deve partire
-// da Marsala per un ritorno, non solo a che ora è il volo. Sono stime, non
-// promesse: il traffico reale può sempre cambiarle.
-const TRANSFER_TRAVEL_MINUTES = { TPS: 45, PMO: 105 };
-const AIRPORT_BUFFER_WITH_CHECKED_BAG_MINUTES = 90;
-const AIRPORT_BUFFER_HAND_LUGGAGE_MINUTES = 60;
 // Oltre questo intervallo fra un orario e il successivo (già ordinati), la
 // persona apre una nuova fascia: due voli/partenze vicini nel tempo vanno
 // nello stesso van, uno lontano nel tempo no.
@@ -699,46 +699,11 @@ const TIME_BAND_GAP_MINUTES = 90;
 // lista piatta come prima, esattamente come per una barca piccola oggi.
 const TIME_BAND_MIN_GROUP_SIZE = 6;
 
-function timeToMinutes(hhmm) {
-  const normalized = optionalTime(hhmm);
-  if (!normalized) return null;
-  const [hours, minutes] = normalized.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
 function minutesToTime(totalMinutes) {
   const normalized = ((totalMinutes % 1440) + 1440) % 1440;
   const hours = Math.floor(normalized / 60);
   const minutes = normalized % 60;
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-}
-
-// Solo per il ritorno: a che ora il van deve lasciare Marsala perché la
-// persona arrivi in aeroporto col margine giusto, calcolato all'indietro
-// dall'orario del volo. Il bagaglio in stiva richiede più margine di un
-// bagaglio a mano (imbarco più lento), come indicato dal titolare.
-function suggestedMarsalaDeparture(record) {
-  const airport = airportCode(record);
-  const travelMinutes = TRANSFER_TRAVEL_MINUTES[airport];
-  const flightMinutes = timeToMinutes(record.time || record.departureTime);
-  if (!travelMinutes || flightMinutes === null) return '';
-  const bufferMinutes = Number(record.luggageCount) > 0
-    ? AIRPORT_BUFFER_WITH_CHECKED_BAG_MINUTES
-    : AIRPORT_BUFFER_HAND_LUGGAGE_MINUTES;
-  return minutesToTime(flightMinutes - travelMinutes - bufferMinutes);
-}
-
-// Chiave usata per ordinare e raggruppare per fascia oraria: per l'andata è
-// l'orario di arrivo del volo (quando la persona è pronta al ritiro), per il
-// ritorno è l'orario di partenza da Marsala calcolato sopra, non l'orario del
-// volo — altrimenti due voli vicini ma con bagagli diversi finirebbero in
-// fasce sbagliate rispetto a quando il van deve davvero muoversi.
-function recordClusterMinutes(record, direction) {
-  if (direction === 'return') {
-    const suggested = suggestedMarsalaDeparture(record);
-    return suggested ? timeToMinutes(suggested) : timeToMinutes(record.time);
-  }
-  return timeToMinutes(record.time);
 }
 
 // Fasce dinamiche invece di orari fissi (es. "12-14"): due persone vicine nel
@@ -773,28 +738,6 @@ function timeBandTitle(band, direction) {
   return `${prefix} ${range}`;
 }
 
-// Un solo elenco misto (andata, ritorno, andata, ritorno...) obbliga a
-// leggere ogni riga per capire di cosa si tratta. Due pannelli fissi, ognuno
-// diviso per aeroporto, riflettono come si organizza davvero un transfer:
-// un furgone per Trapani, uno per Palermo, andata e ritorno separati.
-function groupByAirport(records) {
-  const groups = new Map();
-  records.forEach((record) => {
-    const code = airportCode(record) || 'UNKNOWN';
-    if (!groups.has(code)) groups.set(code, []);
-    groups.get(code).push(record);
-  });
-  const order = ['TPS', 'PMO'];
-  return [...groups.entries()].sort(([left], [right]) => {
-    const leftIndex = order.indexOf(left);
-    const rightIndex = order.indexOf(right);
-    if (leftIndex === -1 && rightIndex === -1) return left.localeCompare(right);
-    if (leftIndex === -1) return 1;
-    if (rightIndex === -1) return -1;
-    return leftIndex - rightIndex;
-  });
-}
-
 function renderAirportGroupBody(groupRecords, direction) {
   if (groupRecords.length <= TIME_BAND_MIN_GROUP_SIZE) {
     return `<div class="transfer-operator-list">${groupRecords.map(renderRecord).join('')}</div>`;
@@ -802,12 +745,34 @@ function renderAirportGroupBody(groupRecords, direction) {
   return groupByTimeBand(groupRecords, direction).map((band) => `<div class="transfer-time-band"><h4 class="transfer-time-band-title">${escapeHtml(timeBandTitle(band, direction))}<span>${band.records.length}</span></h4><div class="transfer-operator-list">${band.records.map(renderRecord).join('')}</div></div>`).join('');
 }
 
+function dateGroupLabel(date) {
+  if (!date) return t('dateUnknown');
+  const [year, month, day] = date.split('-').map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day, 12));
+  return new Intl.DateTimeFormat(locale() === 'en' ? 'en-GB' : 'it-IT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(value);
+}
+
+function renderDateGroup(group, direction) {
+  const airports = group.airportGroups
+    .map(({ airport, records }) => `<div class="transfer-airport-group"><h4 class="transfer-airport-group-title">${escapeHtml(airportLabel(airport))}<span>${records.length}</span></h4>${renderAirportGroupBody(records, direction)}</div>`)
+    .join('');
+  const dateLabel = dateGroupLabel(group.date);
+  const dateTitle = group.date
+    ? `<time datetime="${escapeHtml(group.date)}">${escapeHtml(dateLabel)}</time>`
+    : escapeHtml(dateLabel);
+  return `<section class="transfer-date-group"><h3 class="transfer-date-group-title">${dateTitle}<span>${group.count}</span></h3>${airports}</section>`;
+}
+
 function renderDirectionPanel(direction, records) {
   const title = direction === 'return' ? t('panelReturnTitle') : t('panelOutboundTitle');
   const hint = direction === 'return' ? t('panelReturnHint') : t('panelOutboundHint');
-  const groups = groupByAirport(records);
+  const groups = groupTransferRecords(records, direction);
   const body = groups.length
-    ? groups.map(([code, groupRecords]) => `<div class="transfer-airport-group"><h3 class="transfer-airport-group-title">${escapeHtml(airportLabel(code))}<span>${groupRecords.length}</span></h3>${renderAirportGroupBody(groupRecords, direction)}</div>`).join('')
+    ? groups.map((group) => renderDateGroup(group, direction)).join('')
     : `<p class="empty-state">${escapeHtml(t('noRecords'))}</p>`;
   return `<section class="transfer-direction-panel"><h2>${escapeHtml(title)}<span class="transfer-direction-panel-count">${records.length}</span></h2><p class="field-hint">${escapeHtml(hint)}</p>${body}</section>`;
 }

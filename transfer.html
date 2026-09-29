@@ -38,14 +38,21 @@
     .transfer-operator-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:0; padding:18px; border-radius:14px; background:#f7fffe; }
     .transfer-operator-filters label { display:grid; gap:7px; color:#416b6d; font-size:.73rem; font-weight:700; }
     .transfer-operator-filters select,.transfer-operator-filters input,.transfer-record-form input,.transfer-record-form textarea,.transfer-record-form select,.transfer-operator-create-form input { width:100%; border:1px solid rgba(17,45,56,.24); border-radius:8px; padding:10px 11px; color:var(--ink); background:white; font:400 .95rem "DM Sans",sans-serif; }
-    .transfer-operator-list { display:grid; gap:12px; }
-    .transfer-record { border:1px solid rgba(8,123,138,.19); border-radius:15px; overflow:hidden; background:var(--paper); }
-    .transfer-record > summary { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; align-items:center; padding:18px; cursor:pointer; list-style:none; }
+    .transfer-date-group { margin-top:24px; padding-top:20px; border-top:1px solid rgba(8,123,138,.18); }
+    .transfer-date-group:first-of-type { margin-top:0; padding-top:0; border-top:0; }
+    .transfer-date-group-title { display:flex; align-items:center; gap:9px; margin:0 0 14px; color:#063644; font:600 1.2rem/1 "Fraunces",serif; text-transform:capitalize; }
+    .transfer-date-group-title span { display:grid; place-items:center; min-width:23px; height:23px; padding:0 6px; border-radius:999px; background:#087b8a; color:white; font:700 .7rem "DM Sans",sans-serif; }
+    .transfer-operator-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,320px)); justify-content:start; gap:12px; align-items:start; }
+    .transfer-operator-list > .transfer-record { margin-bottom:0; }
+    .transfer-record { width:100%; border:1px solid rgba(8,123,138,.19); border-radius:15px; overflow:hidden; background:var(--paper); }
+    .transfer-record[open] { grid-column:1 / -1; }
+    .transfer-record > summary { position:relative; display:grid; grid-template-columns:minmax(0,1fr); gap:12px; align-items:start; min-height:100%; padding:16px 42px 16px 16px; cursor:pointer; list-style:none; }
     .transfer-record > summary::-webkit-details-marker { display:none; }
+    .transfer-record > summary::after { position:absolute; top:17px; right:16px; margin:0; }
     .transfer-record-summary-copy { display:grid; gap:5px; min-width:0; }
     .transfer-record-summary-copy strong { overflow-wrap:anywhere; font:600 1.25rem/1.04 "Fraunces",serif; }
     .transfer-record-summary-copy span { color:#416b6d; font-size:.85rem; line-height:1.38; }
-    .transfer-record-badges { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+    .transfer-record-badges { display:flex; flex-wrap:wrap; justify-content:flex-start; gap:6px; }
     .transfer-badge { display:inline-flex; align-items:center; min-height:27px; border-radius:999px; padding:0 10px; background:#e8f8f6; color:#063644; font:700 .66rem "DM Mono",monospace; letter-spacing:.035em; text-transform:uppercase; white-space:nowrap; }
     .transfer-badge--confirmed,.transfer-badge--completed { background:#dff6df; color:#21643a; }
     .transfer-badge--cancelled { background:#fde7e2; color:#9c3d2a; }
@@ -82,6 +89,8 @@
       .transfer-record-form label[data-wide],.transfer-record-form .form-actions,.transfer-operator-create-form label[data-wide],.transfer-operator-create-form .form-actions { grid-column:auto; }
       .transfer-access-request { grid-template-columns:1fr; }
       .transfer-access-request-actions { justify-content:flex-start; }
+      .transfer-operator-list { grid-template-columns:minmax(0,320px); }
+      .transfer-record[open] { grid-column:auto; }
     }
     @media (max-width:430px) {
       .transfer-role-switch { flex-wrap:wrap; }
@@ -89,6 +98,7 @@
       .transfer-record > summary { grid-template-columns:1fr; }
       .transfer-record-badges { justify-content:flex-start; }
       .transfer-operator-notice { grid-template-columns:1fr; }
+      .transfer-direction-panel { padding-right:0; padding-left:0; background:transparent; }
     }
   </style>
 </head>
@@ -115,6 +125,6 @@
   <script src="i18n-public-core.js?v=20260928-blast-brand-v1"></script>
   <script src="i18n-public-support.js?v=20260928-transfer-paid-v1"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="transfer.js?v=20260928-blast-experience-v1"></script>
+  <script type="module" src="transfer.js?v=20260929-transfer-timeline-v1"></script>
 </body>
 </html>
