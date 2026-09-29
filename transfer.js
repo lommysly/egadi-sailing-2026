@@ -6,6 +6,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   getFirestore,
   onSnapshot,
   serverTimestamp,
@@ -116,6 +117,12 @@ const COPY = {
     allStatuses: 'Tutti gli stati',
     filterDirection: 'Direzione',
     filterStatus: 'Stato',
+    filterBoat: 'Barca',
+    allBoats: 'Tutte le barche',
+    boatStatsEyebrow: 'Riepilogo per barca',
+    boatStatsTitle: 'Chi ha scelto il transfer, barca per barca',
+    boatStatOf: 'su',
+    boatStatRequested: 'hanno scelto il transfer',
     filterSearch: 'Cerca per nome, aeroporto o volo',
     noRecords: 'Non ci sono movimenti con questi filtri.',
     direction: 'Tratta',
@@ -241,6 +248,12 @@ const COPY = {
     allStatuses: 'All statuses',
     filterDirection: 'Direction',
     filterStatus: 'Status',
+    filterBoat: 'Boat',
+    allBoats: 'All boats',
+    boatStatsEyebrow: 'Boat by boat',
+    boatStatsTitle: 'Who chose the transfer, boat by boat',
+    boatStatOf: 'of',
+    boatStatRequested: 'chose the transfer',
     filterSearch: 'Search name, airport or flight',
     noRecords: 'There are no journeys matching these filters.',
     direction: 'Journey',
@@ -297,8 +310,14 @@ const state = {
   records: [],
   loading: true,
   error: '',
-  filters: { direction: 'all', status: 'all', search: '' },
+  filters: { direction: 'all', status: 'all', search: '', boat: 'all' },
   unsubs: [],
+  // Popolato via getDocs quando compare un boatId nuovo tra i record: quante
+  // persone risultano nella Crew List di quella barca, per confrontarlo con
+  // quante hanno già scelto il transfer (richiesta del titolare, 29/09/2026 —
+  // "non riesco a controllare chi ha fatto e cosa ha fatto" senza un filtro
+  // e una statistica per barca).
+  boatMemberCounts: {},
 };
 
 function locale() {
@@ -614,9 +633,10 @@ function recordMatchesFilters(record) {
   // c'è nulla da mostrare né da organizzare. Va escluso qui, non solo dal
   // filtro stato, perché altrimenti compare comunque con "Tutti gli stati".
   if (record.recordState && record.recordState !== 'active') return false;
-  const { direction, status, search } = state.filters;
+  const { direction, status, search, boat } = state.filters;
   const recordDirection = normalizeDirection(record.direction || record.legDirection || record.travelDirection);
   const recordStatus = recordStatusKey(record);
+  if (boat !== 'all' && boat !== (record.boatId || '')) return false;
   if (direction !== 'all' && direction !== recordDirection) return false;
   if (status !== 'all' && status !== recordStatus) return false;
   if (!search) return true;
@@ -816,11 +836,85 @@ function recordStats(records) {
   };
 }
 
+// Le barche note derivano dai record stessi (che già portano boatId e
+// boatName dalla Cloud Function, functions/index.js:692,697): niente da
+// leggere in più solo per popolare il filtro. Includiamo anche i record
+// "revoked" (bozza o transfer non richiesto) per non far sparire dal filtro
+// una barca i cui membri si sono tutti arrangiati da soli.
+function knownBoats() {
+  const byId = new Map();
+  state.records.forEach((record) => {
+    if (!record.boatId || byId.has(record.boatId)) return;
+    byId.set(record.boatId, record.boatName || record.boatId);
+  });
+  return [...byId.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((first, second) => first.name.localeCompare(second.name, 'it'));
+}
+
+// Il totale iscritti (Crew List) non è nei record: un membro che non ha mai
+// aperto il modulo viaggio non genera alcun record. Lo leggiamo a parte, una
+// sola volta per barca (l'organizzatore ha già accesso in lettura a
+// boats/{boatId}/members — firestore.rules).
+async function ensureBoatMemberCounts(boatIds) {
+  const missing = boatIds.filter((boatId) => !(boatId in state.boatMemberCounts));
+  if (!missing.length) return;
+  await Promise.all(missing.map(async (boatId) => {
+    try {
+      const snapshot = await getDocs(collection(db, 'boats', boatId, 'members'));
+      state.boatMemberCounts[boatId] = snapshot.size;
+    } catch (error) {
+      console.info('Numero di iscritti non disponibile per questa barca.', boatId, error?.code || error);
+      state.boatMemberCounts[boatId] = null;
+    }
+  }));
+  render();
+}
+
+// Persone uniche (non record: ognuna ha fino a due record, andata e ritorno)
+// con almeno una tratta a transfer attivo per quella barca. Calcolato su
+// tutti i record, non su quelli già filtrati dalla toolbar: la statistica
+// per barca resta un riepilogo assoluto, il filtro sotto serve solo a
+// restringere l'elenco dei movimenti.
+function boatTransferRequesterCount(boatId) {
+  const requesters = new Set();
+  state.records.forEach((record) => {
+    if (record.boatId !== boatId) return;
+    if (record.recordState && record.recordState !== 'active') return;
+    requesters.add(record.inviteId);
+  });
+  return requesters.size;
+}
+
+function renderBoatStats() {
+  const boats = knownBoats();
+  if (!boats.length) return '';
+  void ensureBoatMemberCounts(boats.map((boat) => boat.id));
+  const cards = boats.map((boat) => {
+    const requested = boatTransferRequesterCount(boat.id);
+    const total = state.boatMemberCounts[boat.id];
+    const totalText = Number.isInteger(total) ? String(total) : '…';
+    return `<article class="transfer-boat-stat"><strong>${escapeHtml(boat.name)}</strong><span>${requested} ${escapeHtml(t('boatStatOf'))} ${totalText} ${escapeHtml(t('boatStatRequested'))}</span></article>`;
+  }).join('');
+  return `<section class="transfer-operator-card transfer-boat-stats" aria-label="${escapeHtml(t('boatStatsTitle'))}"><p class="eyebrow">${escapeHtml(t('boatStatsEyebrow'))}</p><h2>${escapeHtml(t('boatStatsTitle'))}</h2><div class="transfer-boat-stat-grid">${cards}</div></section>`;
+}
+
+function boatFilterOptions() {
+  const boats = knownBoats();
+  const current = boats.some((boat) => boat.id === state.filters.boat) ? state.filters.boat : 'all';
+  if (current !== state.filters.boat) state.filters.boat = 'all';
+  return boats.map((boat) => `<option value="${escapeHtml(boat.id)}"${boat.id === state.filters.boat ? ' selected' : ''}>${escapeHtml(boat.name)}</option>`).join('');
+}
+
 function renderOperatorDashboard() {
   const filtered = state.records.filter(recordMatchesFilters);
   const stats = recordStats(state.records);
   const sheetUrl = state.isOrganizer ? safeSheetUrl(state.event?.transferSheetUrl) : '';
-  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-light" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section><section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label><label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
+  const boats = knownBoats();
+  const boatFilterField = boats.length
+    ? `<label><span>${escapeHtml(t('filterBoat'))}</span><select name="boat"><option value="all">${escapeHtml(t('allBoats'))}</option>${boatFilterOptions()}</select></label>`
+    : '';
+  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-light" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section>${state.isOrganizer ? renderBoatStats() : ''}<section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label>${boatFilterField}<label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
 }
 
 function renderRoleSwitch() {
@@ -941,6 +1035,7 @@ async function refreshAccess() {
   state.transferOperators = [];
   state.transferPricing = null;
   state.records = [];
+  state.boatMemberCounts = {};
   render();
 
   if (!state.user) {
@@ -1173,6 +1268,10 @@ document.addEventListener('change', (event) => {
   state.filters.direction = ['all', 'outbound', 'return'].includes(values.get('direction')) ? values.get('direction') : 'all';
   state.filters.status = ['all', ...FILTERABLE_STATUSES].includes(values.get('status')) ? values.get('status') : 'all';
   state.filters.search = text(values.get('search'), 120);
+  if (values.has('boat')) {
+    const boatValue = String(values.get('boat') || 'all');
+    state.filters.boat = boatValue === 'all' || knownBoats().some((boat) => boat.id === boatValue) ? boatValue : 'all';
+  }
   renderRecordListOnly();
 });
 

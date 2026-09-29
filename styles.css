@@ -939,6 +939,11 @@ body.menu-open { overflow:hidden; }
 .transfer-operator-summary article { padding:16px; border:1px solid var(--line); border-radius:13px; background:var(--paper); }
 .transfer-operator-summary span { display:block; margin-bottom:6px; color:rgba(17,45,56,.6); font:700 .66rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; }
 .transfer-operator-summary strong { font:600 1.9rem/1 "Fraunces",serif; letter-spacing:-.03em; }
+.transfer-boat-stats { margin-bottom:24px; }
+.transfer-boat-stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:16px; }
+.transfer-boat-stat { padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:var(--paper); }
+.transfer-boat-stat strong { display:block; margin-bottom:4px; font:600 1.05rem "Fraunces",serif; }
+.transfer-boat-stat span { color:rgba(17,45,56,.68); font-size:.84rem; }
 
 .transfer-operator-card { padding:22px; border-radius:16px; background:var(--paper); margin-bottom:20px; }
 .transfer-operator-card:last-child { margin-bottom:0; }
