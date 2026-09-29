@@ -12,6 +12,7 @@ import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-experience-v1';
+import { crewTravelCardPresentation, crewTravelCardPriority } from './crew-flow-state.js?v=20260929-skipper-transfer-cards-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -6646,9 +6647,23 @@ function crewTravelReminderMessage(member, legStates) {
 }
 
 function crewTravelReminderUrl(member, legStates) {
-  const number = normalizeWhatsAppNumber(member.phone || '');
+  const number = paymentRecipientWhatsappNumber(member.id);
   if (!number) return '';
   return selectWhatsappUrl(whatsappLinks(number, crewTravelReminderMessage(member, legStates)), 'preferred');
+}
+
+function crewTravelContactMessage(member) {
+  const locale = inviteLocale(activeInvites.find((invite) => invite.id === member.id));
+  const firstName = member.firstName || memberName(member);
+  return locale === 'en'
+    ? `Hi ${firstName} 🌊\n\nI’m contacting you about arrivals, departures and transfers for Egadi Sailing Experience. Reply here on WhatsApp when you can — thank you!`
+    : `Ciao ${firstName} 🌊\n\nTi contatto per l’organizzazione di arrivi, partenze e transfer di Egadi Sailing Experience. Quando puoi, rispondimi qui su WhatsApp. Grazie!`;
+}
+
+function crewTravelContactUrl(member) {
+  const number = paymentRecipientWhatsappNumber(member.id);
+  if (!number) return '';
+  return selectWhatsappUrl(whatsappLinks(number, crewTravelContactMessage(member)), 'preferred');
 }
 
 // "Direttore d'orchestra": lo skipper vede a colpo d'occhio chi ha ancora
@@ -6658,7 +6673,11 @@ function crewTravelReminderUrl(member, legStates) {
 function renderCrewTravelOverview() {
   const section = document.querySelector('#crewTravelOverview');
   if (!section) return;
-  if (!activeMembers.length) {
+  const travelMembers = activeMembers.filter((member) => {
+    const invite = inviteForRecipient(member.id);
+    return invite && invite.status !== 'revoked';
+  });
+  if (!travelMembers.length) {
     section.hidden = true;
     section.innerHTML = '';
     return;
@@ -6668,20 +6687,31 @@ function renderCrewTravelOverview() {
     const label = direction === 'outbound' ? 'Andata' : 'Ritorno';
     return `<span class="crew-travel-leg crew-travel-leg--${legStates[direction]}"><span aria-hidden="true">${info.icon}</span>${escapeHtml(label)} · ${escapeHtml(info.text)}</span>`;
   };
-  let pendingCount = 0;
-  const rows = activeMembers.map((member) => {
+  const cards = travelMembers.map((member) => {
     const status = crewTravelStatusFor(member.id);
     const legStates = {
       outbound: crewTravelLegState(status, 'outbound'),
       return: crewTravelLegState(status, 'return'),
     };
     const needsReminder = CREW_TRAVEL_NEEDS_REMINDER.has(legStates.outbound) || CREW_TRAVEL_NEEDS_REMINDER.has(legStates.return);
-    if (needsReminder) pendingCount += 1;
-    const reminderUrl = needsReminder ? crewTravelReminderUrl(member, legStates) : '';
-    const action = reminderUrl
-      ? `<a class="button button-whatsapp" href="${escapeHtml(reminderUrl)}" target="_blank" rel="noopener">${whatsappActionIconMarkup({ external: true })}Sollecita</a>`
-      : needsReminder ? '<span class="field-hint">Nessun numero salvato</span>' : '';
-    return `<article class="crew-travel-row"><div class="crew-travel-row-name"><strong>${escapeHtml(memberName(member))}</strong></div><div class="crew-travel-row-legs">${legBadge(legStates, 'outbound')}${legBadge(legStates, 'return')}</div><div class="crew-travel-row-action">${action}</div></article>`;
+    const presentation = crewTravelCardPresentation(legStates);
+    return { member, legStates, needsReminder, presentation };
+  }).sort((first, second) => {
+    const stateOrder = crewTravelCardPriority(first.presentation.tone) - crewTravelCardPriority(second.presentation.tone);
+    return stateOrder || memberName(first.member).localeCompare(memberName(second.member), 'it', { sensitivity: 'base' });
+  });
+  const pendingCount = cards.filter((card) => card.needsReminder).length;
+  const rows = cards.map(({ member, legStates, needsReminder, presentation }) => {
+    const useReminder = needsReminder && presentation.tone !== 'cancelled';
+    const contactUrl = useReminder ? crewTravelReminderUrl(member, legStates) : crewTravelContactUrl(member);
+    const actionLabel = useReminder
+      ? 'Sollecita su WhatsApp'
+      : presentation.tone === 'cancelled' ? 'Contatta su WhatsApp' : 'Scrivi su WhatsApp';
+    const action = contactUrl
+      ? `<a class="button button-whatsapp crew-travel-card-whatsapp" href="${escapeHtml(contactUrl)}" target="_blank" rel="noopener noreferrer">${whatsappActionIconMarkup({ external: true })}${escapeHtml(actionLabel)}</a>`
+      : '<span class="field-hint crew-travel-card-no-contact">Numero WhatsApp non disponibile</span>';
+    const initial = escapeHtml(memberName(member).trim().charAt(0).toUpperCase() || '?');
+    return `<article class="crew-travel-card crew-travel-card--${escapeHtml(presentation.tone)}"><header class="crew-travel-card-heading"><span class="crew-travel-card-avatar" aria-hidden="true">${initial}</span><span class="crew-travel-card-person"><strong>${escapeHtml(memberName(member))}</strong><small>${escapeHtml(presentation.label)}</small></span></header><div class="crew-travel-card-legs">${legBadge(legStates, 'outbound')}${legBadge(legStates, 'return')}</div><div class="crew-travel-card-action">${action}</div></article>`;
   }).join('');
   section.hidden = false;
   const heading = pendingCount
@@ -6740,6 +6770,7 @@ function renderMembers() {
 function renderInvites() {
   const list = document.querySelector('#inviteList');
   if (list) list.replaceChildren();
+  renderCrewTravelOverview();
   renderPaymentRecipientOptions();
   renderCapacityStatus();
   renderSkipperDashboardOverview();

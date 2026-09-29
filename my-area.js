@@ -1,6 +1,6 @@
 import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { auth, crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260928-blast-experience-v1';
-import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-state.js?v=20260928-crew-flow-v1';
+import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-state.js?v=20260929-skipper-transfer-cards-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
 

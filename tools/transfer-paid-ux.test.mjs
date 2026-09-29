@@ -41,7 +41,7 @@ test('le pagine caricano gli script transfer con una versione nuova', () => {
   const travelHtml = readFileSync(new URL('../travel.html', import.meta.url), 'utf8');
   const myAreaHtml = readFileSync(new URL('../my-area.html', import.meta.url), 'utf8');
   assert.match(travelHtml, /travel\.js\?v=20260928-transfer-paid-v1/);
-  assert.match(myAreaHtml, /my-area\.js\?v=20260928-transfer-paid-v1/);
+  assert.match(myAreaHtml, /my-area\.js\?v=20260929-skipper-transfer-cards-v1/);
   assert.match(publicHtml, /i18n-public-support\.js\?v=20260928-transfer-paid-v1/);
 });
 

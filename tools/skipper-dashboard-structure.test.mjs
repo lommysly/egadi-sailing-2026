@@ -280,9 +280,9 @@ test('tutte le pagine caricano il nuovo CSS versionato e area usa il nuovo JS', 
   assert.equal(htmlFiles.length, 13);
   for (const name of htmlFiles) {
     const source = readFileSync(new URL(name, rootUrl), 'utf8');
-    assert.match(source, /styles\.css\?v=20260928-skipper-flow-v1/, `${name}: versione CSS non aggiornata`);
+    assert.match(source, /styles\.css\?v=20260929-skipper-transfer-cards-v1/, `${name}: versione CSS non aggiornata`);
   }
-  assert.match(areaHtml, /area\.js\?v=20260928-skipper-flow-v1/);
+  assert.match(areaHtml, /area\.js\?v=20260929-skipper-transfer-cards-v1/);
 });
 
 test('la pagina conserva ID statici univoci dopo il riordino dei pannelli', () => {
