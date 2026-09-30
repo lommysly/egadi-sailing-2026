@@ -107,6 +107,24 @@
     .transfer-bulk-toolbar-actions { display:flex; flex-wrap:wrap; align-items:center; gap:14px; }
     .transfer-bulk-toolbar-note { margin:14px 0; color:#6d4300; font-size:.82rem; line-height:1.4; }
     .transfer-bulk-form .form-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+    .transfer-access-log { margin-top:30px; padding-top:28px; border-top:1px solid var(--line); }
+    .transfer-access-log h3 { margin:26px 0 10px; }
+    .transfer-access-log-boats { display:grid; gap:10px; }
+    .transfer-access-log-boat { border:1px solid rgba(8,123,138,.19); border-radius:12px; background:#f7fffe; overflow:hidden; }
+    .transfer-access-log-boat > summary { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px 16px; cursor:pointer; list-style:none; font-weight:700; color:#063644; }
+    .transfer-access-log-boat > summary::-webkit-details-marker { display:none; }
+    .transfer-access-log-boat > summary span { font-weight:400; color:#416b6d; font-size:.8rem; }
+    .transfer-access-log-skipper { padding:0 16px 14px; border-bottom:1px solid rgba(8,123,138,.14); }
+    .transfer-access-log-skipper strong { display:block; margin-bottom:6px; font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; color:#416b6d; }
+    .transfer-access-log-skipper > span { display:block; margin-top:6px; font-size:.82rem; color:#416b6d; }
+    .transfer-access-log-badges { display:flex; flex-wrap:wrap; gap:8px; }
+    .transfer-access-log-item { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:#eef0f1; color:#374a50; font-size:.76rem; }
+    .transfer-access-log-item--done { background:#dff6df; color:#21643a; }
+    .transfer-access-log-item--pending { background:#ffe6b3; color:#6d4300; }
+    .transfer-access-log-members { list-style:none; margin:0; padding:10px 16px 14px; display:grid; gap:10px; }
+    .transfer-access-log-member { display:grid; gap:3px; padding-bottom:9px; border-bottom:1px solid rgba(17,45,56,.08); font-size:.82rem; color:#416b6d; }
+    .transfer-access-log-member:last-child { border-bottom:0; padding-bottom:0; }
+    .transfer-access-log-member strong { color:#063644; font-size:.9rem; }
     @media (max-width:800px) {
       .transfer-role-switch { top:72px; }
       .transfer-bulk-toolbar { top:72px; }
@@ -152,6 +170,6 @@
   <script src="i18n-public-core.js?v=20260928-blast-brand-v1"></script>
   <script src="i18n-public-support.js?v=20260928-transfer-paid-v1"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="transfer.js?v=20260930-sticky-bulk-v1"></script>
+  <script type="module" src="transfer.js?v=20260930-access-log-v1"></script>
 </body>
 </html>

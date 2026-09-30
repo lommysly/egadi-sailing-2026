@@ -386,6 +386,11 @@ const state = {
   // 30/09/2026: il sollecito deve coprire barca ed equipaggio, non solo il
   // transfer — caso reale di Michele Pasini/Carpe Diem).
   boatSetupStatus: {},
+  // Elenco completo (nome + ultimo aggiornamento) di chi è iscritto a ogni
+  // barca, per il registro attività "chi ha fatto cosa e quando" (richiesta
+  // di Silvio, 30/09/2026, visibile solo all'organizzatore). Solo
+  // tempistiche e sezioni completate, mai i valori inseriti.
+  boatMembers: {},
   // Selezione multipla dei movimenti (es. tutta una fascia oraria dello
   // stesso volo) per assegnare van/punto di ritrovo/orario in un solo
   // salvataggio invece di aprire ogni persona singolarmente (richiesta di
@@ -1018,11 +1023,37 @@ async function ensureBoatSetupStatus(boatIds) {
       ]);
       state.boatSetupStatus[boatId] = {
         rulesActive: briefingSnap.exists() && Boolean(briefingSnap.data()?.rulesText),
+        rulesUpdatedAt: briefingSnap.data()?.updatedAt || null,
         dossierConfirmed: contactSnap.exists(),
+        dossierUpdatedAt: contactSnap.data()?.updatedAt || null,
       };
     } catch (error) {
       console.info('Stato di impostazione non disponibile per questa barca.', boatId, error?.code || error);
       state.boatSetupStatus[boatId] = { rulesActive: null, dossierConfirmed: null };
+    }
+  }));
+  render();
+}
+
+// Stessa collezione già letta per il conteggio iscritti (ensureBoatMemberCounts):
+// qui teniamo anche nome e ultimo aggiornamento, per il registro attività.
+// Una seconda lettura della stessa collezione invece di riusare quella
+// funzione: tenerle separate evita di rompere il conteggio già in uso altrove
+// se questo elenco cambia forma in futuro.
+async function ensureBoatMembers(boatIds) {
+  const missing = boatIds.filter((boatId) => !(boatId in state.boatMembers));
+  if (!missing.length) return;
+  await Promise.all(missing.map(async (boatId) => {
+    try {
+      const snapshot = await getDocs(collection(db, 'boats', boatId, 'members'));
+      state.boatMembers[boatId] = snapshot.docs.map((entry) => ({
+        id: entry.id,
+        displayName: text(entry.data()?.displayName, 120) || '—',
+        updatedAt: entry.data()?.updatedAt || null,
+      }));
+    } catch (error) {
+      console.info('Elenco iscritti non disponibile per questa barca.', boatId, error?.code || error);
+      state.boatMembers[boatId] = [];
     }
   }));
   render();
@@ -1268,6 +1299,69 @@ function renderBoatStats() {
   return `<section class="transfer-operator-card transfer-boat-stats" aria-label="${escapeHtml(t('boatStatsTitle'))}"><p class="eyebrow">${escapeHtml(t('boatStatsEyebrow'))}</p><h2>${escapeHtml(t('boatStatsTitle'))}</h2>${summary}<div class="transfer-boat-stat-grid">${cards}</div></section>`;
 }
 
+// Registro "chi ha fatto cosa e quando", riservato all'organizzatore che ha
+// creato l'evento (nessun ruolo "proprietario" distinto esiste ancora nel
+// sistema — dedicato a questo singolo evento, come tutto il resto — quindi
+// riusa lo stesso controllo isOrganizer() delle altre viste amministrative,
+// senza inventare un livello di accesso nuovo). Mostra solo tempistiche e
+// sezioni completate, mai i valori inseriti: quelli restano nelle pagine già
+// esistenti (Crew List, area transfer). Richiesta di Silvio, 30/09/2026.
+function accessLogBadge(done, label) {
+  return `<span class="transfer-access-log-item transfer-access-log-item--${done ? 'done' : 'pending'}"><span aria-hidden="true">${done ? '✓' : '!'}</span>${escapeHtml(label)}</span>`;
+}
+
+function accessLogTravelLine(entry, direction) {
+  const dirLabel = direction === 'outbound' ? 'Andata' : 'Ritorno';
+  if (!entry) return `${dirLabel}: viaggio non ancora inserito`;
+  const travelState = entry[direction];
+  const transferState = entry[`${direction}Transfer`];
+  const when = entry.updatedAt ? formatDateTime(entry.updatedAt) : '';
+  if (!travelState || travelState === 'missing') return `${dirLabel}: da inserire`;
+  const stateLabel = travelState === 'draft' ? 'bozza' : 'confermato';
+  const transferLabel = transferState === 'requested' ? 'transfer richiesto' : transferState === 'not_requested' ? 'in autonomia' : 'transfer da scegliere';
+  return `${dirLabel}: ${stateLabel} · ${transferLabel}${when ? ` · ${when}` : ''}`;
+}
+
+function renderAccessLogBoat(boat) {
+  const members = state.boatMembers[boat.id] || [];
+  const travelEntries = state.boatTravelStatus[boat.id] || [];
+  const setup = state.boatSetupStatus[boat.id] || {};
+  const findTravel = (inviteId) => travelEntries.find((entry) => entry.inviteId === inviteId) || null;
+  const skipperTravel = findTravel('skipper');
+  const skipperBadges = [
+    accessLogBadge(setup.rulesActive === true, setup.rulesActive ? `Regole attive · ${setup.rulesUpdatedAt ? formatDateTime(setup.rulesUpdatedAt) : '—'}` : 'Regole da attivare'),
+    accessLogBadge(setup.dossierConfirmed === true, setup.dossierConfirmed ? `Dossier confermato · ${setup.dossierUpdatedAt ? formatDateTime(setup.dossierUpdatedAt) : '—'}` : 'Dossier da compilare'),
+  ].join('');
+  const skipperTravelLine = `${accessLogTravelLine(skipperTravel, 'outbound')} · ${accessLogTravelLine(skipperTravel, 'return')}`;
+  const memberRows = members.map((member) => {
+    const travel = findTravel(member.id);
+    const memberWhen = member.updatedAt ? formatDateTime(member.updatedAt) : 'mai salvata';
+    const travelLine = `${accessLogTravelLine(travel, 'outbound')} · ${accessLogTravelLine(travel, 'return')}`;
+    return `<li class="transfer-access-log-member"><strong>${escapeHtml(member.displayName)}</strong><span>Crew List aggiornata: ${escapeHtml(memberWhen)}</span><span>${escapeHtml(travelLine)}</span></li>`;
+  }).join('');
+  return `<details class="transfer-access-log-boat"><summary><strong>${escapeHtml(boat.name)}</strong><span>${members.length} ${members.length === 1 ? 'persona' : 'persone'}</span></summary><div class="transfer-access-log-skipper"><strong>Skipper</strong><div class="transfer-access-log-badges">${skipperBadges}</div><span>${escapeHtml(skipperTravelLine)}</span></div><ul class="transfer-access-log-members">${memberRows || '<li class="transfer-empty">Nessun iscritto ancora.</li>'}</ul></details>`;
+}
+
+function renderAccessLog() {
+  if (!state.isOrganizer || !state.allBoats.length) return '';
+  const boatIds = state.allBoats.map((boat) => boat.id);
+  void ensureBoatMembers(boatIds);
+  const boatsMarkup = state.allBoats.map(renderAccessLogBoat).join('');
+  const operatorRows = state.transferOperators.map((operator) => {
+    const ownRecords = state.records.filter((record) => record.assignedOperatorUid === operator.id);
+    const lastActivityMs = ownRecords.reduce((latest, record) => {
+      const when = dateValue(record.updatedAt)?.getTime() || 0;
+      return when > latest ? when : latest;
+    }, 0);
+    const lastActivityLabel = lastActivityMs ? formatDateTime(new Date(lastActivityMs)) : 'nessuna attività registrata';
+    return `<li class="transfer-access-log-member"><strong>${escapeHtml(operator.name || operator.email || operator.id)}</strong><span>${ownRecords.length} movimenti gestiti · ultima attività: ${escapeHtml(lastActivityLabel)}</span></li>`;
+  }).join('');
+  const operatorsSection = state.transferOperators.length
+    ? `<h3>Referenti transfer</h3><ul class="transfer-access-log-members">${operatorRows}</ul>`
+    : '';
+  return `<section class="transfer-operator-card transfer-access-log" aria-label="Registro attività"><p class="eyebrow">Solo per te · registro attività</p><h2>Chi ha fatto cosa, e quando</h2><p class="field-hint">Solo tempistiche e sezioni completate: per i valori esatti apri la Crew List o la scheda della barca. Apri una barca per il dettaglio.</p><div class="transfer-access-log-boats">${boatsMarkup}</div>${operatorsSection}</section>`;
+}
+
 function boatFilterOptions() {
   const boats = knownBoats();
   const current = boats.some((boat) => boat.id === state.filters.boat) ? state.filters.boat : 'all';
@@ -1283,7 +1377,7 @@ function renderOperatorDashboard() {
   const boatFilterField = boats.length
     ? `<label><span>${escapeHtml(t('filterBoat'))}</span><select name="boat"><option value="all">${escapeHtml(t('allBoats'))}</option>${boatFilterOptions()}</select></label>`
     : '';
-  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-ghost" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section>${state.isOrganizer ? renderBoatStats() : ''}<section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label>${boatFilterField}<label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div id="transferBulkToolbar" class="transfer-bulk-toolbar" hidden></div><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
+  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-ghost" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section>${state.isOrganizer ? renderBoatStats() : ''}<section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label>${boatFilterField}<label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div id="transferBulkToolbar" class="transfer-bulk-toolbar" hidden></div><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}${state.isOrganizer ? renderAccessLog() : ''}`;
   renderBulkToolbar();
 }
 
