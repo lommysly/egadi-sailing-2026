@@ -136,7 +136,7 @@ const COPY = {
     boatChecklistBoat: 'Barca',
     boatChecklistRules: 'Regole',
     boatChecklistDossier: 'Dossier',
-    boatStatSetupFollowUp: 'Barca da impostare: mancano barca, regole o dossier',
+    boatStatSetupFollowUp: 'Barca da impostare:',
     filterSearch: 'Cerca per nome, aeroporto o volo',
     noRecords: 'Non ci sono movimenti con questi filtri.',
     direction: 'Tratta',
@@ -281,7 +281,7 @@ const COPY = {
     boatChecklistBoat: 'Boat',
     boatChecklistRules: 'Rules',
     boatChecklistDossier: 'Dossier',
-    boatStatSetupFollowUp: 'Boat setup incomplete: boat, rules or dossier missing',
+    boatStatSetupFollowUp: 'Boat setup incomplete:',
     filterSearch: 'Search name, airport or flight',
     noRecords: 'There are no journeys matching these filters.',
     direction: 'Journey',
@@ -1123,7 +1123,13 @@ function renderBoatStats() {
   const cards = state.allBoats.map((boat) => {
     const breakdown = boatTravelBreakdown(boat.id);
     const readiness = boatSetupReadiness(boat);
-    const needsSetupFollowUp = boatSetupIssues(readiness).length > 0;
+    // Il flag deve nominare esattamente cosa manca: un testo generico ("barca,
+    // regole o dossier") contraddiceva la checklist qui sopra quando solo una
+    // delle tre voci era davvero incompleta (caso reale Carpe Diem, dove le
+    // regole erano già attive ma il flag le elencava comunque — segnalato da
+    // Silvio, 30/09/2026).
+    const setupIssues = boatSetupIssues(readiness);
+    const needsSetupFollowUp = setupIssues.length > 0;
     if (needsSetupFollowUp) totals.setupIncomplete += 1;
     if (Number.isInteger(breakdown.total)) totals.members += breakdown.total;
     totals.outboundRequested += breakdown.outbound.requested;
@@ -1160,7 +1166,7 @@ function renderBoatStats() {
         ${legLine(t('outbound'), breakdown.return)}
       </div>
       <div class="transfer-boat-stat-footer">
-        ${needsSetupFollowUp ? `<span class="transfer-boat-stat-flag transfer-boat-stat-flag--setup">${escapeHtml(t('boatStatSetupFollowUp'))}</span>` : ''}
+        ${needsSetupFollowUp ? `<span class="transfer-boat-stat-flag transfer-boat-stat-flag--setup">${escapeHtml(`${t('boatStatSetupFollowUp')} ${setupIssues.join(', ')}.`)}</span>` : ''}
         ${skipperNeedsFollowUp ? `<span class="transfer-boat-stat-flag transfer-boat-stat-flag--setup">${escapeHtml(t('boatStatSkipperFollowUp'))}</span>` : ''}
         ${needsFollowUp ? `<span class="transfer-boat-stat-flag">${escapeHtml(t('boatStatFollowUp'))}</span>` : ''}
         ${reminderUrl ? `<a class="button button-whatsapp transfer-boat-stat-action" href="${escapeHtml(reminderUrl)}" target="_blank" rel="noopener noreferrer"><span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${escapeHtml(t('boatReminderAction'))}</a>` : ''}
