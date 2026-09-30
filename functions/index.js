@@ -609,6 +609,49 @@ async function writeCrewTravelStatus(boatId, inviteId, direction, travelState, t
   }, { merge: true });
 }
 
+// "Sei da solo su questa tratta" è un dato reale, non un'ipotesi: chi sceglie
+// il transfer organizzato deve sapere subito se in questo momento è l'unica
+// persona su quella tratta/data/aeroporto, perché il minimo fatturato
+// (transferPricing) si applica per intero a lui. Aggiorna tutto il gruppo
+// che condivide tratta+aeroporto+data, non solo chi ha appena salvato: se
+// una quarta persona si aggiunge, anche le prime tre devono vedere il
+// numero cambiare. Mai nomi o contatti, solo un conteggio, sullo stesso
+// documento minimo già letto dalla persona (crewTravelStatus; "skipper"
+// come pseudo-inviteId per lo skipper stesso, stesso schema già leggibile
+// da isSkipper — nessuna nuova regola necessaria). Richiesta di Silvio,
+// 30/09/2026.
+async function refreshTransferCompanionCounts(direction, airport, date) {
+  if (!airport || !date) return;
+  const snapshot = await db.collection(`events/${EVENT_ID}/transferOpsRecords`)
+    .where('direction', '==', direction)
+    .where('airport', '==', airport)
+    .where('date', '==', date)
+    .where('recordState', '==', 'active')
+    .get();
+  const records = snapshot.docs
+    .map((doc) => doc.data())
+    .filter((record) => asUid(record.boatId) && asUid(record.inviteId));
+  const companions = Math.max(0, records.length - 1);
+  await Promise.all(records.map((record) => db.doc(`boats/${record.boatId}/crewTravelStatus/${record.inviteId}`).set({
+    inviteId: record.inviteId,
+    [`${direction}TransferCompanions`]: companions,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true })));
+}
+
+// Chi lascia la tratta (bozza cancellata, transfer non più richiesto) non
+// deve restare con un numero vecchio: il proprio conteggio va tolto qui,
+// mentre il resto del gruppo lo aggiorna refreshTransferCompanionCounts
+// sopra con l'aeroporto/data precedenti.
+async function clearTransferCompanionCount(boatId, inviteId, direction) {
+  if (!asUid(boatId) || !asUid(inviteId)) return;
+  await db.doc(`boats/${boatId}/crewTravelStatus/${inviteId}`).set({
+    inviteId,
+    [`${direction}TransferCompanions`]: FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
 // L'equipaggio vede soltanto lo stato della propria richiesta: niente
 // nominativi, contatti, mezzi o note presenti nella coda dell'operatore.
 async function writeCrewTransferOperationStatus(record, revision) {
@@ -647,11 +690,18 @@ exports.materializeCrewTravel = onDocumentWritten({
   const after = event.data?.after;
   const revision = sourceRevision(after?.exists ? after : event.data?.before, event.time);
   if (!after?.exists) {
+    const previousTransfer = (await transferRef.get()).data() || null;
     await Promise.all([
       markBackupRevoked(backupRef, revision),
       markTransferRequestRevoked(transferRef, revision),
       writeCrewTravelStatus(boatId, inviteId, direction, 'missing', 'undecided'),
     ]);
+    if (previousTransfer?.recordState === 'active') {
+      await Promise.all([
+        refreshTransferCompanionCounts(direction, previousTransfer.airport, previousTransfer.date),
+        clearTransferCompanionCount(boatId, inviteId, direction),
+      ]);
+    }
     return;
   }
 
@@ -679,10 +729,17 @@ exports.materializeCrewTravel = onDocumentWritten({
 
   if (!validSourceLeg(leg, direction, invite)) {
     await markTransferRequestRevoked(transferRef, revision);
+    if (existingTransfer?.recordState === 'active') {
+      await Promise.all([
+        refreshTransferCompanionCounts(direction, existingTransfer.airport, existingTransfer.date),
+        clearTransferCompanionCount(boatId, inviteId, direction),
+      ]);
+    }
     return;
   }
 
   const timing = timeForTransfer(direction, leg);
+  const airport = airportForTransfer(direction, leg);
   await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(transferRef);
     if (existing.exists && Number(existing.data().sourceRevision || 0) > revision) return;
@@ -699,7 +756,7 @@ exports.materializeCrewTravel = onDocumentWritten({
       contactConsent: true,
       phone: asText(member?.phone || invite?.phone, 40),
       email: asText(member?.email, 160),
-      airport: airportForTransfer(direction, leg),
+      airport,
       date: timing.date,
       time: timing.time,
       transport: transportLabel(leg),
@@ -712,6 +769,9 @@ exports.materializeCrewTravel = onDocumentWritten({
     };
     transaction.set(transferRef, payload, { merge: true });
   });
+  // validSourceLeg (già verificato sopra) implica sempre transferRequestState
+  // 'requested': un ripensamento sarebbe ridondante qui.
+  await refreshTransferCompanionCounts(direction, airport, timing.date);
 });
 
 // Le tratte dello skipper seguono lo stesso flusso dell'equipaggio soltanto
@@ -731,7 +791,14 @@ exports.materializeSkipperTravel = onDocumentWritten({
   const after = event.data?.after;
   const revision = sourceRevision(after?.exists ? after : event.data?.before, event.time);
   if (!after?.exists) {
+    const previousTransfer = (await transferRef.get()).data() || null;
     await Promise.all([markBackupRevoked(backupRef, revision), markTransferRequestRevoked(transferRef, revision)]);
+    if (previousTransfer?.recordState === 'active') {
+      await Promise.all([
+        refreshTransferCompanionCounts(direction, previousTransfer.airport, previousTransfer.date),
+        clearTransferCompanionCount(boatId, 'skipper', direction),
+      ]);
+    }
     return;
   }
 
@@ -759,10 +826,17 @@ exports.materializeSkipperTravel = onDocumentWritten({
 
   if (!validSkipperSourceLeg(leg, direction, profile)) {
     await markTransferRequestRevoked(transferRef, revision);
+    if (existingTransfer?.recordState === 'active') {
+      await Promise.all([
+        refreshTransferCompanionCounts(direction, existingTransfer.airport, existingTransfer.date),
+        clearTransferCompanionCount(boatId, 'skipper', direction),
+      ]);
+    }
     return;
   }
 
   const timing = timeForTransfer(direction, leg);
+  const airport = airportForTransfer(direction, leg);
   await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(transferRef);
     if (existing.exists && Number(existing.data().sourceRevision || 0) > revision) return;
@@ -780,7 +854,7 @@ exports.materializeSkipperTravel = onDocumentWritten({
       contactConsent: true,
       phone: asText(profile?.phone, 40),
       email: asText(profile?.email, 160),
-      airport: airportForTransfer(direction, leg),
+      airport,
       date: timing.date,
       time: timing.time,
       transport: transportLabel(leg),
@@ -793,6 +867,7 @@ exports.materializeSkipperTravel = onDocumentWritten({
     };
     transaction.set(transferRef, payload, { merge: true });
   });
+  await refreshTransferCompanionCounts(direction, airport, timing.date);
 });
 
 exports.copyTransferOperationsToBackup = onDocumentWritten({

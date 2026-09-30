@@ -675,7 +675,15 @@ function formatEuro(cents) {
 // organizzato" sembrava senza costi (segnalato dal titolare, 28/09/2026). Il
 // minimo fatturabile si applica anche viaggiando da soli: lo diciamo esplicito
 // per non far scoprire il costo pieno solo a richiesta confermata.
-function transferPriceNote(terminalAirport) {
+//
+// "Sei da solo" non resta un'ipotesi: appena la richiesta è salvata,
+// currentTransferOperationStatus[`${direction}TransferCompanions`] (scritto
+// da materializeCrewTravel/refreshTransferCompanionCounts) dice quante altre
+// persone attive risultano sulla stessa tratta/data/aeroporto in questo
+// momento — così chi ne ha bisogno può decidere di arrangiarsi diversamente
+// (richiesta di Silvio, 30/09/2026: "deve essere consapevole che a lui non
+// ha alternative... quindi lui è da solo").
+function transferPriceNote(terminalAirport, direction) {
   const fallback = isEnglish()
     ? 'The organised transfer is a paid service. The transfer company will confirm the exact fare before final arrangements.'
     : 'Il transfer organizzato è un servizio a pagamento. La società transfer confermerà il costo esatto prima dell’organizzazione definitiva.';
@@ -687,9 +695,19 @@ function transferPriceNote(terminalAirport) {
   if (!Number.isInteger(activeTransferPricing.minimumBillablePersons) || activeTransferPricing.minimumBillablePersons <= 0) return fallback;
   const minimum = activeTransferPricing.minimumBillablePersons;
   const minimumTotalCents = perPersonCents * minimum;
-  return isEnglish()
+  const base = isEnglish()
     ? `The transfer is not free: ${formatEuro(perPersonCents)} per person, minimum ${minimum} people billed (${formatEuro(minimumTotalCents)} even if you travel alone). The transfer company will confirm the exact cost once your group is organised.`
     : `Il transfer non è gratuito: ${formatEuro(perPersonCents)} a persona, minimo ${minimum} persone fatturate (${formatEuro(minimumTotalCents)} anche se viaggi da solo). Il costo esatto te lo conferma la società transfer quando organizza il gruppo.`;
+  const companions = direction ? currentTransferOperationStatus?.[`${direction}TransferCompanions`] : null;
+  if (!Number.isInteger(companions)) return base;
+  if (companions === 0) {
+    return `${base}${isEnglish()
+      ? ' Right now you are the only person on this route and date: the minimum fare would fall entirely on you.'
+      : ' Al momento risulti l’unica persona su questa tratta e data: il minimo fatturato ricadrebbe interamente su di te.'}`;
+  }
+  return `${base}${isEnglish()
+    ? ` Right now ${companions} other ${companions === 1 ? 'person shares' : 'people share'} this route and date, so the cost can be split.`
+    : ` Al momento ci sono anche altre ${companions} ${companions === 1 ? 'persona' : 'persone'} sulla stessa tratta e data: il costo può essere diviso.`}`;
 }
 
 function updateConditionalFields(form) {
@@ -708,7 +726,7 @@ function updateConditionalFields(form) {
   const priceNote = form.querySelector('[data-transfer-price-note]');
   if (priceNote) {
     const terminalAirport = (direction === 'return' ? inputValue(form, 'originAirport') : inputValue(form, 'destinationAirport')).toUpperCase();
-    const noteText = needsTransferConsent ? transferPriceNote(terminalAirport) : '';
+    const noteText = needsTransferConsent ? transferPriceNote(terminalAirport, direction) : '';
     priceNote.textContent = noteText;
     priceNote.hidden = !noteText;
   }
@@ -816,7 +834,7 @@ function renderTransferProgress(card, direction, leg, copy) {
   else if (['confirmed', 'completed', 'cancelled'].includes(operational)) key = operational;
   const [title, detail] = copy.transferProgress[key];
   const terminalAirport = String(direction === 'return' ? leg.originAirport || '' : leg.destinationAirport || '').toUpperCase();
-  const paidServiceDetail = transferPriceNote(terminalAirport);
+  const paidServiceDetail = transferPriceNote(terminalAirport, direction);
   const icon = key === 'confirmed' || key === 'completed' ? '✓' : key === 'cancelled' || key === 'draft' ? '!' : '•';
   target.hidden = false;
   target.className = `crew-transfer-progress crew-transfer-progress--${key}`;

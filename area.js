@@ -6086,12 +6086,21 @@ function updateSkipperTravelMode(form) {
 
 // Stessa logica e stesso dato di travel.js (equipaggio): il transfer non è
 // gratuito, e il minimo fatturabile si applica anche viaggiando da soli.
-function skipperTransferPriceNote(terminalAirport) {
+// "Sei da solo" non resta un'ipotesi: crewTravelStatusFor('skipper') (scritto
+// da materializeSkipperTravel/refreshTransferCompanionCounts, stesso
+// documento minimo già letto per il resto dell'equipaggio) dice quante altre
+// persone attive risultano sulla stessa tratta/data/aeroporto in questo
+// momento (richiesta di Silvio, 30/09/2026).
+function skipperTransferPriceNote(terminalAirport, legId) {
   if (!activeTransferPricing) return '';
   const perPersonCents = terminalAirport === 'PMO' ? activeTransferPricing.pmoPricePerPersonCents : activeTransferPricing.tpsPricePerPersonCents;
   if (!Number.isFinite(perPersonCents)) return '';
   const minimum = Number.isInteger(activeTransferPricing.minimumBillablePersons) ? activeTransferPricing.minimumBillablePersons : 1;
-  return ` Il transfer non è gratuito: ${formatCurrency(perPersonCents / 100)} a persona, minimo ${minimum} persone fatturate (${formatCurrency((perPersonCents * minimum) / 100)} anche da solo). Il costo esatto te lo conferma la società transfer quando organizza il gruppo.`;
+  const base = ` Il transfer non è gratuito: ${formatCurrency(perPersonCents / 100)} a persona, minimo ${minimum} persone fatturate (${formatCurrency((perPersonCents * minimum) / 100)} anche da solo). Il costo esatto te lo conferma la società transfer quando organizza il gruppo.`;
+  const companions = legId ? crewTravelStatusFor('skipper')?.[`${legId}TransferCompanions`] : null;
+  if (!Number.isInteger(companions)) return base;
+  if (companions === 0) return `${base} Al momento risulti l’unica persona su questa tratta e data: il minimo fatturato ricadrebbe interamente su di te.`;
+  return `${base} Al momento ci sono anche altre ${companions} ${companions === 1 ? 'persona' : 'persone'} sulla stessa tratta e data: il costo può essere diviso.`;
 }
 
 function updateSkipperTravelTransferHint(form) {
@@ -6130,9 +6139,9 @@ function updateSkipperTravelTransferHint(form) {
   } else if (plan === 'transfer' && !airportReady) {
     hint.textContent = 'Per il transfer scegli prima l’aeroporto reale: Trapani · TPS oppure Palermo · PMO.';
   } else if (plan === 'transfer' && transferConsent?.checked !== true) {
-    hint.textContent = 'Conferma il consenso: al salvataggio la società incaricata riceverà solo i dati necessari a organizzare il transfer.' + skipperTransferPriceNote(airport);
+    hint.textContent = 'Conferma il consenso: al salvataggio la società incaricata riceverà solo i dati necessari a organizzare il transfer.' + skipperTransferPriceNote(airport, legId);
   } else if (plan === 'transfer') {
-    hint.textContent = 'Al salvataggio la richiesta entrerà nella coda della società transfer, con i soli dati necessari a contattarti e organizzare il mezzo.' + skipperTransferPriceNote(airport);
+    hint.textContent = 'Al salvataggio la richiesta entrerà nella coda della società transfer, con i soli dati necessari a contattarti e organizzare il mezzo.' + skipperTransferPriceNote(airport, legId);
   } else if (plan === 'independent') {
     hint.textContent = 'Hai segnato che ti organizzi autonomamente: nessun contatto viene condiviso.';
   } else if (plan === 'ride_offer' && !airportReady) {
@@ -7115,6 +7124,10 @@ function subscribeToBoat(boat) {
     activeCrewTravelStatus = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
     renderCrewTravelOverview();
     renderSkipperDashboardOverview();
+    // Include il documento "skipper": aggiorna subito il conteggio compagni
+    // di tratta nel proprio form viaggio, se aperto (richiesta di Silvio,
+    // 30/09/2026).
+    document.querySelectorAll('[data-skipper-travel-leg]').forEach((form) => updateSkipperTravelTransferHint(form));
   }, () => {
     activeCrewTravelStatus = [];
     renderCrewTravelOverview();
