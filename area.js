@@ -6944,7 +6944,16 @@ function renderMembers() {
       ? ''
       : `<button class="text-button" type="button" data-confirm-member-role="${escapeHtml(member.id)}">Conferma ruolo</button>`;
     const initial = escapeHtml(memberName(member).trim().charAt(0).toUpperCase() || '?');
-    return `<article class="crew-member-card crew-member-card--${statusTone}"><span class="crew-member-avatar" aria-hidden="true">${initial}</span><div class="crew-member-info"><strong>${escapeHtml(memberName(member))}</strong><span class="crew-member-role">${escapeHtml(roleStatus)}</span><span class="crew-member-status">${escapeHtml(status)}</span></div><div class="member-actions">${confirmAction}<button class="button button-ghost" type="button" data-edit-member="${escapeHtml(member.id)}">Modifica</button></div></article>`;
+    // Chi non ha "createdBy" è arrivato tramite il proprio invito personale
+    // (ha già compilato da solo): eliminarlo cancella dati reali, non un
+    // errore. Le due etichette e i due messaggi di conferma restano diversi
+    // apposta, per non far sembrare la stessa azione ovunque (caso reale
+    // Giulia/Luca Nacci: due schede create dallo skipper per errore, senza
+    // che le persone vere avessero mai iniziato la loro registrazione,
+    // bloccavano il posto — richiesta di Silvio, 30/09/2026).
+    const isManualEntry = Boolean(member.createdBy);
+    const deleteLabel = isManualEntry ? 'Elimina scheda' : 'Rimuovi dall’equipaggio';
+    return `<article class="crew-member-card crew-member-card--${statusTone}"><span class="crew-member-avatar" aria-hidden="true">${initial}</span><div class="crew-member-info"><strong>${escapeHtml(memberName(member))}</strong><span class="crew-member-role">${escapeHtml(roleStatus)}</span><span class="crew-member-status">${escapeHtml(status)}</span></div><div class="member-actions">${confirmAction}<button class="button button-ghost" type="button" data-edit-member="${escapeHtml(member.id)}">Modifica</button><button class="text-button member-delete-action" type="button" data-delete-member="${escapeHtml(member.id)}" data-manual-entry="${isManualEntry ? 'true' : 'false'}">${escapeHtml(deleteLabel)}</button></div></article>`;
   }).join('');
   renderPaymentRecipientOptions();
   renderCapacityStatus();
@@ -8402,6 +8411,25 @@ document.querySelector('#memberList').addEventListener('click', async (event) =>
     } catch (error) {
       setMessage(document.querySelector('#memberFormMessage'), 'Non riesco a confermare il ruolo.', true);
       confirmButton.disabled = false;
+    }
+    return;
+  }
+  const deleteButton = event.target.closest('[data-delete-member]');
+  if (deleteButton) {
+    const member = activeMembers.find((candidate) => candidate.id === deleteButton.dataset.deleteMember);
+    if (!member || !activeBoat) return;
+    const isManualEntry = deleteButton.dataset.manualEntry === 'true';
+    const confirmText = isManualEntry
+      ? `"${memberName(member)}" è una scheda creata manualmente e nessuno l’ha ancora compilata da sola: eliminarla libera il posto perché la persona vera possa registrarsi con il proprio invito. Procedere?`
+      : `"${memberName(member)}" ha già inserito i propri dati. Eliminarla la rimuove definitivamente dalla Crew List: l’azione non si può annullare. Procedere?`;
+    if (!window.confirm(confirmText)) return;
+    deleteButton.disabled = true;
+    try {
+      await deleteDoc(doc(db, 'boats', activeBoat.id, 'members', member.id));
+      setMessage(document.querySelector('#memberFormMessage'), `${memberName(member)} rimossa dalla Crew List.`);
+    } catch (error) {
+      setMessage(document.querySelector('#memberFormMessage'), 'Non riesco a eliminare questa scheda. Riprova tra poco.', true);
+      deleteButton.disabled = false;
     }
     return;
   }

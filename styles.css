@@ -283,6 +283,7 @@ body.menu-open { overflow:hidden; }
 .crew-member-card--ready .crew-member-status { background:#d7f5df; color:#1c6b3a; }
 .member-actions { display:flex; flex:0 0 auto; align-items:center; gap:8px; }
 .crew-member-card .member-actions .button { padding:0 14px; min-height:36px; }
+.member-delete-action { color:#9c3d2a; }
 @media (max-width:640px) { .crew-member-card { flex-wrap:wrap; } .member-actions { flex-basis:100%; justify-content:flex-end; } }
 .transfer-access-request { flex-wrap:wrap; }
 .projection-row small { display:block; margin-top:7px; color:var(--sun-deep); font:700 .67rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; }
