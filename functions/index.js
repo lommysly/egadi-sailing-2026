@@ -44,7 +44,7 @@ function normalizedEmail(value) {
 function asTemporaryPassword(value) {
   if (typeof value !== 'string') return '';
   const password = value.trim();
-  return password.length >= 12 && password.length <= 128 ? password : '';
+  return password.length >= 8 && password.length <= 128 ? password : '';
 }
 
 function isManagedPasswordTransferOperator(operator) {
@@ -140,7 +140,7 @@ function asProvisioningData(data) {
     throw new HttpsError('invalid-argument', 'Inserisci il nome del referente transfer.');
   }
   if (!temporaryPassword) {
-    throw new HttpsError('invalid-argument', 'La password temporanea deve contenere da 12 a 128 caratteri.');
+    throw new HttpsError('invalid-argument', 'La password temporanea deve contenere da 8 a 128 caratteri.');
   }
   return { email, name, temporaryPassword };
 }

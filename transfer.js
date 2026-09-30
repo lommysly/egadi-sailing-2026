@@ -69,7 +69,7 @@ const COPY = {
     operatorNameLabel: 'Nome del referente',
     operatorEmailLabel: 'Email operativa',
     temporaryPasswordLabel: 'Password iniziale o nuova',
-    temporaryPasswordHelp: 'Almeno 12 caratteri. Per riattivare un account sospeso, usa la stessa email e imposta una nuova password provvisoria.',
+    temporaryPasswordHelp: 'Almeno 8 caratteri. Per riattivare un account sospeso, usa la stessa email e imposta una nuova password provvisoria.',
     createOperator: 'Crea o riattiva accesso',
     createOperatorSuccess: 'Accesso creato o riattivato. Comunica al referente email e password con un messaggio separato.',
     createOperatorError: 'Non è stato possibile creare o riattivare l’accesso. Verifica email e password, poi riprova.',
@@ -214,7 +214,7 @@ const COPY = {
     operatorNameLabel: 'Contact name',
     operatorEmailLabel: 'Operations email',
     temporaryPasswordLabel: 'Initial or new password',
-    temporaryPasswordHelp: 'At least 12 characters. To reactivate a suspended account, use the same email and set a new temporary password.',
+    temporaryPasswordHelp: 'At least 8 characters. To reactivate a suspended account, use the same email and set a new temporary password.',
     createOperator: 'Create or reactivate access',
     createOperatorSuccess: 'Access created or reactivated. Send the contact the email and password through a separate message.',
     createOperatorError: 'The access could not be created or reactivated. Check the email and password, then try again.',
@@ -648,7 +648,7 @@ function renderManagedOperatorRow(operator) {
 }
 
 function renderOperatorCreationForm() {
-  return `<form class="compact-form" data-create-transfer-operator><label><span>${escapeHtml(t('operatorNameLabel'))}</span><input name="name" type="text" required autocomplete="name" maxlength="120" /></label><label><span>${escapeHtml(t('operatorEmailLabel'))}</span><input name="email" type="email" required autocomplete="username" inputmode="email" maxlength="160" /></label><label data-wide><span>${escapeHtml(t('temporaryPasswordLabel'))}</span><input name="temporaryPassword" type="password" required autocomplete="new-password" minlength="12" maxlength="128" aria-describedby="temporary-password-help" /><small id="temporary-password-help">${escapeHtml(t('temporaryPasswordHelp'))}</small></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('createOperator'))}</button><p class="form-message" data-message="operator-create" role="status"></p></div></form>`;
+  return `<form class="compact-form" data-create-transfer-operator><label><span>${escapeHtml(t('operatorNameLabel'))}</span><input name="name" type="text" required autocomplete="name" maxlength="120" /></label><label><span>${escapeHtml(t('operatorEmailLabel'))}</span><input name="email" type="email" required autocomplete="username" inputmode="email" maxlength="160" /></label><label data-wide><span>${escapeHtml(t('temporaryPasswordLabel'))}</span><input name="temporaryPassword" type="password" required autocomplete="new-password" minlength="8" maxlength="128" aria-describedby="temporary-password-help" /><small id="temporary-password-help">${escapeHtml(t('temporaryPasswordHelp'))}</small></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('createOperator'))}</button><p class="form-message" data-message="operator-create" role="status"></p></div></form>`;
 }
 
 function renderPricingForm() {
@@ -1441,7 +1441,7 @@ async function createTransferOperator(form) {
   const email = text(values.get('email'), 160).toLowerCase();
   const temporaryPassword = String(values.get('temporaryPassword') || '');
   const submit = form.querySelector('button[type="submit"]');
-  if (!name || !email || temporaryPassword.length < 12) {
+  if (!name || !email || temporaryPassword.length < 8) {
     displayMessage('operator-create', t('createOperatorError'), true);
     return;
   }
