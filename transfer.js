@@ -128,6 +128,9 @@ const COPY = {
     boatStatIndependentShort: 'in autonomia',
     boatStatPendingShort: 'da sollecitare',
     boatStatFollowUp: 'Contatta lo skipper: qualcuno non ha ancora deciso',
+    boatStatSkipperLabel: 'Skipper',
+    boatStatSkipperRequested: 'transfer richiesto',
+    boatStatSkipperUnknown: 'da verificare',
     boatReminderAction: 'Sollecita lo skipper',
     boatChecklistBoat: 'Barca',
     boatChecklistRules: 'Regole',
@@ -269,6 +272,9 @@ const COPY = {
     boatStatIndependentShort: 'on their own',
     boatStatPendingShort: 'to follow up',
     boatStatFollowUp: 'Contact the skipper: someone has not decided yet',
+    boatStatSkipperLabel: 'Skipper',
+    boatStatSkipperRequested: 'transfer requested',
+    boatStatSkipperUnknown: 'to check',
     boatReminderAction: 'Remind the skipper',
     boatChecklistBoat: 'Boat',
     boatChecklistRules: 'Rules',
@@ -983,6 +989,23 @@ async function ensureBoatTravelStatus(boatIds) {
 // Per ogni tratta: quante persone hanno chiesto il transfer, quante si
 // arrangiano da sole, quante restano da sollecitare (non hanno ancora
 // deciso, oppure non hanno mai aperto il modulo viaggio).
+// Il transfer dello skipper (anche lui decide se prenderlo, vedi
+// skipperContact più sopra) viaggia in transferOpsRecords con inviteId
+// "skipper" (functions/index.js, materializeSkipperTravel) — già caricato in
+// state.records, quindi nessuna lettura in più. Non distingue "si arrangia
+// da solo" da "non ha ancora deciso" (stesso limite di transferOpsRecords
+// per l'equipaggio, prima di crewTravelStatus): senza un record attivo resta
+// "da verificare", non necessariamente un problema. Segnalato da Silvio,
+// 30/09/2026: il riepilogo per barca ometteva del tutto il transfer e la
+// partecipazione dello skipper.
+function boatSkipperTransferStatus(boatId) {
+  const hasActiveLeg = (direction) => state.records.some((record) => record.boatId === boatId
+    && record.inviteId === 'skipper'
+    && (!record.recordState || record.recordState === 'active')
+    && normalizeDirection(record.direction || record.legDirection || record.travelDirection) === direction);
+  return { outbound: hasActiveLeg('outbound'), return: hasActiveLeg('return') };
+}
+
 function boatTravelBreakdown(boatId) {
   const statuses = state.boatTravelStatus[boatId] || [];
   const total = state.boatMemberCounts[boatId];
@@ -1104,6 +1127,9 @@ function renderBoatStats() {
     const totalText = hasData ? String(breakdown.total) : '…';
     const statusClass = (needsFollowUp || needsSetupFollowUp) ? ' transfer-boat-stat--pending' : hasData && breakdown.total > 0 ? ' transfer-boat-stat--ready' : '';
     const legLine = (label, leg) => `<span>${escapeHtml(label)}: ${leg.requested} ${escapeHtml(t('boatStatRequestedShort'))} · ${leg.independent} ${escapeHtml(t('boatStatIndependentShort'))} · ${Number.isInteger(leg.pending) ? leg.pending : '…'} ${escapeHtml(t('boatStatPendingShort'))}</span>`;
+    const skipperStatus = boatSkipperTransferStatus(boat.id);
+    const skipperStatusText = (done) => (done ? t('boatStatSkipperRequested') : t('boatStatSkipperUnknown'));
+    const skipperLine = `<span class="transfer-boat-stat-skipper-line">${escapeHtml(t('boatStatSkipperLabel'))} · ${escapeHtml(t('inbound'))}: ${escapeHtml(skipperStatusText(skipperStatus.outbound))} · ${escapeHtml(t('outbound'))}: ${escapeHtml(skipperStatusText(skipperStatus.return))}</span>`;
     const reminderUrl = hasData ? whatsappDraftUrl(boatReminderMessage(boat, breakdown, readiness)) : '';
     const initial = escapeHtml(boat.name.trim().charAt(0).toUpperCase() || '?');
     return `<article class="transfer-boat-stat${statusClass}">
@@ -1117,6 +1143,7 @@ function renderBoatStats() {
         ${checklistItem(readiness.dossierConfirmed, t('boatChecklistDossier'))}
       </div>
       <div class="transfer-boat-stat-legs">
+        ${skipperLine}
         ${legLine(t('inbound'), breakdown.outbound)}
         ${legLine(t('outbound'), breakdown.return)}
       </div>
