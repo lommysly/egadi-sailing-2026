@@ -6204,6 +6204,56 @@ function updateSkipperTravelTransferHint(form) {
   } else {
     hint.textContent = 'Puoi indicarlo già ora: resta nella tua scheda privata finché non attivi un’azione dedicata.';
   }
+  renderSkipperTransferProgress(form, legId, isTransfer && transferConsent?.checked === true);
+}
+
+// Lo skipper prende un transfer come chiunque altro, ma prima non aveva
+// nessuna vetrina sul proprio stato: solo l'equipaggio vedeva "in
+// organizzazione/confermato". writeCrewTransferOperationStatus ora scrive lo
+// stato anche su crewTravelStatus/skipper (stesso documento già letto per il
+// conteggio compagni di viaggio), quindi basta leggerlo da qui — nessuna
+// nuova regola di sicurezza serve (richiesta di Silvio, 30/09/2026).
+const SKIPPER_TRANSFER_PROGRESS_COPY = {
+  requested: ['Richiesta salvata', 'La società transfer non ha ancora confermato il collegamento.'],
+  planning: ['In organizzazione', 'La società transfer sta organizzando questo collegamento.'],
+  confirmed: ['Transfer confermato', 'La società transfer ha confermato il collegamento.'],
+  completed: ['Transfer concluso', 'Questo collegamento risulta completato.'],
+  cancelled: ['Transfer annullato', 'La società transfer ha annullato la richiesta.'],
+};
+
+function skipperMeetingDetailText(legId, key) {
+  const status = crewTravelStatusFor('skipper');
+  const meetingPoint = String(status?.[`${legId}MeetingPoint`] || '').trim();
+  const meetingTime = String(status?.[`${legId}MeetingTime`] || '').trim();
+  if (meetingPoint || meetingTime) {
+    const timeLabel = meetingTime ? `ore ${meetingTime}` : '';
+    const bits = [meetingPoint, timeLabel].filter(Boolean).join(' · ');
+    return ` Punto di ritrovo: ${bits}.`;
+  }
+  if (key === 'planning' || key === 'confirmed') {
+    return ' Il punto di ritrovo comparirà qui appena la società transfer lo imposta.';
+  }
+  return '';
+}
+
+function renderSkipperTransferProgress(form, legId, isTransfer) {
+  const target = form?.querySelector('[data-transfer-progress]');
+  if (!target) return;
+  if (!isTransfer) {
+    target.hidden = true;
+    target.replaceChildren();
+    return;
+  }
+  const operation = crewTravelStatusFor('skipper')?.[`${legId}OperationStatus`];
+  let key = 'requested';
+  if (operation === 'planned') key = 'planning';
+  else if (['confirmed', 'completed', 'cancelled'].includes(operation)) key = operation;
+  const [title, detail] = SKIPPER_TRANSFER_PROGRESS_COPY[key];
+  const meetingDetail = skipperMeetingDetailText(legId, key);
+  const icon = key === 'confirmed' || key === 'completed' ? '✓' : key === 'cancelled' ? '!' : '•';
+  target.hidden = false;
+  target.className = `crew-transfer-progress crew-transfer-progress--${key}`;
+  target.innerHTML = `<span class="crew-transfer-progress-icon" aria-hidden="true">${icon}</span><div><p class="eyebrow">Transfer organizzato · stato aggiornato</p><strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}${escapeHtml(meetingDetail)}</span></div>`;
 }
 
 function setSkipperTravelFormField(form, name, value) {

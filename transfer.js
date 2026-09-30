@@ -164,6 +164,7 @@ const COPY = {
     bulkApplySuccess: 'Aggiornati {count} movimenti.',
     bulkApplyError: 'Non sono riuscito ad aggiornare questi movimenti. Riprova tra poco.',
     bulkApplyEmpty: 'Compila almeno un campo da applicare al gruppo.',
+    bulkOpenCardWarning: 'Usa "Applica" qui sotto per cambiare tutte le persone selezionate insieme. Se apri e salvi una singola scheda qui sopra, quel salvataggio riguarda solo quella persona.',
     languageIt: 'IT',
     languageEn: 'EN',
     approvalError: 'Impossibile aggiornare l’abilitazione. Riprova tra poco.',
@@ -319,6 +320,7 @@ const COPY = {
     bulkApplySuccess: 'Updated {count} records.',
     bulkApplyError: 'Could not update these records. Please try again shortly.',
     bulkApplyEmpty: 'Fill in at least one field to apply to the group.',
+    bulkOpenCardWarning: 'Use "Apply" below to change all selected people together. Opening and saving a single card above only affects that one person.',
     languageIt: 'IT',
     languageEn: 'EN',
     approvalError: 'The access setting could not be updated. Please try again shortly.',
@@ -1636,7 +1638,7 @@ function renderBulkToolbar() {
     return;
   }
   container.hidden = false;
-  container.innerHTML = `<form class="transfer-bulk-form" data-bulk-form><div class="transfer-bulk-toolbar-head"><strong>${escapeHtml(t('bulkSelectedCount').replace('{count}', String(count)))}</strong><button class="text-button" type="button" data-action="bulk-clear">${escapeHtml(t('bulkClearSelection'))}</button></div><div class="transfer-record-form"><label><span>${escapeHtml(t('status'))}</span><select name="status"><option value="">${escapeHtml(t('bulkKeepValue'))}</option>${statusOptions('', OPERATIONAL_STATUSES)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500" placeholder="${escapeHtml(t('bulkFieldHint'))}"></textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('bulkApply').replace('{count}', String(count)))}</button><p class="form-message" data-message="bulk-actions" role="status"></p></div></div></form>`;
+  container.innerHTML = `<form class="transfer-bulk-form" data-bulk-form><div class="transfer-bulk-toolbar-head"><strong>${escapeHtml(t('bulkSelectedCount').replace('{count}', String(count)))}</strong><button class="text-button" type="button" data-action="bulk-clear">${escapeHtml(t('bulkClearSelection'))}</button></div><p class="transfer-bulk-toolbar-note">${escapeHtml(t('bulkOpenCardWarning'))}</p><div class="transfer-record-form"><label><span>${escapeHtml(t('status'))}</span><select name="status"><option value="">${escapeHtml(t('bulkKeepValue'))}</option>${statusOptions('', OPERATIONAL_STATUSES)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500" placeholder="${escapeHtml(t('bulkFieldHint'))}"></textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('bulkApply').replace('{count}', String(count)))}</button><p class="form-message" data-message="bulk-actions" role="status"></p></div></div></form>`;
 }
 
 // Un cluster ha una sola casella "seleziona tutti": deve riflettere lo stato

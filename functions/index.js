@@ -686,17 +686,26 @@ async function clearTransferCompanionCount(boatId, inviteId, direction) {
   }, { merge: true });
 }
 
-// L'equipaggio vede soltanto lo stato della propria richiesta: niente
-// nominativi, contatti, mezzi o note presenti nella coda dell'operatore.
+// La persona vede lo stato della propria richiesta e, se il gestore lo ha
+// impostato, dove e quando presentarsi: mai nominativi, contatti, mezzo
+// assegnato o note interne della coda dell'operatore (quei campi restano
+// solo suoi). Prima escludeva lo skipper: anche lui prende un transfer e
+// aspettava "chiedigli i dettagli" come tutti gli altri, senza motivo
+// (richiesta di Silvio, 30/09/2026).
 async function writeCrewTransferOperationStatus(record, revision) {
   const boatId = asUid(record?.boatId);
   const inviteId = asUid(record?.inviteId);
   const direction = record?.direction;
-  if (!boatId || !inviteId || inviteId === 'skipper' || !['outbound', 'return'].includes(direction)) return;
+  if (!boatId || !inviteId || !['outbound', 'return'].includes(direction)) return;
   const statusRef = db.doc(`boats/${boatId}/crewTravelStatus/${inviteId}`);
   const statusKey = `${direction}OperationStatus`;
   const revisionKey = `${direction}OperationRevision`;
-  const status = record?.recordState === 'active' ? safeStatus(record.status) : 'revoked';
+  const meetingPointKey = `${direction}MeetingPoint`;
+  const meetingTimeKey = `${direction}MeetingTime`;
+  const isActive = record?.recordState === 'active';
+  const status = isActive ? safeStatus(record.status) : 'revoked';
+  const meetingPoint = isActive ? asText(record.meetingPoint, 160) : '';
+  const meetingTime = isActive ? asText(record.meetingTime, 5) : '';
   await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(statusRef);
     if (Number(snapshot.data()?.[revisionKey] || 0) >= revision) return;
@@ -704,6 +713,8 @@ async function writeCrewTransferOperationStatus(record, revision) {
       inviteId,
       [statusKey]: status,
       [revisionKey]: revision,
+      [meetingPointKey]: meetingPoint,
+      [meetingTimeKey]: meetingTime,
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
   });

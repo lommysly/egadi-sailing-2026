@@ -1137,3 +1137,17 @@ body.menu-open { overflow:hidden; }
   .skipper-charter-delivery-view .charter-delivery-panel { margin-top:0; }
   .boat-form-edit-panel { margin-top:14px; padding-top:16px; }
 }
+
+/* Stato live del transfer organizzato dal gestore: prima solo in
+   travel.html (equipaggio), spostato qui perché ora lo usa anche area.html
+   (lo skipper prende un transfer come chiunque altro, richiesta di Silvio,
+   30/09/2026) — stesso componente, niente duplicazione. */
+.crew-transfer-progress { display:grid; grid-template-columns:auto minmax(0,1fr); gap:12px; align-items:start; margin:0 0 18px; padding:15px 16px; border:1px solid rgba(8,123,138,.24); border-radius:13px; background:#f1fbfa; }
+.crew-transfer-progress[hidden] { display:none; }
+.crew-transfer-progress-icon { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#087b8a; color:white; font-weight:700; }
+.crew-transfer-progress--draft .crew-transfer-progress-icon,.crew-transfer-progress--requested .crew-transfer-progress-icon { background:#ad772e; }
+.crew-transfer-progress--cancelled .crew-transfer-progress-icon { background:#a83e35; }
+.crew-transfer-progress .eyebrow { margin:0 0 5px; color:#087b8a; font-size:.62rem; }
+.crew-transfer-progress strong,.crew-transfer-progress span:last-child { display:block; }
+.crew-transfer-progress strong { color:#063644; font:600 1.07rem/1.2 "Fraunces",serif; }
+.crew-transfer-progress span:last-child { margin-top:4px; color:#416b6d; font-size:.81rem; line-height:1.43; }

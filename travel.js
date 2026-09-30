@@ -136,7 +136,7 @@ function copyForLocale() {
         draft: ['Trip still in draft', 'The organiser can see this transfer choice, but your trip details are not confirmed yet.'],
         requested: ['Request saved', 'The transfer organiser has not confirmed your connection yet.'],
         planning: ['Being arranged', 'The transfer organiser is working on your connection.'],
-        confirmed: ['Transfer confirmed', 'The organiser has confirmed this connection. Check with them for the meeting details.'],
+        confirmed: ['Transfer confirmed', 'The organiser has confirmed this connection.'],
         completed: ['Transfer completed', 'This connection has been marked as completed.'],
         cancelled: ['Transfer cancelled', 'The organiser has cancelled this request. Contact your skipper before travelling.'],
       },
@@ -274,7 +274,7 @@ function copyForLocale() {
       draft: ['Viaggio ancora in bozza', 'Il gestore può vedere la scelta del transfer, ma i dati del viaggio non sono ancora confermati.'],
       requested: ['Richiesta salvata', 'Il gestore non ha ancora confermato il collegamento.'],
       planning: ['In organizzazione', 'Il gestore sta organizzando questo collegamento.'],
-      confirmed: ['Transfer confermato', 'Il gestore ha confermato il collegamento. Chiedigli i dettagli del ritrovo.'],
+      confirmed: ['Transfer confermato', 'Il gestore ha confermato il collegamento.'],
       completed: ['Transfer concluso', 'Questo collegamento risulta completato.'],
       cancelled: ['Transfer annullato', 'Il gestore ha annullato la richiesta. Contatta lo skipper prima di partire.'],
     },
@@ -818,6 +818,28 @@ function updatePersistedLegState(card, direction, leg, copy) {
   renderTransferProgress(card, direction, currentPersistedLegs[direction] || leg, copy);
 }
 
+// Prima diceva solo "chiedi al gestore i dettagli del ritrovo": il punto e
+// l'orario che il gestore imposta sulla sua coda arrivano già su questo
+// stesso documento (crewTravelStatus, via writeCrewTransferOperationStatus)
+// quindi si possono mostrare qui, invece di rimandare a un messaggio esterno
+// che l'operatore dovrebbe scrivere a mano a ogni persona (richiesta di
+// Silvio, 30/09/2026). Mezzo assegnato e note restano solo dell'operatore.
+function meetingDetailText(direction, key) {
+  const meetingPoint = String(currentTransferOperationStatus?.[`${direction}MeetingPoint`] || '').trim();
+  const meetingTime = String(currentTransferOperationStatus?.[`${direction}MeetingTime`] || '').trim();
+  if (meetingPoint || meetingTime) {
+    const timeLabel = meetingTime ? (isEnglish() ? `time ${meetingTime}` : `ore ${meetingTime}`) : '';
+    const bits = [meetingPoint, timeLabel].filter(Boolean).join(' · ');
+    return isEnglish() ? ` Meeting point: ${bits}.` : ` Punto di ritrovo: ${bits}.`;
+  }
+  if (key === 'planning' || key === 'confirmed') {
+    return isEnglish()
+      ? ' The meeting point will appear here as soon as the organiser sets it.'
+      : ' Il punto di ritrovo comparirà qui appena il gestore lo imposta.';
+  }
+  return '';
+}
+
 function renderTransferProgress(card, direction, leg, copy) {
   const target = card.querySelector('[data-transfer-progress]');
   if (leg.airportMarsalaChoice !== 'transfer' || !leg.transferOperatorConsent) {
@@ -835,10 +857,11 @@ function renderTransferProgress(card, direction, leg, copy) {
   const [title, detail] = copy.transferProgress[key];
   const terminalAirport = String(direction === 'return' ? leg.originAirport || '' : leg.destinationAirport || '').toUpperCase();
   const paidServiceDetail = transferPriceNote(terminalAirport, direction);
+  const meetingDetail = meetingDetailText(direction, key);
   const icon = key === 'confirmed' || key === 'completed' ? '✓' : key === 'cancelled' || key === 'draft' ? '!' : '•';
   target.hidden = false;
   target.className = `crew-transfer-progress crew-transfer-progress--${key}`;
-  target.innerHTML = `<span class="crew-transfer-progress-icon" aria-hidden="true">${icon}</span><div><p class="eyebrow">${copy.transferProgress.eyebrow}</p><strong>${title}</strong><span>${detail} ${paidServiceDetail}</span></div>`;
+  target.innerHTML = `<span class="crew-transfer-progress-icon" aria-hidden="true">${icon}</span><div><p class="eyebrow">${copy.transferProgress.eyebrow}</p><strong>${title}</strong><span>${detail}${meetingDetail} ${paidServiceDetail}</span></div>`;
 }
 
 function applySavedLegState(card, message, direction, leg, copy) {

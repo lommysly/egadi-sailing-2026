@@ -520,6 +520,24 @@ function renderCrewActivityTimeline({ profileReady, briefingReady, pendingPaymen
   `).join('');
 }
 
+// Stesso dato di travel.js (crewTravelStatus.{direction}MeetingPoint/Time,
+// scritto da writeCrewTransferOperationStatus): qui prima si diceva solo
+// "chiedigli i dettagli del ritrovo", rimandando a un messaggio a parte che
+// l'operatore doveva scrivere a mano (richiesta di Silvio, 30/09/2026).
+function meetingDetailText(direction, operation) {
+  const meetingPoint = String(activeCrewTravelStatus?.[`${direction}MeetingPoint`] || '').trim();
+  const meetingTime = String(activeCrewTravelStatus?.[`${direction}MeetingTime`] || '').trim();
+  if (meetingPoint || meetingTime) {
+    const timeLabel = meetingTime ? localized(`ore ${meetingTime}`, `time ${meetingTime}`) : '';
+    const bits = [meetingPoint, timeLabel].filter(Boolean).join(' · ');
+    return ` ${localized('Punto di ritrovo:', 'Meeting point:')} ${bits}.`;
+  }
+  if (operation === 'planned' || operation === 'confirmed') {
+    return ` ${localized('Il punto di ritrovo comparirà qui appena il gestore lo imposta.', 'The meeting point will appear here as soon as the organiser sets it.')}`;
+  }
+  return '';
+}
+
 function crewTravelProgress(direction) {
   const name = direction === 'outbound' ? localized('Andata', 'Outbound') : localized('Rientro', 'Return');
   if (crewTravelStatusReadError) return { tone: 'attention', label: `${name} · ${localized('stato non disponibile', 'status unavailable')}`, detail: localized('Non riesco a leggere l’ultimo aggiornamento. Riprova tra poco.', 'I cannot read the latest update. Try again shortly.') };
@@ -538,8 +556,8 @@ function crewTravelProgress(direction) {
   );
   if (transferState === 'not_requested') return item('complete', localized('senza transfer organizzato', 'no organised transfer'), localized('Hai scelto di organizzare il collegamento autonomamente.', 'You chose to arrange this connection yourself.'));
   if (transferState !== 'requested') return item('attention', localized('collegamento da scegliere', 'connection to choose'), localized('Se vuoi il transfer, selezionalo in questa tratta e dai il consenso.', 'If you need a transfer, select it for this journey and give your consent.'));
-  if (operation === 'planned') return item('update', localized('transfer in organizzazione', 'transfer being arranged'), `${localized('Il gestore sta preparando il collegamento.', 'The organiser is preparing the connection.')} ${crewTransferPaidNote()}`);
-  if (operation === 'confirmed') return item('complete', localized('transfer confermato', 'transfer confirmed'), `${localized('Il gestore ha confermato il collegamento; chiedigli i dettagli del ritrovo.', 'The organiser confirmed the connection; ask them for meeting details.')} ${crewTransferPaidNote()}`);
+  if (operation === 'planned') return item('update', localized('transfer in organizzazione', 'transfer being arranged'), `${localized('Il gestore sta preparando il collegamento.', 'The organiser is preparing the connection.')}${meetingDetailText(direction, operation)} ${crewTransferPaidNote()}`);
+  if (operation === 'confirmed') return item('complete', localized('transfer confermato', 'transfer confirmed'), `${localized('Il gestore ha confermato il collegamento.', 'The organiser confirmed the connection.')}${meetingDetailText(direction, operation)} ${crewTransferPaidNote()}`);
   if (operation === 'completed') return item('complete', localized('transfer concluso', 'transfer completed'), `${localized('Il gestore ha segnato il collegamento come concluso.', 'The organiser marked the connection as completed.')} ${crewTransferPaidNote()}`);
   if (operation === 'cancelled') return item('attention', localized('transfer annullato', 'transfer cancelled'), localized('Contatta lo skipper prima di partire.', 'Contact your skipper before travelling.'));
   return item('waiting', localized('transfer richiesto', 'transfer requested'), `${localized('Richiesta salvata; il gestore non l’ha ancora confermata.', 'Request saved; the organiser has not confirmed it yet.')} ${crewTransferPaidNote()}`);
