@@ -123,15 +123,12 @@ const COPY = {
     allBoats: 'Tutte le barche',
     boatStatsEyebrow: 'Riepilogo per barca',
     boatStatsTitle: 'Chi ha scelto il transfer, barca per barca',
-    boatStatsSummary: '{boats} barche · {members} persone registrate · {outbound} hanno chiesto il transfer in andata, {return} al ritorno.',
+    boatStatsSummary: '{boats} barche · {members} persone a bordo (equipaggio + skipper) · {outbound} hanno chiesto il transfer in andata, {return} al ritorno.',
     boatStatSkipper: 'Skipper {name}',
-    boatStatOnBoard: 'persone registrate',
+    boatStatOnBoard: 'a bordo (equipaggio + skipper)',
     boatStatRequestedShort: 'transfer',
     boatStatIndependentShort: 'in autonomia',
     boatStatPendingShort: 'da sollecitare',
-    boatStatSkipperLabel: 'Skipper',
-    boatStatSkipperRequested: 'transfer richiesto',
-    boatStatSkipperUnknown: 'da verificare',
     boatChecklistCrewTransfer: 'Transfer equipaggio',
     boatChecklistSkipperTransfer: 'Transfer skipper',
     boatReminderAction: 'Sollecita lo skipper',
@@ -269,15 +266,12 @@ const COPY = {
     allBoats: 'All boats',
     boatStatsEyebrow: 'Boat by boat',
     boatStatsTitle: 'Who chose the transfer, boat by boat',
-    boatStatsSummary: '{boats} boats · {members} registered people · {outbound} requested the outbound transfer, {return} the return.',
+    boatStatsSummary: '{boats} boats · {members} people on board (crew + skipper) · {outbound} requested the outbound transfer, {return} the return.',
     boatStatSkipper: 'Skipper {name}',
-    boatStatOnBoard: 'registered people',
+    boatStatOnBoard: 'on board (crew + skipper)',
     boatStatRequestedShort: 'transfer',
     boatStatIndependentShort: 'on their own',
     boatStatPendingShort: 'to follow up',
-    boatStatSkipperLabel: 'Skipper',
-    boatStatSkipperRequested: 'transfer requested',
-    boatStatSkipperUnknown: 'to check',
     boatChecklistCrewTransfer: 'Crew transfer',
     boatChecklistSkipperTransfer: 'Skipper transfer',
     boatReminderAction: 'Remind the skipper',
@@ -1013,20 +1007,38 @@ function boatSkipperTransferStatus(boatId) {
   return { outbound: hasActiveLeg('outbound'), return: hasActiveLeg('return') };
 }
 
-function boatTravelBreakdown(boatId) {
+// Il totale e le due tratte includono anche lo skipper: sale a bordo pure
+// lui, e se ha già deciso il transfer la sua scelta conta nei numeri
+// "richiesto/in autonomia/da sollecitare" come chiunque altro — non solo in
+// una riga separata. Non possiamo sapere se lo skipper "si arrangia da
+// solo" (nessun segnale minimo equivalente a crewTravelStatus per lui): se
+// non ha un transfer attivo, il conteggio lo mette comunque tra i "da
+// sollecitare" tramite la sottrazione, mai tra gli "in autonomia" (richiesta
+// di Silvio, 30/09/2026: "tutto ciò che riguarda lo skipper" va contato, non
+// solo mostrato).
+function boatTravelBreakdown(boatId, skipperStatus = {}) {
   const statuses = state.boatTravelStatus[boatId] || [];
-  const total = state.boatMemberCounts[boatId];
+  const crewTotal = state.boatMemberCounts[boatId];
+  const total = Number.isInteger(crewTotal) ? crewTotal + 1 : null;
   const countFor = (key) => ({
     requested: statuses.filter((entry) => entry[key] === 'requested').length,
     independent: statuses.filter((entry) => entry[key] === 'not_requested').length,
   });
+  const withSkipper = (counted, skipperRequested) => {
+    const requested = counted.requested + (skipperRequested ? 1 : 0);
+    const independent = counted.independent;
+    return {
+      requested,
+      independent,
+      pending: Number.isInteger(total) ? Math.max(0, total - requested - independent) : null,
+    };
+  };
   const outbound = countFor('outboundTransfer');
   const inbound = countFor('returnTransfer');
-  const pendingFor = (counted) => Number.isInteger(total) ? Math.max(0, total - counted.requested - counted.independent) : null;
   return {
     total,
-    outbound: { ...outbound, pending: pendingFor(outbound) },
-    return: { ...inbound, pending: pendingFor(inbound) },
+    outbound: withSkipper(outbound, skipperStatus.outbound === true),
+    return: withSkipper(inbound, skipperStatus.return === true),
   };
 }
 
@@ -1080,12 +1092,16 @@ function boatSetupIssues(readiness) {
 }
 
 function boatReminderMessage(boat, breakdown, readiness, skipperStatus) {
+  // breakdown.total include ormai anche lo skipper: il confronto corretto è
+  // con i posti totali della barca (totalBerths), non con la capienza
+  // equipaggio (capacity), che lo skipper non lo conta (richiesta di Silvio,
+  // 30/09/2026).
   const registered = Number.isInteger(breakdown.total) ? breakdown.total : null;
   const crewLine = registered === null
     ? (locale() === 'en' ? 'crew count not available yet' : 'equipaggio non ancora verificabile')
-    : Number.isInteger(boat.capacity)
-      ? (locale() === 'en' ? `${registered} of ${boat.capacity} crew seats registered` : `${registered} di ${boat.capacity} posti equipaggio registrati`)
-      : (locale() === 'en' ? `${registered} crew members registered` : `${registered} persone di equipaggio registrate`);
+    : Number.isInteger(boat.totalBerths)
+      ? (locale() === 'en' ? `${registered} of ${boat.totalBerths} berths on board (crew + skipper)` : `${registered} di ${boat.totalBerths} posti a bordo (equipaggio + skipper)`)
+      : (locale() === 'en' ? `${registered} people on board, crew and skipper` : `${registered} persone a bordo, equipaggio e skipper`);
   const legLine = (label, leg) => (locale() === 'en'
     ? `${label}: ${leg.requested} requested the transfer, ${leg.independent} arranging on their own, ${Number.isInteger(leg.pending) ? leg.pending : '?'} still undecided`
     : `${label}: ${leg.requested} hanno chiesto il transfer, ${leg.independent} si arrangiano da soli, ${Number.isInteger(leg.pending) ? leg.pending : '?'} non hanno ancora deciso`);
@@ -1126,7 +1142,8 @@ function renderBoatStats() {
   const totals = { members: 0, outboundRequested: 0, outboundPending: 0, returnRequested: 0, returnPending: 0, setupIncomplete: 0 };
   const checklistItem = (done, label) => `<span class="transfer-boat-checklist-item transfer-boat-checklist-item--${done ? 'done' : 'missing'}"><span aria-hidden="true">${done ? '✓' : '!'}</span>${escapeHtml(label)}</span>`;
   const cards = state.allBoats.map((boat) => {
-    const breakdown = boatTravelBreakdown(boat.id);
+    const skipperStatus = boatSkipperTransferStatus(boat.id);
+    const breakdown = boatTravelBreakdown(boat.id, skipperStatus);
     const readiness = boatSetupReadiness(boat);
     // Il flag deve nominare esattamente cosa manca: un testo generico ("barca,
     // regole o dossier") contraddiceva la checklist qui sopra quando solo una
@@ -1143,22 +1160,23 @@ function renderBoatStats() {
     if (Number.isInteger(breakdown.return.pending)) totals.returnPending += breakdown.return.pending;
     const needsFollowUp = (breakdown.outbound.pending || 0) > 0 || (breakdown.return.pending || 0) > 0;
     const hasData = Number.isInteger(breakdown.total);
+    // Il totale ora include lo skipper (boatTravelBreakdown): "occupati" resta
+    // confrontabile solo con i posti totali della barca, non con la capienza
+    // equipaggio (che esclude lo skipper) — richiesta di Silvio, 30/09/2026.
     const totalText = hasData ? String(breakdown.total) : '…';
-    const skipperStatus = boatSkipperTransferStatus(boat.id);
+    const totalBerthsText = Number.isInteger(boat.totalBerths) ? String(boat.totalBerths) : '…';
     // Anche lo skipper fa parte dell'equipaggio e sale sulla barca: se non ha
     // ancora deciso il proprio transfer è tra le persone da gestire, non un
     // dettaglio a parte (richiesta di Silvio, 30/09/2026).
     const skipperNeedsFollowUp = !skipperStatus.outbound || !skipperStatus.return;
     const statusClass = (needsFollowUp || needsSetupFollowUp || skipperNeedsFollowUp) ? ' transfer-boat-stat--pending' : hasData && breakdown.total > 0 ? ' transfer-boat-stat--ready' : '';
     const legLine = (label, leg) => `<span>${escapeHtml(label)}: ${leg.requested} ${escapeHtml(t('boatStatRequestedShort'))} · ${leg.independent} ${escapeHtml(t('boatStatIndependentShort'))} · ${Number.isInteger(leg.pending) ? leg.pending : '…'} ${escapeHtml(t('boatStatPendingShort'))}</span>`;
-    const skipperStatusText = (done) => (done ? t('boatStatSkipperRequested') : t('boatStatSkipperUnknown'));
-    const skipperLine = `<span class="transfer-boat-stat-skipper-line${skipperNeedsFollowUp ? ' transfer-boat-stat-skipper-line--pending' : ''}">${escapeHtml(t('boatStatSkipperLabel'))} · ${escapeHtml(t('inbound'))}: ${escapeHtml(skipperStatusText(skipperStatus.outbound))} · ${escapeHtml(t('outbound'))}: ${escapeHtml(skipperStatusText(skipperStatus.return))}</span>`;
     const reminderUrl = hasData ? whatsappDraftUrl(boatReminderMessage(boat, breakdown, readiness, skipperStatus)) : '';
     const initial = escapeHtml(boat.name.trim().charAt(0).toUpperCase() || '?');
     return `<article class="transfer-boat-stat${statusClass}">
       <header class="transfer-boat-stat-heading">
         <span class="transfer-boat-stat-avatar" aria-hidden="true">${initial}</span>
-        <span class="transfer-boat-stat-person"><strong>${escapeHtml(boat.name)}</strong><small>${boat.skipperName ? escapeHtml(t('boatStatSkipper').replace('{name}', boat.skipperName)) : ''} · ${totalText} ${escapeHtml(t('boatStatOnBoard'))}</small></span>
+        <span class="transfer-boat-stat-person"><strong>${escapeHtml(boat.name)}</strong><small>${boat.skipperName ? escapeHtml(t('boatStatSkipper').replace('{name}', boat.skipperName)) : ''} · ${totalText}/${totalBerthsText} ${escapeHtml(t('boatStatOnBoard'))}</small></span>
       </header>
       <div class="transfer-boat-checklist">
         ${checklistItem(readiness.boatConfigured, t('boatChecklistBoat'))}
@@ -1168,7 +1186,6 @@ function renderBoatStats() {
         ${checklistItem(!skipperNeedsFollowUp, t('boatChecklistSkipperTransfer'))}
       </div>
       <div class="transfer-boat-stat-legs">
-        ${skipperLine}
         ${legLine(t('inbound'), breakdown.outbound)}
         ${legLine(t('outbound'), breakdown.return)}
       </div>
