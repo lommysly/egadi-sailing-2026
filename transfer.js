@@ -165,6 +165,8 @@ const COPY = {
     bulkApplyError: 'Non sono riuscito ad aggiornare questi movimenti. Riprova tra poco.',
     bulkApplyEmpty: 'Compila almeno un campo da applicare al gruppo.',
     bulkOpenCardWarning: 'Usa "Applica" qui sotto per cambiare tutte le persone selezionate insieme. Se apri e salvi una singola scheda qui sopra, quel salvataggio riguarda solo quella persona.',
+    bulkExpandForm: 'Gestisci insieme',
+    bulkCollapseForm: 'Chiudi',
     languageIt: 'IT',
     languageEn: 'EN',
     approvalError: 'Impossibile aggiornare l’abilitazione. Riprova tra poco.',
@@ -321,6 +323,8 @@ const COPY = {
     bulkApplyError: 'Could not update these records. Please try again shortly.',
     bulkApplyEmpty: 'Fill in at least one field to apply to the group.',
     bulkOpenCardWarning: 'Use "Apply" below to change all selected people together. Opening and saving a single card above only affects that one person.',
+    bulkExpandForm: 'Manage together',
+    bulkCollapseForm: 'Close',
     languageIt: 'IT',
     languageEn: 'EN',
     approvalError: 'The access setting could not be updated. Please try again shortly.',
@@ -389,6 +393,11 @@ const state = {
   // ogni aggiornamento Firestore, che altrimenti cancellerebbero la
   // selezione a metà lavoro.
   selectedRecordIds: new Set(),
+  // Il modulo di modifica di gruppo resta chiuso finché l'operatore non
+  // preme esplicitamente "Gestisci insieme": deve essere un'azione voluta,
+  // non un pannello che compare già aperto e passa inosservato se la pagina
+  // è scrollata più in basso (richiesta di Silvio, 30/09/2026).
+  bulkFormExpanded: false,
 };
 
 function locale() {
@@ -1628,6 +1637,14 @@ async function saveRecord(form) {
   }
 }
 
+// Prima il pannello appariva già aperto subito sopra la lista: con la
+// pagina scrollata sui movimenti in basso restava fuori dallo schermo, e
+// senza scroll automatico sembrava non essere successo nulla al click
+// (segnalato da Silvio, 30/09/2026 — "non è intuitivo... non ti dice se
+// c'era già o non c'era"). Ora è una barra fissa in fondo allo schermo,
+// sempre visibile appena selezioni qualcuno, con un solo pulsante esplicito
+// per aprire i campi di modifica: chi lo preme sa cosa sta per fare, non
+// scopre un modulo già aperto da qualche parte.
 function renderBulkToolbar() {
   const container = document.querySelector('#transferBulkToolbar');
   if (!container) return;
@@ -1635,10 +1652,16 @@ function renderBulkToolbar() {
   if (count === 0) {
     container.hidden = true;
     container.innerHTML = '';
+    state.bulkFormExpanded = false;
     return;
   }
   container.hidden = false;
-  container.innerHTML = `<form class="transfer-bulk-form" data-bulk-form><div class="transfer-bulk-toolbar-head"><strong>${escapeHtml(t('bulkSelectedCount').replace('{count}', String(count)))}</strong><button class="text-button" type="button" data-action="bulk-clear">${escapeHtml(t('bulkClearSelection'))}</button></div><p class="transfer-bulk-toolbar-note">${escapeHtml(t('bulkOpenCardWarning'))}</p><div class="transfer-record-form"><label><span>${escapeHtml(t('status'))}</span><select name="status"><option value="">${escapeHtml(t('bulkKeepValue'))}</option>${statusOptions('', OPERATIONAL_STATUSES)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500" placeholder="${escapeHtml(t('bulkFieldHint'))}"></textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('bulkApply').replace('{count}', String(count)))}</button><p class="form-message" data-message="bulk-actions" role="status"></p></div></div></form>`;
+  const expanded = state.bulkFormExpanded;
+  const toggleLabel = expanded ? t('bulkCollapseForm') : t('bulkExpandForm');
+  const formFields = expanded
+    ? `<p class="transfer-bulk-toolbar-note">${escapeHtml(t('bulkOpenCardWarning'))}</p><div class="transfer-record-form"><label><span>${escapeHtml(t('status'))}</span><select name="status"><option value="">${escapeHtml(t('bulkKeepValue'))}</option>${statusOptions('', OPERATIONAL_STATUSES)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500" placeholder="${escapeHtml(t('bulkFieldHint'))}"></textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('bulkApply').replace('{count}', String(count)))}</button><p class="form-message" data-message="bulk-actions" role="status"></p></div></div>`
+    : '';
+  container.innerHTML = `<form class="transfer-bulk-form" data-bulk-form><div class="transfer-bulk-toolbar-head"><strong>${escapeHtml(t('bulkSelectedCount').replace('{count}', String(count)))}</strong><div class="transfer-bulk-toolbar-actions"><button class="text-button" type="button" data-action="bulk-clear">${escapeHtml(t('bulkClearSelection'))}</button><button class="button button-primary" type="button" data-action="bulk-toggle-form">${escapeHtml(toggleLabel)}</button></div></div>${formFields}</form>`;
 }
 
 // Un cluster ha una sola casella "seleziona tutti": deve riflettere lo stato
@@ -1765,6 +1788,10 @@ document.addEventListener('click', async (event) => {
   if (action === 'bulk-clear') {
     state.selectedRecordIds.clear();
     renderRecordListOnly();
+    renderBulkToolbar();
+  }
+  if (action === 'bulk-toggle-form') {
+    state.bulkFormExpanded = !state.bulkFormExpanded;
     renderBulkToolbar();
   }
 });
