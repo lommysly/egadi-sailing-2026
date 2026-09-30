@@ -129,6 +129,10 @@ const COPY = {
     boatStatPendingShort: 'da sollecitare',
     boatStatFollowUp: 'Contatta lo skipper: qualcuno non ha ancora deciso',
     boatReminderAction: 'Sollecita lo skipper',
+    boatChecklistBoat: 'Barca',
+    boatChecklistRules: 'Regole',
+    boatChecklistDossier: 'Dossier',
+    boatStatSetupFollowUp: 'Barca da impostare: mancano barca, regole o dossier',
     filterSearch: 'Cerca per nome, aeroporto o volo',
     noRecords: 'Non ci sono movimenti con questi filtri.',
     direction: 'Tratta',
@@ -266,6 +270,10 @@ const COPY = {
     boatStatPendingShort: 'to follow up',
     boatStatFollowUp: 'Contact the skipper: someone has not decided yet',
     boatReminderAction: 'Remind the skipper',
+    boatChecklistBoat: 'Boat',
+    boatChecklistRules: 'Rules',
+    boatChecklistDossier: 'Dossier',
+    boatStatSetupFollowUp: 'Boat setup incomplete: boat, rules or dossier missing',
     filterSearch: 'Search name, airport or flight',
     noRecords: 'There are no journeys matching these filters.',
     direction: 'Journey',
@@ -336,6 +344,13 @@ const state = {
   // equipaggio (richiesta del titolare, 29/09/2026).
   allBoats: [],
   boatTravelStatus: {},
+  // Due segnali "barca impostata" oltre al transfer: regole di bordo attive
+  // e dossier skipper confermato. Letti da percorsi già aperti
+  // all'organizzatore (briefing/board, skipperContact) per capire chi ha
+  // solo registrato la barca senza proseguire (richiesta del titolare,
+  // 30/09/2026: il sollecito deve coprire barca ed equipaggio, non solo il
+  // transfer — caso reale di Michele Pasini/Carpe Diem).
+  boatSetupStatus: {},
 };
 
 function locale() {
@@ -906,6 +921,8 @@ async function ensureAllBoatsLoaded() {
           name: data.name || entry.id,
           skipperName: data.skipperName || '',
           capacity: Number.isInteger(data.capacity) ? data.capacity : null,
+          totalBerths: Number.isInteger(data.totalBerths) ? data.totalBerths : null,
+          bathroomCount: Number.isInteger(data.berthLayout?.bathroomCount) ? data.berthLayout.bathroomCount : 0,
         };
       })
       .sort((first, second) => first.name.localeCompare(second.name, 'it'));
@@ -913,6 +930,34 @@ async function ensureAllBoatsLoaded() {
   } catch (error) {
     console.info('Elenco barche non disponibile.', error?.code || error);
   }
+}
+
+// Due segnali "barca impostata" oltre al transfer: regole di bordo attive
+// (briefing/board) e dossier skipper confermato (skipperContact/default,
+// scritto solo alla conferma finale, mai dalla bozza — vedi area.js). Sono
+// gli unici due percorsi, oltre a boats stesso, già leggibili
+// dall'organizzatore senza esporre nulla del dossier privato: bastano per
+// capire chi ha solo registrato la barca senza proseguire (richiesta del
+// titolare, 30/09/2026 — caso reale di Michele Pasini/Carpe Diem).
+async function ensureBoatSetupStatus(boatIds) {
+  const missing = boatIds.filter((boatId) => !(boatId in state.boatSetupStatus));
+  if (!missing.length) return;
+  await Promise.all(missing.map(async (boatId) => {
+    try {
+      const [briefingSnap, contactSnap] = await Promise.all([
+        getDoc(doc(db, 'boats', boatId, 'briefing', 'board')),
+        getDoc(doc(db, 'boats', boatId, 'skipperContact', 'default')),
+      ]);
+      state.boatSetupStatus[boatId] = {
+        rulesActive: briefingSnap.exists() && Boolean(briefingSnap.data()?.rulesText),
+        dossierConfirmed: contactSnap.exists(),
+      };
+    } catch (error) {
+      console.info('Stato di impostazione non disponibile per questa barca.', boatId, error?.code || error);
+      state.boatSetupStatus[boatId] = { rulesActive: null, dossierConfirmed: null };
+    }
+  }));
+  render();
 }
 
 // Stato dettagliato per persona e per tratta (richiesto/autonomo/non deciso),
@@ -963,17 +1008,48 @@ function whatsappDraftUrl(message) {
   return `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
-// Stesso hash che l'area skipper legge al caricamento per aprire già
-// "Viaggio e comunicazioni → Equipaggio" (area.js, SKIPPER_OPERATIONS_HASHES.
-// crew): chi riceve il sollecito arriva già nella schermata giusta invece di
-// dover cercarla da solo dopo aver fatto login (richiesta di Silvio,
-// 30/09/2026: ogni sollecito WhatsApp deve portare dritto a dove gestire la
-// pratica).
-function skipperCrewTravelUrl() {
-  return new URL('area.html#skipper-viaggi-equipaggio', window.location.href).toString();
+// Stesso hash che l'area skipper legge al caricamento (area.js,
+// SKIPPER_DASHBOARD_HASHES/SKIPPER_OPERATIONS_HASHES): chi riceve il
+// sollecito arriva già nella schermata giusta invece di doverla cercare da
+// solo dopo il login. Se manca anche solo barca/regole/dossier lo mandiamo
+// alla Panoramica intera (dove trova già il pop-up con tutto ciò che manca),
+// non solo alla sezione transfer — richiesta di Silvio, 30/09/2026: "il
+// sollecito deve essere anche a larga scala, non soltanto per la gestione
+// dei transfer" (caso reale di Michele Pasini/Carpe Diem).
+function skipperDestinationUrl(needsSetupFollowUp) {
+  const hash = needsSetupFollowUp ? 'skipper-panorama' : 'skipper-viaggi-equipaggio';
+  return new URL(`area.html#${hash}`, window.location.href).toString();
 }
 
-function boatReminderMessage(boat, breakdown) {
+// "Barca impostata" oltre al transfer: posti/bagni configurati, regole di
+// bordo attive, dossier skipper confermato. Vedi ensureBoatSetupStatus per
+// da dove arrivano rulesActive/dossierConfirmed.
+function boatSetupReadiness(boat) {
+  const status = state.boatSetupStatus[boat.id] || {};
+  return {
+    boatConfigured: Number.isInteger(boat.totalBerths) && boat.totalBerths >= 2 && boat.bathroomCount > 0,
+    rulesActive: status.rulesActive === true,
+    dossierConfirmed: status.dossierConfirmed === true,
+  };
+}
+
+function boatSetupIssues(readiness) {
+  const issues = [];
+  if (!readiness.boatConfigured) {
+    issues.push(locale() === 'en'
+      ? 'boat setup (total berths and bathrooms) still incomplete'
+      : 'configurazione della barca (posti letto e bagni) da completare');
+  }
+  if (!readiness.rulesActive) {
+    issues.push(locale() === 'en' ? 'onboard rules not activated yet' : 'regole di bordo non ancora attivate');
+  }
+  if (!readiness.dossierConfirmed) {
+    issues.push(locale() === 'en' ? 'skipper dossier not confirmed yet' : 'dossier skipper non ancora confermato');
+  }
+  return issues;
+}
+
+function boatReminderMessage(boat, breakdown, readiness) {
   const registered = Number.isInteger(breakdown.total) ? breakdown.total : null;
   const crewLine = registered === null
     ? (locale() === 'en' ? 'crew count not available yet' : 'equipaggio non ancora verificabile')
@@ -986,10 +1062,23 @@ function boatReminderMessage(boat, breakdown) {
   const greeting = boat.skipperName
     ? (locale() === 'en' ? `Hi ${boat.skipperName}` : `Ciao ${boat.skipperName}`)
     : (locale() === 'en' ? 'Hi' : 'Ciao');
-  const link = skipperCrewTravelUrl();
+  const setupIssues = boatSetupIssues(readiness);
+  const needsSetup = setupIssues.length > 0;
+  const link = skipperDestinationUrl(needsSetup);
+  const setupBlock = needsSetup
+    ? (locale() === 'en'
+        ? `Your boat ${boat.name} still needs:\n${setupIssues.map((issue) => `- ${issue}`).join('\n')}\n\n`
+        : `La tua barca ${boat.name} risulta ancora da impostare:\n${setupIssues.map((issue) => `- ${issue}`).join('\n')}\n\n`)
+    : '';
+  const crewTransferIntro = needsSetup
+    ? (locale() === 'en' ? 'Crew and transfer so far:' : 'Equipaggio e transfer finora:')
+    : (locale() === 'en' ? `Quick transfer summary for ${boat.name} (Egadi Sailing Experience):` : `Riepilogo veloce transfer per ${boat.name} (Egadi Sailing Experience):`);
+  const openLine = needsSetup
+    ? (locale() === 'en' ? 'Open your dashboard' : 'Apri la tua area')
+    : (locale() === 'en' ? "Open your crew's travel section" : 'Apri la sezione viaggio del tuo equipaggio');
   return locale() === 'en'
-    ? `${greeting} 🌊\n\nQuick transfer summary for ${boat.name} (Egadi Sailing Experience):\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nFeel free to share this in your crew chat, so whoever is missing can complete their choice.\n\nOpen your crew's travel section: ${link}`
-    : `${greeting} 🌊\n\nRiepilogo veloce transfer per ${boat.name} (Egadi Sailing Experience):\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nPuoi condividerlo anche nel gruppo dell'equipaggio, così chi manca completa la scelta.\n\nApri la sezione viaggio del tuo equipaggio: ${link}`;
+    ? `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nFeel free to share this in your crew chat, so whoever is missing can complete their choice.\n\n${openLine}: ${link}`
+    : `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nPuoi condividerlo anche nel gruppo dell'equipaggio, così chi manca completa la scelta.\n\n${openLine}: ${link}`;
 }
 
 function renderBoatStats() {
@@ -997,9 +1086,14 @@ function renderBoatStats() {
   const boatIds = state.allBoats.map((boat) => boat.id);
   void ensureBoatMemberCounts(boatIds);
   void ensureBoatTravelStatus(boatIds);
-  const totals = { members: 0, outboundRequested: 0, outboundPending: 0, returnRequested: 0, returnPending: 0 };
+  void ensureBoatSetupStatus(boatIds);
+  const totals = { members: 0, outboundRequested: 0, outboundPending: 0, returnRequested: 0, returnPending: 0, setupIncomplete: 0 };
+  const checklistItem = (done, label) => `<span class="transfer-boat-checklist-item transfer-boat-checklist-item--${done ? 'done' : 'missing'}"><span aria-hidden="true">${done ? '✓' : '!'}</span>${escapeHtml(label)}</span>`;
   const cards = state.allBoats.map((boat) => {
     const breakdown = boatTravelBreakdown(boat.id);
+    const readiness = boatSetupReadiness(boat);
+    const needsSetupFollowUp = boatSetupIssues(readiness).length > 0;
+    if (needsSetupFollowUp) totals.setupIncomplete += 1;
     if (Number.isInteger(breakdown.total)) totals.members += breakdown.total;
     totals.outboundRequested += breakdown.outbound.requested;
     totals.returnRequested += breakdown.return.requested;
@@ -1008,30 +1102,41 @@ function renderBoatStats() {
     const needsFollowUp = (breakdown.outbound.pending || 0) > 0 || (breakdown.return.pending || 0) > 0;
     const hasData = Number.isInteger(breakdown.total);
     const totalText = hasData ? String(breakdown.total) : '…';
-    const statusClass = needsFollowUp ? ' transfer-boat-stat--pending' : hasData && breakdown.total > 0 ? ' transfer-boat-stat--ready' : '';
+    const statusClass = (needsFollowUp || needsSetupFollowUp) ? ' transfer-boat-stat--pending' : hasData && breakdown.total > 0 ? ' transfer-boat-stat--ready' : '';
     const legLine = (label, leg) => `<span>${escapeHtml(label)}: ${leg.requested} ${escapeHtml(t('boatStatRequestedShort'))} · ${leg.independent} ${escapeHtml(t('boatStatIndependentShort'))} · ${Number.isInteger(leg.pending) ? leg.pending : '…'} ${escapeHtml(t('boatStatPendingShort'))}</span>`;
-    const reminderUrl = hasData ? whatsappDraftUrl(boatReminderMessage(boat, breakdown)) : '';
+    const reminderUrl = hasData ? whatsappDraftUrl(boatReminderMessage(boat, breakdown, readiness)) : '';
     const initial = escapeHtml(boat.name.trim().charAt(0).toUpperCase() || '?');
     return `<article class="transfer-boat-stat${statusClass}">
       <header class="transfer-boat-stat-heading">
         <span class="transfer-boat-stat-avatar" aria-hidden="true">${initial}</span>
         <span class="transfer-boat-stat-person"><strong>${escapeHtml(boat.name)}</strong><small>${boat.skipperName ? escapeHtml(t('boatStatSkipper').replace('{name}', boat.skipperName)) : ''} · ${totalText} ${escapeHtml(t('boatStatOnBoard'))}</small></span>
       </header>
+      <div class="transfer-boat-checklist">
+        ${checklistItem(readiness.boatConfigured, t('boatChecklistBoat'))}
+        ${checklistItem(readiness.rulesActive, t('boatChecklistRules'))}
+        ${checklistItem(readiness.dossierConfirmed, t('boatChecklistDossier'))}
+      </div>
       <div class="transfer-boat-stat-legs">
         ${legLine(t('inbound'), breakdown.outbound)}
         ${legLine(t('outbound'), breakdown.return)}
       </div>
       <div class="transfer-boat-stat-footer">
+        ${needsSetupFollowUp ? `<span class="transfer-boat-stat-flag transfer-boat-stat-flag--setup">${escapeHtml(t('boatStatSetupFollowUp'))}</span>` : ''}
         ${needsFollowUp ? `<span class="transfer-boat-stat-flag">${escapeHtml(t('boatStatFollowUp'))}</span>` : ''}
         ${reminderUrl ? `<a class="button button-whatsapp transfer-boat-stat-action" href="${escapeHtml(reminderUrl)}" target="_blank" rel="noopener noreferrer"><span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${escapeHtml(t('boatReminderAction'))}</a>` : ''}
       </div>
     </article>`;
   }).join('');
+  const setupSummary = totals.setupIncomplete > 0
+    ? `<p class="field-hint transfer-boat-setup-summary">${escapeHtml(locale() === 'en'
+        ? `${totals.setupIncomplete} ${totals.setupIncomplete === 1 ? 'boat has' : 'boats have'} not finished boat setup, rules or dossier yet.`
+        : `${totals.setupIncomplete} ${totals.setupIncomplete === 1 ? 'barca non ha' : 'barche non hanno'} ancora completato barca, regole o dossier.`)}</p>`
+    : '';
   const summary = `<p class="field-hint">${escapeHtml(t('boatStatsSummary')
     .replace('{boats}', String(state.allBoats.length))
     .replace('{members}', String(totals.members))
     .replace('{outbound}', String(totals.outboundRequested))
-    .replace('{return}', String(totals.returnRequested)))}</p>`;
+    .replace('{return}', String(totals.returnRequested)))}</p>${setupSummary}`;
   return `<section class="transfer-operator-card transfer-boat-stats" aria-label="${escapeHtml(t('boatStatsTitle'))}"><p class="eyebrow">${escapeHtml(t('boatStatsEyebrow'))}</p><h2>${escapeHtml(t('boatStatsTitle'))}</h2>${summary}<div class="transfer-boat-stat-grid">${cards}</div></section>`;
 }
 
@@ -1174,6 +1279,7 @@ async function refreshAccess() {
   state.boatMemberCounts = {};
   state.allBoats = [];
   state.boatTravelStatus = {};
+  state.boatSetupStatus = {};
   render();
 
   if (!state.user) {
