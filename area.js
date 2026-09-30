@@ -1612,7 +1612,26 @@ function currentBriefingAcceptanceCount() {
     && (activeBriefing?.fullRulesRequired !== true || acceptance.fullRulesRead === true)).length;
 }
 
+// Imbarco/Partenza/Rientro restano un unico valore "boardingAt" ecc. nel
+// documento (formato toDateTimeLocal), ma nel form sono due input separati
+// (data + ora): un <input type="datetime-local"> non apre il calendario
+// classico su alcuni browser/WebView e costringeva a scrivere l'orario a
+// mano (segnalato da Silvio, 30/09/2026) — la coppia data/ora è lo stesso
+// pattern già usato per gli orari dei transfer, sempre affidabile.
+const COMBINED_DATETIME_FIELDS = Object.freeze(['boardingAt', 'departureAt', 'returnAt']);
+
+function combinedDateTimeFieldNames(field) {
+  const base = field.replace(/At$/, '');
+  return { dateField: `${base}Date`, timeField: `${base}Time` };
+}
+
 function briefingFieldValue(form, field) {
+  if (COMBINED_DATETIME_FIELDS.includes(field)) {
+    const { dateField, timeField } = combinedDateTimeFieldNames(field);
+    const dateValue = form?.elements.namedItem(dateField)?.value || '';
+    const timeValue = form?.elements.namedItem(timeField)?.value || '';
+    return dateValue && timeValue ? `${dateValue}T${timeValue}` : '';
+  }
   const input = form?.elements.namedItem(field);
   if (!input) return '';
   if (input instanceof RadioNodeList) return input.value || '';
@@ -1671,6 +1690,38 @@ function renderBoardRulesOverview() {
   if (rulesButton) rulesButton.textContent = hasRules ? 'Salva modifiche al regolamento' : 'Attiva regolamento di bordo';
   if (tripButton) tripButton.disabled = !hasRules;
   if (editor && !hasRules) editor.open = true;
+  renderBoardTripOverview();
+}
+
+// Stessa logica del regolamento sopra (riepilogo prima, modulo aperto solo
+// su richiesta): un modulo orari sempre spalancato, con placeholder vuoti,
+// sembrava un compito da fare anche a regolamento già confermato — segnalato
+// da Silvio, 30/09/2026, proprio su Karibu (regole attive, ma la bacheca
+// sembrava "ancora da fare"). Orari e punto di ritrovo restano facoltativi:
+// qui cambia solo la presentazione, non l'obbligo di compilarli.
+function renderBoardTripOverview() {
+  const overview = document.querySelector('#boardTripOverview');
+  const editor = document.querySelector('#tripUpdateEditor');
+  const editorSummary = document.querySelector('#tripUpdateEditorSummary');
+  if (!overview) return;
+  const meetingPoint = String(activeBriefing?.meetingPoint || '').trim();
+  const boardingAt = activeBriefing?.boardingAt || '';
+  const departureAt = activeBriefing?.departureAt || '';
+  const returnAt = activeBriefing?.returnAt || '';
+  const scheduleNote = String(activeBriefing?.scheduleNote || '').trim();
+  const hasAnyTripInfo = Boolean(meetingPoint || boardingAt || departureAt || returnAt || scheduleNote);
+  const legLabel = (label, value) => `${label} ${value ? formatDateTime(value) : 'da definire'}`;
+  if (hasAnyTripInfo) {
+    overview.innerHTML = `<div class="board-rules-overview-icon" aria-hidden="true">✓</div><div class="board-rules-overview-copy"><p class="eyebrow">Bacheca del viaggio · aggiornata</p><h4>${escapeHtml(meetingPoint || 'Punto di ritrovo da definire')}</h4><p>${escapeHtml([legLabel('Imbarco', boardingAt), legLabel('Partenza', departureAt), legLabel('Rientro', returnAt)].join(' · '))}</p>${scheduleNote ? `<div class="board-rules-overview-meta"><span>${escapeHtml(scheduleNote)}</span></div>` : ''}</div>`;
+  } else {
+    overview.innerHTML = '<div class="board-rules-overview-icon is-pending" aria-hidden="true">!</div><div class="board-rules-overview-copy"><p class="eyebrow">Bacheca del viaggio · da compilare</p><h4>Nessun orario ancora indicato</h4><p>Non è obbligatorio: il regolamento resta valido comunque. Aggiungili quando hai conferme su porto, imbarco o meteo.</p></div>';
+  }
+  if (editorSummary) editorSummary.textContent = hasAnyTripInfo ? 'Aggiorna orari e punto di ritrovo' : 'Inserisci orari e punto di ritrovo';
+  // Solo aprire, mai richiudere da qui: altrimenti un aggiornamento qualsiasi
+  // (es. nuove conferme di lettura) richiuderebbe il modulo mentre lo skipper
+  // lo sta ancora compilando. La chiusura esplicita avviene solo al primo
+  // caricamento dei dati, in renderBriefingForm.
+  if (editor && !hasAnyTripInfo) editor.open = true;
 }
 
 function updateRulesEditorChangeWarning() {
@@ -6957,6 +7008,14 @@ function renderBriefingForm() {
     if (!input) continue;
     input.value = input.type === 'datetime-local' ? toDateTimeLocal(value) : value || '';
   }
+  COMBINED_DATETIME_FIELDS.forEach((field) => {
+    const { dateField, timeField } = combinedDateTimeFieldNames(field);
+    const [datePart = '', timePart = ''] = toDateTimeLocal(activeBriefing[field]).split('T');
+    const dateInput = form.elements.namedItem(dateField);
+    const timeInput = form.elements.namedItem(timeField);
+    if (dateInput) dateInput.value = datePart;
+    if (timeInput) timeInput.value = timePart;
+  });
   // Una bacheca italiana già attiva non deve trasformarsi in bilingue solo
   // perché l'editor propone una bozza inglese quando si crea una nuova barca.
   // Se nel documento non esiste il testo EN, i suoi campi restano davvero
@@ -6973,6 +7032,10 @@ function renderBriefingForm() {
   }
   form.dataset.loadedVersion = String(activeBriefing.rulesVersion || 1);
   document.querySelector('#rulesEditor').open = false;
+  const tripEditor = document.querySelector('#tripUpdateEditor');
+  if (tripEditor && Boolean(activeBriefing.meetingPoint || activeBriefing.boardingAt || activeBriefing.departureAt || activeBriefing.returnAt || activeBriefing.scheduleNote)) {
+    tripEditor.open = false;
+  }
   renderBoardRulesOverview();
   updateRulesEditorChangeWarning();
 }
@@ -8355,9 +8418,9 @@ briefingForm.addEventListener('submit', async (event) => {
     rulesTextEn,
     fullRulesRequired: true,
     meetingPoint: fields.get('meetingPoint').trim(),
-    boardingAt: fields.get('boardingAt'),
-    departureAt: fields.get('departureAt'),
-    returnAt: fields.get('returnAt'),
+    boardingAt: briefingFieldValue(form, 'boardingAt'),
+    departureAt: briefingFieldValue(form, 'departureAt'),
+    returnAt: briefingFieldValue(form, 'returnAt'),
     scheduleNote: fields.get('scheduleNote').trim(),
     scheduleNoteEn,
   };

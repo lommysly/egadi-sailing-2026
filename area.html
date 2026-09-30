@@ -546,15 +546,24 @@
             <section class="board-trip-update" aria-labelledby="tripUpdateTitle">
               <p class="eyebrow">Bacheca del viaggio</p>
               <h4 id="tripUpdateTitle">Orari e punto di ritrovo</h4>
-              <p class="panel-lead">Sono informazioni operative, non regole da approvare. Aggiornale quando hai conferme su porto, cambusa o meteo: l’equipaggio le ritrova nella propria area.</p>
-              <div class="form-grid">
-                <label>Punto di ritrovo<input name="meetingPoint" maxlength="160" placeholder="Es. Porto di Marsala, pontile da confermare" /></label>
-                <label>Imbarco<input name="boardingAt" type="datetime-local" /></label>
-                <label>Partenza<input name="departureAt" type="datetime-local" /></label>
-                <label>Rientro previsto<input name="returnAt" type="datetime-local" /></label>
-              </div>
-              <label>Nota operativa<input name="scheduleNote" maxlength="400" placeholder="Es. cambusa già pronta; rotta adattata al meteo" /></label>
-              <button id="saveTripUpdateButton" class="button button-ghost" type="submit" data-board-save="schedule">Salva aggiornamento del viaggio</button>
+              <p class="panel-lead">Sono informazioni operative, non regole da approvare: restano separate dal regolamento qui sopra, che hai già confermato. Aggiornale quando hai conferme su porto, cambusa o meteo: l’equipaggio le ritrova nella propria area.</p>
+              <section id="boardTripOverview" class="board-rules-overview" aria-live="polite"></section>
+              <details id="tripUpdateEditor" class="board-rules-editor">
+                <summary id="tripUpdateEditorSummary">Inserisci orari e punto di ritrovo</summary>
+                <div class="board-rules-editor-content">
+                  <div class="form-grid">
+                    <label>Punto di ritrovo<input name="meetingPoint" maxlength="160" placeholder="Es. Porto di Marsala, pontile da confermare" /></label>
+                    <label>Imbarco · data<input name="boardingDate" type="date" /></label>
+                    <label>Imbarco · ora<input name="boardingTime" type="time" /><small class="field-hint">Formato 24 ore.</small></label>
+                    <label>Partenza · data<input name="departureDate" type="date" /></label>
+                    <label>Partenza · ora<input name="departureTime" type="time" /><small class="field-hint">Formato 24 ore.</small></label>
+                    <label>Rientro previsto · data<input name="returnDate" type="date" /></label>
+                    <label>Rientro previsto · ora<input name="returnTime" type="time" /><small class="field-hint">Formato 24 ore.</small></label>
+                  </div>
+                  <label>Nota operativa<input name="scheduleNote" maxlength="400" placeholder="Es. cambusa già pronta; rotta adattata al meteo" /></label>
+                  <button id="saveTripUpdateButton" class="button button-ghost" type="submit" data-board-save="schedule">Salva aggiornamento del viaggio</button>
+                </div>
+              </details>
             </section>
             <p id="briefingFormMessage" class="form-message" role="status" aria-live="polite"></p>
           </form>
@@ -593,6 +602,6 @@
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a><a href="https://thatsablast.it/beta#form" target="_blank" rel="noopener noreferrer">Prova la Beta ↗</a></div></footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="area.js?v=20260930-transfer-companions-v1"></script>
+  <script type="module" src="area.js?v=20260930-trip-datetime-picker-v1"></script>
 </body>
 </html>
