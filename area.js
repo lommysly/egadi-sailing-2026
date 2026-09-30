@@ -1782,9 +1782,9 @@ function renderSkipperDashboardOverview() {
 
   const totalBerths = declaredTotalBerths(activeBoat);
   const bathroomCount = normalizeBerthLayout(activeBoat?.berthLayout).bathroomCount;
-  const fleetVisibility = activeBoat?.fleetShowAvailability === false
-    ? 'Posti liberi privati nella flotta.'
-    : 'Partecipazione e posti liberi pubblicati nella flotta.';
+  // Chi registra una barca fa parte della flotta: niente opt-out, i posti
+  // liberi sono sempre pubblici (richiesta del titolare, 30/09/2026).
+  const fleetVisibility = 'Partecipazione e posti liberi pubblicati nella flotta.';
   setSkipperDashboardMetric(
     'boat',
     activeBoat?.name ? `${activeBoat.name} · ${activeBoat.model}` : 'Configura la barca',
@@ -3275,23 +3275,19 @@ function renderBerthLayoutSummary() {
     : `${totalDescription}. Se vuoi, completa anche la configurazione reale di cabine e dinette.`;
 }
 
-function isFleetAvailabilityPublic(boat) {
-  // Prima di questa pubblicazione non esisteva una scelta persistita: anche
-  // l'eventuale `false` legacy era il vecchio default, non un opt-out dello skipper.
-  return boat?.fleetPublicProfileReady !== true || boat?.fleetShowAvailability !== false;
-}
-
+// Chi registra una barca per l'evento fa parte della flotta: niente opt-out,
+// i posti liberi sono sempre pubblici (richiesta del titolare, 30/09/2026 —
+// vedi anche hasValidPublicFleetProfile in firestore.rules, che lo impone).
 function publicFleetProfile(boat) {
-  const showAvailability = isFleetAvailabilityPublic(boat);
   return {
     name: String(boat.name || '').trim(),
     model: String(boat.model || '').trim(),
     boatType: declaredFleetBoatType(boat),
     skipperName: String(boat.skipperName || '').trim(),
     capacity: Number(boat.capacity),
-    showAvailability,
-    availableSeats: showAvailability ? declaredFleetAvailability(boat) : null,
-    berthPreference: showAvailability ? declaredFleetBerthPreference(boat) : 'not_specified',
+    showAvailability: true,
+    availableSeats: declaredFleetAvailability(boat),
+    berthPreference: declaredFleetBerthPreference(boat),
     updatedAt: serverTimestamp(),
   };
 }
@@ -3326,13 +3322,12 @@ function renderFleetProfileForm() {
   if (!form || !activeBoat) return;
   form.elements.availableSeats.value = String(Math.max(0, crewSeatLimit() - allocatedCrewSeatCount()));
   form.elements.berthPreference.value = declaredFleetBerthPreference(activeBoat);
-  form.elements.showAvailability.checked = isFleetAvailabilityPublic(activeBoat);
 }
 
 async function syncPublicFleetAvailabilityFromCrew() {
   const boat = activeBoat;
   if (!boat?.id || !boat.publicFleetId || !auth.currentUser || boat.skipperId !== auth.currentUser.uid
-    || !isFleetAvailabilityPublic(boat) || fleetAvailabilitySyncInProgress) return;
+    || fleetAvailabilitySyncInProgress) return;
   const availableSeats = Math.max(0, crewSeatLimit() - allocatedCrewSeatCount());
   if (declaredFleetAvailability(boat) === availableSeats) return;
   fleetAvailabilitySyncInProgress = true;
@@ -3362,7 +3357,10 @@ function fleetInitializationChanges(boat) {
   if (isLegacyFleetProfile || !hasValidFleetAvailability(boat)) {
     changes.fleetAvailableSeats = declaredFleetAvailability({ capacity: boat.capacity });
   }
-  if (isLegacyFleetProfile || typeof boat.fleetShowAvailability !== 'boolean') changes.fleetShowAvailability = true;
+  // Corregge anche un `false` già salvato in passato (checkbox rimossa,
+  // niente più opt-out): la flotta va aggiornata da sola al primo accesso
+  // successivo dello skipper, senza bisogno di intervento manuale.
+  if (boat.fleetShowAvailability !== true) changes.fleetShowAvailability = true;
   if (boat.fleetBerthPreference !== berthPreference) changes.fleetBerthPreference = berthPreference;
   if (boat.fleetPublicProfileReady !== true) changes.fleetPublicProfileReady = true;
   return changes;
@@ -3381,9 +3379,7 @@ async function publishExistingBoatToFleet(boat) {
     if (activeBoat?.id === boat.id) {
       activeBoat = publishedBoat;
       renderFleetProfileForm();
-      setMessage(message, publishedBoat.fleetShowAvailability
-        ? 'Partecipazione pubblicata: anche i posti disponibili sono visibili.'
-        : 'Partecipazione pubblicata: i posti disponibili restano privati.');
+      setMessage(message, 'Partecipazione pubblicata: anche i posti disponibili sono visibili.');
     }
   } catch (error) {
     setMessage(message, getFirestoreErrorMessage(error, 'Non riesco ad aggiungere automaticamente la barca alla flotta. Riprova tra poco.'), true);
@@ -4185,6 +4181,21 @@ function publicJourneyUrl() {
 function participantUrl(invite) {
   if (!invite?.accessKey) return '';
   const url = new URL('participant.html', window.location.href);
+  url.searchParams.set('invite', invite.id);
+  url.searchParams.set('boat', activeBoat.id);
+  url.searchParams.set('key', invite.accessKey);
+  url.searchParams.set('lang', inviteLocale(invite));
+  return url.toString();
+}
+
+// Stesso schema di participantUrl: crew-session.js legge invite/boat/key da
+// qualunque pagina riservata equipaggio, quindi questo link apre già la
+// pagina Viaggio con l'accesso attivo, senza passare da participant.html
+// (richiesta di Silvio, 30/09/2026: ogni sollecito WhatsApp deve portare
+// dritto a dove completare la pratica).
+function travelUrl(invite) {
+  if (!invite?.accessKey) return '';
+  const url = new URL('travel.html', window.location.href);
   url.searchParams.set('invite', invite.id);
   url.searchParams.set('boat', activeBoat.id);
   url.searchParams.set('key', invite.accessKey);
@@ -6636,7 +6647,8 @@ function crewTravelLegState(status, direction) {
 // un promemoria diretto, mai i dettagli del viaggio che lo skipper stesso
 // non può leggere (vedi crewTravelStatusFor).
 function crewTravelReminderMessage(member, legStates) {
-  const locale = inviteLocale(activeInvites.find((invite) => invite.id === member.id));
+  const invite = activeInvites.find((entry) => entry.id === member.id);
+  const locale = inviteLocale(invite);
   const firstName = member.firstName || memberName(member);
   const pendingDirections = ['outbound', 'return'].filter((direction) => CREW_TRAVEL_NEEDS_REMINDER.has(legStates[direction]));
   const onlyTransferMissing = pendingDirections.length > 0
@@ -6645,14 +6657,16 @@ function crewTravelReminderMessage(member, legStates) {
     ? (locale === 'en' ? 'the return leg (from Marsala)' : 'il ritorno (da Marsala)')
     : (locale === 'en' ? 'the outbound leg (to Marsala)' : "l’andata (verso Marsala)"));
   const missingText = pendingDirections.map(directionLabel).join(locale === 'en' ? ' and ' : ' e ');
+  const link = travelUrl(invite);
+  const linkLine = link ? `\n\n${link}` : '';
   if (onlyTransferMissing) {
     return locale === 'en'
-      ? `Hi ${firstName} 🌊\n\nYour travel details for Egadi Sailing Experience look complete, but you haven’t chosen the airport ↔ Marsala connection yet for ${missingText}. Open “Airport connection” in your travel area, pick an option and save — thank you!`
-      : `Ciao ${firstName} 🌊\n\nI tuoi dati di viaggio per Egadi Sailing Experience sembrano completi, ma non hai ancora scelto il collegamento aeroporto ↔ Marsala per ${missingText}. Apri “Collegamento aeroporto” nella tua area viaggio, scegli un’opzione e salva — grazie!`;
+      ? `Hi ${firstName} 🌊\n\nYour travel details for Egadi Sailing Experience look complete, but you haven’t chosen the airport ↔ Marsala connection yet for ${missingText}. Open “Airport connection” in your travel area, pick an option and save — thank you!${linkLine}`
+      : `Ciao ${firstName} 🌊\n\nI tuoi dati di viaggio per Egadi Sailing Experience sembrano completi, ma non hai ancora scelto il collegamento aeroporto ↔ Marsala per ${missingText}. Apri “Collegamento aeroporto” nella tua area viaggio, scegli un’opzione e salva — grazie!${linkLine}`;
   }
   return locale === 'en'
-    ? `Hi ${firstName} 🌊\n\nCan you finish and confirm ${missingText} in your travel details for Egadi Sailing Experience? I need it to organise transfers and the schedule.\n\nOpen your personal area and save it — thank you!`
-    : `Ciao ${firstName} 🌊\n\nPuoi completare e confermare ${missingText} nei tuoi dati di viaggio per Egadi Sailing Experience? Mi serve per organizzare i transfer e il programma.\n\nApri la tua area personale e salva, grazie!`;
+    ? `Hi ${firstName} 🌊\n\nCan you finish and confirm ${missingText} in your travel details for Egadi Sailing Experience? I need it to organise transfers and the schedule.\n\nOpen your personal area and save it — thank you!${linkLine}`
+    : `Ciao ${firstName} 🌊\n\nPuoi completare e confermare ${missingText} nei tuoi dati di viaggio per Egadi Sailing Experience? Mi serve per organizzare i transfer e il programma.\n\nApri la tua area personale e salva, grazie!${linkLine}`;
 }
 
 function crewTravelReminderUrl(member, legStates) {
@@ -7276,7 +7290,7 @@ boatForm.addEventListener('submit', async (event) => {
       skipperName: fields.get('skipperName').trim(), note: fields.get('note').trim(), berthLayout, berthRates: readBerthRates(form), skipperId: user.uid,
       publicFleetId: activeBoat?.publicFleetId || createPublicFleetId(),
       fleetAvailableSeats: Math.min(previousAvailability, capacity),
-      fleetShowAvailability: isFleetAvailabilityPublic(activeBoat),
+      fleetShowAvailability: true,
       fleetBerthPreference: declaredFleetBerthPreference(activeBoat),
       eventId, updatedAt: serverTimestamp(),
     };
@@ -7326,15 +7340,13 @@ document.querySelector('#fleetProfileForm').addEventListener('submit', async (ev
     const fleetData = {
       publicFleetId: activeBoat.publicFleetId || createPublicFleetId(),
       fleetAvailableSeats: availableSeats,
-      fleetShowAvailability: fields.get('showAvailability') === 'on',
+      fleetShowAvailability: true,
       fleetBerthPreference: berthPreference,
       updatedAt: serverTimestamp(),
     };
     activeBoat = await saveBoatAndPublicFleet(activeBoat.id, activeBoat, fleetData);
     renderFleetProfileForm();
-    setMessage(message, activeBoat.fleetShowAvailability
-      ? 'Flotta aggiornata: i posti disponibili sono pubblici.'
-      : 'Flotta aggiornata: i posti disponibili restano privati.');
+    setMessage(message, 'Flotta aggiornata: i posti disponibili sono pubblici.');
   } catch (error) {
     setMessage(message, 'Non riesco ad aggiornare la flotta. Verifica le regole Firestore.', true);
   } finally {
@@ -8454,6 +8466,13 @@ skipperProfileForm.addEventListener('submit', async (event) => {
     } else {
       const batch = writeBatch(db);
       batch.set(doc(db, 'boats', activeBoat.id, 'skipperProfile', SKIPPER_PROFILE_ID), profile);
+      // Unica eccezione al dossier privato: solo il telefono, leggibile
+      // dall'organizzatore per sollecitare il transfer (vedi firestore.rules,
+      // skipperContact). Scritto solo alla conferma finale, mai dalla bozza.
+      batch.set(doc(db, 'boats', activeBoat.id, 'skipperContact', SKIPPER_PROFILE_ID), {
+        phone: profile.phone,
+        updatedAt: profile.updatedAt,
+      });
       batch.delete(draftRef);
       await batch.commit();
     }

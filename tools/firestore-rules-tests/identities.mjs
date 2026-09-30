@@ -56,8 +56,8 @@ export function anonContext(testEnv) {
 // Documento evento minimo: privateAreaEnabled true per default, perché ogni
 // gruppo di test (tranne quello dedicato ad "Area privata chiusa") parte già
 // con l'area aperta, come fa la matrice per i casi successivi al primo.
-export function eventDocData({ open = true, organizerIds = [ORGANIZER_A] } = {}) {
-  return { privateAreaEnabled: open, publicFleetEnabled: false, organizerIds };
+export function eventDocData({ open = true, organizerIds = [ORGANIZER_A], publicFleetEnabled = false } = {}) {
+  return { privateAreaEnabled: open, publicFleetEnabled, organizerIds };
 }
 
 export function boatDocData(overrides = {}) {

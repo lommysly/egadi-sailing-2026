@@ -270,6 +270,21 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid;
     }
 
+    // Solo il numero di telefono dello skipper, in un documento separato dal
+    // dossier: l'organizzatore deve poterlo leggere per sollecitare il
+    // transfer via WhatsApp (anche lo skipper decide se prenderlo), ma il
+    // resto del dossier (documenti, patente, dati anagrafici) deve restare
+    // privato come prima. Scritto insieme al dossier finale, mai dalla bozza
+    // (richiesta di Silvio, 30/09/2026).
+    function hasValidSkipperContactPayload() {
+      return request.resource.data.keys().hasAll(['phone', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['phone', 'updatedAt'])
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() > 0
+        && request.resource.data.phone.size() <= 40
+        && request.resource.data.updatedAt == request.time;
+    }
+
     // Il dossier finale resta in /skipperProfile. Questa bozza vive in un
     // documento distinto, privato allo skipper, e permette di sospendere la
     // compilazione finché non sono disponibili i riferimenti dei documenti.
@@ -2213,6 +2228,13 @@ service cloud.firestore {
         && request.resource.data.capacity == getAfter(/databases/$(database)/documents/boats/$(request.auth.uid)).data.capacity;
     }
 
+    // Chi registra una barca per l'evento fa parte della flotta: niente più
+    // opt-out sui posti disponibili (showAvailability poteva essere false,
+    // nascondendo i dati a chi cercava un posto). Richiesta esplicita del
+    // titolare, 30/09/2026: "se decidi di far parte della flotta, i dati
+    // della flotta devono essere condivisi, altrimenti non registri una
+    // barca". showAvailability resta nello schema solo per compatibilità con
+    // i documenti già pubblicati; deve sempre valere true.
     function hasValidPublicFleetProfile() {
       return request.resource.data.keys().hasAll(['name', 'model', 'boatType', 'skipperName', 'capacity', 'showAvailability', 'availableSeats', 'berthPreference', 'updatedAt'])
         && request.resource.data.keys().hasOnly(['name', 'model', 'boatType', 'skipperName', 'capacity', 'showAvailability', 'availableSeats', 'berthPreference', 'updatedAt'])
@@ -2229,16 +2251,12 @@ service cloud.firestore {
         && request.resource.data.capacity is int
         && request.resource.data.capacity >= 1
         && request.resource.data.capacity <= 30
-        && request.resource.data.showAvailability is bool
+        && request.resource.data.showAvailability == true
         && request.resource.data.berthPreference in ['not_specified', 'cabin_female', 'cabin_male', 'cabin_mixed', 'dinette', 'other']
         && request.resource.data.updatedAt == request.time
-        && ((request.resource.data.showAvailability == true
-          && request.resource.data.availableSeats is int
-          && request.resource.data.availableSeats >= 0
-          && request.resource.data.availableSeats <= request.resource.data.capacity)
-          || (request.resource.data.showAvailability == false
-            && request.resource.data.availableSeats == null
-            && request.resource.data.berthPreference == 'not_specified'));
+        && request.resource.data.availableSeats is int
+        && request.resource.data.availableSeats >= 0
+        && request.resource.data.availableSeats <= request.resource.data.capacity;
     }
 
     match /events/egadi-2026 {
@@ -2491,6 +2509,22 @@ service cloud.firestore {
           && profileId == 'default'
           && isSkipper(boatId)
           && hasValidSkipperProfilePayload();
+        allow delete: if false;
+      }
+
+      // Unica eccezione al dossier privato: solo il telefono, per la gestione
+      // equipaggio dell'organizzatore (es. "Sollecita lo skipper" via
+      // WhatsApp nell'area transfer). Niente documenti, patente o dati
+      // anagrafici qui: quelli restano solo in /skipperProfile, sopra.
+      match /skipperContact/{contactId} {
+        allow get: if isPrivateAreaOpen()
+          && contactId == 'default'
+          && (isSkipper(boatId) || isOrganizer());
+        allow list: if false;
+        allow create, update: if isPrivateAreaOpen()
+          && contactId == 'default'
+          && isSkipper(boatId)
+          && hasValidSkipperContactPayload();
         allow delete: if false;
       }
 

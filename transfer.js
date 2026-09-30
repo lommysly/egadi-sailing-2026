@@ -963,6 +963,16 @@ function whatsappDraftUrl(message) {
   return `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
+// Stesso hash che l'area skipper legge al caricamento per aprire già
+// "Viaggio e comunicazioni → Equipaggio" (area.js, SKIPPER_OPERATIONS_HASHES.
+// crew): chi riceve il sollecito arriva già nella schermata giusta invece di
+// dover cercarla da solo dopo aver fatto login (richiesta di Silvio,
+// 30/09/2026: ogni sollecito WhatsApp deve portare dritto a dove gestire la
+// pratica).
+function skipperCrewTravelUrl() {
+  return new URL('area.html#skipper-viaggi-equipaggio', window.location.href).toString();
+}
+
 function boatReminderMessage(boat, breakdown) {
   const registered = Number.isInteger(breakdown.total) ? breakdown.total : null;
   const crewLine = registered === null
@@ -976,9 +986,10 @@ function boatReminderMessage(boat, breakdown) {
   const greeting = boat.skipperName
     ? (locale() === 'en' ? `Hi ${boat.skipperName}` : `Ciao ${boat.skipperName}`)
     : (locale() === 'en' ? 'Hi' : 'Ciao');
+  const link = skipperCrewTravelUrl();
   return locale() === 'en'
-    ? `${greeting} 🌊\n\nQuick transfer summary for ${boat.name} (Egadi Sailing Experience):\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nFeel free to share this in your crew chat, so whoever is missing can complete their choice.`
-    : `${greeting} 🌊\n\nRiepilogo veloce transfer per ${boat.name} (Egadi Sailing Experience):\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nPuoi condividerlo anche nel gruppo dell'equipaggio, così chi manca completa la scelta.`;
+    ? `${greeting} 🌊\n\nQuick transfer summary for ${boat.name} (Egadi Sailing Experience):\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nFeel free to share this in your crew chat, so whoever is missing can complete their choice.\n\nOpen your crew's travel section: ${link}`
+    : `${greeting} 🌊\n\nRiepilogo veloce transfer per ${boat.name} (Egadi Sailing Experience):\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nPuoi condividerlo anche nel gruppo dell'equipaggio, così chi manca completa la scelta.\n\nApri la sezione viaggio del tuo equipaggio: ${link}`;
 }
 
 function renderBoatStats() {

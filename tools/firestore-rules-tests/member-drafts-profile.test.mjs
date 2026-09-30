@@ -189,6 +189,12 @@ function validSkipperProfilePayload(overrides = {}) {
   };
 }
 
+// Unica eccezione al dossier privato: solo il telefono, leggibile anche
+// dall'organizzatore (vedi firestore.rules, skipperContact).
+function validSkipperContactPayload(overrides = {}) {
+  return { phone: '+390000000010', updatedAt: serverTimestamp(), ...overrides };
+}
+
 function validSkipperProfileDraftPayload(overrides = {}) {
   return {
     firstName: 'Silvio', lastName: '', birthDate: '', birthPlace: '', nationality: '',
@@ -535,6 +541,103 @@ for (const [label, getContext] of [
     await assertFails(setDoc(doc(ctx.firestore(), 'boats/SKIPPER_A/skipperProfile/default'), validSkipperProfilePayload()));
   });
 }
+
+// ---------------------------------------------------------------------------
+// Caso: Contatto skipper (boats/SKIPPER_A/skipperContact/default) — solo il
+// telefono, unica eccezione al dossier privato: l'organizzatore deve poterlo
+// leggere per sollecitare il transfer via WhatsApp (richiesta di Silvio,
+// 30/09/2026: "anche lo skipper decide di prendere un transfer").
+// ---------------------------------------------------------------------------
+
+test('contatto skipper: SKIPPER_A crea il proprio contatto con schema esatto', async () => {
+  await seedEventOpen();
+  await seedBoat();
+  const skipper = skipperContext(testEnv);
+  await assertSucceeds(setDoc(doc(skipper.firestore(), 'boats/SKIPPER_A/skipperContact/default'), validSkipperContactPayload()));
+});
+
+test('contatto skipper: SKIPPER_A aggiorna il proprio contatto gia creato', async () => {
+  await seedEventOpen();
+  await seedBoat();
+  const skipper = skipperContext(testEnv);
+  const ref = doc(skipper.firestore(), 'boats/SKIPPER_A/skipperContact/default');
+  await assertSucceeds(setDoc(ref, validSkipperContactPayload()));
+  await assertSucceeds(setDoc(ref, validSkipperContactPayload({ phone: '+390000000097' })));
+});
+
+test('contatto skipper: creazione negata con un campo extra non previsto', async () => {
+  await seedEventOpen();
+  await seedBoat();
+  const skipper = skipperContext(testEnv);
+  await assertFails(setDoc(
+    doc(skipper.firestore(), 'boats/SKIPPER_A/skipperContact/default'),
+    validSkipperContactPayload({ email: 'non-previsto@test.local' }),
+  ));
+});
+
+test('contatto skipper: creazione negata con un ID documento diverso da default', async () => {
+  await seedEventOpen();
+  await seedBoat();
+  const skipper = skipperContext(testEnv);
+  await assertFails(setDoc(doc(skipper.firestore(), 'boats/SKIPPER_A/skipperContact/other'), validSkipperContactPayload()));
+});
+
+test('contatto skipper: creazione negata con telefono vuoto', async () => {
+  await seedEventOpen();
+  await seedBoat();
+  const skipper = skipperContext(testEnv);
+  await assertFails(setDoc(doc(skipper.firestore(), 'boats/SKIPPER_A/skipperContact/default'), validSkipperContactPayload({ phone: '' })));
+});
+
+test('contatto skipper: list sulla collezione e sempre negata', async () => {
+  await seedEventOpen();
+  await seedBoat();
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'boats/SKIPPER_A/skipperContact/default'), validSkipperContactPayload({ updatedAt: Timestamp.now() }));
+  });
+  const organizer = organizerContext(testEnv);
+  await assertFails(getDocs(collection(organizer.firestore(), 'boats/SKIPPER_A/skipperContact')));
+});
+
+test('contatto skipper: ORGANIZER_A puo leggere il telefono di SKIPPER_A', async () => {
+  await seedEventOpen();
+  await seedBoat();
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'boats/SKIPPER_A/skipperContact/default'), validSkipperContactPayload({ updatedAt: Timestamp.now() }));
+  });
+  const organizer = organizerContext(testEnv);
+  await assertSucceeds(getDoc(doc(organizer.firestore(), 'boats/SKIPPER_A/skipperContact/default')));
+});
+
+for (const [label, getContext] of [
+  ['CREW_A', () => crewAContext(testEnv)],
+  ['OUTSIDER_A', () => outsiderContext(testEnv)],
+  ['SKIPPER_B', () => skipperContext(testEnv, 'SKIPPER_B')],
+]) {
+  test(`contatto skipper: ${label} non puo leggere il contatto di SKIPPER_A`, async () => {
+    await seedEventOpen();
+    await seedBoat();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'boats/SKIPPER_A/skipperContact/default'), validSkipperContactPayload({ updatedAt: Timestamp.now() }));
+    });
+    const ctx = getContext();
+    await assertFails(getDoc(doc(ctx.firestore(), 'boats/SKIPPER_A/skipperContact/default')));
+  });
+
+  test(`contatto skipper: ${label} non puo creare/scrivere il contatto di SKIPPER_A`, async () => {
+    await seedEventOpen();
+    await seedBoat();
+    const ctx = getContext();
+    await assertFails(setDoc(doc(ctx.firestore(), 'boats/SKIPPER_A/skipperContact/default'), validSkipperContactPayload()));
+  });
+}
+
+test('contatto skipper: ORGANIZER_A non puo scrivere il contatto di SKIPPER_A', async () => {
+  await seedEventOpen();
+  await seedBoat();
+  const organizer = organizerContext(testEnv);
+  await assertFails(setDoc(doc(organizer.firestore(), 'boats/SKIPPER_A/skipperContact/default'), validSkipperContactPayload()));
+});
 
 // ---------------------------------------------------------------------------
 // Caso: Bozza dossier skipper (boats/SKIPPER_A/skipperProfileDraft/default)
