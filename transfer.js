@@ -127,16 +127,15 @@ const COPY = {
     boatStatRequestedShort: 'transfer',
     boatStatIndependentShort: 'in autonomia',
     boatStatPendingShort: 'da sollecitare',
-    boatStatFollowUp: 'Contatta lo skipper: qualcuno non ha ancora deciso',
     boatStatSkipperLabel: 'Skipper',
     boatStatSkipperRequested: 'transfer richiesto',
     boatStatSkipperUnknown: 'da verificare',
-    boatStatSkipperFollowUp: 'Anche lo skipper deve decidere il proprio transfer',
+    boatChecklistCrewTransfer: 'Transfer equipaggio',
+    boatChecklistSkipperTransfer: 'Transfer skipper',
     boatReminderAction: 'Sollecita lo skipper',
     boatChecklistBoat: 'Barca',
     boatChecklistRules: 'Regole',
     boatChecklistDossier: 'Dossier',
-    boatStatSetupFollowUp: 'Barca da impostare:',
     filterSearch: 'Cerca per nome, aeroporto o volo',
     noRecords: 'Non ci sono movimenti con questi filtri.',
     direction: 'Tratta',
@@ -272,16 +271,15 @@ const COPY = {
     boatStatRequestedShort: 'transfer',
     boatStatIndependentShort: 'on their own',
     boatStatPendingShort: 'to follow up',
-    boatStatFollowUp: 'Contact the skipper: someone has not decided yet',
     boatStatSkipperLabel: 'Skipper',
     boatStatSkipperRequested: 'transfer requested',
     boatStatSkipperUnknown: 'to check',
-    boatStatSkipperFollowUp: 'The skipper also needs to decide on their own transfer',
+    boatChecklistCrewTransfer: 'Crew transfer',
+    boatChecklistSkipperTransfer: 'Skipper transfer',
     boatReminderAction: 'Remind the skipper',
     boatChecklistBoat: 'Boat',
     boatChecklistRules: 'Rules',
     boatChecklistDossier: 'Dossier',
-    boatStatSetupFollowUp: 'Boat setup incomplete:',
     filterSearch: 'Search name, airport or flight',
     noRecords: 'There are no journeys matching these filters.',
     direction: 'Journey',
@@ -1159,6 +1157,8 @@ function renderBoatStats() {
         ${checklistItem(readiness.boatConfigured, t('boatChecklistBoat'))}
         ${checklistItem(readiness.rulesActive, t('boatChecklistRules'))}
         ${checklistItem(readiness.dossierConfirmed, t('boatChecklistDossier'))}
+        ${checklistItem(!needsFollowUp, t('boatChecklistCrewTransfer'))}
+        ${checklistItem(!skipperNeedsFollowUp, t('boatChecklistSkipperTransfer'))}
       </div>
       <div class="transfer-boat-stat-legs">
         ${skipperLine}
@@ -1166,9 +1166,6 @@ function renderBoatStats() {
         ${legLine(t('outbound'), breakdown.return)}
       </div>
       <div class="transfer-boat-stat-footer">
-        ${needsSetupFollowUp ? `<span class="transfer-boat-stat-flag transfer-boat-stat-flag--setup">${escapeHtml(`${t('boatStatSetupFollowUp')} ${setupIssues.join(', ')}.`)}</span>` : ''}
-        ${skipperNeedsFollowUp ? `<span class="transfer-boat-stat-flag transfer-boat-stat-flag--setup">${escapeHtml(t('boatStatSkipperFollowUp'))}</span>` : ''}
-        ${needsFollowUp ? `<span class="transfer-boat-stat-flag">${escapeHtml(t('boatStatFollowUp'))}</span>` : ''}
         ${reminderUrl ? `<a class="button button-whatsapp transfer-boat-stat-action" href="${escapeHtml(reminderUrl)}" target="_blank" rel="noopener noreferrer"><span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${escapeHtml(t('boatReminderAction'))}</a>` : ''}
       </div>
     </article>`;

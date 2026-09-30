@@ -946,7 +946,7 @@ body.menu-open { overflow:hidden; }
    .crew-member-card (richiesta di Silvio, 30/09/2026). */
 .transfer-boat-stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:16px; }
 .transfer-boat-stat-grid > .transfer-boat-stat:last-child:nth-child(2n+1) { grid-column:1/-1; }
-.transfer-boat-stat { display:flex; flex-direction:column; min-height:278px; padding:16px 18px; border:1px solid var(--line); border-left:4px solid rgba(17,45,56,.15); border-radius:14px; background:var(--paper); }
+.transfer-boat-stat { display:flex; flex-direction:column; min-height:254px; padding:16px 18px; border:1px solid var(--line); border-left:4px solid rgba(17,45,56,.15); border-radius:14px; background:var(--paper); }
 .transfer-boat-stat-heading { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
 .transfer-boat-stat-avatar { display:grid; flex:0 0 auto; width:38px; height:38px; place-items:center; border-radius:50%; background:var(--sand); color:var(--ink); font:600 1rem "Fraunces",serif; }
 .transfer-boat-stat-person { min-width:0; }
@@ -964,8 +964,6 @@ body.menu-open { overflow:hidden; }
 .transfer-boat-stat-action { margin-left:auto; }
 .transfer-boat-stat--pending { border-left-color:#c2410c; border-color:rgba(194,65,12,.35); background:#fdece3; }
 .transfer-boat-stat--ready { border-left-color:#1c8a4c; }
-.transfer-boat-stat-flag { display:inline-block; padding:3px 9px; border-radius:999px; background:#c2410c; color:white; font:700 .68rem "DM Mono",monospace; letter-spacing:.02em; }
-.transfer-boat-stat-flag--setup { background:#9a3412; }
 .transfer-boat-setup-summary { margin-top:4px; }
 @media (max-width:800px) {
   .transfer-boat-stat-grid { grid-template-columns:1fr; }
