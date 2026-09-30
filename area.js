@@ -6431,10 +6431,13 @@ function projectionActionLink(url, label, icon, tone = '', { newTab = false } = 
   return `<a class="${classes.join(' ')}" href="${escapeHtml(url)}"${target} aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="projection-action-icon" aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span></a>`;
 }
 
+// Prima nascondeva le azioni secondarie (Conferma accredito, Annulla,
+// Modifica...) dietro un "Altre opzioni" da aprire: proprio le azioni che
+// servono più spesso quando ci sono versamenti da confermare, un tocco in
+// più ogni volta per trovarle (richiesta di Silvio, 30/09/2026 — tolto il
+// contenitore, restano tutte visibili come le azioni principali).
 function projectionMoreActions(actions) {
-  const availableActions = actions.filter(Boolean);
-  if (!availableActions.length) return '';
-  return `<details class="projection-more-actions"><summary>Altre opzioni</summary><div class="projection-more-actions-list">${availableActions.join('')}</div></details>`;
+  return actions.filter(Boolean).join('');
 }
 
 function invitePrimaryAction(invite) {

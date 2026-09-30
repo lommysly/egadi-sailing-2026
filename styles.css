@@ -348,13 +348,6 @@ body.menu-open { overflow:hidden; }
 .projection-action-release { border-color:rgba(167,73,57,.28); color:#9b3e31; }
 .projection-action-release:hover { border-color:#a74939; background:#fff4f1; }
 .projection-action-release .projection-action-icon { background:#fde6df; color:#9b3e31; }
-.projection-more-actions { grid-column:1 / -1; position:relative; }
-.projection-more-actions > summary { display:flex; align-items:center; justify-content:center; gap:7px; min-height:38px; padding:0 12px; border:1px solid rgba(8,123,138,.2); border-radius:10px; color:#416b6d; cursor:pointer; font:700 .72rem "DM Sans",sans-serif; list-style:none; }
-.projection-more-actions > summary::-webkit-details-marker { display:none; }
-.projection-more-actions > summary::after { content:"⌄"; color:var(--sun-deep); font-size:1rem; line-height:1; }
-.projection-more-actions[open] > summary::after { transform:rotate(180deg); }
-.projection-more-actions-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding-top:8px; }
-.projection-more-actions-list .projection-action { font-size:.71rem; }
 .invite-plan-status { display:block; margin-top:7px; color:#416b6d; font-size:.74rem; line-height:1.42; }
 .member-row > span,.payment-status { text-align:right; white-space:nowrap; }
 .payment-status { color:#416b6d !important; font-weight:700; }
