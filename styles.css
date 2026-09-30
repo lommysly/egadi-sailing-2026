@@ -940,13 +940,30 @@ body.menu-open { overflow:hidden; }
 .transfer-operator-summary span { display:block; margin-bottom:6px; color:rgba(17,45,56,.6); font:700 .66rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; }
 .transfer-operator-summary strong { font:600 1.9rem/1 "Fraunces",serif; letter-spacing:-.03em; }
 .transfer-boat-stats { margin-bottom:24px; }
-.transfer-boat-stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:16px; }
-.transfer-boat-stat { padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:var(--paper); }
-.transfer-boat-stat strong { display:block; margin-bottom:2px; font:600 1.05rem "Fraunces",serif; }
-.transfer-boat-stat small { display:block; margin-bottom:8px; color:rgba(17,45,56,.55); font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; }
-.transfer-boat-stat span { display:block; margin-top:4px; color:rgba(17,45,56,.68); font-size:.84rem; }
-.transfer-boat-stat--pending { border-color:rgba(194,65,12,.35); background:#fdece3; }
-.transfer-boat-stat-flag { display:inline-block; margin-top:8px; padding:3px 9px; border-radius:999px; background:#c2410c; color:white; font:700 .68rem "DM Mono",monospace; letter-spacing:.02em; }
+/* Card sempre rettangolari e simmetriche: griglia a 2 colonne fisse (non
+   auto-fit, che allargava le ultime card rimaste sole in una riga corta) e
+   un'altezza minima comune, stesso principio già usato per .dashboard-hub e
+   .crew-member-card (richiesta di Silvio, 30/09/2026). */
+.transfer-boat-stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:16px; }
+.transfer-boat-stat-grid > .transfer-boat-stat:last-child:nth-child(2n+1) { grid-column:1/-1; }
+.transfer-boat-stat { display:flex; flex-direction:column; min-height:216px; padding:16px 18px; border:1px solid var(--line); border-left:4px solid rgba(17,45,56,.15); border-radius:14px; background:var(--paper); }
+.transfer-boat-stat-heading { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.transfer-boat-stat-avatar { display:grid; flex:0 0 auto; width:38px; height:38px; place-items:center; border-radius:50%; background:var(--sand); color:var(--ink); font:600 1rem "Fraunces",serif; }
+.transfer-boat-stat-person { min-width:0; }
+.transfer-boat-stat-person strong { display:block; font:600 1.05rem "Fraunces",serif; }
+.transfer-boat-stat-person small { display:block; margin-top:2px; color:rgba(17,45,56,.55); font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; }
+.transfer-boat-stat-legs { display:grid; gap:4px; margin-bottom:auto; }
+.transfer-boat-stat-legs span { display:block; color:rgba(17,45,56,.68); font-size:.84rem; }
+.transfer-boat-stat-footer { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:14px; }
+.transfer-boat-stat-action { margin-left:auto; }
+.transfer-boat-stat--pending { border-left-color:#c2410c; border-color:rgba(194,65,12,.35); background:#fdece3; }
+.transfer-boat-stat--ready { border-left-color:#1c8a4c; }
+.transfer-boat-stat-flag { display:inline-block; padding:3px 9px; border-radius:999px; background:#c2410c; color:white; font:700 .68rem "DM Mono",monospace; letter-spacing:.02em; }
+@media (max-width:800px) {
+  .transfer-boat-stat-grid { grid-template-columns:1fr; }
+  .transfer-boat-stat-grid > .transfer-boat-stat:last-child:nth-child(2n+1) { grid-column:auto; }
+  .transfer-boat-stat-action { margin-left:0; }
+}
 
 .transfer-operator-card { padding:22px; border-radius:16px; background:var(--paper); margin-bottom:20px; }
 .transfer-operator-card:last-child { margin-bottom:0; }

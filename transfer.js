@@ -128,6 +128,7 @@ const COPY = {
     boatStatIndependentShort: 'in autonomia',
     boatStatPendingShort: 'da sollecitare',
     boatStatFollowUp: 'Contatta lo skipper: qualcuno non ha ancora deciso',
+    boatReminderAction: 'Sollecita lo skipper',
     filterSearch: 'Cerca per nome, aeroporto o volo',
     noRecords: 'Non ci sono movimenti con questi filtri.',
     direction: 'Tratta',
@@ -264,6 +265,7 @@ const COPY = {
     boatStatIndependentShort: 'on their own',
     boatStatPendingShort: 'to follow up',
     boatStatFollowUp: 'Contact the skipper: someone has not decided yet',
+    boatReminderAction: 'Remind the skipper',
     filterSearch: 'Search name, airport or flight',
     noRecords: 'There are no journeys matching these filters.',
     direction: 'Journey',
@@ -897,7 +899,15 @@ async function ensureAllBoatsLoaded() {
   try {
     const snapshot = await getDocs(collection(db, 'boats'));
     state.allBoats = snapshot.docs
-      .map((entry) => ({ id: entry.id, name: entry.data()?.name || entry.id, skipperName: entry.data()?.skipperName || '' }))
+      .map((entry) => {
+        const data = entry.data() || {};
+        return {
+          id: entry.id,
+          name: data.name || entry.id,
+          skipperName: data.skipperName || '',
+          capacity: Number.isInteger(data.capacity) ? data.capacity : null,
+        };
+      })
       .sort((first, second) => first.name.localeCompare(second.name, 'it'));
     render();
   } catch (error) {
@@ -945,6 +955,32 @@ function boatTravelBreakdown(boatId) {
   };
 }
 
+// Nessun numero: skipperProfile/skipperTravel restano privati per regola
+// esplicita (firestore.rules, "non consultabile da... organizzatore"), quindi
+// il link apre WhatsApp senza destinatario e Silvio sceglie lui il contatto
+// già salvato in rubrica — stesso pattern di openWhatsAppDraft in area.js.
+function whatsappDraftUrl(message) {
+  return `https://wa.me/?text=${encodeURIComponent(message)}`;
+}
+
+function boatReminderMessage(boat, breakdown) {
+  const registered = Number.isInteger(breakdown.total) ? breakdown.total : null;
+  const crewLine = registered === null
+    ? (locale() === 'en' ? 'crew count not available yet' : 'equipaggio non ancora verificabile')
+    : Number.isInteger(boat.capacity)
+      ? (locale() === 'en' ? `${registered} of ${boat.capacity} crew seats registered` : `${registered} di ${boat.capacity} posti equipaggio registrati`)
+      : (locale() === 'en' ? `${registered} crew members registered` : `${registered} persone di equipaggio registrate`);
+  const legLine = (label, leg) => (locale() === 'en'
+    ? `${label}: ${leg.requested} requested the transfer, ${leg.independent} arranging on their own, ${Number.isInteger(leg.pending) ? leg.pending : '?'} still undecided`
+    : `${label}: ${leg.requested} hanno chiesto il transfer, ${leg.independent} si arrangiano da soli, ${Number.isInteger(leg.pending) ? leg.pending : '?'} non hanno ancora deciso`);
+  const greeting = boat.skipperName
+    ? (locale() === 'en' ? `Hi ${boat.skipperName}` : `Ciao ${boat.skipperName}`)
+    : (locale() === 'en' ? 'Hi' : 'Ciao');
+  return locale() === 'en'
+    ? `${greeting} 🌊\n\nQuick transfer summary for ${boat.name} (Egadi Sailing Experience):\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nFeel free to share this in your crew chat, so whoever is missing can complete their choice.`
+    : `${greeting} 🌊\n\nRiepilogo veloce transfer per ${boat.name} (Egadi Sailing Experience):\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nPuoi condividerlo anche nel gruppo dell'equipaggio, così chi manca completa la scelta.`;
+}
+
 function renderBoatStats() {
   if (!state.allBoats.length) return '';
   const boatIds = state.allBoats.map((boat) => boat.id);
@@ -959,14 +995,25 @@ function renderBoatStats() {
     if (Number.isInteger(breakdown.outbound.pending)) totals.outboundPending += breakdown.outbound.pending;
     if (Number.isInteger(breakdown.return.pending)) totals.returnPending += breakdown.return.pending;
     const needsFollowUp = (breakdown.outbound.pending || 0) > 0 || (breakdown.return.pending || 0) > 0;
-    const totalText = Number.isInteger(breakdown.total) ? String(breakdown.total) : '…';
+    const hasData = Number.isInteger(breakdown.total);
+    const totalText = hasData ? String(breakdown.total) : '…';
+    const statusClass = needsFollowUp ? ' transfer-boat-stat--pending' : hasData && breakdown.total > 0 ? ' transfer-boat-stat--ready' : '';
     const legLine = (label, leg) => `<span>${escapeHtml(label)}: ${leg.requested} ${escapeHtml(t('boatStatRequestedShort'))} · ${leg.independent} ${escapeHtml(t('boatStatIndependentShort'))} · ${Number.isInteger(leg.pending) ? leg.pending : '…'} ${escapeHtml(t('boatStatPendingShort'))}</span>`;
-    return `<article class="transfer-boat-stat${needsFollowUp ? ' transfer-boat-stat--pending' : ''}">
-      <strong>${escapeHtml(boat.name)}</strong>
-      <small>${boat.skipperName ? escapeHtml(t('boatStatSkipper').replace('{name}', boat.skipperName)) : ''} · ${totalText} ${escapeHtml(t('boatStatOnBoard'))}</small>
-      ${legLine(t('inbound'), breakdown.outbound)}
-      ${legLine(t('outbound'), breakdown.return)}
-      ${needsFollowUp ? `<span class="transfer-boat-stat-flag">${escapeHtml(t('boatStatFollowUp'))}</span>` : ''}
+    const reminderUrl = hasData ? whatsappDraftUrl(boatReminderMessage(boat, breakdown)) : '';
+    const initial = escapeHtml(boat.name.trim().charAt(0).toUpperCase() || '?');
+    return `<article class="transfer-boat-stat${statusClass}">
+      <header class="transfer-boat-stat-heading">
+        <span class="transfer-boat-stat-avatar" aria-hidden="true">${initial}</span>
+        <span class="transfer-boat-stat-person"><strong>${escapeHtml(boat.name)}</strong><small>${boat.skipperName ? escapeHtml(t('boatStatSkipper').replace('{name}', boat.skipperName)) : ''} · ${totalText} ${escapeHtml(t('boatStatOnBoard'))}</small></span>
+      </header>
+      <div class="transfer-boat-stat-legs">
+        ${legLine(t('inbound'), breakdown.outbound)}
+        ${legLine(t('outbound'), breakdown.return)}
+      </div>
+      <div class="transfer-boat-stat-footer">
+        ${needsFollowUp ? `<span class="transfer-boat-stat-flag">${escapeHtml(t('boatStatFollowUp'))}</span>` : ''}
+        ${reminderUrl ? `<a class="button button-whatsapp transfer-boat-stat-action" href="${escapeHtml(reminderUrl)}" target="_blank" rel="noopener noreferrer"><span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${escapeHtml(t('boatReminderAction'))}</a>` : ''}
+      </div>
     </article>`;
   }).join('');
   const summary = `<p class="field-hint">${escapeHtml(t('boatStatsSummary')
