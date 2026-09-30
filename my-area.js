@@ -1292,6 +1292,11 @@ async function reportCrewPayment(controls) {
         currency: 'EUR',
         reason: 'Pagamento segnalato dalla persona',
         accountingCategory: 'cost_recovery',
+        // Senza questo campo lo skipper può confermare la segnalazione ma il
+        // saldo non si aggiorna mai: paymentAllocation() (area.js) non trova
+        // un importo da contare (bug reale scoperto il 30/09/2026 — vedi
+        // isValidSelfReportedPaymentCreate in firestore.rules).
+        contributionItemId: 'berth_base',
         isOptional: false,
         dueDate: '',
         paymentMethods: {},

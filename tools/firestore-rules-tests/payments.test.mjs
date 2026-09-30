@@ -1217,6 +1217,14 @@ function selfReportedPayload(overrides = {}) {
     createdBy = CREW_A,
     declaredBy = CREW_A,
     status = 'prepared',
+    // Senza questo campo, una segnalazione poi confermata dallo skipper
+    // risultava "verified" ma paymentAllocation() (area.js/my-area.js) non
+    // trovava alcun importo da contare nel saldo: un bug reale, scoperto e
+    // corretto il 30/09/2026 (Giorgia Clert, barca Profumo di mare —
+    // risultava ancora con 150€ da versare nonostante l'accredito fosse già
+    // confermato). "berth_base" fa scattare lo stesso fallback già usato
+    // dalle ricevute manuali generiche.
+    contributionItemId = 'berth_base',
     extraTopLevel = {},
   } = overrides;
   return {
@@ -1226,6 +1234,7 @@ function selfReportedPayload(overrides = {}) {
     currency: 'EUR',
     reason: 'Pagamento segnalato dalla persona',
     accountingCategory: 'cost_recovery',
+    contributionItemId,
     isOptional: false,
     dueDate: '',
     paymentMethods: {},
@@ -1281,7 +1290,6 @@ test('self_reported: creazione diretta con status "verified" viene negata', asyn
 });
 
 for (const [field, value] of [
-  ['contributionItemId', 'berth_double_cabin'],
   ['collectorId', SKIPPER_A],
   ['collectorName', SKIPPER_NAME],
   ['allocation', { berthCents: 4000, protectionInsuranceCents: 4000 }],
@@ -1293,6 +1301,21 @@ for (const [field, value] of [
     await assertFails(setDoc(paymentDoc(crewA, `self-reported-extra-${field}`), payload));
   });
 }
+
+test('self_reported: contributionItemId diverso da "berth_base" viene negato', async () => {
+  await seedCrewABaseline();
+  const crewA = crewAContext(testEnv);
+  const payload = selfReportedPayload({ contributionItemId: 'berth_double_cabin' });
+  await assertFails(setDoc(paymentDoc(crewA, 'self-reported-wrong-contribution-item'), payload));
+});
+
+test('self_reported: senza contributionItemId viene negato', async () => {
+  await seedCrewABaseline();
+  const crewA = crewAContext(testEnv);
+  const payload = selfReportedPayload({});
+  delete payload.contributionItemId;
+  await assertFails(setDoc(paymentDoc(crewA, 'self-reported-missing-contribution-item'), payload));
+});
 
 test('self_reported: amountCents a 0 viene negato', async () => {
   await seedCrewABaseline();

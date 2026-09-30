@@ -2193,11 +2193,20 @@ service cloud.firestore {
         && (!board.data.keys().hasAll(['fullRulesRequired'])
           || board.data.fullRulesRequired != true
           || (acceptance.data.keys().hasAll(['fullRulesRead']) && acceptance.data.fullRulesRead == true))
-        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'entryType', 'amountCents', 'currency', 'reason', 'accountingCategory', 'isOptional', 'dueDate', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy', 'declaredAt', 'declaredBy', 'declaredMethod'])
+        && request.resource.data.keys().hasOnly(['recipientId', 'memberId', 'payerInviteId', 'entryType', 'amountCents', 'currency', 'reason', 'accountingCategory', 'contributionItemId', 'isOptional', 'dueDate', 'paymentMethods', 'status', 'createdAt', 'createdBy', 'verifiedAt', 'verifiedBy', 'cancelledAt', 'cancelledBy', 'declaredAt', 'declaredBy', 'declaredMethod'])
         && request.resource.data.recipientId == inviteId
         && request.resource.data.memberId == inviteId
         && request.resource.data.payerInviteId == inviteId
         && request.resource.data.entryType == 'self_reported'
+        // Senza questo campo, paymentAllocation() (area.js/my-area.js) non
+        // trova né un allocation esplicito né un contributionItemId
+        // riconosciuto e considera l'importo pari a zero: una segnalazione
+        // poi confermata dallo skipper resta "verified" ma non conta mai nel
+        // saldo — bug reale scoperto su Profumo di mare, 30/09/2026 (Giorgia
+        // Clert risultava ancora con 150€ da versare nonostante l'accredito
+        // fosse già confermato). "berth_base" fa scattare lo stesso fallback
+        // già usato per le ricevute manuali generiche.
+        && request.resource.data.contributionItemId == 'berth_base'
         && request.resource.data.amountCents is int
         && request.resource.data.amountCents >= 1
         && request.resource.data.amountCents <= 1000000
