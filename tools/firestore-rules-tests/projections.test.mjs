@@ -152,6 +152,28 @@ test('proiezione privata: ORGANIZER_A puo creare una proiezione con schema valid
   );
 });
 
+test('proiezione privata: SKIPPER_A puo creare una proiezione con paymentManagedExternally true (quota gia incassata fuori piattaforma)', async () => {
+  await seedOpenEventAndBoat();
+  const skipper = skipperContext(testEnv);
+  await assertSucceeds(
+    setDoc(
+      doc(skipper.firestore(), `boats/${SKIPPER_A}/crewProjections/${PROJECTION_A_ID}`),
+      baseProjectionFields({ paymentManagedExternally: true }),
+    ),
+  );
+});
+
+test('proiezione privata: nega paymentManagedExternally di tipo diverso da booleano', async () => {
+  await seedOpenEventAndBoat();
+  const skipper = skipperContext(testEnv);
+  await assertFails(
+    setDoc(
+      doc(skipper.firestore(), `boats/${SKIPPER_A}/crewProjections/${PROJECTION_A_ID}`),
+      baseProjectionFields({ paymentManagedExternally: 'true' }),
+    ),
+  );
+});
+
 test('proiezione privata: OUTSIDER_A non puo creare una proiezione', async () => {
   await seedOpenEventAndBoat();
   const outsider = outsiderContext(testEnv);
@@ -323,6 +345,23 @@ test('proiezione privata: SKIPPER_A puo aggiornare la propria bozza mentre e pro
       updatedBy: SKIPPER_A,
     }),
   );
+});
+
+test('proiezione privata: SKIPPER_A puo attivare/disattivare paymentManagedExternally sulla propria bozza', async () => {
+  await seedOpenEventAndBoat();
+  await seedProjection();
+  const skipper = skipperContext(testEnv);
+  const ref = doc(skipper.firestore(), `boats/${SKIPPER_A}/crewProjections/${PROJECTION_A_ID}`);
+  await assertSucceeds(updateDoc(ref, {
+    paymentManagedExternally: true,
+    updatedAt: serverTimestamp(),
+    updatedBy: SKIPPER_A,
+  }));
+  await assertSucceeds(updateDoc(ref, {
+    paymentManagedExternally: false,
+    updatedAt: serverTimestamp(),
+    updatedBy: SKIPPER_A,
+  }));
 });
 
 test('proiezione privata: OUTSIDER_A non puo aggiornare la proiezione', async () => {

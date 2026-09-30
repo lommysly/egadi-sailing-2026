@@ -6385,8 +6385,13 @@ function projectionCardActions(projection, invite) {
   const secondaryActions = [];
   const balance = projectionPaymentBalance(projection);
   const contributionVerified = projectionHasVerifiedContribution(projection);
+  // Se lo skipper ha già incassato fuori dalla piattaforma, la scheda smette
+  // di proporre di avviare una nuova richiesta o un nuovo acconto: la quota
+  // resta visibile, solo non viene più sollecitata dall'app (richiesta di
+  // Silvio, 30/09/2026).
+  const paymentManagedExternally = projection.paymentManagedExternally === true;
   const editAction = projectionActionTextButton('edit-projection', projection.id, 'Modifica scheda e quota', '✎');
-  if (balance.expectedCents > 0) {
+  if (balance.expectedCents > 0 && !paymentManagedExternally) {
     actions.push(projectionActionTextButton('register-manual-receipt', projection.id, 'Registra acconto', '+'));
   }
   cancellableActivePaymentsForProjection(projection).forEach((payment) => {
@@ -6419,7 +6424,7 @@ function projectionCardActions(projection, invite) {
   const primaryInviteAction = invitePrimaryAction(invite);
   if (primaryInviteAction) actions.unshift(primaryInviteAction);
   if (!contributionVerified) actions.push(editAction);
-  if (balance.remainingCents > 0) {
+  if (balance.remainingCents > 0 && !paymentManagedExternally) {
     actions.push(projectionActionTextButton('request-projection-balance', projection.id, 'Chiedi saldo', '€'));
   }
   if (!contributionVerified && projection.pricingMode === 'dashboard') {
@@ -6451,9 +6456,15 @@ function renderProjectionCard(projection, { isOpen = false } = {}) {
   const cost = projectionCostBreakdown(projection);
   const isExemptFromCosts = projection.contributesToCosts === false;
   const contributionVerified = projectionHasVerifiedContribution(projection);
+  // Comodità dello skipper, non un dato economico: la quota resta quella
+  // vera, solo non viene più proposto di gestirla dall'app (richiesta di
+  // Silvio, 30/09/2026).
+  const paymentManagedExternally = projection.paymentManagedExternally === true;
   const currentCostModel = costPlanQuoteModel();
   const dashboardPricingReady = Boolean(currentCostModel && !automaticCostPlanPricingMessage(currentCostModel));
-  const pricingSource = contributionVerified
+  const pricingSource = paymentManagedExternally
+    ? 'Incassata fuori dalla piattaforma'
+    : contributionVerified
     ? 'Quota bloccata dopo versamento verificato'
     : isExemptFromCosts
     ? 'Ruolo gratuito'
@@ -7431,6 +7442,12 @@ function projectionDraftFromFields(fields, id, existingProjection = null) {
     preferredLocale: fields.get('preferredLocale') === 'en' ? 'en' : 'it',
     contributesToCosts,
     contactConsent: paidProjection ? paidProjection.contactConsent === true : fields.get('contactConsent') === 'on',
+    // Comodità per lo skipper, non un dato economico: segnala che ha già
+    // incassato la quota fuori dalla piattaforma, così la scheda smette di
+    // proporre "Registra acconto"/"Chiedi saldo" per questa persona. Resta
+    // modificabile in qualunque momento dalla stessa scheda (richiesta di
+    // Silvio, 30/09/2026).
+    paymentManagedExternally: fields.get('paymentManagedExternally') === 'on',
   };
 }
 
@@ -7517,6 +7534,7 @@ function fillProjectionForm(projection) {
   form.elements.contributesToCosts.checked = normalized.contributesToCosts !== false;
   form.elements.contributesToCosts.dataset.userChoice = 'true';
   form.elements.contactConsent.checked = projection.contactConsent === true;
+  form.elements.paymentManagedExternally.checked = projection.paymentManagedExternally === true;
   syncProjectionCabinGroupField();
   syncProjectionCostParticipation();
   renderProjectionCostPreview();

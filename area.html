@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260930-default-briefing-v1" />
+  <link rel="stylesheet" href="styles.css?v=20260930-payment-external-v1" />
 </head>
 <body class="area-page">
   <a class="skip-link" href="#main-content">Vai al contenuto principale</a>
@@ -155,6 +155,7 @@
                 </details>
               </fieldset>
               <label class="consent-field"><input name="contactConsent" type="checkbox" required /> Ho ricevuto il consenso della persona a essere contattata per questo viaggio. *</label>
+              <label class="consent-field"><input name="paymentManagedExternally" type="checkbox" /> Ho già incassato la quota fuori dalla piattaforma: non propormi "Registra acconto" o "Chiedi saldo" per questa persona.</label>
                 <div class="form-actions"><button id="projectionSubmitButton" class="button button-primary" type="submit">Salva la scheda e riserva il posto</button><button id="cancelProjectionEdit" class="text-button" type="button" hidden>Annulla modifica</button><p id="projectionFormMessage" class="form-message" role="status" aria-live="polite"></p></div>
               </form>
             </section>
@@ -592,6 +593,6 @@
   <footer class="site-footer"><div><a class="brand" href="index.html"><span class="brand-mark">E</span><span>Egadi<br />Sailing Experience</span></a></div><div><a href="index.html">Il viaggio</a><a href="flotta.html">Flottiglia</a><a href="passage-plan.html">Passage Plan</a><a href="arrivi-partenze.html">Arrivi &amp; partenze</a><a href="film.html">Il film</a><a href="accesso.html">Area riservata</a><a href="privacy.html">Privacy e dati</a><a href="https://thatsablast.it/beta#form" target="_blank" rel="noopener noreferrer">Prova la Beta ↗</a></div></footer>
   <script src="i18n.js?v=20260914-en2"></script>
   <script src="app.js?v=20260914-en2"></script>
-  <script type="module" src="area.js?v=20260930-default-briefing-v1"></script>
+  <script type="module" src="area.js?v=20260930-payment-external-v1"></script>
 </body>
 </html>

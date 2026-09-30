@@ -666,15 +666,23 @@ service cloud.firestore {
     // gruppo cabina profondo (es. "double-4"), il limite di 1000 espressioni
     // valutabili per richiesta — scoperto il 23/09/2026 con Antonio Lorenzon,
     // il cui invito veniva rifiutato in silenzio proprio per questo.
+    // paymentManagedExternally (opzionale) è una comodità per lo skipper, non
+    // un limite di sicurezza: segnala che ha già incassato la quota fuori
+    // dalla piattaforma, così la scheda smette di proporre "Registra
+    // acconto"/"Chiedi saldo" per quella persona. Non cambia nulla su importi
+    // o capienza: resta in Crew List come chiunque altro (richiesta di
+    // Silvio, 30/09/2026).
     function hasValidCrewProjectionPayloadV3(projectionId) {
       return request.resource.data.keys().hasAll(['contributesToCosts', 'pricingMode'])
-        && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'starterPackItemsSnapshot', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['id', 'firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'starterPackItemsSnapshot', 'paymentManagedExternally', 'status', 'inviteId', 'invitedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
         && hasValidCrewProjectionPayloadCore(projectionId)
         && request.resource.data.contributesToCosts is bool
         && request.resource.data.pricingMode is string
         && request.resource.data.pricingMode in ['dashboard', 'custom']
         && (!request.resource.data.keys().hasAny(['pricingSnapshotAt'])
           || request.resource.data.pricingSnapshotAt is timestamp)
+        && (!request.resource.data.keys().hasAny(['paymentManagedExternally'])
+          || request.resource.data.paymentManagedExternally is bool)
         && hasValidCrewProjectionStarterPackSnapshot()
         && (request.resource.data.contributesToCosts == true
           || (request.resource.data.berthCents == 0
@@ -723,7 +731,7 @@ service cloud.firestore {
         && request.resource.data.invitedAt == null
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'pricingMode', 'updatedAt', 'updatedBy']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firstName', 'lastName', 'displayName', 'whatsappNumber', 'plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'preferredLocale', 'contactConsent', 'contributesToCosts', 'pricingMode', 'paymentManagedExternally', 'updatedAt', 'updatedBy']);
     }
 
     // Dopo l'invito l'identità e i prezzi concordati sono indipendenti dal
@@ -826,7 +834,7 @@ service cloud.firestore {
         && (request.resource.data.pricingSnapshotAt == request.time
           || (resource.data.keys().hasAll(['pricingSnapshotAt'])
             && request.resource.data.pricingSnapshotAt == resource.data.pricingSnapshotAt))
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contactConsent', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'updatedAt', 'updatedBy']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plannedRole', 'berthType', 'cabinGroupId', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contactConsent', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'paymentManagedExternally', 'updatedAt', 'updatedBy']);
     }
 
     // Il collegamento diventa reale solo nel batch che crea l'invito con lo
@@ -879,7 +887,7 @@ service cloud.firestore {
         && (!resource.data.keys().hasAny(['pricingMode'])
           ? request.resource.data.pricingMode == 'custom'
           : request.resource.data.pricingMode == resource.data.pricingMode)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'inviteId', 'invitedAt', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'starterPackItemsSnapshot', 'updatedAt', 'updatedBy'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'inviteId', 'invitedAt', 'berthCents', 'starterPackCents', 'protectionInsuranceCents', 'refundableDepositCents', 'contributesToCosts', 'pricingMode', 'pricingSnapshotAt', 'starterPackItemsSnapshot', 'paymentManagedExternally', 'updatedAt', 'updatedBy'])
         && hasMatchingCrewProjectionInviteAfter(boatId, projectionId);
     }
 
