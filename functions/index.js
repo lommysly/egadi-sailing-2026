@@ -790,6 +790,10 @@ exports.materializeCrewTravel = onDocumentWritten({
       contactConsent: true,
       phone: asText(member?.phone || invite?.phone, 40),
       email: asText(member?.email, 160),
+      // La società transfer parla italiano: chi ha scelto l'inglese nel
+      // proprio invito va segnalato prima di scriverle, non scoperto durante
+      // la chiamata (richiesta di Silvio, 30/09/2026).
+      preferredLocale: (member?.preferredLocale === 'en' || invite?.preferredLocale === 'en') ? 'en' : 'it',
       airport,
       date: timing.date,
       time: timing.time,

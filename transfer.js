@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-experience-v1';
@@ -153,6 +154,17 @@ const COPY = {
     saveRecord: 'Salva aggiornamento',
     saved: 'Aggiornamento salvato.',
     saveError: 'Impossibile salvare l’aggiornamento. Riprova tra poco.',
+    selectRecord: 'Seleziona questa persona',
+    selectClusterAll: 'Seleziona tutti · {count}',
+    bulkSelectedCount: '{count} movimenti selezionati',
+    bulkClearSelection: 'Annulla selezione',
+    bulkKeepValue: '— non modificare —',
+    bulkFieldHint: 'Lascia vuoto per non modificare',
+    bulkApply: 'Applica a {count} movimenti',
+    bulkApplySuccess: 'Aggiornati {count} movimenti.',
+    bulkApplyError: 'Non sono riuscito ad aggiornare questi movimenti. Riprova tra poco.',
+    bulkApplyEmpty: 'Compila almeno un campo da applicare al gruppo.',
+    speaksEnglish: 'Parla inglese',
     approvalError: 'Impossibile aggiornare l’abilitazione. Riprova tra poco.',
     loadError: 'L’area transfer non è disponibile in questo momento. Riprova tra poco.',
     signInError: 'Non è stato possibile completare l’accesso Google. Riprova scegliendo l’account corretto.',
@@ -296,6 +308,17 @@ const COPY = {
     saveRecord: 'Save update',
     saved: 'Update saved.',
     saveError: 'The update could not be saved. Please try again shortly.',
+    selectRecord: 'Select this person',
+    selectClusterAll: 'Select all · {count}',
+    bulkSelectedCount: '{count} records selected',
+    bulkClearSelection: 'Clear selection',
+    bulkKeepValue: '— leave unchanged —',
+    bulkFieldHint: 'Leave blank to keep unchanged',
+    bulkApply: 'Apply to {count} records',
+    bulkApplySuccess: 'Updated {count} records.',
+    bulkApplyError: 'Could not update these records. Please try again shortly.',
+    bulkApplyEmpty: 'Fill in at least one field to apply to the group.',
+    speaksEnglish: 'Speaks English',
     approvalError: 'The access setting could not be updated. Please try again shortly.',
     loadError: 'The transfer area is not available right now. Please try again shortly.',
     signInError: 'Google sign-in could not be completed. Please choose the correct account and try again.',
@@ -355,6 +378,13 @@ const state = {
   // 30/09/2026: il sollecito deve coprire barca ed equipaggio, non solo il
   // transfer — caso reale di Michele Pasini/Carpe Diem).
   boatSetupStatus: {},
+  // Selezione multipla dei movimenti (es. tutta una fascia oraria dello
+  // stesso volo) per assegnare van/punto di ritrovo/orario in un solo
+  // salvataggio invece di aprire ogni persona singolarmente (richiesta di
+  // Silvio, 30/09/2026). Un Set sopravvive ai re-render completi innescati da
+  // ogni aggiornamento Firestore, che altrimenti cancellerebbero la
+  // selezione a metà lavoro.
+  selectedRecordIds: new Set(),
 };
 
 function locale() {
@@ -766,7 +796,7 @@ function renderRecord(record) {
   const suggestedDepartureDetail = suggestedDeparture
     ? recordDetail(t('suggestedDepartureLabel'), `${escapeHtml(suggestedDeparture)}<small>${escapeHtml(t('suggestedDepartureHint'))}</small>`)
     : '';
-  return `<details class="transfer-record transfer-record--${escapeHtml(displayStatus)}" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span></span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${suggestedDepartureDetail}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details>`;
+  return `<div class="transfer-record-row"><label class="transfer-record-select-label" title="${escapeHtml(t('selectRecord'))}"><input type="checkbox" data-record-select="${recordId}"${state.selectedRecordIds.has(record.id) ? ' checked' : ''} aria-label="${escapeHtml(t('selectRecord'))}" /></label><details class="transfer-record transfer-record--${escapeHtml(displayStatus)}" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges"><span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span>${record.preferredLocale === 'en' ? `<span class="transfer-badge transfer-badge--language">${escapeHtml(t('speaksEnglish'))}</span>` : ''}</span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${suggestedDepartureDetail}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}"><label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details></div>`;
 }
 
 // Oltre questo intervallo fra un orario e il successivo (già ordinati), la
@@ -817,11 +847,23 @@ function timeBandTitle(band, direction) {
   return `${prefix} ${range}`;
 }
 
+// Un'unica casella "seleziona tutti" per ogni cluster visivo già esistente
+// (la fascia oraria stessa, o la lista piatta quando il gruppo è troppo
+// piccolo per averne una): non introduce un raggruppamento nuovo, sceglie
+// solo tutte le persone che l'operatore vede già insieme (richiesta di
+// Silvio, 30/09/2026 — stesso volo/fascia oraria, gestione unica).
+function renderClusterSelectAll(records) {
+  if (records.length < 2) return '';
+  const allSelected = records.every((record) => state.selectedRecordIds.has(record.id));
+  const label = t('selectClusterAll').replace('{count}', String(records.length));
+  return `<label class="transfer-cluster-select"><input type="checkbox" data-select-cluster${allSelected ? ' checked' : ''} />${escapeHtml(label)}</label>`;
+}
+
 function renderAirportGroupBody(groupRecords, direction) {
   if (groupRecords.length <= TIME_BAND_MIN_GROUP_SIZE) {
-    return `<div class="transfer-operator-list">${groupRecords.map(renderRecord).join('')}</div>`;
+    return `<div class="transfer-cluster" data-cluster>${renderClusterSelectAll(groupRecords)}<div class="transfer-operator-list">${groupRecords.map(renderRecord).join('')}</div></div>`;
   }
-  return groupByTimeBand(groupRecords, direction).map((band) => `<div class="transfer-time-band"><h4 class="transfer-time-band-title">${escapeHtml(timeBandTitle(band, direction))}<span>${band.records.length}</span></h4><div class="transfer-operator-list">${band.records.map(renderRecord).join('')}</div></div>`).join('');
+  return groupByTimeBand(groupRecords, direction).map((band) => `<div class="transfer-time-band"><h4 class="transfer-time-band-title">${escapeHtml(timeBandTitle(band, direction))}<span>${band.records.length}</span></h4><div class="transfer-cluster" data-cluster>${renderClusterSelectAll(band.records)}<div class="transfer-operator-list">${band.records.map(renderRecord).join('')}</div></div></div>`).join('');
 }
 
 function dateGroupLabel(date) {
@@ -1222,7 +1264,8 @@ function renderOperatorDashboard() {
   const boatFilterField = boats.length
     ? `<label><span>${escapeHtml(t('filterBoat'))}</span><select name="boat"><option value="all">${escapeHtml(t('allBoats'))}</option>${boatFilterOptions()}</select></label>`
     : '';
-  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-ghost" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section>${state.isOrganizer ? renderBoatStats() : ''}<section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label>${boatFilterField}<label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
+  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-ghost" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section>${state.isOrganizer ? renderBoatStats() : ''}<section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label>${boatFilterField}<label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div id="transferBulkToolbar" class="transfer-bulk-toolbar" hidden></div><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}`;
+  renderBulkToolbar();
 }
 
 function renderRoleSwitch() {
@@ -1298,6 +1341,10 @@ function listenToPrivateData() {
   const recordsRef = collection(db, 'events', EVENT_ID, 'transferOpsRecords');
   state.unsubs.push(onSnapshot(recordsRef, (snapshot) => {
     state.records = sortByUpdatedAt(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+    const stillPresent = new Set(state.records.map((record) => record.id));
+    [...state.selectedRecordIds].forEach((id) => {
+      if (!stillPresent.has(id)) state.selectedRecordIds.delete(id);
+    });
     render();
   }, () => {
     state.error = t('loadError');
@@ -1571,6 +1618,119 @@ async function saveRecord(form) {
   }
 }
 
+function renderBulkToolbar() {
+  const container = document.querySelector('#transferBulkToolbar');
+  if (!container) return;
+  const count = state.selectedRecordIds.size;
+  if (count === 0) {
+    container.hidden = true;
+    container.innerHTML = '';
+    return;
+  }
+  container.hidden = false;
+  container.innerHTML = `<form class="transfer-bulk-form" data-bulk-form><div class="transfer-bulk-toolbar-head"><strong>${escapeHtml(t('bulkSelectedCount').replace('{count}', String(count)))}</strong><button class="text-button" type="button" data-action="bulk-clear">${escapeHtml(t('bulkClearSelection'))}</button></div><div class="transfer-record-form"><label><span>${escapeHtml(t('status'))}</span><select name="status"><option value="">${escapeHtml(t('bulkKeepValue'))}</option>${statusOptions('', OPERATIONAL_STATUSES)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" placeholder="${escapeHtml(t('bulkFieldHint'))}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500" placeholder="${escapeHtml(t('bulkFieldHint'))}"></textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('bulkApply').replace('{count}', String(count)))}</button><p class="form-message" data-message="bulk-actions" role="status"></p></div></div></form>`;
+}
+
+// Un cluster ha una sola casella "seleziona tutti": deve riflettere lo stato
+// reale (tutti/nessuno/alcuni) anche dopo che l'operatore ha spuntato o
+// tolto una singola persona al suo interno, non solo al render iniziale.
+function syncClusterCheckboxState(cluster) {
+  if (!cluster) return;
+  const clusterToggle = cluster.querySelector('[data-select-cluster]');
+  if (!clusterToggle) return;
+  const checkboxes = [...cluster.querySelectorAll('[data-record-select]')];
+  const checkedCount = checkboxes.filter((item) => item.checked).length;
+  clusterToggle.checked = checkedCount > 0 && checkedCount === checkboxes.length;
+  clusterToggle.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+}
+
+// La casella vive fuori dal <details> (riga a sé, non dentro il <summary>):
+// niente preventDefault qui, altrimenti il browser annulla anche il suo
+// stesso toggle nativo e la casella torna sempre deselezionata (le "pre-click
+// activation steps" di un checkbox aggiornano .checked PRIMA che questo
+// listener lo veda, quindi va letto così com'è, non invertito). Restava
+// nidificata nel summary in un tentativo precedente proprio per evitare di
+// aprire la scheda al click: qui il problema non si pone perché è una riga
+// separata, verificato con un test visivo prima di questo commit.
+function toggleRecordSelection(checkbox) {
+  const recordId = checkbox.dataset.recordSelect;
+  if (!recordId) return;
+  if (checkbox.checked) state.selectedRecordIds.add(recordId); else state.selectedRecordIds.delete(recordId);
+  syncClusterCheckboxState(checkbox.closest('[data-cluster]'));
+  renderBulkToolbar();
+}
+
+function toggleClusterSelection(clusterToggle) {
+  const cluster = clusterToggle.closest('[data-cluster]');
+  if (!cluster) return;
+  const nextChecked = clusterToggle.checked;
+  cluster.querySelectorAll('[data-record-select]').forEach((checkbox) => {
+    checkbox.checked = nextChecked;
+    const recordId = checkbox.dataset.recordSelect;
+    if (!recordId) return;
+    if (nextChecked) state.selectedRecordIds.add(recordId); else state.selectedRecordIds.delete(recordId);
+  });
+  clusterToggle.indeterminate = false;
+  renderBulkToolbar();
+}
+
+// Ogni campo lasciato vuoto non viene toccato: la selezione multipla mette
+// insieme persone diverse che possono già avere note o assegnazioni proprie,
+// e un campo vuoto per errore non deve cancellarle a tutte in un colpo solo
+// (richiesta di Silvio, 30/09/2026 — van/orario/punto di ritrovo comuni per
+// una fascia oraria, senza perdere il resto già impostato persona per
+// persona).
+async function applyBulkUpdate(form) {
+  if (!state.user || (!state.isOrganizer && state.operator?.active !== true)) return;
+  const recordIds = [...state.selectedRecordIds];
+  if (!recordIds.length) return;
+  const values = new FormData(form);
+  const updates = {};
+  const statusValue = String(values.get('status') || '');
+  if (OPERATIONAL_STATUSES.includes(statusValue)) updates.status = statusValue;
+  const assignment = text(values.get('assignment'), 120);
+  if (assignment) updates.groupName = assignment;
+  const meetingPoint = text(values.get('meetingPoint'), 160);
+  if (meetingPoint) updates.meetingPoint = meetingPoint;
+  const meetingTime = optionalTime(values.get('meetingTime'));
+  if (meetingTime) updates.meetingTime = meetingTime;
+  const vehicleName = text(values.get('vehicleName'), 120);
+  if (vehicleName) updates.vehicleName = vehicleName;
+  const operatorNotes = text(values.get('operatorNotes'), 500);
+  if (operatorNotes) updates.operatorNotes = operatorNotes;
+  if (!Object.keys(updates).length) {
+    displayMessage('bulk-actions', t('bulkApplyEmpty'), true);
+    return;
+  }
+  updates.assignedOperatorUid = state.user.uid;
+  updates.updatedAt = serverTimestamp();
+  updates.updatedBy = state.user.uid;
+  displayMessage('bulk-actions', '');
+  try {
+    const batch = writeBatch(db);
+    recordIds.forEach((recordId) => {
+      batch.update(doc(db, 'events', EVENT_ID, 'transferOpsRecords', recordId), updates);
+    });
+    await batch.commit();
+    displayMessage('bulk-actions', t('bulkApplySuccess').replace('{count}', String(recordIds.length)));
+  } catch (error) {
+    console.error('Impossibile applicare l’aggiornamento di gruppo ai movimenti transfer.', error);
+    displayMessage('bulk-actions', t('bulkApplyError'), true);
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const clusterToggle = event.target.closest('[data-select-cluster]');
+  if (clusterToggle) {
+    toggleClusterSelection(clusterToggle);
+    return;
+  }
+  const recordToggle = event.target.closest('[data-record-select]');
+  if (recordToggle) {
+    toggleRecordSelection(recordToggle);
+  }
+});
+
 document.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-action]');
   if (!button) return;
@@ -1592,6 +1752,11 @@ document.addEventListener('click', async (event) => {
   if (action === 'impersonate-operator') await impersonateOperator(button.dataset.operatorId, button.dataset.operatorName, button);
   if (action === 'suspend-operator') await suspendOperator(button.dataset.operatorId, button.dataset.operatorName, button);
   if (action === 'delete-operator') await deleteOperator(button.dataset.operatorId, button.dataset.operatorName, button);
+  if (action === 'bulk-clear') {
+    state.selectedRecordIds.clear();
+    renderRecordListOnly();
+    renderBulkToolbar();
+  }
 });
 
 document.addEventListener('change', (event) => {
@@ -1643,6 +1808,12 @@ document.addEventListener('submit', (event) => {
   if (createOperatorForm) {
     event.preventDefault();
     createTransferOperator(createOperatorForm);
+    return;
+  }
+  const bulkForm = event.target.closest('[data-bulk-form]');
+  if (bulkForm) {
+    event.preventDefault();
+    applyBulkUpdate(bulkForm);
     return;
   }
   const form = event.target.closest('[data-record-form]');
