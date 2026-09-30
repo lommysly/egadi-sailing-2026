@@ -324,6 +324,40 @@ exports.deleteTransferOperator = onCall({
   return { uid, deleted: true, authDeleted: Boolean(targetUser) };
 });
 
+// Permette all'organizzatore di vedere esattamente cosa vede un referente
+// transfer, senza mai conoscerne la password: genera un custom token per il
+// suo UID e basta. Perimetro volutamente ristretto ai soli account transfer
+// creati e gestiti dalla regia (stesso controllo già in mano
+// all'organizzatore con sospendi/elimina) — mai skipper, equipaggio o altri
+// organizzatori: quei ruoli restano protetti dalle stesse regole di
+// privacy che già impediscono all'organizzatore di leggerne i dati privati
+// (richiesta di Silvio, 30/09/2026).
+exports.impersonateTransferOperator = onCall({
+  region: REGION,
+  serviceAccount: RUNTIME_SERVICE_ACCOUNT,
+  timeoutSeconds: 60,
+  memory: '256MiB',
+}, async (request) => {
+  const organizerUid = await authenticatedOrganizerUid(request);
+  const uid = asUid(request.data?.uid);
+  if (!uid) {
+    throw new HttpsError('invalid-argument', 'Identificativo account transfer non valido.');
+  }
+  const operatorRef = db.doc(`events/${EVENT_ID}/transferOperators/${uid}`);
+  const operatorSnapshot = await operatorRef.get();
+  const operator = operatorSnapshot.exists ? operatorSnapshot.data() : null;
+  if (!isManagedPasswordTransferOperator(operator) || operator.active !== true) {
+    throw new HttpsError('failed-precondition', 'Questo referente non è un account transfer attivo gestito dalla regia.');
+  }
+  const targetUser = await authUserByUidOrNull(uid);
+  if (!targetUser || !hasPasswordOnlyProvider(targetUser)) {
+    throw new HttpsError('failed-precondition', 'L’account transfer non usa più le credenziali dedicate: non può essere aperto da qui.');
+  }
+  const token = await auth.createCustomToken(uid, { impersonatedBy: organizerUid });
+  logger.info('Organizzatore in visualizzazione come referente transfer', { organizerUid, operatorUid: uid });
+  return { token };
+});
+
 function sourceRevision(snapshot, eventTime) {
   const timestamp = snapshot?.updateTime;
   if (timestamp?.toMillis) return timestamp.toMillis();

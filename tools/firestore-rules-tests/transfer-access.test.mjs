@@ -55,6 +55,23 @@ function legacyGoogleContext() {
   });
 }
 
+// Stesso UID del referente password, ma sign_in_provider "custom": è
+// esattamente la sessione che nasce da impersonateTransferOperator, quando
+// l'organizzatore entra come questo referente per vedere cosa vede lui.
+function impersonatedOperatorContext() {
+  return testEnv.authenticatedContext(OPERATOR_A, {
+    firebase: { sign_in_provider: 'custom' },
+    email: OPERATOR_A_EMAIL,
+  });
+}
+
+function customProviderOutsiderContext() {
+  return testEnv.authenticatedContext(OUTSIDER_A, {
+    firebase: { sign_in_provider: 'custom' },
+    email: 'outsider@example.test',
+  });
+}
+
 async function seedEvent() {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), 'events/egadi-2026'), eventDocData());
@@ -156,4 +173,19 @@ test('accesso transfer: un vecchio ruolo Google non legge più la coda', async (
   await seedTransferRecord();
   const legacyGoogle = legacyGoogleContext();
   await assertFails(getDoc(doc(legacyGoogle.firestore(), 'events/egadi-2026/transferOpsRecords/record-a')));
+});
+
+test('accesso transfer: l’organizzatore impersonato (sign_in_provider custom) legge la coda come il referente', async () => {
+  await seedEvent();
+  await seedManagedOperator();
+  await seedTransferRecord();
+  const impersonated = impersonatedOperatorContext();
+  await assertSucceeds(getDoc(doc(impersonated.firestore(), 'events/egadi-2026/transferOpsRecords/record-a')));
+});
+
+test('accesso transfer: sign_in_provider custom da solo non basta senza un documento operatore valido', async () => {
+  await seedEvent();
+  await seedTransferRecord();
+  const outsider = customProviderOutsiderContext();
+  await assertFails(getDoc(doc(outsider.firestore(), 'events/egadi-2026/transferOpsRecords/record-a')));
 });

@@ -480,9 +480,15 @@ service cloud.firestore {
     // Accesso operativo separato dalla Crew List: il referente usa soltanto
     // credenziali email/password create dalla regia. Non esiste una richiesta
     // autonoma, ne' un percorso Google da approvare per l'area transfer.
+    // 'custom' copre la sola sessione aperta da impersonateTransferOperator
+    // (Cloud Function, accessibile solo all'organizzatore): un custom token
+    // per questo UID può nascere solo lì, mai da un client. L'account resta
+    // comunque vincolato più sotto ad accessMode/authProvider 'password' sul
+    // documento Firestore, che descrive come è stato creato, non come questa
+    // sessione ha effettuato l'accesso (richiesta di Silvio, 30/09/2026).
     function isManagedTransferOperatorAccount() {
       return signedIn()
-        && request.auth.token.firebase.sign_in_provider == 'password'
+        && request.auth.token.firebase.sign_in_provider in ['password', 'custom']
         && request.auth.token.email is string;
     }
 

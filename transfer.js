@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
-import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 import {
   collection,
@@ -77,6 +77,8 @@ const COPY = {
     noOperators: 'Non hai ancora creato alcun accesso transfer.',
     activeOperator: 'Accesso attivo',
     suspendedOperator: 'Accesso sospeso',
+    impersonateOperator: 'Entra come questo referente',
+    impersonateOperatorConfirm: 'Entrare come {name} per vedere esattamente cosa vede lui? La tua sessione da organizzatore terminerà subito: per tornare al tuo account dovrai uscire e rientrare con Google.',
     suspend: 'Sospendi',
     suspendConfirm: 'Sospendere l’accesso di {name}? Il referente non vedrà più i movimenti, ma l’account resterà disponibile per una futura riattivazione.',
     suspendSuccess: 'Accesso sospeso. Il referente non può più vedere i movimenti.',
@@ -221,6 +223,8 @@ const COPY = {
     noOperators: 'You have not created any transfer access yet.',
     activeOperator: 'Access active',
     suspendedOperator: 'Access suspended',
+    impersonateOperator: 'Enter as this contact',
+    impersonateOperatorConfirm: 'Enter as {name} to see exactly what they see? Your organiser session will end immediately: to return to your account, sign out and sign back in with Google.',
     suspend: 'Suspend',
     suspendConfirm: 'Suspend {name}’s access? The contact will no longer see journeys, but the account will remain available for future reactivation.',
     suspendSuccess: 'Access suspended. The contact can no longer see journeys.',
@@ -639,10 +643,13 @@ function renderManagedOperatorRow(operator) {
   const active = operator.active === true;
   const updated = formatDateTime(operator.updatedAt || operator.approvedAt);
   const status = active ? t('activeOperator') : t('suspendedOperator');
+  const impersonateAction = active
+    ? `<button class="button button-ghost" type="button" data-action="impersonate-operator" data-operator-id="${escapeHtml(operator.id)}" data-operator-name="${escapeHtml(name)}">${escapeHtml(t('impersonateOperator'))}</button>`
+    : '';
   const actions = active
     ? `<button class="button button-ghost" type="button" data-action="suspend-operator" data-operator-id="${escapeHtml(operator.id)}" data-operator-name="${escapeHtml(name)}">${escapeHtml(t('suspend'))}</button>`
     : '';
-  return `<article class="transfer-access-request"><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(email)} · ${escapeHtml(status)}${updated ? ` · ${escapeHtml(t('lastUpdated'))}: ${escapeHtml(updated)}` : ''}</span></div><div class="transfer-access-request-actions">${actions}<button class="button button-ghost" type="button" data-action="delete-operator" data-operator-id="${escapeHtml(operator.id)}" data-operator-name="${escapeHtml(name)}">${escapeHtml(t('deleteOperator'))}</button></div></article>`;
+  return `<article class="transfer-access-request"><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(email)} · ${escapeHtml(status)}${updated ? ` · ${escapeHtml(t('lastUpdated'))}: ${escapeHtml(updated)}` : ''}</span></div><div class="transfer-access-request-actions">${impersonateAction}${actions}<button class="button button-ghost" type="button" data-action="delete-operator" data-operator-id="${escapeHtml(operator.id)}" data-operator-name="${escapeHtml(name)}">${escapeHtml(t('deleteOperator'))}</button></div></article>`;
 }
 
 function renderOperatorCreationForm() {
@@ -1500,6 +1507,26 @@ async function deleteOperator(operatorId, name, button) {
   }
 }
 
+// Nessuna password del referente viene mai vista o toccata: la Cloud
+// Function genera un custom token solo per quel singolo UID e solo se è un
+// account transfer attivo già gestito dalla regia. Firebase Auth ammette un
+// solo utente per sessione: da qui in poi il browser diventa quel referente,
+// la sessione organizzatore finisce (richiesta di Silvio, 30/09/2026).
+async function impersonateOperator(operatorId, name, button) {
+  if (!state.user || !state.isOrganizer || !operatorId) return;
+  if (!window.confirm(messageForOperator('impersonateOperatorConfirm', name))) return;
+  displayMessage('access-management', '');
+  if (button) button.disabled = true;
+  try {
+    const result = await httpsCallable(functions, 'impersonateTransferOperator')({ uid: operatorId });
+    await signInWithCustomToken(auth, result.data.token);
+  } catch (error) {
+    console.error('Impossibile entrare come questo referente transfer.', error?.code || error);
+    displayMessage('access-management', t('manageOperatorError'), true);
+    if (button) button.disabled = false;
+  }
+}
+
 async function saveRecord(form) {
   if (!state.user || (!state.isOrganizer && state.operator?.active !== true)) return;
   const recordId = form.dataset.recordForm;
@@ -1545,6 +1572,7 @@ document.addEventListener('click', async (event) => {
   }
   if (action === 'delete-legacy-request') await deleteLegacyRequest(button.dataset.requestId, button);
   if (action === 'delete-legacy-operator') await deleteLegacyOperator(button.dataset.operatorId, button);
+  if (action === 'impersonate-operator') await impersonateOperator(button.dataset.operatorId, button.dataset.operatorName, button);
   if (action === 'suspend-operator') await suspendOperator(button.dataset.operatorId, button.dataset.operatorName, button);
   if (action === 'delete-operator') await deleteOperator(button.dataset.operatorId, button.dataset.operatorName, button);
 });
