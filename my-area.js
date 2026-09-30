@@ -1398,22 +1398,37 @@ function participantProjectionRows() {
   ].join('');
 }
 
-// Una fattura, non un elenco di frasi: una riga per voce (posto+assicurazione,
-// Starter Pack, cauzione), sempre le stesse tre colonne (versato / da dare /
-// come) invece di 9 card separate che ripetevano più volte lo stesso numero
-// in parole diverse — con "posto" e "assicurazione" mostrati anche come due
-// righe indipendenti, la stessa cifra compariva tre volte sullo schermo.
-// "Semplicità davanti, complessità dietro le quinte": tutte le funzioni di
-// calcolo sotto restano invariate, cambia solo come vengono lette (richiesta
-// di Silvio, 30/09/2026, dopo una ricognizione dal telefono).
-function financeInvoiceRow({ label, totalLabel, paidLabel, owedLabel, method, tone = 'default', note = '' }) {
-  return `<article class="finance-invoice-row finance-invoice-row--${tone}">
-    <div class="finance-invoice-row-head"><strong>${escapeHtml(label)}</strong>${totalLabel ? `<span>${escapeHtml(totalLabel)}</span>` : ''}</div>
-    <dl class="finance-invoice-row-lines">
-      <div><dt>${escapeHtml(localized('Hai versato', 'Paid'))}</dt><dd>${escapeHtml(paidLabel)}</dd></div>
-      <div><dt>${escapeHtml(localized('Ancora da dare', 'Still to give'))}</dt><dd>${escapeHtml(owedLabel)}${method ? ` · ${escapeHtml(method)}` : ''}</dd></div>
-    </dl>
-    ${note ? `<p class="finance-invoice-row-note">${note}</p>` : ''}
+// Icone semplici, un solo tratto, colore ereditato (currentColor): niente
+// immagini esterne da caricare, restano nitide a qualunque dimensione.
+// "Le immagini raccontano più delle scritte" (Silvio, 30/09/2026): l'icona
+// di stato (spunta/euro/pallino) va letta da sola, prima ancora del testo.
+const FINANCE_ICONS = {
+  berth: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 17v-5.5a2 2 0 0 1 2-2h15a2 2 0 0 1 2 2V17"/><path d="M2.5 17v2.5M21.5 17v2.5"/><path d="M4.5 9.5V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3.5"/></svg>',
+  starterPack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="11.5" rx="1.5"/><path d="M3 13.5h18"/><path d="M12 9v11.5"/><path d="M12 9C10 9 8.3 7.7 8.3 5.8 8.3 4 10 3.3 12 5c2-1.7 3.7-1 3.7.8C15.7 7.7 14 9 12 9Z"/></svg>',
+  deposit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.6 3.1 7.8 7.5 9.2 4.4-1.4 7.5-4.6 7.5-9.2V6L12 3Z"/></svg>',
+  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.5 2.5 5.5-6"/></svg>',
+  pending: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.8 8.7c-.8-.7-1.8-1.1-3-1.1-2.4 0-4.3 2-4.3 4.4s1.9 4.4 4.3 4.4c1.2 0 2.2-.4 3-1.1"/><path d="M6.8 10.5h5.6M6.8 13.2h4.6"/></svg>',
+  muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12h7"/></svg>',
+  bank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9.5 12 4.5l8.5 5"/><path d="M5.5 9.5v8M10 9.5v8M14 9.5v8M18.5 9.5v8"/><path d="M3.5 20.5h17"/></svg>',
+  cash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="19" height="11.5" rx="1.6"/><circle cx="12" cy="12.25" r="2.6"/><path d="M5.5 9v0M18.5 15.5v0"/></svg>',
+};
+
+// Una card con un'icona di stato grande, non una tabella da leggere riga per
+// riga: "saldato"/"da versare" deve capirsi dal colore e dall'icona prima
+// ancora del numero. Il "quanto hai già versato" diventa una nota piccola
+// solo quando serve, non una colonna sempre visibile — meno testo, più
+// riconoscimento immediato (richiesta di Silvio, 30/09/2026: "un'alternativa
+// più cognitiva", dopo aver trovato la prima versione ancora troppo fitta).
+function financeStatusCard({ icon, label, totalLabel, statusTone, statusText, methodIcon = '', methodText = '', note = '' }) {
+  const statusIcon = FINANCE_ICONS[statusTone] || FINANCE_ICONS.muted;
+  return `<article class="finance-card finance-card--${statusTone}">
+    <div class="finance-card-icon" aria-hidden="true">${icon}</div>
+    <div class="finance-card-body">
+      <div class="finance-card-title"><strong>${escapeHtml(label)}</strong>${totalLabel ? `<span>${escapeHtml(totalLabel)}</span>` : ''}</div>
+      <div class="finance-card-status"><span class="finance-card-status-icon" aria-hidden="true">${statusIcon}</span><span>${escapeHtml(statusText)}</span></div>
+      ${methodText ? `<div class="finance-card-method"><span class="finance-card-method-icon" aria-hidden="true">${FINANCE_ICONS[methodIcon] || ''}</span><span>${escapeHtml(methodText)}</span></div>` : ''}
+      ${note ? `<p class="finance-card-note">${note}</p>` : ''}
+    </div>
   </article>`;
 }
 
@@ -1434,74 +1449,85 @@ function renderParticipantFinanceSummary() {
   const cashMethod = localized('Contanti all’imbarco', 'Cash at boarding');
 
   const berthRow = onlineContribution.isExempt
-    ? financeInvoiceRow({
+    ? financeStatusCard({
+      icon: FINANCE_ICONS.berth,
       label: localized('Posto barca e assicurazione', 'Berth and deposit insurance'),
       totalLabel: localized('Esente', 'Exempt'),
-      paidLabel: '—',
-      owedLabel: localized('Non previsto per il tuo ruolo', 'Not applicable for your role'),
-      tone: 'muted',
+      statusTone: 'muted',
+      statusText: localized('Non previsto per il tuo ruolo', 'Not applicable for your role'),
     })
     : !onlineContribution.hasTarget
-      ? financeInvoiceRow({
+      ? financeStatusCard({
+        icon: FINANCE_ICONS.berth,
         label: localized('Posto barca e assicurazione', 'Berth and deposit insurance'),
         totalLabel: localized('Da definire', 'To be confirmed'),
-        paidLabel: '—',
-        owedLabel: localized('Lo skipper deve ancora fissare la quota', 'The skipper still needs to set the amount'),
-        tone: 'muted',
+        statusTone: 'muted',
+        statusText: localized('Lo skipper deve ancora fissare la quota', 'The skipper still needs to set the amount'),
       })
-      : financeInvoiceRow({
+      : financeStatusCard({
+        icon: FINANCE_ICONS.berth,
         label: localized('Posto barca e assicurazione', 'Berth and deposit insurance'),
         totalLabel: formatCurrency(onlineContribution.targetCents / 100),
-        paidLabel: onlineContribution.verifiedCents > 0 ? formatCurrency(onlineContribution.verifiedCents / 100) : localized('Nessun accredito verificato', 'No verified payment'),
-        owedLabel: onlineContribution.overpaidCents > 0
-          ? `${formatCurrency(onlineContribution.overpaidCents / 100)} ${localized('oltre quota — verifica con lo skipper', 'over the agreed amount — check with the skipper')}`
+        statusTone: onlineContribution.overpaidCents > 0 ? 'pending' : onlineContribution.remainingCents > 0 ? 'pending' : 'ok',
+        statusText: onlineContribution.overpaidCents > 0
+          ? localized('Da verificare col skipper', 'Check with the skipper')
           : onlineContribution.remainingCents > 0
-            ? formatCurrency(onlineContribution.remainingCents / 100)
-            : localized('Niente, quota coperta', 'Nothing, contribution covered'),
-        method: onlineContribution.remainingCents > 0 && onlineContribution.overpaidCents === 0 ? bankTransferMethod : '',
-        tone: onlineContribution.overpaidCents > 0 ? 'pending' : onlineContribution.remainingCents > 0 ? 'pending' : 'ok',
+            ? localized(`Da versare ${formatCurrency(onlineContribution.remainingCents / 100)}`, `${formatCurrency(onlineContribution.remainingCents / 100)} still to pay`)
+            : localized('Saldato', 'Fully paid'),
+        methodIcon: onlineContribution.remainingCents > 0 && onlineContribution.overpaidCents === 0 ? 'bank' : '',
+        methodText: onlineContribution.overpaidCents > 0
+          ? localized(`${formatCurrency(onlineContribution.overpaidCents / 100)} oltre quota`, `${formatCurrency(onlineContribution.overpaidCents / 100)} over the agreed amount`)
+          : onlineContribution.remainingCents > 0
+            ? bankTransferMethod
+            : onlineContribution.verifiedCents > 0
+              ? localized(`Hai versato ${formatCurrency(onlineContribution.verifiedCents / 100)}`, `You paid ${formatCurrency(onlineContribution.verifiedCents / 100)}`)
+              : '',
         note: onlineContribution.pendingCents > 0
-          ? `<span aria-hidden="true">•</span> ${escapeHtml(localized(
+          ? escapeHtml(localized(
             `${formatCurrency(onlineContribution.pendingCents / 100)} già segnalati o richiesti: restano "in attesa" finché lo skipper non conferma l’accredito.`,
             `${formatCurrency(onlineContribution.pendingCents / 100)} already reported or requested: they stay "pending" until the skipper confirms the payment.`,
-          ))}`
+          ))
           : '',
       });
 
   const starterPackRow = activeProjection?.contributesToCosts === false
-    ? financeInvoiceRow({
+    ? financeStatusCard({
+      icon: FINANCE_ICONS.starterPack,
       label: 'Starter Pack',
       totalLabel: localized('Non previsto', 'Not applicable'),
-      paidLabel: '—',
-      owedLabel: localized('Non previsto per il tuo ruolo', 'Not applicable for your role'),
-      tone: 'muted',
+      statusTone: 'muted',
+      statusText: localized('Non previsto per il tuo ruolo', 'Not applicable for your role'),
     })
-    : financeInvoiceRow({
+    : financeStatusCard({
+      icon: FINANCE_ICONS.starterPack,
       label: 'Starter Pack',
       totalLabel: starterPackCents > 0 ? formatCurrency(starterPackCents / 100) : localized('Da definire', 'To be confirmed'),
-      paidLabel: '—',
-      owedLabel: starterPackCents > 0 ? formatCurrency(starterPackCents / 100) : localized('Da definire', 'To be confirmed'),
-      method: cashMethod,
-      tone: 'pending',
-      note: starterPack.detail ? `<span aria-hidden="true">ⓘ</span> ${escapeHtml(starterPack.detail)}` : '',
+      statusTone: 'pending',
+      statusText: starterPackCents > 0
+        ? localized(`Da versare ${formatCurrency(starterPackCents / 100)}`, `${formatCurrency(starterPackCents / 100)} still to pay`)
+        : localized('Importo da definire', 'Amount to be confirmed'),
+      methodIcon: 'cash',
+      methodText: cashMethod,
+      note: starterPack.detail ? escapeHtml(starterPack.detail) : '',
     });
 
   const depositRow = depositCents > 0
-    ? financeInvoiceRow({
+    ? financeStatusCard({
+      icon: FINANCE_ICONS.deposit,
       label: localized('Cauzione rimborsabile', 'Refundable deposit'),
       totalLabel: formatCurrency(depositCents / 100),
-      paidLabel: '—',
-      owedLabel: formatCurrency(depositCents / 100),
-      method: localized('Contanti all’imbarco · restituita a fine charter', 'Cash at boarding · returned at the end of the charter'),
-      tone: 'pending',
-      note: `<span aria-hidden="true">ⓘ</span> <a class="rules-reference-link" href="#crew-bacheca" data-rules-reference="deposit">${escapeHtml(localized('Leggi la regola sulla cauzione', 'Read the deposit rule'))}</a>`,
+      statusTone: 'pending',
+      statusText: localized(`Da versare ${formatCurrency(depositCents / 100)}`, `${formatCurrency(depositCents / 100)} still to pay`),
+      methodIcon: 'cash',
+      methodText: localized('Contanti all’imbarco · restituita a fine charter', 'Cash at boarding · returned at the end of the charter'),
+      note: `<a class="rules-reference-link" href="#crew-bacheca" data-rules-reference="deposit">${escapeHtml(localized('Leggi la regola sulla cauzione', 'Read the deposit rule'))}</a>`,
     })
-    : financeInvoiceRow({
+    : financeStatusCard({
+      icon: FINANCE_ICONS.deposit,
       label: localized('Cauzione rimborsabile', 'Refundable deposit'),
       totalLabel: localized('Non prevista', 'Not applicable'),
-      paidLabel: '—',
-      owedLabel: localized('Non prevista per il tuo posto', 'Not applicable for your berth'),
-      tone: 'muted',
+      statusTone: 'muted',
+      statusText: localized('Non prevista per il tuo posto', 'Not applicable for your berth'),
     });
 
   const acceptedAt = formatDateTime(activeRuleAcceptance?.acceptedAt);
@@ -1511,7 +1537,7 @@ function renderParticipantFinanceSummary() {
     <h4>${escapeHtml(localized('Cosa hai già dato e cosa manca', 'What you’ve already given and what’s left'))}</h4>
     ${participantProjectionRows() ? `<div class="participant-finance-grid participant-finance-grid-compact">${participantProjectionRows()}</div>` : ''}
     ${participantPaymentInstructionsMarkup(onlineContribution)}
-    <div class="finance-invoice">${berthRow}${starterPackRow}${depositRow}</div>
+    <div class="finance-cards">${berthRow}${starterPackRow}${depositRow}</div>
     <div class="participant-finance-acceptance"><strong>${escapeHtml(localized('Regole di bordo accettate', 'Board rules accepted'))}</strong>${acceptedAt ? ` · ${escapeHtml(acceptedAt)}` : ''}. <a href="#crew-bacheca">${escapeHtml(localized('Rileggi il regolamento e la bacheca', 'Read the rules and updates again'))}</a></div>
   `;
 }

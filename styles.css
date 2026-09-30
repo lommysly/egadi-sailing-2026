@@ -672,24 +672,38 @@ body.menu-open { overflow:hidden; }
 .participant-finance-acceptance strong { display:block; margin-bottom:3px; }
 .participant-finance-acceptance a { color:#075d69; font-weight:700; text-decoration-thickness:1px; text-underline-offset:3px; }
 .participant-finance-grid-compact { margin-bottom:14px; }
-/* Una riga per voce, sempre le stesse due colonne (versato/da dare), come
-   una fattura: sostituisce le nove card separate del vecchio riepilogo
-   (richiesta di Silvio, 30/09/2026, dopo una ricognizione dal telefono). */
-.finance-invoice { display:grid; gap:10px; margin:14px 0; }
-.finance-invoice-row { padding:14px 16px; border:1px solid rgba(8,123,138,.18); border-radius:12px; background:white; }
-.finance-invoice-row--ok { border-color:rgba(47,125,74,.32); background:#f2faf3; }
-.finance-invoice-row--pending { border-color:rgba(175,122,34,.32); background:#fffaf0; }
-.finance-invoice-row--muted { border-color:rgba(17,45,56,.14); background:#f7f8f8; }
-.finance-invoice-row-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:9px; }
-.finance-invoice-row-head strong { font:600 1.05rem "Fraunces",serif; color:#0a3d49; }
-.finance-invoice-row-head span { font:700 1.05rem "Fraunces",serif; color:#416b6d; white-space:nowrap; }
-.finance-invoice-row-lines { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:0; }
-.finance-invoice-row-lines div { display:grid; gap:2px; min-width:0; }
-.finance-invoice-row-lines dt { margin:0; color:#416b6d; font:700 .64rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; }
-.finance-invoice-row-lines dd { margin:0; color:#0a3d49; font:600 .92rem "DM Sans",sans-serif; overflow-wrap:anywhere; }
-.finance-invoice-row-note { margin:10px 0 0; padding-top:9px; border-top:1px dashed rgba(17,45,56,.16); color:#416b6d; font-size:.76rem; line-height:1.42; }
-.finance-invoice-row-note a { color:#075d69; font-weight:700; }
-@media (max-width:430px) { .finance-invoice-row-lines { grid-template-columns:1fr; } }
+/* Una card per voce con icona di stato grande: il colore e l'icona si
+   leggono prima ancora del numero, il "quanto hai già versato" diventa una
+   nota secondaria invece di una colonna di pari peso — sostituisce la
+   versione "fattura a due colonne", giudicata ancora troppo fitta
+   (richiesta di Silvio, 30/09/2026: "un'alternativa più cognitiva... con
+   delle icone che danno un'idea visiva"). */
+.finance-cards { display:grid; gap:10px; margin:14px 0; }
+.finance-card { display:flex; align-items:flex-start; gap:12px; padding:14px 16px; border:1px solid rgba(8,123,138,.18); border-radius:14px; background:white; }
+.finance-card--ok { border-color:rgba(47,125,74,.32); background:#f2faf3; }
+.finance-card--pending { border-color:rgba(175,122,34,.32); background:#fffaf0; }
+.finance-card--muted { border-color:rgba(17,45,56,.14); background:#f7f8f8; }
+.finance-card-icon { flex:none; width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(8,123,138,.12); color:#0a3d49; }
+.finance-card-icon svg { width:24px; height:24px; }
+.finance-card--ok .finance-card-icon { background:rgba(47,125,74,.16); color:#2f7d4a; }
+.finance-card--pending .finance-card-icon { background:rgba(175,122,34,.18); color:#af7a22; }
+.finance-card--muted .finance-card-icon { background:rgba(17,45,56,.08); color:#6a7c82; }
+.finance-card-body { flex:1; min-width:0; }
+.finance-card-title { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.finance-card-title strong { font:600 1rem "Fraunces",serif; color:#0a3d49; }
+.finance-card-title span { font:700 .92rem "Fraunces",serif; color:#416b6d; white-space:nowrap; }
+.finance-card-status { display:flex; align-items:center; gap:7px; margin-top:6px; font:700 1.02rem "DM Sans",sans-serif; color:#0a3d49; }
+.finance-card--ok .finance-card-status { color:#2f7d4a; }
+.finance-card--pending .finance-card-status { color:#af7a22; }
+.finance-card--muted .finance-card-status { color:#6a7c82; }
+.finance-card-status-icon { flex:none; width:20px; height:20px; }
+.finance-card-status-icon svg { width:100%; height:100%; }
+.finance-card-method { display:flex; align-items:center; gap:6px; margin-top:5px; color:#416b6d; font-size:.82rem; }
+.finance-card-method-icon { flex:none; width:16px; height:16px; opacity:.85; }
+.finance-card-method-icon svg { width:100%; height:100%; }
+.finance-card-note { margin:10px 0 0; padding-top:9px; border-top:1px dashed rgba(17,45,56,.16); color:#416b6d; font-size:.76rem; line-height:1.42; }
+.finance-card-note a { color:#075d69; font-weight:700; }
+@media (max-width:430px) { .finance-card { gap:10px; padding:12px 14px; } .finance-card-icon { width:38px; height:38px; } .finance-card-icon svg { width:20px; height:20px; } }
 .dashboard-hub-card--static { cursor:default; }
 .dashboard-hub-card--static:hover { background:rgba(255,255,255,.1); transform:none; }
 .crew-activity-timeline { margin-top:20px; padding:18px; border:1px solid rgba(255,255,255,.22); border-radius:14px; background:rgba(0,0,0,.12); }
