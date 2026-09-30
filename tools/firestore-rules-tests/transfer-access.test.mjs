@@ -8,7 +8,10 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  serverTimestamp,
   setDoc,
+  updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import {
   CREW_A,
@@ -112,6 +115,25 @@ async function seedTransferRecord() {
   });
 }
 
+// Rispecchia il documento vero come lo scrive sempre materializeCrewTravel
+// (safeOperationalFields): ogni campo operativo esiste già, anche se vuoto,
+// non manca mai nulla come nel seed minimale sopra.
+async function seedRealisticTransferRecord(recordId) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), `events/egadi-2026/transferOpsRecords/${recordId}`), {
+      recordState: 'active',
+      status: 'new',
+      participantName: 'Partecipante fittizio',
+      assignedOperatorUid: '',
+      groupName: '',
+      meetingPoint: '',
+      meetingTime: '',
+      vehicleName: '',
+      operatorNotes: '',
+    });
+  });
+}
+
 function accessRequestPayload(email) {
   return {
     name: 'Richiesta fittizia',
@@ -188,4 +210,44 @@ test('accesso transfer: sign_in_provider custom da solo non basta senza un docum
   await seedTransferRecord();
   const outsider = customProviderOutsiderContext();
   await assertFails(getDoc(doc(outsider.firestore(), 'events/egadi-2026/transferOpsRecords/record-a')));
+});
+
+// La selezione multipla (transfer.js, applyBulkUpdate) lascia fuori dal
+// payload ogni campo che l'operatore non ha compilato, per non sovrascrivere
+// dati già diversi persona per persona — a differenza del salvataggio
+// singolo (saveRecord) che invece li scrive sempre tutti. Verifica che le
+// Security Rules accettino comunque questo aggiornamento parziale (segnalato
+// da Silvio come "non gestisce gli stati di tutti quanti insieme", 30/09/2026
+// — va capito se è un problema di regole o di UX prima di intervenire).
+test('accesso transfer: un referente può aggiornare solo alcuni campi operativi alla volta (come fa la selezione multipla)', async () => {
+  await seedEvent();
+  await seedManagedOperator();
+  await seedRealisticTransferRecord('record-b');
+  const operator = operatorContext();
+  const recordPath = 'events/egadi-2026/transferOpsRecords/record-b';
+  await assertSucceeds(updateDoc(doc(operator.firestore(), recordPath), {
+    meetingPoint: 'Porto di Marsala',
+    meetingTime: '09:30',
+    assignedOperatorUid: OPERATOR_A,
+    updatedAt: serverTimestamp(),
+    updatedBy: OPERATOR_A,
+  }));
+});
+
+test('accesso transfer: un referente può aggiornare solo lo stato di più movimenti in un batch, senza toccare gli altri campi', async () => {
+  await seedEvent();
+  await seedManagedOperator();
+  await seedRealisticTransferRecord('record-c');
+  await seedRealisticTransferRecord('record-d');
+  const operator = operatorContext();
+  const batch = writeBatch(operator.firestore());
+  const updates = {
+    status: 'confirmed',
+    assignedOperatorUid: OPERATOR_A,
+    updatedAt: serverTimestamp(),
+    updatedBy: OPERATOR_A,
+  };
+  batch.update(doc(operator.firestore(), 'events/egadi-2026/transferOpsRecords/record-c'), updates);
+  batch.update(doc(operator.firestore(), 'events/egadi-2026/transferOpsRecords/record-d'), updates);
+  await assertSucceeds(batch.commit());
 });
