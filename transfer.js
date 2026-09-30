@@ -131,6 +131,7 @@ const COPY = {
     boatStatSkipperLabel: 'Skipper',
     boatStatSkipperRequested: 'transfer richiesto',
     boatStatSkipperUnknown: 'da verificare',
+    boatStatSkipperFollowUp: 'Anche lo skipper deve decidere il proprio transfer',
     boatReminderAction: 'Sollecita lo skipper',
     boatChecklistBoat: 'Barca',
     boatChecklistRules: 'Regole',
@@ -275,6 +276,7 @@ const COPY = {
     boatStatSkipperLabel: 'Skipper',
     boatStatSkipperRequested: 'transfer requested',
     boatStatSkipperUnknown: 'to check',
+    boatStatSkipperFollowUp: 'The skipper also needs to decide on their own transfer',
     boatReminderAction: 'Remind the skipper',
     boatChecklistBoat: 'Boat',
     boatChecklistRules: 'Rules',
@@ -1072,7 +1074,7 @@ function boatSetupIssues(readiness) {
   return issues;
 }
 
-function boatReminderMessage(boat, breakdown, readiness) {
+function boatReminderMessage(boat, breakdown, readiness, skipperStatus) {
   const registered = Number.isInteger(breakdown.total) ? breakdown.total : null;
   const crewLine = registered === null
     ? (locale() === 'en' ? 'crew count not available yet' : 'equipaggio non ancora verificabile')
@@ -1082,6 +1084,12 @@ function boatReminderMessage(boat, breakdown, readiness) {
   const legLine = (label, leg) => (locale() === 'en'
     ? `${label}: ${leg.requested} requested the transfer, ${leg.independent} arranging on their own, ${Number.isInteger(leg.pending) ? leg.pending : '?'} still undecided`
     : `${label}: ${leg.requested} hanno chiesto il transfer, ${leg.independent} si arrangiano da soli, ${Number.isInteger(leg.pending) ? leg.pending : '?'} non hanno ancora deciso`);
+  // Anche lo skipper fa parte dell'equipaggio e sale sulla barca: se non ha
+  // ancora deciso il proprio transfer, il sollecito lo ricorda a lui stesso,
+  // non solo per il suo equipaggio (richiesta di Silvio, 30/09/2026).
+  const skipperLegLine = (label, done) => (locale() === 'en'
+    ? `${label}: ${done ? 'you already requested the transfer' : 'you have not decided yet'}`
+    : `${label}: ${done ? 'hai già richiesto il transfer' : 'non hai ancora deciso'}`);
   const greeting = boat.skipperName
     ? (locale() === 'en' ? `Hi ${boat.skipperName}` : `Ciao ${boat.skipperName}`)
     : (locale() === 'en' ? 'Hi' : 'Ciao');
@@ -1100,8 +1108,8 @@ function boatReminderMessage(boat, breakdown, readiness) {
     ? (locale() === 'en' ? 'Open your dashboard' : 'Apri la tua area')
     : (locale() === 'en' ? "Open your crew's travel section" : 'Apri la sezione viaggio del tuo equipaggio');
   return locale() === 'en'
-    ? `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nFeel free to share this in your crew chat, so whoever is missing can complete their choice.\n\n${openLine}: ${link}`
-    : `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nPuoi condividerlo anche nel gruppo dell'equipaggio, così chi manca completa la scelta.\n\n${openLine}: ${link}`;
+    ? `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- Your own transfer — ${skipperLegLine(t('inbound'), skipperStatus.outbound)}, ${skipperLegLine(t('outbound'), skipperStatus.return)}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nFeel free to share this in your crew chat, so whoever is missing can complete their choice.\n\n${openLine}: ${link}`
+    : `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- Il tuo transfer — ${skipperLegLine(t('inbound'), skipperStatus.outbound)}, ${skipperLegLine(t('outbound'), skipperStatus.return)}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nPuoi condividerlo anche nel gruppo dell'equipaggio, così chi manca completa la scelta.\n\n${openLine}: ${link}`;
 }
 
 function renderBoatStats() {
@@ -1125,12 +1133,16 @@ function renderBoatStats() {
     const needsFollowUp = (breakdown.outbound.pending || 0) > 0 || (breakdown.return.pending || 0) > 0;
     const hasData = Number.isInteger(breakdown.total);
     const totalText = hasData ? String(breakdown.total) : '…';
-    const statusClass = (needsFollowUp || needsSetupFollowUp) ? ' transfer-boat-stat--pending' : hasData && breakdown.total > 0 ? ' transfer-boat-stat--ready' : '';
-    const legLine = (label, leg) => `<span>${escapeHtml(label)}: ${leg.requested} ${escapeHtml(t('boatStatRequestedShort'))} · ${leg.independent} ${escapeHtml(t('boatStatIndependentShort'))} · ${Number.isInteger(leg.pending) ? leg.pending : '…'} ${escapeHtml(t('boatStatPendingShort'))}</span>`;
     const skipperStatus = boatSkipperTransferStatus(boat.id);
+    // Anche lo skipper fa parte dell'equipaggio e sale sulla barca: se non ha
+    // ancora deciso il proprio transfer è tra le persone da gestire, non un
+    // dettaglio a parte (richiesta di Silvio, 30/09/2026).
+    const skipperNeedsFollowUp = !skipperStatus.outbound || !skipperStatus.return;
+    const statusClass = (needsFollowUp || needsSetupFollowUp || skipperNeedsFollowUp) ? ' transfer-boat-stat--pending' : hasData && breakdown.total > 0 ? ' transfer-boat-stat--ready' : '';
+    const legLine = (label, leg) => `<span>${escapeHtml(label)}: ${leg.requested} ${escapeHtml(t('boatStatRequestedShort'))} · ${leg.independent} ${escapeHtml(t('boatStatIndependentShort'))} · ${Number.isInteger(leg.pending) ? leg.pending : '…'} ${escapeHtml(t('boatStatPendingShort'))}</span>`;
     const skipperStatusText = (done) => (done ? t('boatStatSkipperRequested') : t('boatStatSkipperUnknown'));
-    const skipperLine = `<span class="transfer-boat-stat-skipper-line">${escapeHtml(t('boatStatSkipperLabel'))} · ${escapeHtml(t('inbound'))}: ${escapeHtml(skipperStatusText(skipperStatus.outbound))} · ${escapeHtml(t('outbound'))}: ${escapeHtml(skipperStatusText(skipperStatus.return))}</span>`;
-    const reminderUrl = hasData ? whatsappDraftUrl(boatReminderMessage(boat, breakdown, readiness)) : '';
+    const skipperLine = `<span class="transfer-boat-stat-skipper-line${skipperNeedsFollowUp ? ' transfer-boat-stat-skipper-line--pending' : ''}">${escapeHtml(t('boatStatSkipperLabel'))} · ${escapeHtml(t('inbound'))}: ${escapeHtml(skipperStatusText(skipperStatus.outbound))} · ${escapeHtml(t('outbound'))}: ${escapeHtml(skipperStatusText(skipperStatus.return))}</span>`;
+    const reminderUrl = hasData ? whatsappDraftUrl(boatReminderMessage(boat, breakdown, readiness, skipperStatus)) : '';
     const initial = escapeHtml(boat.name.trim().charAt(0).toUpperCase() || '?');
     return `<article class="transfer-boat-stat${statusClass}">
       <header class="transfer-boat-stat-heading">
@@ -1149,6 +1161,7 @@ function renderBoatStats() {
       </div>
       <div class="transfer-boat-stat-footer">
         ${needsSetupFollowUp ? `<span class="transfer-boat-stat-flag transfer-boat-stat-flag--setup">${escapeHtml(t('boatStatSetupFollowUp'))}</span>` : ''}
+        ${skipperNeedsFollowUp ? `<span class="transfer-boat-stat-flag transfer-boat-stat-flag--setup">${escapeHtml(t('boatStatSkipperFollowUp'))}</span>` : ''}
         ${needsFollowUp ? `<span class="transfer-boat-stat-flag">${escapeHtml(t('boatStatFollowUp'))}</span>` : ''}
         ${reminderUrl ? `<a class="button button-whatsapp transfer-boat-stat-action" href="${escapeHtml(reminderUrl)}" target="_blank" rel="noopener noreferrer"><span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${escapeHtml(t('boatReminderAction'))}</a>` : ''}
       </div>

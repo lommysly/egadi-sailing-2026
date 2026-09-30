@@ -7230,6 +7230,41 @@ document.querySelector('#cancelBoatEdit').addEventListener('click', () => {
   }
 });
 
+// Chi registra una barca fa già parte della flottiglia: il regolamento
+// standard (lo stesso testo già proposto come bozza nel form) va attivo da
+// subito, non lasciato a un clic che lo skipper potrebbe non fare mai (caso
+// reale Michele Pasini/Carpe Diem: barca solo registrata, equipaggio mai
+// sbloccato perché senza regole attive nessuno può accettarle né completare
+// la propria scheda). Scrittura separata dal batch di saveBoatAndPublicFleet
+// perché isSkipper(boatId) legge lo stato prima di questo batch: la barca
+// deve già esistere per superare la regola. Lo skipper resta libero di
+// modificarlo dopo (richiesta di Silvio, 30/09/2026 — solo il testo, non gli
+// orari: quelli restano una scelta libera dello skipper).
+async function activateDefaultBoardBriefing(boatId) {
+  try {
+    await setDoc(doc(db, 'boats', boatId, 'briefing', 'board'), {
+      rulesTitle: 'Regolamento di bordo · Egadi 2026',
+      rulesSummary: DEFAULT_RULES_SUMMARY,
+      rulesText: DEFAULT_FULL_RULES,
+      rulesTitleEn: '',
+      rulesSummaryEn: '',
+      rulesTextEn: '',
+      fullRulesRequired: true,
+      rulesVersion: 1,
+      meetingPoint: '',
+      boardingAt: '',
+      departureAt: '',
+      returnAt: '',
+      scheduleNote: '',
+      scheduleNoteEn: '',
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser.uid,
+    });
+  } catch (error) {
+    console.error('Egadi regolamento standard:', error);
+  }
+}
+
 const boatForm = document.querySelector('#boatForm');
 boatForm.querySelectorAll('[data-berth-layout-input]').forEach((input) => {
   input.addEventListener('input', () => {
@@ -7304,10 +7339,11 @@ boatForm.addEventListener('submit', async (event) => {
       setMessage(document.querySelector('#boatPanelMessage'), 'Dati della barca aggiornati e partecipazione alla flotta pubblicata.');
     } else {
       activeBoat = await saveBoatAndPublicFleet(user.uid, {}, boatData, true);
+      await activateDefaultBoardBriefing(activeBoat.id);
       creatingBoat = false;
       subscribeToBoat(activeBoat);
       resetBoatForm(user);
-      setMessage(document.querySelector('#boatPanelMessage'), 'Barca registrata e partecipazione alla flotta pubblicata.');
+      setMessage(document.querySelector('#boatPanelMessage'), 'Barca registrata, regolamento di bordo standard attivato e partecipazione alla flotta pubblicata.');
     }
   } catch (error) {
     setMessage(document.querySelector('#boatFormMessage'), getFirestoreErrorMessage(error, 'Non riesco a registrare la barca. Riprova tra poco.'), true);

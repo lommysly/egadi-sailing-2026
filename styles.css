@@ -959,6 +959,7 @@ body.menu-open { overflow:hidden; }
 .transfer-boat-stat-legs { display:grid; gap:4px; margin-bottom:auto; }
 .transfer-boat-stat-legs span { display:block; color:rgba(17,45,56,.68); font-size:.84rem; }
 .transfer-boat-stat-skipper-line { padding-bottom:4px; margin-bottom:2px; border-bottom:1px dashed rgba(17,45,56,.18); font-style:italic; }
+.transfer-boat-stat-skipper-line--pending { color:#9a3412; font-weight:700; }
 .transfer-boat-stat-footer { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:14px; }
 .transfer-boat-stat-action { margin-left:auto; }
 .transfer-boat-stat--pending { border-left-color:#c2410c; border-color:rgba(194,65,12,.35); background:#fdece3; }
