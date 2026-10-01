@@ -174,3 +174,48 @@
 @media (prefers-reduced-motion:reduce) {
   .passage-day-visual img { transition:none; }
 }
+
+/* Pagina intera in versione scura, non solo l'hero dell'itinerario: la bozza
+   artifact piaceva di più così (Silvio, 1° ottobre). Stessa struttura e
+   stessi dati, solo superfici/testo invertiti; gli accenti verde/ambra/blu
+   delle pillole meteo restano gli stessi per non perdere il significato. */
+.passage-plan-main .passage-status div { background:#0b3744; }
+.passage-plan-main .passage-introduction,
+.passage-plan-main .passage-day-card,
+.passage-plan-main .passage-climate-outlook { background:#0b3744; }
+.passage-plan-main .passage-updated,
+.passage-plan-main .passage-validity,
+.passage-plan-main .passage-source { color:rgba(234,248,246,.68); }
+.passage-plan-main .passage-sources-list li { background:rgba(255,255,255,.05); border-color:rgba(234,248,246,.16); }
+.passage-plan-main .passage-source-icon { background:rgba(255,255,255,.08); color:#7fe9de; }
+.passage-plan-main .passage-sources-list small { color:rgba(234,248,246,.58); }
+.passage-plan-main .passage-day-heading { border-color:rgba(234,248,246,.16); }
+.passage-plan-main .passage-overnight { background:rgba(69,217,203,.1); }
+.passage-plan-main .passage-overnight-meta { color:#7fe9de; }
+.passage-plan-main .passage-alternative { background:rgba(255,255,255,.05); }
+.passage-plan-main .passage-decision { background:rgba(231,179,95,.12); border-color:#e7b35f; }
+.passage-plan-main .passage-decision strong { color:#e7b35f; }
+.passage-plan-main .passage-weather-details > summary { color:#9fd4d1; }
+.passage-plan-main .passage-stop-note { background:rgba(69,217,203,.1); }
+.passage-plan-main .passage-stop-section { background:rgba(255,255,255,.04); }
+.passage-plan-main .passage-stop-card { background:rgba(255,255,255,.06); border-color:rgba(234,248,246,.14); }
+.passage-plan-main .passage-stop-check { color:#9fd4d1; border-top-color:rgba(234,248,246,.14); }
+.passage-plan-main .passage-stop-check summary { color:#9fd4d1; }
+.passage-plan-main .passage-stop-check summary::marker { color:#7fe9de; }
+.passage-plan-main .passage-stop-check[open] summary { color:#7fe9de; }
+.passage-plan-main .passage-stop-check p { color:#9fd4d1; }
+.passage-plan-main .passage-stop-moment { color:#7fe9de; }
+.passage-plan-main .passage-data-grid div { border-color:rgba(234,248,246,.16); }
+.passage-plan-main .passage-data-grid dt { color:#9fd4d1; }
+.passage-plan-main .passage-weather-pending { background:rgba(255,255,255,.05); color:#cdeeea; }
+.passage-plan-main .passage-weather-pending strong { color:#7fe9de; }
+.passage-plan-main .passage-climate-item { background:rgba(255,255,255,.05); border-color:rgba(234,248,246,.16); }
+.passage-plan-main .passage-climate-icon { background:rgba(255,255,255,.08); color:#7fe9de; }
+.passage-plan-main .passage-climate-item dt { color:#9fd4d1; }
+.passage-plan-main .passage-climate-item dt b { color:#eaf8f6; }
+.passage-plan-main .passage-climate-item dd { color:#9fd4d1; }
+.passage-plan-main .passage-safety { background:#0b3744; color:#eaf8f6; }
+.passage-plan-main .passage-navigation { background:rgba(69,217,203,.1); color:#cdeeea; }
+.passage-plan-main .passage-navigation strong { color:#7fe9de; }
+.passage-plan-main .eyebrow { color:#7fe9de; }
+.passage-plan-main .passage-stop-heading { color:#7fe9de; }

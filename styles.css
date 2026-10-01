@@ -766,7 +766,7 @@ body.menu-open { overflow:hidden; }
 .briefing-translation-editor[open] summary { margin-bottom:14px; }
 .briefing-translation-editor .panel-lead { max-width:760px; }
 .crew-area-list { display:grid; gap:10px; margin-top:24px; }
-.passage-plan-main { padding-bottom:90px; }
+.passage-plan-main { padding-bottom:90px; background:#052530; color:#eaf8f6; }
 .passage-status { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
 .passage-status div { padding:18px; border-radius:14px; background:var(--ink); color:white; }
 .passage-status span { display:block; margin-bottom:7px; color:#9fc8c5; font:.64rem "DM Mono",monospace; letter-spacing:.08em; text-transform:uppercase; }
