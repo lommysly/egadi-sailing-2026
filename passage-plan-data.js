@@ -3,22 +3,23 @@
  * briefing: nessun dato personale o informazione di Crew List va inserito qui.
  */
 window.PASSAGE_PLAN_DATA = {
-  updatedAt: "20 settembre 2026 · piano di rotta aggiornato",
-  phase: "Conto alla rovescia in aggiornamento",
-  confidence: "Rotta definita · astronomia verificata · meteo: prima tendenza dal 28 settembre",
-  status: "Pianificazione aggiornata · meteo in attesa della finestra utile",
-  publishedAt: "20 settembre 2026 · aggiornamento di pianificazione",
-  validFrom: "Valido come piano di navigazione e preparazione dell’equipaggio fino al prossimo aggiornamento meteo",
+  updatedAt: "1 ottobre 2026 · prima tendenza operativa vento/mare",
+  phase: "Tendenza operativa · 7 giorni alla partenza",
+  confidence: "Rotta definita · astronomia verificata · meteo: prima tendenza multi-modello, affidabilità media (i modelli divergono ancora su vento e pioggia)",
+  status: "Dati vento/mare pubblicati giorno per giorno · i modelli professionali non sono ancora allineati, nuovo controllo entro il 5-6 ottobre",
+  publishedAt: "1 ottobre 2026 · aggiornamento meteo operativo preliminare",
+  validFrom: "Valido come tendenza operativa preliminare fino al prossimo aggiornamento meteo, atteso il 5-6 ottobre quando i bollettini ufficiali ed i servizi nautici copriranno davvero l’8 ottobre",
   validUntil: "Non è un bollettino di bordo: non conferma vento, onda, porto, boe o rada.",
-  nextUpdateAt: "28 settembre · prima tendenza a 10 giorni",
-  dataMode: "planning",
-  weatherNoticeTitle: "Per vento e onda aspettiamo la finestra utile.",
-  weatherNoticeText: "Siamo ancora fuori dalla finestra utile: una previsione puntuale sarebbe poco seria. Il 28 settembre arriverà una prima tendenza; dal 3 ottobre pubblicheremo i dati per giornata, poi le conferme quotidiane dello skipper.",
-  summary: "La rotta desiderata resta Marsala → Levanzo → Marettimo → Favignana → Marsala. In questa fase il lavoro utile è fissare ripari, margini e alternative; il meteo vero entrerà nel piano soltanto quando potrà aiutare davvero a decidere.",
-  sourceNote: "Controllo del 20 settembre: l’Area Marina Protetta richiede di verificare zonazione, autorizzazioni e campi boe prima della sosta. Le calette qui raccontano possibilità di giornata, non posti assegnati né promesse di rada. Ogni scelta serale resta allo skipper della singola barca, dopo aver letto il mare reale.",
+  nextUpdateAt: "5-6 ottobre · quando meteoam, Windy e PredictWind copriranno l’8 ottobre con dati affidabili",
+  dataMode: "operational",
+  weatherNoticeTitle: "Prima tendenza operativa pubblicata, i modelli non sono ancora allineati.",
+  weatherNoticeText: "Il 1° ottobre abbiamo confrontato più modelli professionali (ECMWF, GFS, ICON, meteoblue AI su Windy): concordano su un giovedì 8 probabilmente asciutto, ma divergono su intensità del vento e su quando arriverà la pioggia. Nuovo controllo con fonti ufficiali il 5-6 ottobre.",
+  summary: "La rotta desiderata resta Marsala → Levanzo → Marettimo → Favignana → Marsala. Il 1° ottobre abbiamo confrontato più modelli professionali (ECMWF, GFS, ICON, meteoblue AI) per i 4 giorni: concordano su un giovedì 8 probabilmente senza pioggia, con vento tra leggero e moderato secondo il modello e mare poco mosso. Sulla pioggia i modelli non sono ancora allineati: al momento il segnale più concreto si sposta su venerdì 9, non più su giovedì. Non è ancora il momento di fissare la decisione finale: lo skipper la prenderà con i bollettini ufficiali, 2-4 giorni prima della partenza.",
+  sourceNote: "Controllo del 20 settembre: l’Area Marina Protetta richiede di verificare zonazione, autorizzazioni e campi boe prima della sosta. Le calette qui raccontano possibilità di giornata, non posti assegnati né promesse di rada. Ogni scelta serale resta allo skipper della singola barca, dopo aver letto il mare reale. Controllo meteo del 1° ottobre: i servizi nautici Windy e PredictWind sono fortemente dinamici (JavaScript) e non sempre leggibili da uno strumento automatico; i numeri qui pubblicati vengono dalla consultazione diretta di Windy (confronto multi-modello ECMWF/GFS/ICON/meteoblue AI). PredictWind, Windguru e i bollettini ufficiali (Meteomar, Protezione Civile) non coprivano ancora l’8-11 ottobre con dati puntuali al momento del controllo.",
   sources: [
     { label: "Fonte astronomica", url: "https://aa.usno.navy.mil/data/api", scope: "alba, tramonto e luna · fuso Europe/Rome", checkedAt: "calcolo del piano: 11 settembre 2026" },
-    { label: "Meteo Aeronautica Militare · Sicilia", url: "https://www.meteoam.it/it/sicilia", scope: "previsioni e mare nella finestra utile", checkedAt: "20 settembre 2026" },
+    { label: "Windy · confronto multi-modello (ECMWF, GFS, ICON, meteoblue AI)", url: "https://www.windy.com/multimodel/37.798/12.431?37.495,12.431,9", scope: "vento, pioggia, nuvolosità e stato del mare punto per punto, con confronto diretto fra modelli", checkedAt: "1 ottobre 2026, circa le 11:00" },
+    { label: "Meteo Aeronautica Militare · Sicilia", url: "https://www.meteoam.it/it/sicilia", scope: "previsioni e mare nella finestra utile (non copriva ancora l’8-11 ottobre al controllo del 1° ottobre)", checkedAt: "1 ottobre 2026" },
     { label: "AMP Egadi · moduli e autorizzazioni", url: "https://www.ampisoleegadi.it/index.php/moduli-e-istanze/", scope: "permessi, ancoraggio e ormeggio", checkedAt: "20 settembre 2026" },
     { label: "AMP Egadi · campi boe", url: "https://redirect.ampisoleegadi.it/1497.html", scope: "aree e disponibilità da verificare", checkedAt: "20 settembre 2026" },
     { label: "Medie climatiche · Isole Egadi", url: "https://www.climieviaggi.it/clima/italia/isole-egadi", scope: "temperature, mare, pioggia e sole medi di ottobre (dato storico, non una previsione)", checkedAt: "22 settembre 2026" }
@@ -27,7 +28,7 @@ window.PASSAGE_PLAN_DATA = {
   // solo a farsi un'idea mentre si aspetta la prima tendenza reale del 28/9.
   climateOutlook: {
     title: "Cosa aspettarsi di solito a inizio ottobre",
-    disclaimer: "Media storica delle Egadi, non una previsione per questo viaggio: può cambiare. La prima tendenza reale arriva il 28 settembre.",
+    disclaimer: "Media storica delle Egadi, non una previsione per questo viaggio: può cambiare. La tendenza operativa reale, giorno per giorno, è qui sotto.",
     items: [
       { icon: "air", label: "Aria", value: "16–24°C", detail: "mite di giorno, si rinfresca la sera" },
       { icon: "water", label: "Mare", value: "circa 22°C", detail: "acqua ancora calda, bagno normalmente comodo" },
@@ -70,12 +71,12 @@ window.PASSAGE_PLAN_DATA = {
           check: "La notte non è garantita: ogni barca segue la decisione del proprio skipper, non la lista delle calette."
         }
       ],
-      wind: "Finché non entra la finestra utile non pubblichiamo una direzione o un’intensità: sarebbe una falsa precisione.",
-      sea: "Onda e periodo saranno indicati solo nel briefing operativo, con fonte e ora di emissione.",
-      air: "Temperatura, nuvolosità e percezione del vento arriveranno con la previsione per giornata.",
-      water: "La temperatura dell’acqua sarà aggiornata vicino alla partenza con una fonte marina e l’osservazione a bordo.",
-      currents: "Nessun valore affidabile da anticipare ora: verifica nel briefing operativo e a bordo.",
-      decision: "Lo skipper conferma rotta, orario e notte dopo aver verificato condizioni reali e avvisi locali.",
+      wind: "I modelli professionali non sono ancora allineati sull’intensità: meteoblue AI indica vento leggero (2-5 nodi, raffiche fino a 11), ECMWF indica invece brezza moderata per l’intera giornata (13-17 nodi). Direzione prevalentemente da terra (quadrante N-NO) in entrambi, ma la lettura va confermata più vicino alla data.",
+      sea: "Da poco mosso a localmente mosso: l’onda combinata varia da 0,3 m (GFS) a 0,6-1,0 m (ECMWF) nell’arco della giornata, periodo breve (circa 5 secondi, onda di vento locale, non swell lungo).",
+      air: "Tra 17°C (notte) e 26°C (primo pomeriggio) secondo i modelli; cielo prevalentemente sereno o poco nuvoloso in giornata.",
+      water: "Non rilevata in questa sessione dai modelli consultati (non espongono la temperatura del mare nella vista oraria): stima storica di inizio ottobre circa 22°C (vedi clima tipico sopra), da confermare con una fonte marina vicino alla partenza.",
+      currents: "Nessuna fonte con dati di corrente puntuali per quest’area a questa distanza: verifica nel briefing operativo e a bordo.",
+      decision: "Tutti i modelli professionali consultati concordano su un giovedì probabilmente asciutto: il segnale di pioggia visto inizialmente su alcuni servizi sembra, al momento, spostarsi più su venerdì 9 che su giovedì 8 — ma siamo ancora a 7 giorni dalla partenza ed è presto per escluderlo con certezza. Lo skipper confermerà se partire giovedì o restare a Marsala (cena a terra) e partire venerdì mattina, con il bollettino ufficiale 2-4 giorni prima.",
       sun: "Alba 07:12 · tramonto 18:43 · crepuscolo civile fino alle 19:09.",
       moon: "Falce calante · levata 04:45 · tramonto 17:29."
     },
@@ -102,12 +103,12 @@ window.PASSAGE_PLAN_DATA = {
           check: "Posto barca, canale di contatto e orario di arrivo vengono confermati dallo skipper con la struttura portuale."
         }
       ],
-      wind: "La prima tendenza sarà pubblicata il 28 settembre; prima non indicheremo nodi o direzioni come fossero affidabili.",
-      sea: "Il briefing utile separerà onda, periodo e direzione di provenienza quando la fonte li renderà disponibili.",
-      air: "Temperatura, visibilità e eventuali fenomeni saranno aggiornati vicino alla data.",
-      water: "Dato marino da aggiornare nella settimana della partenza.",
-      currents: "Da controllare nella finestra operativa: non vengono stimati oggi.",
-      decision: "La partenza per Marettimo avviene solo con una finestra che lasci margine a tutte le barche.",
+      wind: "Ancora brezza moderata secondo ECMWF (17-19 nodi al mattino presto, poi in attenuazione), più leggera secondo meteoblue AI (fino a 7 nodi); GFS indica invece vento in aumento nel pomeriggio (7-15 nodi), in coincidenza con il possibile arrivo della pioggia.",
+      sea: "Poco mosso: onda combinata intorno a 1,0-1,1 m secondo ECMWF, periodo breve; dato più calmo nelle prime ore secondo GFS.",
+      air: "Tra 17°C e 26°C secondo i modelli. GFS è l’unico a indicare pioggia in aumento durante la giornata (da circa 0,6 mm al mattino presto fino a circa 11 mm nel primo pomeriggio): meteoblue AI ed ECMWF non la mostrano. È il giorno in cui i modelli divergono di più: da riverificare a ridosso della data.",
+      water: "Dato marino non rilevato in questa sessione: stima storica circa 22°C, da aggiornare nella settimana della partenza con una fonte marina.",
+      currents: "Da controllare nella finestra operativa: nessuna fonte con dati puntuali a questa distanza.",
+      decision: "Se giovedì si decidesse di restare a Marsala per il maltempo, venerdì mattina diventerebbe la partenza: proprio venerdì, però, è il giorno in cui un modello (GFS) indica più probabilità di pioggia e vento in aumento nel pomeriggio. Anche in questo scenario la partenza andrà quindi valutata con calma al mattino, non data per scontata, e la traversata verso Marettimo avviene solo con una finestra che lasci margine a tutte le barche.",
       sun: "Alba 07:13 · tramonto 18:42 · crepuscolo civile fino alle 19:08.",
       moon: "Falce calante · levata 05:52 · tramonto 17:54."
     },
@@ -134,9 +135,9 @@ window.PASSAGE_PLAN_DATA = {
           check: "Orario e approccio dipendono dalla traversata reale, dagli avvisi e dalla conferma del posto barca."
         }
       ],
-      wind: "Nessun valore puntuale oggi: la tendenza viene controllata dal 28 settembre.",
-      sea: "Onda e swell saranno letti con dettaglio solo quando la previsione entra nella finestra utile.",
-      air: "Temperatura e copertura del cielo verranno aggiornate nel briefing per giornata.",
+      wind: "A 9 giorni di anticipo il dato non è ancora affidabile: i modelli mostrano un lieve aumento rispetto ai due giorni precedenti, ma il valore puntuale va preso con cautela fino al prossimo controllo (5-6 ottobre).",
+      sea: "Onda in leggero aumento secondo il modello ECMWF-mare (fino a circa 1,3-1,4 m), ma a questa distanza l’affidabilità resta bassa: dettaglio e swell saranno letti meglio quando la previsione entra nella finestra operativa.",
+      air: "Temperatura e copertura del cielo verranno confermate nel prossimo aggiornamento, quando il dato sarà più affidabile.",
       water: "Dato marino da verificare vicino alla partenza.",
       currents: "Da verificare nel briefing operativo e durante la navigazione.",
       decision: "L’ordine tra visita e trasferimento resta flessibile: si sceglie il momento che lascia più margine.",
@@ -166,8 +167,8 @@ window.PASSAGE_PLAN_DATA = {
           check: "La partenza è intorno alle 15:30, salvo anticipo deciso dallo skipper per rientrare con tranquillità."
         }
       ],
-      wind: "Il valore utile verrà pubblicato soltanto nell’ultima settimana.",
-      sea: "Mare e onda saranno riletti prima della sosta e prima del rientro.",
+      wind: "A 10 giorni di anticipo nessun modello consultato dà un valore puntuale solido: il dato utile arriverà con il prossimo controllo (5-6 ottobre) e poi nel briefing operativo.",
+      sea: "Mare e onda saranno riletti prima della sosta e prima del rientro, quando il dato sarà più affidabile.",
       air: "Temperatura, visibilità e fenomeni saranno aggiornati nel briefing operativo.",
       water: "Dato marino da verificare nella settimana della partenza.",
       currents: "Nessun valore affidabile anticipato: si controllano con le fonti operative e a bordo.",
