@@ -39,6 +39,7 @@
       moon: 'Luna',
       wind: 'Vento',
       sea: 'Mare / onda',
+      sky: 'Cielo',
       air: 'Aria',
       water: 'Acqua',
       currents: 'Correnti',
@@ -51,6 +52,7 @@
       indicativeOvernight: 'Piano notte indicativo:',
       alternative: 'Alternativa:',
       climateOutlookEyebrow: 'Clima tipico del periodo',
+      weatherDetailsToggle: 'Dettagli meteo e fonti',
     },
     en: {
       visualLabels: [
@@ -87,6 +89,7 @@
       moon: 'Moon',
       wind: 'Wind',
       sea: 'Sea state / waves',
+      sky: 'Sky',
       air: 'Air',
       water: 'Water',
       currents: 'Currents',
@@ -99,6 +102,7 @@
       indicativeOvernight: 'Indicative overnight plan:',
       alternative: 'Alternative:',
       climateOutlookEyebrow: 'Typical climate for the period',
+      weatherDetailsToggle: 'Weather details and sources',
     },
   };
   const copy = COPY[locale];
@@ -120,6 +124,35 @@
     wind: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M2.5 7h9a2 2 0 1 0-1.9-2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2.5 13h11a2 2 0 1 1-1.9 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2.5 10h14.5a1.8 1.8 0 1 0-1.7-2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
     rain: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5.5 9.5a3 3 0 0 1 .4-5.9 4 4 0 0 1 7.6.9 3 3 0 0 1-.5 6H6Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6.5 13v2.4M10 13v2.4M13.5 13v2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
     sun: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="3.3" stroke="currentColor" stroke-width="1.4"/><path d="M10 2.6v2M10 15.4v2M17.4 10h-2M4.6 10h-2M15.2 4.8l-1.4 1.4M6.2 13.8l-1.4 1.4M15.2 15.2l-1.4-1.4M6.2 6.2 4.8 4.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    wave: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M1.5 8.5c1.3-1.6 2.6-1.6 3.9 0s2.6 1.6 3.9 0 2.6-1.6 3.9 0 2.6 1.6 3.9 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M1.5 13c1.3-1.6 2.6-1.6 3.9 0s2.6 1.6 3.9 0 2.6-1.6 3.9 0 2.6 1.6 3.9 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  };
+
+  // Un colpo d'occhio prima del testo lungo: 4 icone riconoscibili (le stesse
+  // del clima tipico sopra, più l'onda) invece di dover leggere i paragrafi
+  // per capire se una giornata è "facile" o "da monitorare" (richiesta di
+  // Silvio, 1/10/2026: "giorno per giorno... facile da leggere" — passo
+  // intermedio prima del redesign figurativo definitivo della settimana
+  // prossima).
+  const renderDayGlance = (glance) => {
+    if (!glance) return '';
+    const items = [
+      glance.wind ? { icon: 'wind', label: copy.wind, value: glance.wind } : null,
+      glance.sea ? { icon: 'wave', label: copy.sea, value: glance.sea } : null,
+      glance.sky ? { icon: glance.skyIcon || 'sun', label: copy.sky, value: glance.sky } : null,
+      glance.air ? { icon: 'air', label: copy.air, value: glance.air } : null,
+    ].filter(Boolean);
+    if (!items.length) return '';
+    return `
+      <div class="passage-day-glance">
+        ${items.map((item) => `
+          <div class="passage-day-glance-item">
+            <span class="passage-day-glance-icon" aria-hidden="true">${CLIMATE_ICONS[item.icon] || ''}</span>
+            <span class="passage-day-glance-label">${escapeHtml(item.label)}</span>
+            <strong>${escapeHtml(item.value)}</strong>
+          </div>
+        `).join("")}
+      </div>
+    `;
   };
 
   // Sono immagini di scenario, non indicazioni nautiche né conferme di sosta.
@@ -289,16 +322,19 @@
       <div><dt>${escapeHtml(copy.moon)}</dt><dd>${escapeHtml(day.moon)}</dd></div>
     </dl>
   ` : `
-    <dl class="passage-data-grid">
-      <div><dt>${escapeHtml(copy.wind)}</dt><dd>${escapeHtml(day.wind)}</dd></div>
-      <div><dt>${escapeHtml(copy.sea)}</dt><dd>${escapeHtml(day.sea)}</dd></div>
-      <div><dt>${escapeHtml(copy.air)}</dt><dd>${escapeHtml(day.air)}</dd></div>
-      <div><dt>${escapeHtml(copy.water)}</dt><dd>${escapeHtml(day.water)}</dd></div>
-      <div><dt>${escapeHtml(copy.currents)}</dt><dd>${escapeHtml(day.currents)}</dd></div>
-      <div><dt>${escapeHtml(copy.skipperDecision)}</dt><dd>${escapeHtml(day.decision)}</dd></div>
-      <div><dt>${escapeHtml(copy.sun)}</dt><dd>${escapeHtml(day.sun)}</dd></div>
-      <div><dt>${escapeHtml(copy.moon)}</dt><dd>${escapeHtml(day.moon)}</dd></div>
-    </dl>
+    ${day.decision ? `<p class="passage-decision"><strong>${escapeHtml(copy.skipperDecision)}</strong> ${escapeHtml(day.decision)}</p>` : ''}
+    <details class="passage-weather-details">
+      <summary>${escapeHtml(copy.weatherDetailsToggle)}</summary>
+      <dl class="passage-data-grid">
+        <div><dt>${escapeHtml(copy.wind)}</dt><dd>${escapeHtml(day.wind)}</dd></div>
+        <div><dt>${escapeHtml(copy.sea)}</dt><dd>${escapeHtml(day.sea)}</dd></div>
+        <div><dt>${escapeHtml(copy.air)}</dt><dd>${escapeHtml(day.air)}</dd></div>
+        <div><dt>${escapeHtml(copy.water)}</dt><dd>${escapeHtml(day.water)}</dd></div>
+        <div><dt>${escapeHtml(copy.currents)}</dt><dd>${escapeHtml(day.currents)}</dd></div>
+        <div><dt>${escapeHtml(copy.sun)}</dt><dd>${escapeHtml(day.sun)}</dd></div>
+        <div><dt>${escapeHtml(copy.moon)}</dt><dd>${escapeHtml(day.moon)}</dd></div>
+      </dl>
+    </details>
   `;
 
   $("#dailyPlan").innerHTML = (data.days || []).map((day, index) => {
@@ -329,6 +365,7 @@
               <p class="eyebrow">${escapeHtml(day.date)}</p>
               <h2>${escapeHtml(day.route)}</h2>
             </div>
+            ${renderDayGlance(day.glance)}
             <p class="passage-day-plan">${escapeHtml(day.plan)}</p>
             ${day.navigation ? `<p class="passage-navigation"><strong>${escapeHtml(copy.navigation)}</strong>${escapeHtml(day.navigation)}</p>` : ''}
             <p class="passage-overnight"><span class="passage-overnight-meta">${escapeHtml(day.overnightType || copy.overnightUndefined)} · ${escapeHtml(day.overnightStatus || copy.overnightStatus)}</span><strong>${escapeHtml(copy.indicativeOvernight)}</strong> ${escapeHtml(day.overnight)}</p>
