@@ -131,6 +131,17 @@
   color:white;
 }
 
+/* Pillole meteo "a semaforo" (Beaufort/Douglas) nella didascalia della foto:
+   verde/ambra leggibili a colpo d'occhio, grigio quando il dato non è ancora
+   affidabile (richiesta di Silvio, 1° ottobre: niente numeri nudi, niente
+   colore "tranquillo" per un dato che non conosciamo ancora). */
+.passage-day-pills { display:flex; flex-wrap:wrap; gap:7px; margin:0 0 10px; }
+.passage-day-pill { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:999px; background:rgba(255,255,255,.16); backdrop-filter:blur(6px); font:600 .74rem "DM Sans",sans-serif; color:#fff; }
+.passage-day-pill svg { width:13px; height:13px; flex:none; }
+.passage-day-pill.tone-good { background:#2f8a52; }
+.passage-day-pill.tone-caution { background:#b9822c; }
+.passage-day-pill.tone-calm { background:#2f72ad; }
+.passage-day-pill.tone-muted { background:rgba(255,255,255,.14); }
 .passage-day-visual figcaption span { display:block; margin-bottom:6px; font:500 .67rem "DM Mono",monospace; letter-spacing:.06em; text-transform:uppercase; }
 .passage-day-visual figcaption small { display:block; color:rgba(255,255,255,.78); font-size:.68rem; line-height:1.4; }
 .passage-day-visual figcaption a { color:#befff4; text-underline-offset:2px; }

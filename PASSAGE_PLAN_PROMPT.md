@@ -37,37 +37,42 @@ REGOLE DI AFFIDABILITÀ
 1. Non inventare dati, orari, allerta, correnti o disponibilità di boe/porti. Se un dato non è disponibile, scrivi “non disponibile” e indica come verificarlo.
 2. A T−30 produci solo scenario climatico e pianificazione: non usare numeri come se fossero una previsione.
 3. Indica sempre la data/ora di emissione, la validità, il prossimo aggiornamento, le fonti consultate e una confidenza: bassa, media o alta. Se le fonti divergono, dichiaralo.
-4. Per il vento specifica sempre “da” (direzione di provenienza), gradi veri se disponibili, intensità media e raffiche in nodi.
-5. Per il mare separa mare del vento e swell quando la fonte lo permette: direzione di provenienza, altezza significativa e periodo. Non ridurre tutto a “mare mosso”.
-6. Per le correnti indica direzione e velocità solo con una fonte affidabile; altrimenti annota che la verifica è a bordo.
-7. Indica temperatura aria, temperatura acqua, nuvolosità, precipitazioni, visibilità e fenomeni che cambiano comfort/sicurezza.
-8. Per ogni data calcola per la località/area della tappa: alba e tramonto del sole, fase della luna, levata e tramonto della luna. Usa fuso Europe/Rome e scrivi la fonte astronomica.
-9. Non dare istruzioni nautiche definitive e non sostituire bollettini ufficiali, avvisi ai naviganti, ordinanze o la decisione dello skipper.
-10. Distingui sempre una caletta bella da una rada idonea: una cala può essere indicata come scenario di tramonto, alba o sosta diurna, ma non come pernottamento garantito. Per ogni notte indica separatamente porto, campo boe autorizzato o rada da confermare dopo controllo di meteo, onda, fondale, zonazione AMP, ordinanze, autorizzazioni e disponibilità.
-11. Per ogni porto, campo boe o rada usa uno stato esplicito: `idea`, `da verificare` o `confermato dallo skipper`. Non usare mai “confermato” senza indicare ora della verifica di autorizzazione e disponibilità.
+4. **Verifica la copertura reale di ogni fonte prima di scrivere un numero.** Scoperto il 1° ottobre 2026 (controllo a T−7 per l'8 ottobre): Windy, PredictWind e Windguru sono spesso leggibili solo da browser reale (sono siti dinamici), e anche così la loro finestra di dettaglio numerico affidabile può fermarsi a 5-7 giorni; i bollettini ufficiali (Meteomar, Protezione Civile) coprono tipicamente solo le prossime 24-72 ore. Non assumere che una fonte copra una data solo perché ne copre altre più vicine: controlla ogni singola data richiesta e dichiara esplicitamente, categoria per categoria (vento, mare, visibilità...), se il dato è realmente disponibile o solo una tendenza qualitativa.
+5. Per il vento specifica sempre: direzione di provenienza in gradi veri **e** punto cardinale (es. “300° / NO”), intensità media **e** raffiche in nodi, grado Beaufort corrispondente, e la tendenza prevista nelle 24-48 ore successive (in rinforzo, in calo, stabile). Se le fonti divergono sull'intensità, riporta il range e quali fonti dicono cosa.
+6. Per il mare indica sempre lo stato del mare con la scala Douglas (nome, es. “poco mosso”) oltre alla descrizione, l'altezza significativa dell'onda in metri e il periodo in secondi. Separa sempre mare del vento e swell quando la fonte lo permette (direzione di provenienza, altezza e periodo di ciascuno): non ridurre mai tutto a “mare mosso”.
+7. Per le correnti indica direzione e velocità solo con una fonte affidabile; altrimenti annota che la verifica è a bordo.
+8. Indica sempre: temperatura aria, temperatura acqua, visibilità, nuvolosità (con il tipo di nubi quando è rilevante per la sicurezza, es. cumulonembi), precipitazioni (intensità e probabilità in %), e qualunque fenomeno che cambi comfort o sicurezza.
+9. Segnala esplicitamente eventuali zone o momenti a rischio meteo lungo la rotta o nell'area (temporali, burrasche, venti forti, rotori, zone di convergenza): se non ce ne sono secondo le fonti consultate, scrivilo comunque (“nessun rischio segnalato dalle fonti consultate per questa finestra”) invece di ometterlo.
+10. Per ogni data calcola per la località/area della tappa: alba e tramonto del sole, fase della luna, levata e tramonto della luna. Usa fuso Europe/Rome e scrivi la fonte astronomica.
+11. Non dare istruzioni nautiche definitive e non sostituire bollettini ufficiali, avvisi ai naviganti, ordinanze o la decisione dello skipper.
+12. Distingui sempre una caletta bella da una rada idonea: una cala può essere indicata come scenario di tramonto, alba o sosta diurna, ma non come pernottamento garantito. Per ogni notte indica separatamente porto, campo boe autorizzato o rada da confermare dopo controllo di meteo, onda, fondale, zonazione AMP, ordinanze, autorizzazioni e disponibilità.
+13. Per ogni porto, campo boe o rada usa uno stato esplicito: `idea`, `da verificare` o `confermato dallo skipper`. Non usare mai “confermato” senza indicare ora della verifica di autorizzazione e disponibilità.
+14. Indica sempre eventuali rotte o soste alternative utili se le condizioni previste sconsigliano il piano desiderato (non solo “si valuterà”, ma l'alternativa concreta più sensata secondo le fonti).
 
 FORMATO OBBLIGATORIO
 Restituisci prima una sintesi per l'equipaggio, chiara e non allarmistica; poi quattro schede giornaliere, una per data. Per ogni scheda usa esattamente queste etichette:
 - Data e tratta
 - Piano indicativo
 - Notte prevista
-- Alternativa / ridosso
+- Alternativa / ridosso (incluse eventuali rotte alternative utili)
 - Scenari di luce e soste possibili
-- Vento
-- Mare / onda
-- Aria
+- Vento (direzione in ° e punto cardinale, nodi medi e raffiche, Beaufort, tendenza 24-48h)
+- Mare / onda (scala Douglas, altezza significativa e periodo, swell separato se disponibile)
+- Visibilità
+- Aria (temperatura, nuvolosità/tipo di nubi, precipitazioni con intensità e probabilità %)
 - Acqua
 - Correnti
+- Zone a rischio meteo (temporali, burrasche, venti forti, rotori, convergenze — o “nessuno segnalato”)
 - Sole
 - Luna
-- Decisione / attenzione skipper
+- Decisione / attenzione skipper (sintesi operativa con consigli pratici per uno skipper esperto)
 
 Chiudi con:
-- fonti, URL e orario di consultazione;
+- fonti meteo-marine, URL e orario di consultazione;
 - limiti del dato e variazioni fra modelli;
 - una nota di sicurezza: “La rotta e gli ancoraggi sono confermati dallo skipper in base alle condizioni reali, agli avvisi e alle ordinanze vigenti.”
 
-Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi: updatedAt, publishedAt, validFrom, validUntil, nextUpdateAt, dataMode (`planning`, `trend` o `operational`), phase, confidence, status, summary, sourceNote, stopsNote, mooringGuide e sources. `sources` è un array di oggetti con label, url, scope e checkedAt. Per ogni giorno mantieni: date, route, plan, overnight, overnightType, overnightStatus, alternative, stops, wind, sea, air, water, currents, decision, sun, moon. `stops` è un array di oggetti con moment, title, description e check.
+Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi: updatedAt, publishedAt, validFrom, validUntil, nextUpdateAt, dataMode (`planning`, `trend` o `operational`), phase, confidence, status, summary, sourceNote, stopsNote, mooringGuide e sources. `sources` è un array di oggetti con label, url, scope e checkedAt. Per ogni giorno mantieni: date, route, plan, overnight, overnightType, overnightStatus, alternative, stops, wind, sea, air, water, currents, decision, sun, moon, e `glance` (oggetto breve per la card: wind, windTone, sea, seaTone, sky, skyIcon, skyTone, air — tone è `good`/`caution`/`calm`/`muted`). `stops` è un array di oggetti con moment, title, description e check. Visibilità, tipo di nubi, probabilità di pioggia e zone a rischio meteo non hanno un campo JS dedicato oggi: includili dentro `wind`, `sea`, `air` o `decision` a seconda di dove sono più pertinenti (es. zone a rischio dentro `decision`, visibilità dentro `air`). Se col tempo risultano scomodi da leggere così, valutare l'aggiunta di campi dedicati nel modello dati.
 ```
 
 ## Fonti da confrontare nel briefing reale

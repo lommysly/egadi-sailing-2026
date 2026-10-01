@@ -782,6 +782,13 @@ body.menu-open { overflow:hidden; }
 .passage-sources-list a { font-weight:700; font-size:.86rem; overflow-wrap:anywhere; }
 .passage-sources-list small { color:rgba(17,45,56,.62); font-size:.74rem; line-height:1.4; overflow-wrap:anywhere; }
 @media (max-width:640px) { .passage-sources-list { grid-template-columns:1fr; } }
+/* Mappa illustrata dentro l'hero scuro già esistente (passage-visual.css):
+   non una carta nautica, solo per farsi un'idea del giro. Stile "vetro"
+   coerente con .passage-route-line (ricerca 1/10/2026 su itinerari
+   "giorno per giorno" figurativi). La lista numerata accanto resta la
+   versione accessibile delle stesse 5 tappe. */
+.passage-route-map { margin:22px 0 0; padding:16px; border-radius:14px; background:rgba(0,35,49,.26); border:1px solid rgba(200,255,249,.32); }
+.passage-route-map svg { width:100%; height:auto; display:block; max-width:480px; margin:0 auto; }
 .passage-day-list { display:grid; gap:18px; }
 .passage-day-card { padding:30px; border-radius:18px; background:var(--paper); }
 .passage-day-heading { display:flex; justify-content:space-between; gap:22px; align-items:start; border-bottom:1px solid var(--line); }
@@ -791,13 +798,6 @@ body.menu-open { overflow:hidden; }
 .passage-overnight { margin:18px 0; padding:15px; border-left:4px solid var(--sun); border-radius:0 10px 10px 0; background:#eaf8f6; line-height:1.55; }
 .passage-overnight-meta { display:block; margin-bottom:8px; color:var(--sun-deep); font:500 .64rem "DM Mono",monospace; letter-spacing:.07em; text-transform:uppercase; }
 .passage-alternative { padding:14px; border-radius:10px; background:#e8eee9; font-size:.9rem; }
-.passage-day-glance { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:20px 0; }
-.passage-day-glance-item { display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; padding:12px 8px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.72); }
-.passage-day-glance-icon { flex:none; width:30px; height:30px; display:grid; place-items:center; border-radius:50%; background:var(--sand); color:var(--sun-deep); }
-.passage-day-glance-icon svg { width:16px; height:16px; }
-.passage-day-glance-label { margin:0; color:#416b6d; font:.6rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; }
-.passage-day-glance-item strong { font:600 .85rem "Fraunces",serif; color:var(--ink); line-height:1.25; }
-@media (max-width:640px) { .passage-day-glance { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 .passage-decision { margin:14px 0 0; padding:15px; border-left:4px solid var(--sun-deep); border-radius:0 10px 10px 0; background:#fffaf0; font-size:.92rem; line-height:1.5; }
 .passage-decision strong { display:block; margin-bottom:6px; color:var(--sun-deep); font:500 .64rem "DM Mono",monospace; letter-spacing:.07em; text-transform:uppercase; }
 /* Il racconto di fonti e modelli diventa un dettaglio facoltativo, non testo

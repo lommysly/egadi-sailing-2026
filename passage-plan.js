@@ -127,29 +127,25 @@
     wave: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M1.5 8.5c1.3-1.6 2.6-1.6 3.9 0s2.6 1.6 3.9 0 2.6-1.6 3.9 0 2.6 1.6 3.9 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M1.5 13c1.3-1.6 2.6-1.6 3.9 0s2.6 1.6 3.9 0 2.6-1.6 3.9 0 2.6 1.6 3.9 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
   };
 
-  // Un colpo d'occhio prima del testo lungo: 4 icone riconoscibili (le stesse
-  // del clima tipico sopra, più l'onda) invece di dover leggere i paragrafi
-  // per capire se una giornata è "facile" o "da monitorare" (richiesta di
-  // Silvio, 1/10/2026: "giorno per giorno... facile da leggere" — passo
-  // intermedio prima del redesign figurativo definitivo della settimana
-  // prossima).
-  const renderDayGlance = (glance) => {
+  // Pillole "a semaforo" invece di numeri nudi: stessa logica della scala
+  // Beaufort/Douglas a colori pieni trovata nella ricerca del 1° ottobre
+  // (community Windy) — verde/ambra leggibili a colpo d'occhio, grigio
+  // quando il dato non è ancora affidabile (mai un colore "tranquillo" per
+  // qualcosa che in realtà non sappiamo ancora).
+  const renderDayPills = (glance) => {
     if (!glance) return '';
     const items = [
-      glance.wind ? { icon: 'wind', label: copy.wind, value: glance.wind } : null,
-      glance.sea ? { icon: 'wave', label: copy.sea, value: glance.sea } : null,
-      glance.sky ? { icon: glance.skyIcon || 'sun', label: copy.sky, value: glance.sky } : null,
-      glance.air ? { icon: 'air', label: copy.air, value: glance.air } : null,
+      glance.wind ? { icon: 'wind', tone: glance.windTone || 'muted', value: glance.wind } : null,
+      glance.sea ? { icon: 'wave', tone: glance.seaTone || 'muted', value: glance.sea } : null,
+      glance.sky ? { icon: glance.skyIcon || 'sun', tone: glance.skyTone || 'muted', value: glance.sky } : null,
     ].filter(Boolean);
     if (!items.length) return '';
     return `
-      <div class="passage-day-glance">
+      <div class="passage-day-pills">
         ${items.map((item) => `
-          <div class="passage-day-glance-item">
-            <span class="passage-day-glance-icon" aria-hidden="true">${CLIMATE_ICONS[item.icon] || ''}</span>
-            <span class="passage-day-glance-label">${escapeHtml(item.label)}</span>
-            <strong>${escapeHtml(item.value)}</strong>
-          </div>
+          <span class="passage-day-pill tone-${escapeHtml(item.tone)}">
+            <span aria-hidden="true">${CLIMATE_ICONS[item.icon] || ''}</span>${escapeHtml(item.value)}
+          </span>
         `).join("")}
       </div>
     `;
@@ -200,12 +196,18 @@
     },
   ];
 
-  const renderDayVisual = (visual) => {
+  // La foto reale della tappa, con il trattamento scuro già pronto in
+  // passage-visual.css (ritaglio per foto, sfumatura, hover) — qui aggiungo
+  // solo le pillole meteo nella didascalia, sopra l'etichetta di scenario
+  // già esistente (richiesta di Silvio, 1° ottobre: pubblicare subito con i
+  // dati di oggi, aggiornare di nuovo lunedì).
+  const renderDayVisual = (visual, day) => {
     if (!visual) return '';
     return `
       <figure class="passage-day-visual ${escapeHtml(visual.className)}">
         <img src="${visual.imageUrl}" alt="${escapeHtml(visual.alt)}" loading="lazy" decoding="async" />
         <figcaption>
+          ${renderDayPills(day.glance)}
           <span>${escapeHtml(visual.label)} · ${escapeHtml(copy.scenarioImage)}</span>
           <small>${escapeHtml(copy.photo)}: <a href="${visual.sourceUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(visual.author)}</a> · <a href="${visual.licenseUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(visual.license)}</a></small>
         </figcaption>
@@ -365,13 +367,12 @@
               <p class="eyebrow">${escapeHtml(day.date)}</p>
               <h2>${escapeHtml(day.route)}</h2>
             </div>
-            ${renderDayGlance(day.glance)}
             <p class="passage-day-plan">${escapeHtml(day.plan)}</p>
             ${day.navigation ? `<p class="passage-navigation"><strong>${escapeHtml(copy.navigation)}</strong>${escapeHtml(day.navigation)}</p>` : ''}
             <p class="passage-overnight"><span class="passage-overnight-meta">${escapeHtml(day.overnightType || copy.overnightUndefined)} · ${escapeHtml(day.overnightStatus || copy.overnightStatus)}</span><strong>${escapeHtml(copy.indicativeOvernight)}</strong> ${escapeHtml(day.overnight)}</p>
             <p class="passage-alternative"><strong>${escapeHtml(copy.alternative)}</strong> ${escapeHtml(day.alternative)}</p>
           </div>
-          ${renderDayVisual(DAY_VISUALS[index])}
+          ${renderDayVisual(DAY_VISUALS[index], day)}
         </div>
         ${stops}
         ${operationalData(day)}

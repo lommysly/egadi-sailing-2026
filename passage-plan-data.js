@@ -6,14 +6,14 @@ window.PASSAGE_PLAN_DATA = {
   updatedAt: "1 ottobre 2026 · prima tendenza operativa vento/mare",
   phase: "Tendenza operativa · 7 giorni alla partenza",
   confidence: "Rotta definita · astronomia verificata · meteo: prima tendenza multi-modello, affidabilità media (i modelli divergono ancora su vento e pioggia)",
-  status: "Dati vento/mare pubblicati giorno per giorno · i modelli professionali non sono ancora allineati, nuovo controllo entro il 5-6 ottobre",
+  status: "Dati vento/mare pubblicati giorno per giorno · i modelli professionali non sono ancora allineati, nuovo controllo entro il lunedì 5 ottobre",
   publishedAt: "1 ottobre 2026 · aggiornamento meteo operativo preliminare",
-  validFrom: "Valido come tendenza operativa preliminare fino al prossimo aggiornamento meteo, atteso il 5-6 ottobre quando i bollettini ufficiali ed i servizi nautici copriranno davvero l’8 ottobre",
+  validFrom: "Valido come tendenza operativa preliminare fino al prossimo aggiornamento meteo, atteso il lunedì 5 ottobre quando i bollettini ufficiali ed i servizi nautici copriranno davvero l’8 ottobre",
   validUntil: "Non è un bollettino di bordo: non conferma vento, onda, porto, boe o rada.",
-  nextUpdateAt: "5-6 ottobre · quando meteoam, Windy e PredictWind copriranno l’8 ottobre con dati affidabili",
+  nextUpdateAt: "lunedì 5 ottobre · quando meteoam, Windy e PredictWind copriranno l’8 ottobre con dati affidabili",
   dataMode: "operational",
   weatherNoticeTitle: "Prima tendenza operativa pubblicata, i modelli non sono ancora allineati.",
-  weatherNoticeText: "Il 1° ottobre abbiamo confrontato più modelli professionali (ECMWF, GFS, ICON, meteoblue AI su Windy): concordano su un giovedì 8 probabilmente asciutto, ma divergono su intensità del vento e su quando arriverà la pioggia. Nuovo controllo con fonti ufficiali il 5-6 ottobre.",
+  weatherNoticeText: "Il 1° ottobre abbiamo confrontato più modelli professionali (ECMWF, GFS, ICON, meteoblue AI su Windy): concordano su un giovedì 8 probabilmente asciutto, ma divergono su intensità del vento e su quando arriverà la pioggia. Nuovo controllo con fonti ufficiali il lunedì 5 ottobre.",
   summary: "La rotta desiderata resta Marsala → Levanzo → Marettimo → Favignana → Marsala. Giovedì 8 si annuncia probabilmente asciutto, ma restiamo prudenti: il rischio di pioggia potrebbe spostarsi su venerdì 9. La decisione finale — partire giovedì o venerdì mattina — arriva con il bollettino ufficiale, 2-4 giorni prima della partenza.",
   sourceNote: "Controllo del 20 settembre: l’Area Marina Protetta richiede di verificare zonazione, autorizzazioni e campi boe prima della sosta. Le calette qui raccontano possibilità di giornata, non posti assegnati né promesse di rada. Ogni scelta serale resta allo skipper della singola barca, dopo aver letto il mare reale. Il controllo meteo dell’1 ottobre viene dal confronto diretto di più modelli professionali su Windy (vedi le fonti qui sotto).",
   sources: [
@@ -51,7 +51,7 @@ window.PASSAGE_PLAN_DATA = {
     {
       date: "Giovedì 8 ottobre",
       route: "Marsala → Levanzo",
-      glance: { wind: "2-17 nodi (modelli discordi)", sea: "0,3-1,0 m", sky: "Probabilmente asciutto", skyIcon: "sun", air: "17-26°C" },
+      glance: { wind: "2-17 nodi (modelli discordi)", windTone: "caution", sea: "0,3-1,0 m", seaTone: "calm", sky: "Probabilmente asciutto", skyIcon: "sun", skyTone: "good", air: "17-26°C" },
       plan: "Ci si incontra a Marsala con la cambusa già pronta e si parte intorno alle 15:00. La prima uscita serve a prendere il ritmo della flotta, arrivare con luce e cercare un tramonto che non chieda fretta.",
       navigation: "Una navigazione di apertura, pensata per chiudere la giornata prima del buio. Levanzo è l’orizzonte della prima sera, non un punto da raggiungere a ogni costo.",
       overnight: "Prima scelta: una rada a Levanzo soltanto se, sul posto, è consentita e realmente calma. In caso contrario si cerca un riparo diverso deciso dallo skipper.",
@@ -84,7 +84,7 @@ window.PASSAGE_PLAN_DATA = {
     {
       date: "Venerdì 9 ottobre",
       route: "Levanzo → Marettimo",
-      glance: { wind: "7-19 nodi, in aumento", sea: "~1,0-1,1 m", sky: "Pioggia possibile (solo GFS)", skyIcon: "rain", air: "17-26°C" },
+      glance: { wind: "7-19 nodi, in aumento", windTone: "caution", sea: "~1,0-1,1 m", seaTone: "caution", sky: "Pioggia possibile (solo GFS)", skyIcon: "rain", skyTone: "caution", air: "17-26°C" },
       plan: "Il mattino resta aperto a un bagno o a una piccola esplorazione di Levanzo. Dopo pranzo la flotta punta Marettimo: la serata ha una base precisa, il porto e il borgo.",
       navigation: "È la tratta che chiede più margine. La sosta a Levanzo deve restare leggera: per Marettimo si parte quando il mare permette a tutte le barche una traversata comoda.",
       overnight: "Porto di Marettimo: piano della notte, con cena libera a terra o a bordo e ritrovo nel borgo.",
@@ -138,7 +138,7 @@ window.PASSAGE_PLAN_DATA = {
           check: "Orario e approccio dipendono dalla traversata reale, dagli avvisi e dalla conferma del posto barca."
         }
       ],
-      wind: "A 9 giorni di anticipo il dato non è ancora affidabile: i modelli mostrano un lieve aumento rispetto ai due giorni precedenti, ma il valore puntuale va preso con cautela fino al prossimo controllo (5-6 ottobre).",
+      wind: "A 9 giorni di anticipo il dato non è ancora affidabile: i modelli mostrano un lieve aumento rispetto ai due giorni precedenti, ma il valore puntuale va preso con cautela fino al prossimo controllo (lunedì 5 ottobre).",
       sea: "Onda in leggero aumento secondo il modello ECMWF-mare (fino a circa 1,3-1,4 m), ma a questa distanza l’affidabilità resta bassa: dettaglio e swell saranno letti meglio quando la previsione entra nella finestra operativa.",
       air: "Temperatura e copertura del cielo verranno confermate nel prossimo aggiornamento, quando il dato sarà più affidabile.",
       water: "Dato marino da verificare vicino alla partenza.",
@@ -171,7 +171,7 @@ window.PASSAGE_PLAN_DATA = {
           check: "La partenza è intorno alle 15:30, salvo anticipo deciso dallo skipper per rientrare con tranquillità."
         }
       ],
-      wind: "A 10 giorni di anticipo nessun modello consultato dà un valore puntuale solido: il dato utile arriverà con il prossimo controllo (5-6 ottobre) e poi nel briefing operativo.",
+      wind: "A 10 giorni di anticipo nessun modello consultato dà un valore puntuale solido: il dato utile arriverà con il prossimo controllo (lunedì 5 ottobre) e poi nel briefing operativo.",
       sea: "Mare e onda saranno riletti prima della sosta e prima del rientro, quando il dato sarà più affidabile.",
       air: "Temperatura, visibilità e fenomeni saranno aggiornati nel briefing operativo.",
       water: "Dato marino da verificare nella settimana della partenza.",
