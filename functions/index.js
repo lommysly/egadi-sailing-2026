@@ -627,18 +627,48 @@ function transferRequestState(leg) {
   return 'undecided';
 }
 
-// Riepilogo minimo per lo skipper: solo se una tratta manca, è in bozza o è
-// confermata, e se il transfer è stato richiesto. Mai volo, orario o
-// aeroporto, che restano privati alla persona (crewTravel/{inviteId}/legs è
-// owner-only nelle regole, lo skipper non può leggerlo). Collezione separata
-// da members perché la sua validazione lato client (hasValidMemberPayload)
-// whitelista già le sue chiavi: aggiungere questi campi lì avrebbe rotto
-// ogni salvataggio successivo della scheda.
-async function writeCrewTravelStatus(boatId, inviteId, direction, travelState, transferState) {
+// Riepilogo minimo per lo skipper: se una tratta manca, è in bozza o è
+// confermata, se il transfer è stato richiesto, e il solo momento che serve a
+// chi comanda la barca — quando la persona arriva in andata, quando riparte
+// al rientro — con il mezzo, perché "atterra alle 14:30" e "è a Marsala alle
+// 14:30" sono due cose diverse.
+//
+// Resta tutto il resto fuori: volo, vettore, aeroporti, bagagli, città. Le
+// tratte complete (crewTravel/{inviteId}/legs) restano owner-only nelle
+// regole e lo skipper non può leggerle: questi tre campi sono l'eccezione
+// motivata, non l'apertura della scatola (richiesta di Silvio, 2/10/2026:
+// "mi serve sapere gli orari di arrivo" per sapere quando si può salpare).
+// L'informativa nomina già lo skipper fra i destinatari di questa categoria
+// di dati — vedi PRIVACY_DA_COMPLETARE.md, riga "Arrivi, partenze e
+// transfer".
+//
+// Collezione separata da members perché la sua validazione lato client
+// (hasValidMemberPayload) whitelista già le sue chiavi: aggiungere questi
+// campi lì avrebbe rotto ogni salvataggio successivo della scheda.
+function crewScheduleFields(direction, leg) {
+  if (!leg) {
+    return {
+      [`${direction}Date`]: FieldValue.delete(),
+      [`${direction}Time`]: FieldValue.delete(),
+      [`${direction}Transport`]: FieldValue.delete(),
+    };
+  }
+  // In andata conta quando arriva, al rientro quando riparte da Marsala.
+  const date = direction === 'return' ? leg.departureDate : leg.arrivalDate;
+  const time = direction === 'return' ? leg.departureTime : leg.arrivalTime;
+  return {
+    [`${direction}Date`]: typeof date === 'string' && date ? date : FieldValue.delete(),
+    [`${direction}Time`]: typeof time === 'string' && time ? time : FieldValue.delete(),
+    [`${direction}Transport`]: typeof leg.transportMode === 'string' && leg.transportMode ? leg.transportMode : FieldValue.delete(),
+  };
+}
+
+async function writeCrewTravelStatus(boatId, inviteId, direction, travelState, transferState, leg = null) {
   await db.doc(`boats/${boatId}/crewTravelStatus/${inviteId}`).set({
     inviteId,
     [direction]: travelState,
     [`${direction}Transfer`]: transferState,
+    ...crewScheduleFields(direction, leg),
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
 }
@@ -751,7 +781,7 @@ exports.materializeCrewTravel = onDocumentWritten({
   }
 
   const leg = after.data();
-  await writeCrewTravelStatus(boatId, inviteId, direction, leg.state === 'ready' ? 'ready' : 'draft', transferRequestState(leg));
+  await writeCrewTravelStatus(boatId, inviteId, direction, leg.state === 'ready' ? 'ready' : 'draft', transferRequestState(leg), leg);
   const boatRef = db.doc(`boats/${boatId}`);
   const inviteRef = db.doc(`boats/${boatId}/invites/${inviteId}`);
   const memberRef = db.doc(`boats/${boatId}/members/${inviteId}`);

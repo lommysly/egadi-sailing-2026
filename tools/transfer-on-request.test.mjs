@@ -108,3 +108,39 @@ test('chiedere il transfer apre anche il passo dove sta il consenso', () => {
   const handler = travel.slice(travel.indexOf("form.querySelector('[data-transfer-request]')?.addEventListener"));
   assert.match(handler.slice(0, 600), /setTravelStep\(form\.closest\('details'\), 'connection'\)/);
 });
+
+// Gli orari di arrivo sono una domanda diversa dal transfer: servono a sapere
+// quando la barca può salpare. Restano separati nella card e, soprattutto,
+// restano minimi: lo skipper non deve poter leggere il resto del viaggio.
+test('allo skipper arrivano data, ora e mezzo — e nient’altro del viaggio', () => {
+  const functions = read('functions/index.js');
+  const fields = functions.slice(functions.indexOf('function crewScheduleFields'), functions.indexOf('async function writeCrewTravelStatus'));
+  assert.match(fields, /\$\{direction\}Date/);
+  assert.match(fields, /\$\{direction\}Time/);
+  assert.match(fields, /\$\{direction\}Transport/);
+  ['carrier', 'serviceNumber', 'originAirport', 'destinationAirport', 'luggageCount', 'originCity', 'destinationCity'].forEach((campo) => {
+    assert.doesNotMatch(fields, new RegExp(`leg\\.${campo}`), `lo skipper non deve vedere ${campo}`);
+  });
+});
+
+test('in andata conta quando arriva, al rientro quando riparte', () => {
+  const functions = read('functions/index.js');
+  const fields = functions.slice(functions.indexOf('function crewScheduleFields'), functions.indexOf('async function writeCrewTravelStatus'));
+  assert.match(fields, /direction === 'return' \? leg\.departureDate : leg\.arrivalDate/);
+  assert.match(fields, /direction === 'return' \? leg\.departureTime : leg\.arrivalTime/);
+});
+
+test('la riga orari è separata dai badge del transfer e non è un allarme', () => {
+  assert.match(area, /function crewTravelSchedule\(status, direction\)/);
+  assert.match(area, /crew-travel-card-legs[\s\S]{0,120}\$\{scheduleLine\(schedule\)\}/);
+  assert.match(area, /non comunicato/);
+  // Nessun tono d'allarme: un orario mancante è informazione, non colpa.
+  const styles = read('styles.css');
+  assert.match(styles, /\.crew-travel-when-entry--unknown \{[^}]*font-style:italic/);
+});
+
+test('la persona sa esattamente che cosa vede il suo skipper', () => {
+  assert.match(travel, /skipperSeesSchedule/);
+  assert.match(travel, /lo skipper vede soltanto quando arrivi, quando riparti e con che mezzo/);
+  assert.match(read('PRIVACY_DA_COMPLETARE.md'), /crewTravel\/\{inviteId\}\/legs` resta owner-only/);
+});

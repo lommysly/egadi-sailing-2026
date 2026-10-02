@@ -68,6 +68,7 @@ function copyForLocale() {
       stepConnection: 'Airport connection',
       stepCarpool: 'Carpool',
       details: 'Journey details',
+      skipperSeesSchedule: 'Of your journey your skipper only sees when you arrive, when you leave and by which means: they need it to know when the boat can sail. Flight, carrier, airports and luggage stay visible only to you and, if you request the transfer, to the company arranging it.',
       transport: 'Main transport',
       choose: 'Choose',
       flight: 'Flight',
@@ -214,6 +215,7 @@ function copyForLocale() {
     statusReadyNoTransfer: 'Viaggio confermato · nessun transfer richiesto',
     statusReadyPending: 'Viaggio confermato · transfer non indicato',
     details: 'Dettagli del viaggio',
+    skipperSeesSchedule: 'Del tuo viaggio lo skipper vede soltanto quando arrivi, quando riparti e con che mezzo: gli serve per sapere a che ora può salpare. Volo, vettore, aeroporti e bagagli restano visibili solo a te e, se chiedi il transfer, alla società che lo organizza.',
     transport: 'Mezzo principale',
     choose: 'Seleziona',
     flight: 'Aereo',
@@ -625,6 +627,7 @@ function renderLegForm(direction, rawLeg) {
       </nav>
       <fieldset class="skipper-travel-main-fieldset" data-travel-step-panel="trip">
         <legend>${copy.details}</legend>
+        <p class="field-hint">${copy.skipperSeesSchedule}</p>
         <label class="travel-mode-control">${copy.transport}<select name="transportMode"><option value="">${copy.choose}</option><option value="flight">${copy.flight}</option><option value="train">${copy.train}</option><option value="car">${copy.car}</option><option value="ferry">${copy.ferry}</option><option value="other">${copy.other}</option></select></label>
         <div class="travel-route">
           <section class="travel-location-card"><p class="travel-location-kicker">${copy.origin}</p><div class="travel-autocomplete" data-travel-combobox><label>${copy.city}<input name="originCity" autocomplete="address-level2" data-travel-autocomplete="city" placeholder="${copy.cityPlaceholder}" /></label></div><div class="travel-autocomplete" data-travel-combobox><label>${copy.airport}<input id="${formId}-origin-airport" name="originAirportLookup" autocomplete="off" data-travel-autocomplete="airport" data-travel-city-target="originCity" data-travel-airport-target="originAirport" placeholder="${copy.airportPlaceholder}" /></label><input name="originAirport" type="hidden" /></div></section>

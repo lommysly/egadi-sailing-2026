@@ -266,6 +266,15 @@ body.menu-open { overflow:hidden; }
 .crew-travel-card-person strong { overflow-wrap:anywhere; font:600 1.13rem/1.05 "Fraunces",serif; }
 .crew-travel-card-person small { color:#416b6d; font-size:.76rem; line-height:1.3; }
 .crew-travel-card-legs { display:flex; flex-wrap:wrap; align-content:start; gap:7px; }
+/* Quando arriva e quando riparte: riga separata dai badge del transfer,
+   perché è un'altra domanda — a che ora si può salpare, non chi sale sul
+   pulmino. Tono informativo, mai d'allarme: un orario non comunicato non è
+   una colpa (richiesta di Silvio, 2/10/2026). */
+.crew-travel-when { display:grid; gap:3px; margin-top:9px; padding-top:9px; border-top:1px solid rgba(2,43,58,.1); }
+.crew-travel-when-entry { font-size:.78rem; line-height:1.4; color:#334e57; }
+.crew-travel-when-entry strong { display:inline-block; min-width:52px; font:700 .66rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; color:#5b7480; }
+.crew-travel-when-entry small { color:#6c838d; font-size:.72rem; }
+.crew-travel-when-entry--unknown { color:#8296a0; font-style:italic; }
 .crew-travel-leg { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:999px; background:var(--sand); font:700 .66rem "DM Mono",monospace; letter-spacing:.02em; }
 .crew-travel-leg--transfer_ready,.crew-travel-leg--transfer_planning { background:#d9eff6; color:#11566a; }
 .crew-travel-leg--transfer_confirmed,.crew-travel-leg--transfer_completed { background:#c3ecd1; color:#155c34; }

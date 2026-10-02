@@ -6883,6 +6883,34 @@ function crewTravelLegState(status, direction) {
   return 'missing';
 }
 
+// Quando una persona arriva, e con che mezzo. È l'unica cosa del viaggio che
+// lo skipper può leggere — la tratta completa (volo, vettore, aeroporti,
+// bagagli) resta privata alla persona — e serve a una domanda sola: a che ora
+// si può salpare (richiesta di Silvio, 2/10/2026). Separata dal transfer di
+// proposito: sapere l'orario non ha niente a che vedere con il pulmino.
+const CREW_TRANSPORT_LABELS = {
+  flight: 'volo',
+  train: 'treno',
+  car: 'auto',
+  ferry: 'nave',
+  other: 'altro mezzo',
+};
+
+function crewTravelSchedule(status, direction) {
+  const date = status?.[`${direction}Date`];
+  const time = status?.[`${direction}Time`];
+  if (!date && !time) return null;
+  const transport = CREW_TRANSPORT_LABELS[status?.[`${direction}Transport`]] || '';
+  let dayLabel = '';
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split('-').map(Number);
+    dayLabel = new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('it-IT', {
+      weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC',
+    });
+  }
+  return { dayLabel, time: typeof time === 'string' ? time : '', transport };
+}
+
 // Stesso tono e struttura di whatsappUrl() più sotto (messaggio di invito):
 // un promemoria diretto, mai i dettagli del viaggio che lo skipper stesso
 // non può leggere (vedi crewTravelStatusFor).
@@ -6939,12 +6967,17 @@ function crewTravelOverviewCards() {
       outbound: crewTravelLegState(status, 'outbound'),
       return: crewTravelLegState(status, 'return'),
     };
+    const schedule = {
+      outbound: crewTravelSchedule(status, 'outbound'),
+      return: crewTravelSchedule(status, 'return'),
+    };
     const needsReminder = CREW_TRAVEL_NEEDS_REMINDER.has(legStates.outbound)
       || CREW_TRAVEL_NEEDS_REMINDER.has(legStates.return);
     const presentation = crewTravelCardPresentation(legStates);
     return {
       member,
       legStates,
+      schedule,
       needsReminder,
       presentation,
       group: crewTravelOverviewGroup(legStates),
@@ -6976,7 +7009,16 @@ function renderCrewTravelOverview() {
     const label = direction === 'outbound' ? 'Andata' : 'Ritorno';
     return `<span class="crew-travel-leg crew-travel-leg--${legStates[direction]}"><span aria-hidden="true">${info.icon}</span>${escapeHtml(label)} · ${escapeHtml(info.text)}</span>`;
   };
-  const renderCard = ({ member, legStates, needsReminder, presentation }) => {
+  const scheduleLine = (schedule) => {
+    const entry = (direction, label) => {
+      const value = schedule[direction];
+      if (!value) return `<span class="crew-travel-when-entry crew-travel-when-entry--unknown">${label}: non comunicato</span>`;
+      const when = [value.dayLabel, value.time].filter(Boolean).join(' · ');
+      return `<span class="crew-travel-when-entry"><strong>${escapeHtml(label)}</strong> ${escapeHtml(when)}${value.transport ? ` <small>${escapeHtml(value.transport)}</small>` : ''}</span>`;
+    };
+    return `<div class="crew-travel-when">${entry('outbound', 'Arriva')}${entry('return', 'Riparte')}</div>`;
+  };
+  const renderCard = ({ member, legStates, schedule, needsReminder, presentation }) => {
     const useReminder = needsReminder && presentation.tone !== 'cancelled';
     const contactUrl = useReminder ? crewTravelReminderUrl(member, legStates) : crewTravelContactUrl(member);
     const actionLabel = useReminder
@@ -6986,7 +7028,7 @@ function renderCrewTravelOverview() {
       ? `<a class="button button-whatsapp crew-travel-card-whatsapp" href="${escapeHtml(contactUrl)}" target="_blank" rel="noopener noreferrer">${whatsappActionIconMarkup({ external: true })}${escapeHtml(actionLabel)}</a>`
       : '<span class="field-hint crew-travel-card-no-contact">Numero WhatsApp non disponibile</span>';
     const initial = escapeHtml(memberName(member).trim().charAt(0).toUpperCase() || '?');
-    return `<article class="crew-travel-card crew-travel-card--${escapeHtml(presentation.tone)}"><header class="crew-travel-card-heading"><span class="crew-travel-card-avatar" aria-hidden="true">${initial}</span><span class="crew-travel-card-person"><strong>${escapeHtml(memberName(member))}</strong><small>${escapeHtml(presentation.label)}</small></span></header><div class="crew-travel-card-legs">${legBadge(legStates, 'outbound')}${legBadge(legStates, 'return')}</div><div class="crew-travel-card-action">${action}</div></article>`;
+    return `<article class="crew-travel-card crew-travel-card--${escapeHtml(presentation.tone)}"><header class="crew-travel-card-heading"><span class="crew-travel-card-avatar" aria-hidden="true">${initial}</span><span class="crew-travel-card-person"><strong>${escapeHtml(memberName(member))}</strong><small>${escapeHtml(presentation.label)}</small></span></header><div class="crew-travel-card-legs">${legBadge(legStates, 'outbound')}${legBadge(legStates, 'return')}</div>${scheduleLine(schedule)}<div class="crew-travel-card-action">${action}</div></article>`;
   };
   const waitingCards = cards.filter((card) => card.group === 'waiting');
   const submittedCards = cards.filter((card) => card.group === 'submitted');
