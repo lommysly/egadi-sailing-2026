@@ -136,6 +136,8 @@ const COPY = {
     boatChecklistBoat: 'Barca',
     boatChecklistRules: 'Regole',
     boatChecklistDossier: 'Dossier',
+    boatChecklistQuotes: 'Quote',
+    boatChecklistExtras: 'Extra',
     filterSearch: 'Cerca per nome, aeroporto o volo',
     noRecords: 'Non ci sono movimenti con questi filtri.',
     direction: 'Tratta',
@@ -294,6 +296,8 @@ const COPY = {
     boatChecklistBoat: 'Boat',
     boatChecklistRules: 'Rules',
     boatChecklistDossier: 'Dossier',
+    boatChecklistQuotes: 'Contributions',
+    boatChecklistExtras: 'Extras',
     filterSearch: 'Search name, airport or flight',
     noRecords: 'There are no journeys matching these filters.',
     direction: 'Journey',
@@ -386,6 +390,13 @@ const state = {
   // 30/09/2026: il sollecito deve coprire barca ed equipaggio, non solo il
   // transfer — caso reale di Michele Pasini/Carpe Diem).
   boatSetupStatus: {},
+  // Stato della parte economica per barca: è il buco da cui sono passate
+  // Carpe Diem e Neptune Planet, che a sei giorni dalla partenza non avevano
+  // nessuna quota compilata e il cui equipaggio non vedeva alcun costo
+  // (richiesta di Silvio, 2/10/2026: un sollecito dall'app, non a memoria).
+  // Il preventivo privato dello skipper (costPlan) resta volutamente fuori:
+  // le regole lo riservano a lui e nemmeno l'organizzatore lo legge.
+  boatEconomyStatus: {},
   // Elenco completo (nome + ultimo aggiornamento) di chi è iscritto a ogni
   // barca, per il registro attività "chi ha fatto cosa e quando" (richiesta
   // di Silvio, 30/09/2026, visibile solo all'organizzatore). Solo
@@ -1035,6 +1046,37 @@ async function ensureBoatSetupStatus(boatIds) {
   render();
 }
 
+// Due segnali leggibili dall'organizzatore senza entrare nel preventivo
+// privato dello skipper: le voci extra dichiarate (contributionPlan) e le
+// quote già assegnate alle persone (crewProjections). Bastano a distinguere
+// "ha impostato i costi" da "non ha mai aperto la parte economica".
+async function ensureBoatEconomyStatus(boatIds) {
+  const missing = boatIds.filter((boatId) => !(boatId in state.boatEconomyStatus));
+  if (!missing.length) return;
+  await Promise.all(missing.map(async (boatId) => {
+    try {
+      const [planSnap, projectionsSnap] = await Promise.all([
+        getDoc(doc(db, 'boats', boatId, 'contributionPlan', 'default')),
+        getDocs(collection(db, 'boats', boatId, 'crewProjections')),
+      ]);
+      const items = planSnap.exists() ? planSnap.data()?.items || {} : {};
+      const decidedItems = Object.values(items).filter((item) => item?.state && item.state !== 'to_define').length;
+      const pricedProjections = projectionsSnap.docs.filter((entry) => Number(entry.data()?.berthCents) > 0).length;
+      state.boatEconomyStatus[boatId] = {
+        planExists: planSnap.exists(),
+        decidedItems,
+        planUpdatedAt: planSnap.data()?.updatedAt || null,
+        projectionsTotal: projectionsSnap.size,
+        pricedProjections,
+      };
+    } catch (error) {
+      console.info('Stato economico non disponibile per questa barca.', boatId, error?.code || error);
+      state.boatEconomyStatus[boatId] = null;
+    }
+  }));
+  render();
+}
+
 // Stessa collezione già letta per il conteggio iscritti (ensureBoatMemberCounts):
 // qui teniamo anche nome e ultimo aggiornamento, per il registro attività.
 // Una seconda lettura della stessa collezione invece di riusare quella
@@ -1160,10 +1202,15 @@ function skipperDestinationUrl(needsSetupFollowUp) {
 // da dove arrivano rulesActive/dossierConfirmed.
 function boatSetupReadiness(boat) {
   const status = state.boatSetupStatus[boat.id] || {};
+  const economy = state.boatEconomyStatus[boat.id];
   return {
     boatConfigured: Number.isInteger(boat.totalBerths) && boat.totalBerths >= 2 && boat.bathroomCount > 0,
     rulesActive: status.rulesActive === true,
     dossierConfirmed: status.dossierConfirmed === true,
+    // `null` quando il dato non è ancora stato letto: diverso da "non fatto",
+    // altrimenti il sollecito partirebbe verso chi ha già impostato tutto.
+    quotesSet: economy ? economy.pricedProjections > 0 : null,
+    extrasSet: economy ? economy.decidedItems > 0 : null,
   };
 }
 
@@ -1179,6 +1226,20 @@ function boatSetupIssues(readiness) {
   }
   if (!readiness.dossierConfirmed) {
     issues.push(locale() === 'en' ? 'skipper dossier not confirmed yet' : 'dossier skipper non ancora confermato');
+  }
+  // Le due voci economiche portano con sé l'istruzione: senza il percorso
+  // esatto il sollecito costringe comunque a una telefonata (richiesta di
+  // Silvio, 2/10/2026 — caso Carpe Diem e Neptune Planet, equipaggi che non
+  // vedevano alcun costo a sei giorni dalla partenza).
+  if (readiness.quotesSet === false) {
+    issues.push(locale() === 'en'
+      ? 'contributions never set: your crew sees no cost at all — dashboard, "Conti" panel, "Dashboard economica"'
+      : 'quote mai impostate: il tuo equipaggio non vede nessun costo — area skipper, pannello «Conti», sezione «Dashboard economica»');
+  }
+  if (readiness.extrasSet === false) {
+    issues.push(locale() === 'en'
+      ? 'planned extras never defined (provisions, fuel, transfer, dinner ashore, mooring) — "Conti" panel, "Extra programmati"'
+      : 'voci extra mai definite (cambusa, gasolio, transfer, cena a terra, ormeggio) — pannello «Conti», sezione «Extra programmati»');
   }
   return issues;
 }
@@ -1231,6 +1292,7 @@ function renderBoatStats() {
   void ensureBoatMemberCounts(boatIds);
   void ensureBoatTravelStatus(boatIds);
   void ensureBoatSetupStatus(boatIds);
+  void ensureBoatEconomyStatus(boatIds);
   const totals = { members: 0, outboundRequested: 0, outboundPending: 0, returnRequested: 0, returnPending: 0, setupIncomplete: 0 };
   const checklistItem = (done, label) => `<span class="transfer-boat-checklist-item transfer-boat-checklist-item--${done ? 'done' : 'missing'}"><span aria-hidden="true">${done ? '✓' : '!'}</span>${escapeHtml(label)}</span>`;
   const cards = state.allBoats.map((boat) => {
@@ -1274,6 +1336,8 @@ function renderBoatStats() {
         ${checklistItem(readiness.boatConfigured, t('boatChecklistBoat'))}
         ${checklistItem(readiness.rulesActive, t('boatChecklistRules'))}
         ${checklistItem(readiness.dossierConfirmed, t('boatChecklistDossier'))}
+        ${checklistItem(readiness.quotesSet === true, t('boatChecklistQuotes'))}
+        ${checklistItem(readiness.extrasSet === true, t('boatChecklistExtras'))}
         ${checklistItem(!needsFollowUp, t('boatChecklistCrewTransfer'))}
         ${checklistItem(!skipperNeedsFollowUp, t('boatChecklistSkipperTransfer'))}
       </div>
@@ -1328,9 +1392,21 @@ function renderAccessLogBoat(boat) {
   const setup = state.boatSetupStatus[boat.id] || {};
   const findTravel = (inviteId) => travelEntries.find((entry) => entry.inviteId === inviteId) || null;
   const skipperTravel = findTravel('skipper');
+  const economy = state.boatEconomyStatus[boat.id];
+  const economyBadges = economy
+    ? [
+      accessLogBadge(economy.pricedProjections > 0, economy.pricedProjections > 0
+        ? `Quote assegnate · ${economy.pricedProjections} su ${economy.projectionsTotal}`
+        : 'Quote mai impostate'),
+      accessLogBadge(economy.decidedItems > 0, economy.decidedItems > 0
+        ? `Voci extra definite · ${economy.planUpdatedAt ? formatDateTime(economy.planUpdatedAt) : '—'}`
+        : 'Voci extra mai definite'),
+    ].join('')
+    : '';
   const skipperBadges = [
     accessLogBadge(setup.rulesActive === true, setup.rulesActive ? `Regole attive · ${setup.rulesUpdatedAt ? formatDateTime(setup.rulesUpdatedAt) : '—'}` : 'Regole da attivare'),
     accessLogBadge(setup.dossierConfirmed === true, setup.dossierConfirmed ? `Dossier confermato · ${setup.dossierUpdatedAt ? formatDateTime(setup.dossierUpdatedAt) : '—'}` : 'Dossier da compilare'),
+    economyBadges,
   ].join('');
   const skipperTravelLine = `${accessLogTravelLine(skipperTravel, 'outbound')} · ${accessLogTravelLine(skipperTravel, 'return')}`;
   const memberRows = members.map((member) => {
@@ -1346,6 +1422,7 @@ function renderAccessLog() {
   if (!state.isOrganizer || !state.allBoats.length) return '';
   const boatIds = state.allBoats.map((boat) => boat.id);
   void ensureBoatMembers(boatIds);
+  void ensureBoatEconomyStatus(boatIds);
   const boatsMarkup = state.allBoats.map(renderAccessLogBoat).join('');
   const operatorRows = state.transferOperators.map((operator) => {
     const ownRecords = state.records.filter((record) => record.assignedOperatorUid === operator.id);
@@ -1507,6 +1584,7 @@ async function refreshAccess() {
   state.allBoats = [];
   state.boatTravelStatus = {};
   state.boatSetupStatus = {};
+  state.boatEconomyStatus = {};
   render();
 
   if (!state.user) {
