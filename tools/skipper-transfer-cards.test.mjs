@@ -48,9 +48,9 @@ test('l’elenco resta visibile in Equipaggio e in Viaggi equipaggio con due gru
   assert.match(source, /operationsCrewTravelOverview\.id = 'crewTravelOverviewOperations'/);
   assert.match(source, /querySelectorAll\('\[data-crew-travel-overview\]'\)/);
   assert.match(source, /data-crew-travel-group="\$\{key\}"/);
-  assert.match(source, /In attesa di completamento/);
-  assert.match(source, /Scelta già comunicata/);
-  assert.match(source, /Nessuna persona in attesa/);
+  assert.match(source, /Transfer da completare/);
+  assert.match(source, /Tutti gli altri/);
+  assert.match(source, /Nessuna richiesta rimasta a metà/);
 });
 
 // Il test precedente confrontava `styles.css`/`area.js` con una stringa di

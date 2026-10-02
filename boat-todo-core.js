@@ -15,7 +15,7 @@
 
 // Ordine in cui le cose aperte vanno presentate: prima la barca in sé, poi
 // quello che l'equipaggio deve poter leggere, infine i viaggi.
-export const TODO_KEYS = Object.freeze(['boat', 'rules', 'dossier', 'quotes', 'extras', 'transfer', 'skipperTransfer']);
+export const TODO_KEYS = Object.freeze(['boat', 'rules', 'dossier', 'quotes', 'extras', 'transfer']);
 
 const OUTBOUND_VALUES = ['outbound', 'andata', 'arrival', 'arrivo', 'to_marsala', 'airport_to_marsala'];
 const RETURN_VALUES = ['return', 'ritorno', 'departure', 'partenza', 'from_marsala', 'marsala_to_airport'];
@@ -99,26 +99,35 @@ export function skipperTransferStatus(records, boatId) {
   return { outbound: hasActiveLeg('outbound'), return: hasActiveLeg('return') };
 }
 
-// Per ogni tratta: quante persone hanno chiesto il transfer, quante si
-// arrangiano da sole, quante restano da sollecitare. Il totale include lo
-// skipper (sale a bordo anche lui), quindi se non ha deciso il proprio
-// transfer finisce tra i "da sollecitare" tramite la sottrazione, mai tra gli
-// "in autonomia" (richiesta di Silvio, 30/09/2026).
+// Per ogni tratta: quante persone hanno chiesto il transfer, quante hanno una
+// richiesta rimasta a metà, quante ci arrivano per conto loro.
+//
+// Fino al 2/10/2026 era il contrario: "in autonomia" si contava solo su
+// dichiarazione esplicita e tutti gli altri finivano fra i "da sollecitare"
+// per sottrazione. Risultato: nove persone di Carpe Diem che non avevano mai
+// aperto il modulo risultavano una coda di lavoro per lo skipper, quando
+// semplicemente a Marsala ci arrivavano da sole. Ora la sottrazione sta
+// dall'altra parte: si conta chi ha chiesto il pulmino, e tutto il resto è
+// gente che ci arriva per conto suo — operativamente è la verità, nessuno
+// passa a prenderla. Resta contato a parte solo chi ha chiesto il transfer
+// senza dare il consenso: quello sì è un lavoro vero, perché crede di avere
+// il pulmino e non ce l'ha.
 export function travelBreakdown({ travelStatuses, memberCount, skipperStatus } = {}) {
   const statuses = travelStatuses || [];
   const skipper = skipperStatus || {};
   const total = Number.isInteger(memberCount) ? memberCount + 1 : null;
   const countFor = (key) => ({
     requested: statuses.filter((entry) => entry?.[key] === 'requested').length,
-    independent: statuses.filter((entry) => entry?.[key] === 'not_requested').length,
+    pending: statuses.filter((entry) => entry?.[key] === 'undecided').length,
   });
-  const withSkipper = (counted, skipperRequested) => ({
-    requested: counted.requested + (skipperRequested ? 1 : 0),
-    independent: counted.independent,
-    pending: Number.isInteger(total)
-      ? Math.max(0, total - counted.requested - (skipperRequested ? 1 : 0) - counted.independent)
-      : null,
-  });
+  const withSkipper = (counted, skipperRequested) => {
+    const requested = counted.requested + (skipperRequested ? 1 : 0);
+    return {
+      requested,
+      pending: counted.pending,
+      independent: Number.isInteger(total) ? Math.max(0, total - requested - counted.pending) : null,
+    };
+  };
   return {
     total,
     outbound: withSkipper(countFor('outboundTransfer'), skipper.outbound === true),
@@ -127,9 +136,12 @@ export function travelBreakdown({ travelStatuses, memberCount, skipperStatus } =
 }
 
 // L'elenco delle cose aperte per una barca. Vuoto = niente da sollecitare.
-export function openTodoKeys({ readiness, transferPending, skipperStatus } = {}) {
+//
+// Lo skipper senza transfer non compare più: come per chiunque altro, non
+// averlo chiesto significa che ci arriva per conto suo, non che manca un
+// dato. `transferPending` conta ormai solo le richieste rimaste a metà.
+export function openTodoKeys({ readiness, transferPending } = {}) {
   const state = readiness || {};
-  const skipper = skipperStatus || {};
   const open = [];
   if (!state.boatConfigured) open.push('boat');
   if (!state.rulesActive) open.push('rules');
@@ -137,6 +149,5 @@ export function openTodoKeys({ readiness, transferPending, skipperStatus } = {})
   if (state.quotesSet === false) open.push('quotes');
   if (state.extrasSet === false) open.push('extras');
   if (Number(transferPending) > 0) open.push('transfer');
-  if (!skipper.outbound || !skipper.return) open.push('skipperTransfer');
   return open;
 }

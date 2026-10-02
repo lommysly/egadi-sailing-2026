@@ -1,6 +1,6 @@
 import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { auth, crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20260928-blast-experience-v1';
-import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-state.js?v=20260929-skipper-transfer-lists-v2';
+import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
 
@@ -546,16 +546,27 @@ function crewTravelProgress(direction) {
   const transferState = activeCrewTravelStatus?.[`${direction}Transfer`];
   const operation = activeCrewTravelStatus?.[`${direction}OperationStatus`];
   const item = (tone, label, detail) => ({ tone, label: `${name} · ${label}`, detail });
-  if (!travelState || travelState === 'missing') return item('attention', localized('da inserire', 'not added yet'), localized('Apri Arrivi e partenze per aggiungere questa tratta.', 'Open Arrivals and departures to add this journey.'));
-  if (travelState === 'draft') return item(
-    'attention',
-    localized('bozza salvata', 'draft saved'),
-    transferState === 'requested'
-      ? `${localized('Puoi completarla quando conosci gli orari.', 'Complete it when you know the times.')} ${crewTransferPaidNote()}`
-      : localized('Puoi completarla quando conosci gli orari.', 'Complete it when you know the times.'),
+  // Il transfer si chiede, non è previsto d'ufficio: non aver chiesto niente
+  // non è una pratica aperta, è una scelta legittima. Lo diciamo come fatto,
+  // con il promemoria che nessuno passa a prendere chi non ha chiesto
+  // (richiesta di Silvio, 2/10/2026).
+  if (transferState === 'requested' && travelState === 'draft') return item(
+    'waiting',
+    localized('transfer richiesto · viaggio in bozza', 'transfer requested · trip in draft'),
+    `${localized('La richiesta è partita. Completa gli orari quando li conosci.', 'The request went through. Fill in the times when you know them.')} ${crewTransferPaidNote()}`,
   );
-  if (transferState === 'not_requested') return item('complete', localized('senza transfer organizzato', 'no organised transfer'), localized('Hai scelto di organizzare il collegamento autonomamente.', 'You chose to arrange this connection yourself.'));
-  if (transferState !== 'requested') return item('attention', localized('collegamento da scegliere', 'connection to choose'), localized('Se vuoi il transfer, selezionalo in questa tratta e dai il consenso.', 'If you need a transfer, select it for this journey and give your consent.'));
+  if (transferState === 'undecided') return item(
+    'attention',
+    localized('transfer da completare', 'transfer to complete'),
+    localized('Hai scelto il transfer ma manca il consenso: la richiesta non è partita e nessuno passerà a prenderti. Aprila e metti la spunta.', 'You chose the transfer but the consent is missing: the request never went through and nobody will pick you up. Open it and tick the box.'),
+  );
+  if (transferState !== 'requested') return item(
+    'complete',
+    direction === 'outbound'
+      ? localized('a Marsala ci arrivi tu', 'you get to Marsala on your own')
+      : localized('all’aeroporto ci arrivi tu', 'you get to the airport on your own'),
+    localized('Nessun transfer organizzato per questa tratta: se ti va bene così non devi fare niente. Se lo vuoi, aprilo da Arrivi e partenze.', 'No organised transfer for this leg: if that works for you there is nothing to do. If you want one, open Arrivals and departures.'),
+  );
   if (operation === 'planned') return item('update', localized('transfer in organizzazione', 'transfer being arranged'), `${localized('Il gestore sta preparando il collegamento.', 'The organiser is preparing the connection.')}${meetingDetailText(direction, operation)} ${crewTransferPaidNote()}`);
   if (operation === 'confirmed') return item('complete', localized('transfer confermato', 'transfer confirmed'), `${localized('Il gestore ha confermato il collegamento.', 'The organiser confirmed the connection.')}${meetingDetailText(direction, operation)} ${crewTransferPaidNote()}`);
   if (operation === 'completed') return item('complete', localized('transfer concluso', 'transfer completed'), `${localized('Il gestore ha segnato il collegamento come concluso.', 'The organiser marked the connection as completed.')} ${crewTransferPaidNote()}`);

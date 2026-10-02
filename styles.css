@@ -126,6 +126,19 @@ body.menu-open { overflow:hidden; }
 @media (max-width:800px) { .blast-experience { margin:32px 0 44px; padding:30px 24px; border-radius:22px; }.blast-experience-inner { grid-template-columns:1fr; gap:0; }.blast-experience-orbit { position:absolute; right:-8px; top:-12px; width:142px; min-height:142px; opacity:.9; }.blast-experience-orbit > span { display:none; }.blast-experience-copy { padding-top:72px; }.blast-experience h2 { max-width:540px; padding-right:40px; }.blast-experience-features { grid-template-columns:1fr; }.blast-experience-features li { min-height:0; }.blast-experience-actions { display:grid; grid-template-columns:1fr; gap:13px; }.blast-experience-actions .button,.blast-experience-secondary { width:100%; }.blast-experience-secondary { justify-content:center; } }
 @media (max-width:430px) { .blast-experience { margin-top:26px; padding:28px 20px; }.blast-experience-copy { padding-top:68px; }.blast-experience h2 { padding-right:34px; font-size:2.55rem; }.blast-experience-lead { font-size:.98rem; }.blast-experience-orbit { right:-14px; top:-18px; width:132px; min-height:132px; }.blast-experience-features li { padding:14px 12px; } }
 .transfer-price-note { margin:2px 0 4px; padding:10px 12px; border-radius:10px; border:1px solid rgba(194,65,12,.3); background:#fdece3; color:#9a3412; }
+/* L'avviso in cima al collegamento aeroporto. Dice che cosa succede adesso —
+   "a Marsala ci arrivi tu" — non che cosa manca da compilare: il transfer si
+   chiede, non è previsto d'ufficio. Deve reggere una lettura distratta, per
+   questo sta sopra ogni altra cosa e porta con sé il pulsante per chiederlo
+   (richiesta di Silvio, 2/10/2026). */
+.transfer-alert { display:grid; gap:8px; margin:0 0 18px; padding:16px 18px; border:1px solid transparent; border-radius:14px; }
+.transfer-alert-title { margin:0; font:600 1.08rem/1.25 "Fraunces",serif; }
+.transfer-alert-text { margin:0; font-size:.92rem; line-height:1.52; }
+.transfer-alert-action { justify-self:start; margin-top:4px; }
+.transfer-alert[data-transfer-alert-tone="none"] { border-color:rgba(194,65,12,.38); background:#fff3e4; color:#8a3a08; }
+.transfer-alert[data-transfer-alert-tone="pending"] { border-color:rgba(185,28,28,.4); background:#fdecec; color:#9b1c1c; }
+.transfer-alert[data-transfer-alert-tone="ready"] { border-color:rgba(13,148,136,.4); background:#e6f7f4; color:#115e59; }
+@media (max-width:430px) { .transfer-alert { padding:14px 15px; } .transfer-alert-action { width:100%; justify-self:stretch; } }
 .skipper-checklist-dialog { width:min(560px,calc(100% - 36px)); }
 .skipper-checklist-list { display:grid; gap:12px; margin-top:22px; }
 .skipper-checklist-item { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 16px; border:1px solid rgba(255,183,3,.55); border-radius:12px; background:#fff7e6; }

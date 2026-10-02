@@ -15,25 +15,39 @@ test('una richiesta transfer salvata non accende un allarme per l’equipaggio',
   ), false);
 });
 
-test('l’elenco skipper separa chi deve completare da chi ha già comunicato la scelta', () => {
-  assert.equal(crewTravelOverviewGroup({ outbound: 'missing', return: 'no_transfer' }), 'waiting');
-  assert.equal(crewTravelOverviewGroup({ outbound: 'transfer_ready', return: 'draft' }), 'waiting');
+// Dal 2/10/2026 il transfer si chiede: non averlo chiesto non è una pratica
+// aperta. Nell'elenco dello skipper resta solo chi lo ha chiesto a metà.
+test('nell’elenco skipper resta solo chi ha chiesto il transfer senza completarlo', () => {
+  assert.equal(crewTravelOverviewGroup({ outbound: 'transfer_pending', return: 'no_transfer' }), 'waiting');
+  assert.equal(crewTravelOverviewGroup({ outbound: 'missing', return: 'missing' }), 'submitted');
+  assert.equal(crewTravelOverviewGroup({ outbound: 'transfer_ready', return: 'missing' }), 'submitted');
   assert.equal(crewTravelOverviewGroup({ outbound: 'transfer_ready', return: 'no_transfer' }), 'submitted');
   assert.equal(crewTravelOverviewGroup({ outbound: 'transfer_confirmed', return: 'transfer_completed' }), 'submitted');
   assert.equal(crewTravelOverviewGroup({ outbound: 'no_transfer', return: 'no_transfer' }), 'submitted');
 });
 
-test('una tratta da inserire o da correggere resta visibile come prossimo passo', () => {
+test('una richiesta transfer rimasta a metà resta visibile come prossimo passo', () => {
   assert.equal(crewTravelNeedsAttention(
-    { tone: 'attention', label: 'Andata · da inserire' },
-    { tone: 'complete', label: 'Rientro · senza transfer organizzato' },
+    { tone: 'attention', label: 'Andata · transfer da completare' },
+    { tone: 'complete', label: 'Rientro · all’aeroporto ci arrivi tu' },
   ), true);
+});
+
+test('chi ci arriva per conto suo non ha nessun prossimo passo', () => {
+  assert.equal(crewTravelNeedsAttention(
+    { tone: 'complete', label: 'Andata · a Marsala ci arrivi tu' },
+    { tone: 'complete', label: 'Rientro · all’aeroporto ci arrivi tu' },
+  ), false);
 });
 
 test('le card skipper distinguono azione, gestione, conferma e annullamento', () => {
   assert.deepEqual(
+    crewTravelCardPresentation({ outbound: 'transfer_pending', return: 'no_transfer' }),
+    { tone: 'attention', label: 'Transfer da completare' },
+  );
+  assert.deepEqual(
     crewTravelCardPresentation({ outbound: 'missing', return: 'no_transfer' }),
-    { tone: 'attention', label: 'Da completare' },
+    { tone: 'neutral', label: 'Nessun transfer richiesto' },
   );
   assert.deepEqual(
     crewTravelCardPresentation({ outbound: 'transfer_ready', return: 'no_transfer' }),

@@ -19,7 +19,7 @@ function sourceBetween(source, startMarker, endMarker) {
 
 test('il modulo personale dichiara il costo prima e dopo la conferma', () => {
   // Prima della conferma: la scelta e la nota esplicativa dicono già che si paga.
-  assert.match(travelSource, /airportChoiceTransfer: 'Vorrei il transfer organizzato · servizio a pagamento'/);
+  assert.match(travelSource, /airportChoiceTransfer: '[^']*transfer organizzato · servizio a pagamento'/);
   assert.match(travelSource, /Il transfer organizzato è un servizio a pagamento/);
   assert.match(travelSource, /The organised transfer is a paid service/);
 

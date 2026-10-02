@@ -12,7 +12,7 @@ import { DEFAULT_CREW_ROLE, fillRoleFields, roleConfirmationText, roleFromFields
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-experience-v1';
-import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20260929-skipper-transfer-lists-v2';
+import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import {
   boatFromData,
   boatSetupReadiness,
@@ -21,7 +21,7 @@ import {
   setupSignals,
   skipperTransferStatus,
   travelBreakdown,
-} from './boat-todo-core.js?v=20261002-todo-core-v1';
+} from './boat-todo-core.js?v=20261002-transfer-su-richiesta-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -1884,9 +1884,9 @@ function renderSkipperDashboardOverview() {
   setSkipperDashboardMetric(
     'operations',
     !travelSummary.needsAttention && boardRulesActive && crewTravelPendingCount
-      ? `${crewTravelPendingCount} ${crewTravelPendingCount === 1 ? 'persona da sollecitare' : 'persone da sollecitare'}`
+      ? `${crewTravelPendingCount} ${crewTravelPendingCount === 1 ? 'transfer da completare' : 'transfer da completare'}`
       : operationsNeedAttention ? 'Da completare' : 'Viaggio impostato',
-    `${travelSummary.detail} · ${crewTravelPendingCount ? `${crewTravelPendingCount} ${crewTravelPendingCount === 1 ? 'persona deve completare il viaggio' : 'persone devono completare il viaggio'}` : 'nessuno in attesa'} · ${crewTravelSubmittedCount} ${crewTravelSubmittedCount === 1 ? 'scelta già comunicata' : 'scelte già comunicate'} · ${boardRulesActive ? 'regole attive' : 'regole da attivare'} · ${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} avvisi`,
+    `${travelSummary.detail} · ${crewTravelPendingCount ? `${crewTravelPendingCount} ${crewTravelPendingCount === 1 ? 'persona ha chiesto il transfer senza completarlo' : 'persone hanno chiesto il transfer senza completarlo'}` : 'nessun transfer in sospeso'} · ${crewTravelSubmittedCount} ${crewTravelSubmittedCount === 1 ? 'persona a posto' : 'persone a posto'} · ${boardRulesActive ? 'regole attive' : 'regole da attivare'} · ${currentAcceptanceCount} conferme · ${skipperAnnouncementCount} avvisi`,
     operationsNeedAttention,
     travelSummary.needsAttention
       ? { view: 'operations', operationsView: 'personal', targetId: 'skipperTravelPanel' }
@@ -6834,10 +6834,10 @@ function reflectCreatedProjectionInvite(projection, invite) {
 }
 
 const CREW_TRAVEL_LEG_LABELS = {
-  missing: { icon: '•', text: 'Da inserire' },
-  draft: { icon: '!', text: 'In bozza' },
-  transfer_pending: { icon: '!', text: 'Transfer da scegliere' },
-  no_transfer: { icon: '–', text: 'Transfer non richiesto' },
+  missing: { icon: '–', text: 'Ci arriva per conto suo' },
+  draft: { icon: '–', text: 'Ci arriva per conto suo' },
+  transfer_pending: { icon: '!', text: 'Transfer da completare' },
+  no_transfer: { icon: '–', text: 'Ci arriva per conto suo' },
   transfer_ready: { icon: '•', text: 'Transfer richiesto' },
   transfer_planning: { icon: '•', text: 'In organizzazione' },
   transfer_confirmed: { icon: '✓', text: 'Transfer confermato' },
@@ -6852,16 +6852,23 @@ const CREW_TRAVEL_LEG_LABELS = {
 // "confermate" su entrambe le tratte ma il loro ritorno restava invisibile
 // all'operatore, perché non avevano mai scelto "Vorrei il transfer
 // organizzato" per quella tratta.
-const CREW_TRAVEL_NEEDS_REMINDER = new Set(['missing', 'draft', 'transfer_pending']);
+//
+// Dal 2/10/2026 resta un solo stato da seguire. Non chiediamo più a nessuno
+// di dichiarare che il pulmino non gli serve: chi non chiede niente ci arriva
+// per conto suo. Chi invece ha scelto il transfer e non ha dato il consenso
+// vuole il pulmino e senza quella spunta non lo avrà — quello sì va ricordato.
+const CREW_TRAVEL_NEEDS_REMINDER = new Set(['transfer_pending']);
 
 function crewTravelStatusFor(memberId) {
   return activeCrewTravelStatus.find((entry) => entry.id === memberId) || null;
 }
 
+// Si legge partendo dal transfer, non dallo stato del viaggio: al pulmino
+// serve sapere chi sale, e una richiesta valida vale anche dentro una bozza
+// (vedi validSourceLeg in functions/index.js). Chi non ha chiesto niente — o
+// non ha mai aperto il modulo — ci arriva per conto suo: è la verità
+// operativa, nessuno passa a prenderlo.
 function crewTravelLegState(status, direction) {
-  const tripState = status?.[direction];
-  if (tripState !== 'ready' && tripState !== 'draft') return 'missing';
-  if (tripState === 'draft') return 'draft';
   const transferState = status?.[`${direction}Transfer`];
   if (transferState === 'requested') {
     const operation = status?.[`${direction}OperationStatus`];
@@ -6869,8 +6876,11 @@ function crewTravelLegState(status, direction) {
     if (['confirmed', 'completed', 'cancelled'].includes(operation)) return `transfer_${operation}`;
     return 'transfer_ready';
   }
+  // Ha selezionato il transfer senza dare il consenso: la richiesta non è mai
+  // partita, e questa persona crede di avere il pulmino.
+  if (transferState === 'undecided') return 'transfer_pending';
   if (transferState === 'not_requested') return 'no_transfer';
-  return 'transfer_pending';
+  return 'missing';
 }
 
 // Stesso tono e struttura di whatsappUrl() più sotto (messaggio di invito):
@@ -6881,22 +6891,18 @@ function crewTravelReminderMessage(member, legStates) {
   const locale = inviteLocale(invite);
   const firstName = member.firstName || memberName(member);
   const pendingDirections = ['outbound', 'return'].filter((direction) => CREW_TRAVEL_NEEDS_REMINDER.has(legStates[direction]));
-  const onlyTransferMissing = pendingDirections.length > 0
-    && pendingDirections.every((direction) => legStates[direction] === 'transfer_pending');
   const directionLabel = (direction) => (direction === 'return'
     ? (locale === 'en' ? 'the return leg (from Marsala)' : 'il ritorno (da Marsala)')
     : (locale === 'en' ? 'the outbound leg (to Marsala)' : "l’andata (verso Marsala)"));
   const missingText = pendingDirections.map(directionLabel).join(locale === 'en' ? ' and ' : ' e ');
   const link = travelUrl(invite);
   const linkLine = link ? `\n\n${link}` : '';
-  if (onlyTransferMissing) {
-    return locale === 'en'
-      ? `Hi ${firstName} 🌊\n\nYour travel details for Egadi Sailing Experience look complete, but you haven’t chosen the airport ↔ Marsala connection yet for ${missingText}. Open “Airport connection” in your travel area, pick an option and save — thank you!${linkLine}`
-      : `Ciao ${firstName} 🌊\n\nI tuoi dati di viaggio per Egadi Sailing Experience sembrano completi, ma non hai ancora scelto il collegamento aeroporto ↔ Marsala per ${missingText}. Apri “Collegamento aeroporto” nella tua area viaggio, scegli un’opzione e salva — grazie!${linkLine}`;
-  }
+  // Un solo caso possibile, ormai: ha scelto il transfer e non ha dato il
+  // consenso. Non è un "completa i dati": è una persona che pensa di avere il
+  // pulmino e non ce l'ha. Il messaggio dice esattamente quello.
   return locale === 'en'
-    ? `Hi ${firstName} 🌊\n\nCan you finish and confirm ${missingText} in your travel details for Egadi Sailing Experience? I need it to organise transfers and the schedule.\n\nOpen your personal area and save it — thank you!${linkLine}`
-    : `Ciao ${firstName} 🌊\n\nPuoi completare e confermare ${missingText} nei tuoi dati di viaggio per Egadi Sailing Experience? Mi serve per organizzare i transfer e il programma.\n\nApri la tua area personale e salva, grazie!${linkLine}`;
+    ? `Hi ${firstName} 🌊\n\nYou asked for the airport ↔ Marsala transfer for ${missingText}, but the request never went through: the consent tick is missing. Without it the transfer company cannot see you and nobody will come to pick you up.\n\nOpen your travel area, tick the box and save — it takes a minute.${linkLine}`
+    : `Ciao ${firstName} 🌊\n\nHai chiesto il transfer aeroporto ↔ Marsala per ${missingText}, ma la richiesta non è mai partita: manca la spunta del consenso. Senza quella la società transfer non ti vede e nessuno passa a prenderti.\n\nApri la tua area viaggio, metti la spunta e salva — ci vuole un minuto.${linkLine}`;
 }
 
 function crewTravelReminderUrl(member, legStates) {
@@ -6995,20 +7001,20 @@ function renderCrewTravelOverview() {
         : `<p class="crew-travel-group-empty">${escapeHtml(emptyText)}</p>`}
     </section>`;
   const heading = waitingCards.length
-    ? `<h4>${waitingCards.length} ${waitingCards.length === 1 ? 'persona è ancora in attesa' : 'persone sono ancora in attesa'}</h4><p class="panel-lead">Sotto trovi separatamente chi deve completare e chi ha già comunicato la propria scelta. I badge indicano lo stato di andata e ritorno.</p>`
-    : '<h4>Tutti hanno comunicato andata e ritorno</h4><p class="panel-lead">Le card mostrano se il transfer è richiesto, in organizzazione, confermato oppure non necessario.</p>';
+    ? `<h4>${waitingCards.length} ${waitingCards.length === 1 ? 'persona ha chiesto il transfer senza completarlo' : 'persone hanno chiesto il transfer senza completarlo'}</h4><p class="panel-lead">Il transfer si chiede: chi non lo chiede arriva per conto suo, e per te non c’è niente da fare. Qui sotto trovi solo chi lo ha chiesto e si è fermato a metà.</p>`
+    : '<h4>Nessun transfer in sospeso</h4><p class="panel-lead">Il transfer si chiede: chi non lo chiede arriva per conto suo. I badge mostrano chi sale sul pulmino e a che punto è.</p>';
   const markup = `<p class="eyebrow">Viaggio equipaggio</p>${heading}<div class="crew-travel-groups">${renderGroup({
     key: 'waiting',
-    title: 'In attesa di completamento',
-    detail: 'Queste persone devono ancora completare almeno una tratta o scegliere il collegamento con Marsala.',
+    title: 'Transfer da completare',
+    detail: 'Hanno scelto il transfer ma non hanno dato il consenso: la richiesta non è partita e nessuno passerà a prenderli.',
     entries: waitingCards,
-    emptyText: 'Nessuna persona in attesa.',
+    emptyText: 'Nessuna richiesta rimasta a metà.',
   })}${renderGroup({
     key: 'submitted',
-    title: 'Scelta già comunicata',
-    detail: 'Qui trovi chi ha richiesto il transfer, chi è già in gestione e chi ha scelto di muoversi in autonomia.',
+    title: 'Tutti gli altri',
+    detail: 'Chi ha chiesto il transfer e chi ci arriva per conto suo: in entrambi i casi non devi fare niente.',
     entries: submittedCards,
-    emptyText: 'Nessuna scelta ancora comunicata.',
+    emptyText: 'Nessuna persona in questo elenco.',
   })}</div>`;
   sections.forEach((section) => {
     section.hidden = false;

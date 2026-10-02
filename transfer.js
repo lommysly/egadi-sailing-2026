@@ -30,7 +30,7 @@ import {
   setupSignals,
   skipperTransferStatus,
   travelBreakdown,
-} from './boat-todo-core.js?v=20261002-todo-core-v1';
+} from './boat-todo-core.js?v=20261002-transfer-su-richiesta-v1';
 
 const EVENT_ID = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
@@ -138,10 +138,9 @@ const COPY = {
     boatStatSkipper: 'Skipper {name}',
     boatStatOnBoard: 'a bordo (equipaggio + skipper)',
     boatStatRequestedShort: 'transfer',
-    boatStatIndependentShort: 'in autonomia',
-    boatStatPendingShort: 'da sollecitare',
-    boatChecklistCrewTransfer: 'Transfer equipaggio',
-    boatChecklistSkipperTransfer: 'Transfer skipper',
+    boatStatIndependentShort: 'per conto loro',
+    boatStatPendingShort: 'chiesti a metà',
+    boatChecklistCrewTransfer: 'Transfer equipaggio completati',
     boatReminderAction: 'Sollecita lo skipper',
     boatChecklistBoat: 'Barca',
     boatChecklistRules: 'Regole',
@@ -153,7 +152,7 @@ const COPY = {
     todoTitleMany: '{count} barche da sollecitare',
     todoAllDone: 'Tutto a posto: nessun sollecito da mandare.',
     todoHint: 'Chi ha più cose aperte compare per primo. Il messaggio parte già scritto, con il percorso esatto da seguire.',
-    todoTransfer: '{count} transfer da decidere',
+    todoTransfer: '{count} transfer chiesti a metà',
     filterSearch: 'Cerca per nome, aeroporto o volo',
     noRecords: 'Non ci sono movimenti con questi filtri.',
     direction: 'Tratta',
@@ -305,9 +304,8 @@ const COPY = {
     boatStatOnBoard: 'on board (crew + skipper)',
     boatStatRequestedShort: 'transfer',
     boatStatIndependentShort: 'on their own',
-    boatStatPendingShort: 'to follow up',
-    boatChecklistCrewTransfer: 'Crew transfer',
-    boatChecklistSkipperTransfer: 'Skipper transfer',
+    boatStatPendingShort: 'left half-done',
+    boatChecklistCrewTransfer: 'Crew transfers completed',
     boatReminderAction: 'Remind the skipper',
     boatChecklistBoat: 'Boat',
     boatChecklistRules: 'Rules',
@@ -319,7 +317,7 @@ const COPY = {
     todoTitleMany: '{count} boats to chase',
     todoAllDone: 'All set: nothing to chase.',
     todoHint: 'Boats with the most open items come first. The message is pre-written, with the exact steps to follow.',
-    todoTransfer: '{count} transfers undecided',
+    todoTransfer: '{count} transfers left half-done',
     filterSearch: 'Search name, airport or flight',
     noRecords: 'There are no journeys matching these filters.',
     direction: 'Journey',
@@ -1236,15 +1234,24 @@ function boatReminderMessage(boat, breakdown, readiness, skipperStatus) {
     : Number.isInteger(boat.totalBerths)
       ? (locale() === 'en' ? `${registered} of ${boat.totalBerths} berths on board (crew + skipper)` : `${registered} di ${boat.totalBerths} posti a bordo (equipaggio + skipper)`)
       : (locale() === 'en' ? `${registered} people on board, crew and skipper` : `${registered} persone a bordo, equipaggio e skipper`);
-  const legLine = (label, leg) => (locale() === 'en'
-    ? `${label}: ${leg.requested} requested the transfer, ${leg.independent} arranging on their own, ${Number.isInteger(leg.pending) ? leg.pending : '?'} still undecided`
-    : `${label}: ${leg.requested} hanno chiesto il transfer, ${leg.independent} si arrangiano da soli, ${Number.isInteger(leg.pending) ? leg.pending : '?'} non hanno ancora deciso`);
-  // Anche lo skipper fa parte dell'equipaggio e sale sulla barca: se non ha
-  // ancora deciso il proprio transfer, il sollecito lo ricorda a lui stesso,
-  // non solo per il suo equipaggio (richiesta di Silvio, 30/09/2026).
+  // Il transfer si chiede, non è previsto d'ufficio: chi non lo chiede ci
+  // arriva per conto suo, e non è un lavoro per lo skipper. Il riepilogo lo
+  // dice così, e nomina a parte solo le richieste rimaste a metà — quelle
+  // sono persone convinte di avere il pulmino che non lo avranno
+  // (ribaltamento chiesto da Silvio il 2/10/2026).
+  const legLine = (label, leg) => {
+    const half = Number.isInteger(leg.pending) ? leg.pending : 0;
+    const own = Number.isInteger(leg.independent) ? leg.independent : '?';
+    const halfText = half > 0
+      ? (locale() === 'en' ? `, ${half} asked for it but never completed the request` : `, ${half} lo hanno chiesto senza completare la richiesta`)
+      : '';
+    return locale() === 'en'
+      ? `${label}: ${leg.requested} on the shuttle, ${own} getting there on their own${halfText}`
+      : `${label}: ${leg.requested} sul pulmino, ${own} ci arrivano per conto loro${halfText}`;
+  };
   const skipperLegLine = (label, done) => (locale() === 'en'
-    ? `${label}: ${done ? 'you already requested the transfer' : 'you have not decided yet'}`
-    : `${label}: ${done ? 'hai già richiesto il transfer' : 'non hai ancora deciso'}`);
+    ? `${label}: ${done ? 'you are on the shuttle' : 'you are getting there on your own'}`
+    : `${label}: ${done ? 'sei sul pulmino' : 'ci arrivi per conto tuo'}`);
   const greeting = boat.skipperName
     ? (locale() === 'en' ? `Hi ${boat.skipperName}` : `Ciao ${boat.skipperName}`)
     : (locale() === 'en' ? 'Hi' : 'Ciao');
@@ -1263,8 +1270,8 @@ function boatReminderMessage(boat, breakdown, readiness, skipperStatus) {
     ? (locale() === 'en' ? 'Open your dashboard' : 'Apri la tua area')
     : (locale() === 'en' ? "Open your crew's travel section" : 'Apri la sezione viaggio del tuo equipaggio');
   return locale() === 'en'
-    ? `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- Your own transfer — ${skipperLegLine(t('inbound'), skipperStatus.outbound)}, ${skipperLegLine(t('outbound'), skipperStatus.return)}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nFeel free to share this in your crew chat, so whoever is missing can complete their choice.\n\n${openLine}: ${link}`
-    : `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- Il tuo transfer — ${skipperLegLine(t('inbound'), skipperStatus.outbound)}, ${skipperLegLine(t('outbound'), skipperStatus.return)}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nPuoi condividerlo anche nel gruppo dell'equipaggio, così chi manca completa la scelta.\n\n${openLine}: ${link}`;
+    ? `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- Your own transfer — ${skipperLegLine(t('inbound'), skipperStatus.outbound)}, ${skipperLegLine(t('outbound'), skipperStatus.return)}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nWorth posting once in the crew chat: the transfer has to be requested — nobody books it for you. Whoever wants it opens their travel area and asks; everyone else gets to Marsala on their own, which is perfectly fine.\n\n${openLine}: ${link}`
+    : `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- Il tuo transfer — ${skipperLegLine(t('inbound'), skipperStatus.outbound)}, ${skipperLegLine(t('outbound'), skipperStatus.return)}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nVale la pena dirlo una volta nel gruppo: il transfer va chiesto, nessuno lo prenota d'ufficio. Chi lo vuole apre la sua area viaggio e lo richiede; tutti gli altri a Marsala ci arrivano per conto loro, e va benissimo così.\n\n${openLine}: ${link}`;
 }
 
 // Le stesse informazioni delle card barca, ma rovesciate: non "ecco lo stato
@@ -1277,11 +1284,10 @@ const TODO_CHIP_LABELS = Object.freeze({
   dossier: () => t('boatChecklistDossier'),
   quotes: () => t('boatChecklistQuotes'),
   extras: () => t('boatChecklistExtras'),
-  skipperTransfer: () => t('boatChecklistSkipperTransfer'),
 });
 
-function boatTodoChips(readiness, transferPending, skipperStatus) {
-  return openTodoKeys({ readiness, transferPending, skipperStatus })
+function boatTodoChips(readiness, transferPending) {
+  return openTodoKeys({ readiness, transferPending })
     .map((key) => (key === 'transfer'
       ? t('todoTransfer').replace('{count}', String(transferPending))
       : TODO_CHIP_LABELS[key]()));
@@ -1299,7 +1305,7 @@ function renderTodoBoard() {
     const breakdown = boatTravelBreakdown(boat.id, skipperStatus);
     const readiness = boatSetupReadiness(boat);
     const transferPending = (breakdown.outbound.pending || 0) + (breakdown.return.pending || 0);
-    const chips = boatTodoChips(readiness, transferPending, skipperStatus);
+    const chips = boatTodoChips(readiness, transferPending);
     const reminderUrl = Number.isInteger(breakdown.total)
       ? whatsappDraftUrl(boatReminderMessage(boat, breakdown, readiness, skipperStatus))
       : '';
@@ -1357,12 +1363,10 @@ function renderBoatStats() {
     // equipaggio (che esclude lo skipper) — richiesta di Silvio, 30/09/2026.
     const totalText = hasData ? String(breakdown.total) : '…';
     const totalBerthsText = Number.isInteger(boat.totalBerths) ? String(boat.totalBerths) : '…';
-    // Anche lo skipper fa parte dell'equipaggio e sale sulla barca: se non ha
-    // ancora deciso il proprio transfer è tra le persone da gestire, non un
-    // dettaglio a parte (richiesta di Silvio, 30/09/2026).
-    const skipperNeedsFollowUp = !skipperStatus.outbound || !skipperStatus.return;
-    const statusClass = (needsFollowUp || needsSetupFollowUp || skipperNeedsFollowUp) ? ' transfer-boat-stat--pending' : hasData && breakdown.total > 0 ? ' transfer-boat-stat--ready' : '';
-    const legLine = (label, leg) => `<span>${escapeHtml(label)}: ${leg.requested} ${escapeHtml(t('boatStatRequestedShort'))} · ${leg.independent} ${escapeHtml(t('boatStatIndependentShort'))} · ${Number.isInteger(leg.pending) ? leg.pending : '…'} ${escapeHtml(t('boatStatPendingShort'))}</span>`;
+    // Lo skipper senza transfer non è più un'anomalia: come chiunque altro,
+    // se non lo ha chiesto a Marsala ci arriva per conto suo (2/10/2026).
+    const statusClass = (needsFollowUp || needsSetupFollowUp) ? ' transfer-boat-stat--pending' : hasData && breakdown.total > 0 ? ' transfer-boat-stat--ready' : '';
+    const legLine = (label, leg) => `<span>${escapeHtml(label)}: ${leg.requested} ${escapeHtml(t('boatStatRequestedShort'))} · ${Number.isInteger(leg.independent) ? leg.independent : '…'} ${escapeHtml(t('boatStatIndependentShort'))}${(leg.pending || 0) > 0 ? ` · ${leg.pending} ${escapeHtml(t('boatStatPendingShort'))}` : ''}</span>`;
     const reminderUrl = hasData ? whatsappDraftUrl(boatReminderMessage(boat, breakdown, readiness, skipperStatus)) : '';
     const initial = escapeHtml(boat.name.trim().charAt(0).toUpperCase() || '?');
     return `<article class="transfer-boat-stat${statusClass}">
@@ -1377,7 +1381,6 @@ function renderBoatStats() {
         ${checklistItem(readiness.quotesSet === true, t('boatChecklistQuotes'))}
         ${checklistItem(readiness.extrasSet === true, t('boatChecklistExtras'))}
         ${checklistItem(!needsFollowUp, t('boatChecklistCrewTransfer'))}
-        ${checklistItem(!skipperNeedsFollowUp, t('boatChecklistSkipperTransfer'))}
       </div>
       <div class="transfer-boat-stat-legs">
         ${legLine(t('inbound'), breakdown.outbound)}
@@ -1414,14 +1417,13 @@ function accessLogBadge(done, label) {
 
 function accessLogTravelLine(entry, direction) {
   const dirLabel = direction === 'outbound' ? 'Andata' : 'Ritorno';
-  if (!entry) return `${dirLabel}: viaggio non ancora inserito`;
+  if (!entry) return `${dirLabel}: ci arriva per conto suo`;
   const travelState = entry[direction];
   const transferState = entry[`${direction}Transfer`];
   const when = entry.updatedAt ? formatDateTime(entry.updatedAt) : '';
-  if (!travelState || travelState === 'missing') return `${dirLabel}: da inserire`;
-  const stateLabel = travelState === 'draft' ? 'bozza' : 'confermato';
-  const transferLabel = transferState === 'requested' ? 'transfer richiesto' : transferState === 'not_requested' ? 'in autonomia' : 'transfer da scegliere';
-  return `${dirLabel}: ${stateLabel} · ${transferLabel}${when ? ` · ${when}` : ''}`;
+  if (transferState === 'requested') return `${dirLabel}: transfer richiesto${travelState === 'draft' ? ' · viaggio in bozza' : ''}${when ? ` · ${when}` : ''}`;
+  if (transferState === 'undecided') return `${dirLabel}: transfer chiesto a metà${when ? ` · ${when}` : ''}`;
+  return `${dirLabel}: ci arriva per conto suo${when ? ` · ${when}` : ''}`;
 }
 
 function renderAccessLogBoat(boat) {

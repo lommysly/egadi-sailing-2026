@@ -40,18 +40,18 @@ test('un dato non ancora letto non è "non fatto": niente sollecito a vuoto', ()
   const readiness = readinessOf({ economy: undefined });
   assert.equal(readiness.quotesSet, null);
   assert.equal(readiness.extrasSet, null);
-  assert.deepEqual(openTodoKeys({ readiness, transferPending: 0, skipperStatus: { outbound: true, return: true } }), []);
+  assert.deepEqual(openTodoKeys({ readiness, transferPending: 0 }), []);
 });
 
 test('barca completa ed equipaggio tutto deciso: nessuna cosa aperta', () => {
   const readiness = readinessOf({ economy: economySignals({ planExists: true, items: { cena: { state: 'extra' } }, projectionBerthCents: [45000, 45000] }) });
   assert.deepEqual(readiness, { boatConfigured: true, rulesActive: true, dossierConfirmed: true, quotesSet: true, extrasSet: true });
-  assert.deepEqual(openTodoKeys({ readiness, transferPending: 0, skipperStatus: { outbound: true, return: true } }), []);
+  assert.deepEqual(openTodoKeys({ readiness, transferPending: 0 }), []);
 });
 
 test('chi non ha mai aperto la parte economica compare con quote ed extra', () => {
   const readiness = readinessOf({ economy: economySignals({ planExists: false, items: undefined, projectionBerthCents: [] }) });
-  assert.deepEqual(openTodoKeys({ readiness, transferPending: 0, skipperStatus: { outbound: true, return: true } }), ['quotes', 'extras']);
+  assert.deepEqual(openTodoKeys({ readiness, transferPending: 0 }), ['quotes', 'extras']);
 });
 
 test('una voce lasciata "da definire" non vale come decisa', () => {
@@ -68,8 +68,8 @@ test('regole e dossier mancanti vengono elencati prima della parte economica', (
     contact: null,
     economy: economySignals({ planExists: false, projectionBerthCents: [] }),
   });
-  assert.deepEqual(openTodoKeys({ readiness, transferPending: 3, skipperStatus: { outbound: false, return: false } }),
-    ['boat', 'rules', 'dossier', 'quotes', 'extras', 'transfer', 'skipperTransfer']);
+  assert.deepEqual(openTodoKeys({ readiness, transferPending: 3 }),
+    ['boat', 'rules', 'dossier', 'quotes', 'extras', 'transfer']);
 });
 
 test('un briefing esistente ma senza testo non è un regolamento attivo', () => {
@@ -77,7 +77,7 @@ test('un briefing esistente ma senza testo non è un regolamento attivo', () => 
   assert.deepEqual(setupSignals({}), { rulesActive: false, dossierConfirmed: false });
 });
 
-test('il conteggio transfer comprende lo skipper, che occupa un posto come gli altri', () => {
+test('chi non ha chiesto il transfer ci arriva per conto suo, skipper compreso', () => {
   const breakdown = travelBreakdown({
     travelStatuses: [
       { outboundTransfer: 'requested', returnTransfer: 'requested' },
@@ -89,15 +89,27 @@ test('il conteggio transfer comprende lo skipper, che occupa un posto come gli a
     skipperStatus: { outbound: true, return: false },
   });
   assert.equal(breakdown.total, 5);
-  assert.deepEqual(breakdown.outbound, { requested: 3, independent: 1, pending: 1 });
-  assert.deepEqual(breakdown.return, { requested: 2, independent: 1, pending: 2 });
+  // Andata: 2 richieste + lo skipper = 3 sul pulmino, gli altri 2 per conto
+  // loro — compresa la persona che non ha mai aperto il modulo.
+  assert.deepEqual(breakdown.outbound, { requested: 3, pending: 0, independent: 2 });
+  // Ritorno: lo skipper non lo ha chiesto, quindi sta fra gli altri 3.
+  assert.deepEqual(breakdown.return, { requested: 2, pending: 0, independent: 3 });
+});
+
+test('resta contato a parte solo chi ha chiesto il transfer senza completarlo', () => {
+  const breakdown = travelBreakdown({
+    travelStatuses: [{ outboundTransfer: 'undecided' }, { outboundTransfer: 'requested' }],
+    memberCount: 2,
+    skipperStatus: {},
+  });
+  assert.deepEqual(breakdown.outbound, { requested: 1, pending: 1, independent: 1 });
 });
 
 test('senza il numero di iscritti il conteggio resta sconosciuto, non zero', () => {
   const breakdown = travelBreakdown({ travelStatuses: [], memberCount: null, skipperStatus: {} });
   assert.equal(breakdown.total, null);
-  assert.equal(breakdown.outbound.pending, null);
-  assert.equal(breakdown.return.pending, null);
+  assert.equal(breakdown.outbound.independent, null);
+  assert.equal(breakdown.return.independent, null);
 });
 
 test('del transfer skipper contano solo i record attivi della sua barca', () => {

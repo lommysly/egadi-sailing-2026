@@ -15,8 +15,13 @@ export function crewTravelCardPresentation(legStates = {}) {
   if (includes('transfer_cancelled')) {
     return { tone: 'cancelled', label: 'Transfer da verificare' };
   }
-  if (includes('missing', 'draft', 'transfer_pending')) {
-    return { tone: 'attention', label: 'Da completare' };
+  // Dal 2/10/2026 non chiediamo più a nessuno di dichiarare che NON gli serve
+  // il pulmino: chi non chiede niente ci arriva per conto suo, ed è una scelta
+  // legittima, non una pratica aperta. Resta un solo caso da seguire: chi ha
+  // scelto il transfer e non ha dato il consenso, perché vuole il pulmino e
+  // senza quella spunta non lo avrà.
+  if (includes('transfer_pending')) {
+    return { tone: 'attention', label: 'Transfer da completare' };
   }
   if (includes('transfer_ready', 'transfer_planning')) {
     return { tone: 'planning', label: 'Transfer in gestione' };
@@ -37,14 +42,14 @@ export function crewTravelCardPriority(tone) {
   }[tone] ?? 5;
 }
 
-// Nell'area skipper le persone restano divise in due elenchi semplici:
-// chi deve ancora completare almeno una tratta e chi ha già comunicato
-// entrambe le scelte. I badge della card spiegano poi se il transfer e
-// richiesto, in gestione, concluso oppure non richiesto.
+// Nell'area skipper le persone restano divise in due elenchi semplici: chi ha
+// una richiesta transfer rimasta a metà e tutti gli altri. "Tutti gli altri"
+// comprende sia chi ha chiesto il pulmino sia chi ci arriva per conto suo:
+// per lo skipper sono entrambi a posto, non c'è niente da fare.
 export function crewTravelOverviewGroup(legStates = {}) {
-  return ['missing', 'draft', 'transfer_pending'].some((state) => (
-    legStates.outbound === state || legStates.return === state
-  )) ? 'waiting' : 'submitted';
+  return legStates.outbound === 'transfer_pending' || legStates.return === 'transfer_pending'
+    ? 'waiting'
+    : 'submitted';
 }
 
 // Quando lo skipper richiede la lettura completa, la dichiarazione si abilita

@@ -94,12 +94,20 @@ function copyForLocale() {
       airportTransferDirection: { outbound: 'From the airport to Marsala', return: 'From Marsala to the airport' },
       airportTransferHint: 'The organised transfer is a paid service, available only through Trapani (TPS) or Palermo (PMO). You can change your mind at any time, even after confirming: come back here, change the choice and save again.',
       airportChoiceLabel: 'How will you make this connection?',
-      airportChoiceNone: 'I do not need to indicate it yet',
-      airportChoiceTransfer: 'I would like the organised transfer · paid service',
-      airportChoiceIndependent: 'I will arrange it independently',
-      airportChoiceRideOffer: 'I can offer a car ride',
-      airportChoiceSummary: { '': 'Connection not chosen yet', transfer: 'Paid organised transfer selected', independent: 'Travelling independently', ride_offer: 'Offering a car ride' },
+      airportChoiceTransfer: 'I want the organised transfer · paid service',
+      airportChoiceIndependent: 'I will get there on my own',
+      airportChoiceRideOffer: 'I am driving and can offer a ride',
+      airportChoiceSummary: { '': 'Getting there on your own', transfer: 'Paid organised transfer selected', independent: 'Getting there on your own', ride_offer: 'Offering a car ride' },
       airportChoiceNeedsConsent: 'Paid organised transfer selected · consent still needed',
+      transferAlert: {
+        none: {
+          outbound: ['You get to Marsala on your own', 'No transfer is arranged for your arrival: nobody is coming to pick you up. If you are sorting it out yourself — taxi, car, train, a ride with others — that is perfectly fine and there is nothing else to do.'],
+          return: ['You get to the airport on your own', 'No transfer is arranged for your return: nobody is coming to pick you up. If you are sorting it out yourself — taxi, car, train, a ride with others — that is perfectly fine and there is nothing else to do.'],
+        },
+        action: 'I want the organised transfer',
+        pending: ['Your request has not been sent yet', 'You selected the organised transfer, but without the tick below the request never reaches the company and nobody will come to pick you up.'],
+        ready: ['Organised transfer requested', 'The transfer company arranges the connection and confirms time, meeting point and cost. You can still change your mind: come back here and pick another option.'],
+      },
       operatorConsent: 'I agree that the organiser and the appointed transfer company may use these travel details and my contact information only to arrange the airport ↔ Marsala connection. The operational record is also backed up in the organisers’ private Google Sheet.',
       carpool: 'Carpool with other participants',
       carpoolHint: 'Optional. It can be used for any journey where a car ride is useful.',
@@ -232,12 +240,20 @@ function copyForLocale() {
     airportTransferDirection: { outbound: 'Dall’aeroporto a Marsala', return: 'Da Marsala all’aeroporto' },
     airportTransferHint: 'Il transfer organizzato è un servizio a pagamento, disponibile soltanto da/per Trapani (TPS) o Palermo (PMO). Puoi cambiare idea anche dopo la conferma: torna qui, modifica la scelta e salva di nuovo.',
     airportChoiceLabel: 'Come farai questo collegamento?',
-    airportChoiceNone: 'Non devo ancora indicarlo',
-    airportChoiceTransfer: 'Vorrei il transfer organizzato · servizio a pagamento',
-    airportChoiceIndependent: 'Mi organizzo in autonomia',
-    airportChoiceRideOffer: 'Posso offrire un passaggio in auto',
-    airportChoiceSummary: { '': 'Collegamento ancora da scegliere', transfer: 'Transfer organizzato a pagamento selezionato', independent: 'Ti organizzi in autonomia', ride_offer: 'Offri un passaggio in auto' },
+    airportChoiceTransfer: 'Voglio il transfer organizzato · servizio a pagamento',
+    airportChoiceIndependent: 'Ci arrivo per conto mio',
+    airportChoiceRideOffer: 'Guido io e posso offrire un passaggio',
+    airportChoiceSummary: { '': 'Ci arrivi per conto tuo', transfer: 'Transfer organizzato a pagamento selezionato', independent: 'Ci arrivi per conto tuo', ride_offer: 'Offri un passaggio in auto' },
     airportChoiceNeedsConsent: 'Transfer a pagamento selezionato · manca il consenso',
+    transferAlert: {
+      none: {
+        outbound: ['A Marsala ci arrivi tu', 'Nessun transfer è previsto per il tuo arrivo: non c’è nessuno che passa a prenderti. Se ti organizzi per conto tuo — taxi, auto, treno, un passaggio con altri — va benissimo così e non devi fare altro.'],
+        return: ['All’aeroporto ci arrivi tu', 'Nessun transfer è previsto per il tuo rientro: non c’è nessuno che passa a prenderti. Se ti organizzi per conto tuo — taxi, auto, treno, un passaggio con altri — va benissimo così e non devi fare altro.'],
+      },
+      action: 'Voglio il transfer organizzato',
+      pending: ['Richiesta non ancora partita', 'Hai scelto il transfer organizzato, ma senza la spunta qui sotto la richiesta non arriva alla società e nessuno verrà a prenderti.'],
+      ready: ['Transfer organizzato richiesto', 'La società transfer organizza il collegamento e conferma orario, punto di ritrovo e costo. Puoi cambiare idea anche dopo: torna qui e scegli un’altra opzione.'],
+    },
     operatorConsent: 'Acconsento che organizzazione e società transfer incaricata usino questi dati di viaggio e il mio contatto solo per organizzare il collegamento aeroporto ↔ Marsala. La registrazione operativa viene inoltre riportata nel foglio Google privato dell’organizzazione.',
     carpool: 'Passaggi auto con altri partecipanti',
     carpoolHint: 'È facoltativo: serve per qualsiasi tratto in cui un passaggio in auto può essere utile.',
@@ -345,7 +361,13 @@ function defaultLeg(direction) {
     serviceNumber: '',
     luggageCount: 0,
     bulkyLuggage: false,
-    airportMarsalaChoice: '',
+    // Nessun transfer finché non lo chiedi. È il default sicuro: il sistema
+    // non può prenotare un posto sul pulmino per chi non l'ha chiesto, e chi
+    // non apre mai questa pagina non risulta "incompleto" ma semplicemente
+    // uno che a Marsala ci arriva per conto suo (richiesta di Silvio,
+    // 2/10/2026, dopo il caso Carpe Diem: nove iscritti, nessuno aveva mai
+    // aperto il modulo, e il sito li segnalava tutti come da sollecitare).
+    airportMarsalaChoice: 'independent',
     transferOperatorConsent: false,
     carpoolRole: '',
     carpoolSeats: 0,
@@ -372,7 +394,10 @@ function normalizeLeg(raw, direction) {
     serviceNumber: text(source.serviceNumber).toUpperCase(),
     luggageCount: number(source.luggageCount, 0, 12),
     bulkyLuggage: source.bulkyLuggage === true,
-    airportMarsalaChoice: valueOr(text(source.airportMarsalaChoice), AIRPORT_MARSALA_CHOICES),
+    // Una tratta salvata prima del 2/10/2026 può avere la scelta vuota: ora
+    // quel vuoto vale "ci arrivo per conto mio", così il menu non resta in
+    // bianco e l'avviso qui sopra dice subito come stanno le cose.
+    airportMarsalaChoice: valueOr(text(source.airportMarsalaChoice), AIRPORT_MARSALA_CHOICES) || base.airportMarsalaChoice,
     transferOperatorConsent: source.transferOperatorConsent === true,
     carpoolRole: valueOr(text(source.carpoolRole), CARPOOL_ROLES),
     carpoolSeats: number(source.carpoolSeats, 0, 8),
@@ -588,6 +613,11 @@ function renderLegForm(direction, rawLeg) {
       </div>
       <div class="skipper-travel-status" data-travel-persisted-status role="status" aria-live="polite"><span class="skipper-travel-status-icon" data-travel-persisted-icon aria-hidden="true"></span><div><strong data-travel-persisted-title></strong><span data-travel-persisted-detail></span></div></div>
       <section class="crew-transfer-progress" data-transfer-progress aria-live="polite" hidden></section>
+      <div class="transfer-alert" data-transfer-alert role="status" aria-live="polite">
+        <p class="transfer-alert-title" data-transfer-alert-title></p>
+        <p class="transfer-alert-text" data-transfer-alert-text></p>
+        <button class="button button-primary transfer-alert-action" type="button" data-transfer-request hidden>${copy.transferAlert.action}</button>
+      </div>
       <nav class="dashboard-view-navigation" data-travel-step-nav aria-label="${copy.stepNavLabel}">
         <button type="button" data-travel-step="trip">${TRAVEL_STEP_ICONS.trip}${copy.stepTrip}</button>
         <button type="button" data-travel-step="connection">${TRAVEL_STEP_ICONS.connection}${copy.stepConnection}</button>
@@ -607,7 +637,7 @@ function renderLegForm(direction, rawLeg) {
       <fieldset class="skipper-transfer-fieldset" data-travel-step-panel="connection">
         <legend>${copy.airportTransferDirection[direction]}</legend>
         <p class="field-hint">${copy.airportTransferHint}</p>
-        <label>${copy.airportChoiceLabel}<select name="airportMarsalaChoice"><option value="">${copy.airportChoiceNone}</option><option value="transfer">${copy.airportChoiceTransfer}</option><option value="independent">${copy.airportChoiceIndependent}</option><option value="ride_offer">${copy.airportChoiceRideOffer}</option></select></label>
+        <label>${copy.airportChoiceLabel}<select name="airportMarsalaChoice"><option value="independent">${copy.airportChoiceIndependent}</option><option value="transfer">${copy.airportChoiceTransfer}</option><option value="ride_offer">${copy.airportChoiceRideOffer}</option></select></label>
         <p class="field-hint transfer-price-note" data-transfer-price-note hidden></p>
         <label class="consent-field" data-transfer-consent hidden><input name="transferOperatorConsent" type="checkbox" /><span>${copy.operatorConsent}</span></label>
       </fieldset>
@@ -649,22 +679,26 @@ function populateLegForm(form, leg) {
   updateConditionalFields(form);
 }
 
-// Chi arriva o riparte da Trapani o Palermo ha quasi certamente bisogno del
-// collegamento con Marsala: lasciare la scelta vuota per default significava
-// che molte persone compilavano il volo e si fermavano lì, restando bloccate
-// su "Transfer da scegliere" finché lo skipper non sollecitava (segnalato dal
-// titolare). Pre-selezioniamo "Transfer organizzato" solo quando la scelta è
-// ancora vuota: resta comunque modificabile in un click, e il consenso a
-// condividere i dati con la società transfer resta comunque una spunta
-// esplicita separata, mai automatica.
-function autoSelectAirportTransferChoice(form) {
-  const choiceField = field(form, 'airportMarsalaChoice');
-  if (!choiceField || choiceField.value !== '') return;
-  if (selectValue(form, 'transportMode', TRANSPORT_MODES) !== 'flight') return;
-  const direction = form.closest('[data-travel-direction]')?.dataset.travelDirection;
-  const terminalAirport = (direction === 'return' ? inputValue(form, 'originAirport') : inputValue(form, 'destinationAirport')).toUpperCase();
-  if (!TERMINAL_AIRPORTS.has(terminalAirport)) return;
-  choiceField.value = 'transfer';
+// L'avviso grosso sopra la scelta. Dice sempre che cosa succede DAVVERO
+// adesso, non che cosa manca da compilare: finché non chiedi il transfer, a
+// Marsala ci arrivi tu. Sostituisce la vecchia pre-selezione automatica di
+// "Transfer organizzato", che riempiva la scelta al posto della persona e
+// lasciava tutti in attesa del consenso (richiesta di Silvio, 2/10/2026).
+function updateTransferAlert(form, direction, airportChoice, hasConsent) {
+  const alert = form.querySelector('[data-transfer-alert]');
+  if (!alert || !direction) return;
+  const copy = copyForLocale();
+  const action = alert.querySelector('[data-transfer-request]');
+  const requested = airportChoice === 'transfer';
+  const tone = !requested ? 'none' : hasConsent ? 'ready' : 'pending';
+  const [title, body] = tone === 'none' ? copy.transferAlert.none[direction] : copy.transferAlert[tone];
+  alert.dataset.transferAlertTone = tone;
+  alert.querySelector('[data-transfer-alert-title]').textContent = title;
+  alert.querySelector('[data-transfer-alert-text]').textContent = body;
+  if (action) {
+    action.textContent = copy.transferAlert.action;
+    action.hidden = requested;
+  }
 }
 
 function formatEuro(cents) {
@@ -711,7 +745,6 @@ function transferPriceNote(terminalAirport, direction) {
 }
 
 function updateConditionalFields(form) {
-  autoSelectAirportTransferChoice(form);
   const airportChoice = inputValue(form, 'airportMarsalaChoice');
   const carpoolRole = inputValue(form, 'carpoolRole');
   const transferConsent = form.querySelector('[data-transfer-consent]');
@@ -730,6 +763,7 @@ function updateConditionalFields(form) {
     priceNote.textContent = noteText;
     priceNote.hidden = !noteText;
   }
+  updateTransferAlert(form, direction, airportChoice, inputChecked(form, 'transferOperatorConsent'));
   const summary = form.querySelector('[data-travel-connection-summary]');
   if (direction && summary) {
     const copy = copyForLocale();
@@ -881,6 +915,21 @@ function bindLegForm(form, direction) {
   });
   form.querySelectorAll('[data-save-state]').forEach((button) => {
     button.addEventListener('click', () => { form.dataset.saveState = button.dataset.saveState || 'draft'; });
+  });
+  // Dall'avviso al transfer in un tocco: il pulsante sceglie per la persona e
+  // la porta subito sul consenso, che resta l'unico passo che deve fare lei.
+  form.querySelector('[data-transfer-request]')?.addEventListener('click', () => {
+    const choiceField = field(form, 'airportMarsalaChoice');
+    if (!choiceField) return;
+    choiceField.value = 'transfer';
+    form.dataset.travelDirty = 'true';
+    updateConditionalFields(form);
+    // Il consenso vive nel passo "Collegamento aeroporto": aprirlo fa parte
+    // del gesto, altrimenti la spunta resta in un pannello che non si vede.
+    setTravelStep(form.closest('details'), 'connection');
+    const consent = field(form, 'transferOperatorConsent');
+    consent?.focus();
+    consent?.closest('label')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
