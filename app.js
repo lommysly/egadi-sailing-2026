@@ -1,4 +1,14 @@
 (() => {
+  // Il browser ripristina da solo la posizione dell'ultima visita. Siccome
+  // l'ultima sezione della home è la promo dell'app, riaprendo il sito o
+  // tornando indietro ci si ritrovava dentro, senza capire dove si era
+  // finiti (segnalato da Silvio, 2/10/2026: "si perde orientamento").
+  // Ogni pagina riparte dall'alto; se l'indirizzo contiene un'ancora
+  // esplicita quella continua a comandare, perché lì il punto preciso è
+  // stato chiesto (es. i pannelli dell'area skipper).
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  if (!window.location.hash) window.scrollTo(0, 0);
+
   let hasStarted = false;
 
   const start = () => {
