@@ -21,6 +21,16 @@ import {
   recordClusterMinutes,
   suggestedMarsalaDeparture,
 } from './transfer-ordering.js?v=20260929-transfer-timeline-v1';
+import {
+  boatFromData,
+  boatSetupReadiness as readinessFromSignals,
+  economySignals,
+  normalizeTransferDirection,
+  openTodoKeys,
+  setupSignals,
+  skipperTransferStatus,
+  travelBreakdown,
+} from './boat-todo-core.js?v=20261002-todo-core-v1';
 
 const EVENT_ID = 'egadi-2026';
 const app = initializeApp(firebaseConfig);
@@ -511,10 +521,7 @@ function formatSchedule(record) {
 }
 
 function normalizeDirection(value) {
-  const normalized = text(value, 40).toLowerCase();
-  if (['outbound', 'andata', 'arrival', 'arrivo', 'to_marsala', 'airport_to_marsala'].includes(normalized)) return 'outbound';
-  if (['return', 'ritorno', 'departure', 'partenza', 'from_marsala', 'marsala_to_airport'].includes(normalized)) return 'return';
-  return '';
+  return normalizeTransferDirection(value);
 }
 
 function directionLabel(value) {
@@ -1010,17 +1017,7 @@ async function ensureAllBoatsLoaded() {
   try {
     const snapshot = await getDocs(collection(db, 'boats'));
     state.allBoats = snapshot.docs
-      .map((entry) => {
-        const data = entry.data() || {};
-        return {
-          id: entry.id,
-          name: data.name || entry.id,
-          skipperName: data.skipperName || '',
-          capacity: Number.isInteger(data.capacity) ? data.capacity : null,
-          totalBerths: Number.isInteger(data.totalBerths) ? data.totalBerths : null,
-          bathroomCount: Number.isInteger(data.berthLayout?.bathroomCount) ? data.berthLayout.bathroomCount : 0,
-        };
-      })
+      .map((entry) => boatFromData(entry.id, entry.data()))
       .sort((first, second) => first.name.localeCompare(second.name, 'it'));
     render();
   } catch (error) {
@@ -1045,9 +1042,11 @@ async function ensureBoatSetupStatus(boatIds) {
         getDoc(doc(db, 'boats', boatId, 'skipperContact', 'default')),
       ]);
       state.boatSetupStatus[boatId] = {
-        rulesActive: briefingSnap.exists() && Boolean(briefingSnap.data()?.rulesText),
+        ...setupSignals({
+          briefing: briefingSnap.exists() ? briefingSnap.data() || {} : null,
+          contact: contactSnap.exists() ? contactSnap.data() || {} : null,
+        }),
         rulesUpdatedAt: briefingSnap.data()?.updatedAt || null,
-        dossierConfirmed: contactSnap.exists(),
         dossierUpdatedAt: contactSnap.data()?.updatedAt || null,
       };
     } catch (error) {
@@ -1071,15 +1070,13 @@ async function ensureBoatEconomyStatus(boatIds) {
         getDoc(doc(db, 'boats', boatId, 'contributionPlan', 'default')),
         getDocs(collection(db, 'boats', boatId, 'crewProjections')),
       ]);
-      const items = planSnap.exists() ? planSnap.data()?.items || {} : {};
-      const decidedItems = Object.values(items).filter((item) => item?.state && item.state !== 'to_define').length;
-      const pricedProjections = projectionsSnap.docs.filter((entry) => Number(entry.data()?.berthCents) > 0).length;
       state.boatEconomyStatus[boatId] = {
-        planExists: planSnap.exists(),
-        decidedItems,
+        ...economySignals({
+          planExists: planSnap.exists(),
+          items: planSnap.exists() ? planSnap.data()?.items : {},
+          projectionBerthCents: projectionsSnap.docs.map((entry) => entry.data()?.berthCents),
+        }),
         planUpdatedAt: planSnap.data()?.updatedAt || null,
-        projectionsTotal: projectionsSnap.size,
-        pricedProjections,
       };
     } catch (error) {
       console.info('Stato economico non disponibile per questa barca.', boatId, error?.code || error);
@@ -1146,11 +1143,7 @@ async function ensureBoatTravelStatus(boatIds) {
 // 30/09/2026: il riepilogo per barca ometteva del tutto il transfer e la
 // partecipazione dello skipper.
 function boatSkipperTransferStatus(boatId) {
-  const hasActiveLeg = (direction) => state.records.some((record) => record.boatId === boatId
-    && record.inviteId === 'skipper'
-    && (!record.recordState || record.recordState === 'active')
-    && normalizeDirection(record.direction || record.legDirection || record.travelDirection) === direction);
-  return { outbound: hasActiveLeg('outbound'), return: hasActiveLeg('return') };
+  return skipperTransferStatus(state.records, boatId);
 }
 
 // Il totale e le due tratte includono anche lo skipper: sale a bordo pure
@@ -1163,29 +1156,11 @@ function boatSkipperTransferStatus(boatId) {
 // di Silvio, 30/09/2026: "tutto ciò che riguarda lo skipper" va contato, non
 // solo mostrato).
 function boatTravelBreakdown(boatId, skipperStatus = {}) {
-  const statuses = state.boatTravelStatus[boatId] || [];
-  const crewTotal = state.boatMemberCounts[boatId];
-  const total = Number.isInteger(crewTotal) ? crewTotal + 1 : null;
-  const countFor = (key) => ({
-    requested: statuses.filter((entry) => entry[key] === 'requested').length,
-    independent: statuses.filter((entry) => entry[key] === 'not_requested').length,
+  return travelBreakdown({
+    travelStatuses: state.boatTravelStatus[boatId],
+    memberCount: state.boatMemberCounts[boatId],
+    skipperStatus,
   });
-  const withSkipper = (counted, skipperRequested) => {
-    const requested = counted.requested + (skipperRequested ? 1 : 0);
-    const independent = counted.independent;
-    return {
-      requested,
-      independent,
-      pending: Number.isInteger(total) ? Math.max(0, total - requested - independent) : null,
-    };
-  };
-  const outbound = countFor('outboundTransfer');
-  const inbound = countFor('returnTransfer');
-  return {
-    total,
-    outbound: withSkipper(outbound, skipperStatus.outbound === true),
-    return: withSkipper(inbound, skipperStatus.return === true),
-  };
 }
 
 // Nessun numero: skipperProfile/skipperTravel restano privati per regola
@@ -1213,17 +1188,11 @@ function skipperDestinationUrl(needsSetupFollowUp) {
 // bordo attive, dossier skipper confermato. Vedi ensureBoatSetupStatus per
 // da dove arrivano rulesActive/dossierConfirmed.
 function boatSetupReadiness(boat) {
-  const status = state.boatSetupStatus[boat.id] || {};
-  const economy = state.boatEconomyStatus[boat.id];
-  return {
-    boatConfigured: Number.isInteger(boat.totalBerths) && boat.totalBerths >= 2 && boat.bathroomCount > 0,
-    rulesActive: status.rulesActive === true,
-    dossierConfirmed: status.dossierConfirmed === true,
-    // `null` quando il dato non è ancora stato letto: diverso da "non fatto",
-    // altrimenti il sollecito partirebbe verso chi ha già impostato tutto.
-    quotesSet: economy ? economy.pricedProjections > 0 : null,
-    extrasSet: economy ? economy.decidedItems > 0 : null,
-  };
+  return readinessFromSignals({
+    boat,
+    setup: state.boatSetupStatus[boat.id],
+    economy: state.boatEconomyStatus[boat.id],
+  });
 }
 
 function boatSetupIssues(readiness) {
@@ -1302,16 +1271,20 @@ function boatReminderMessage(boat, breakdown, readiness, skipperStatus) {
 // di tutte le barche", bensì "ecco cosa resta da fare, e a chi scrivere".
 // Nessun calcolo nuovo — riusa readiness, breakdown e il messaggio di
 // sollecito già esistenti (richiesta di Silvio, 2/10/2026).
-function boatTodoChips(readiness, transferPending, skipperNeedsFollowUp) {
-  const chips = [];
-  if (!readiness.boatConfigured) chips.push(t('boatChecklistBoat'));
-  if (!readiness.rulesActive) chips.push(t('boatChecklistRules'));
-  if (!readiness.dossierConfirmed) chips.push(t('boatChecklistDossier'));
-  if (readiness.quotesSet === false) chips.push(t('boatChecklistQuotes'));
-  if (readiness.extrasSet === false) chips.push(t('boatChecklistExtras'));
-  if (transferPending > 0) chips.push(t('todoTransfer').replace('{count}', String(transferPending)));
-  if (skipperNeedsFollowUp) chips.push(t('boatChecklistSkipperTransfer'));
-  return chips;
+const TODO_CHIP_LABELS = Object.freeze({
+  boat: () => t('boatChecklistBoat'),
+  rules: () => t('boatChecklistRules'),
+  dossier: () => t('boatChecklistDossier'),
+  quotes: () => t('boatChecklistQuotes'),
+  extras: () => t('boatChecklistExtras'),
+  skipperTransfer: () => t('boatChecklistSkipperTransfer'),
+});
+
+function boatTodoChips(readiness, transferPending, skipperStatus) {
+  return openTodoKeys({ readiness, transferPending, skipperStatus })
+    .map((key) => (key === 'transfer'
+      ? t('todoTransfer').replace('{count}', String(transferPending))
+      : TODO_CHIP_LABELS[key]()));
 }
 
 function renderTodoBoard() {
@@ -1326,8 +1299,7 @@ function renderTodoBoard() {
     const breakdown = boatTravelBreakdown(boat.id, skipperStatus);
     const readiness = boatSetupReadiness(boat);
     const transferPending = (breakdown.outbound.pending || 0) + (breakdown.return.pending || 0);
-    const skipperNeedsFollowUp = !skipperStatus.outbound || !skipperStatus.return;
-    const chips = boatTodoChips(readiness, transferPending, skipperNeedsFollowUp);
+    const chips = boatTodoChips(readiness, transferPending, skipperStatus);
     const reminderUrl = Number.isInteger(breakdown.total)
       ? whatsappDraftUrl(boatReminderMessage(boat, breakdown, readiness, skipperStatus))
       : '';

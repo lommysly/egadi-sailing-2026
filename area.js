@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
-import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { getBlob, getMetadata, getStorage, ref as storageRef, uploadBytesResumable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
 import { getMissingCharterFields, getMissingSkipperProfileFields, isBoatReadyForPdf, isCharterReady, isSkipperProfileCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260915-skipper-documents-v1';
@@ -13,6 +13,15 @@ import { installInputNormalization, normalizeFormFields } from './input-normaliz
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-experience-v1';
 import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20260929-skipper-transfer-lists-v2';
+import {
+  boatFromData,
+  boatSetupReadiness,
+  economySignals,
+  openTodoKeys,
+  setupSignals,
+  skipperTransferStatus,
+  travelBreakdown,
+} from './boat-todo-core.js?v=20261002-todo-core-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -1497,8 +1506,9 @@ function setupSkipperDashboard() {
         <strong data-skipper-summary="operations">Carico viaggio e regole…</strong><small data-skipper-detail="operations">Transfer, regole di bordo, orari e bacheca.</small>
       </button>
       <a id="skipperTransferHubCard" class="dashboard-hub-card dashboard-hub-card-transfer" href="transfer.html" hidden>
+        <span class="dashboard-hub-status" id="skipperTransferHubCount" hidden></span>
         <span class="dashboard-hub-icon">${skipperDashboardIcon('transfer')}</span><span class="dashboard-hub-label">Console organizzatore</span>
-        <strong>Cose da fare e solleciti</strong><small>Chi ha fatto cosa su tutte le barche, messaggi di sollecito su WhatsApp e movimenti transfer.</small>
+        <strong id="skipperTransferHubSummary">Cose da fare e solleciti</strong><small>Chi ha fatto cosa su tutte le barche, messaggi di sollecito su WhatsApp e movimenti transfer.</small>
       </a>
     </div>
     <div class="dashboard-next-step"><div><span>Prossimo passo</span><strong id="skipperNextActionText">Preparo la tua panoramica.</strong></div><button id="skipperNextActionButton" class="button button-primary" type="button" data-skipper-view="crew">Apri</button></div>
@@ -1737,11 +1747,84 @@ function updateRulesEditorChangeWarning() {
     : 'Stai modificando il regolamento attivo. Dopo il salvataggio le nuove persone leggeranno questo testo prima della Crew List.';
 }
 
+// Quante barche hanno ancora qualcosa di aperto, scritto sulla card che porta
+// alla console: il numero si vede senza entrare, ma l'elenco resta uno solo
+// (richiesta di Silvio, 2/10/2026). La regola di "cosa conta" non è riscritta
+// qui — arriva da boat-todo-core.js, lo stesso file che la console usa per
+// costruire l'elenco e i messaggi di sollecito, quindi numero ed elenco non
+// possono raccontare due cose diverse.
+let organizerTodoCountRequested = false;
+
+function organizerTodoCountLabel(count) {
+  if (count === 0) return 'Tutto a posto: nessun sollecito da mandare.';
+  return count === 1 ? 'Una barca da sollecitare' : `${count} barche da sollecitare`;
+}
+
+function paintOrganizerTodoCount(count) {
+  const summary = document.querySelector('#skipperTransferHubSummary');
+  const badge = document.querySelector('#skipperTransferHubCount');
+  if (summary) summary.textContent = organizerTodoCountLabel(count);
+  if (!badge) return;
+  badge.textContent = String(count);
+  badge.setAttribute('aria-label', organizerTodoCountLabel(count));
+  badge.toggleAttribute('hidden', count === 0);
+}
+
+async function loadOrganizerTodoCount() {
+  if (organizerTodoCountRequested) return;
+  organizerTodoCountRequested = true;
+  try {
+    const [boatsSnapshot, recordsSnapshot] = await Promise.all([
+      getDocs(collection(db, 'boats')),
+      getDocs(collection(db, 'events', eventId, 'transferOpsRecords')),
+    ]);
+    const records = recordsSnapshot.docs.map((entry) => entry.data());
+    const openBoats = await Promise.all(boatsSnapshot.docs.map(async (entry) => {
+      const boat = boatFromData(entry.id, entry.data());
+      const [briefingSnap, contactSnap, planSnap, projectionsSnap, membersSnap, travelSnap] = await Promise.all([
+        getDoc(doc(db, 'boats', boat.id, 'briefing', 'board')),
+        getDoc(doc(db, 'boats', boat.id, 'skipperContact', 'default')),
+        getDoc(doc(db, 'boats', boat.id, 'contributionPlan', 'default')),
+        getDocs(collection(db, 'boats', boat.id, 'crewProjections')),
+        getDocs(collection(db, 'boats', boat.id, 'members')),
+        getDocs(collection(db, 'boats', boat.id, 'crewTravelStatus')),
+      ]);
+      const skipperStatus = skipperTransferStatus(records, boat.id);
+      const breakdown = travelBreakdown({
+        travelStatuses: travelSnap.docs.map((travel) => travel.data()),
+        memberCount: membersSnap.size,
+        skipperStatus,
+      });
+      const readiness = boatSetupReadiness({
+        boat,
+        setup: setupSignals({
+          briefing: briefingSnap.exists() ? briefingSnap.data() || {} : null,
+          contact: contactSnap.exists() ? contactSnap.data() || {} : null,
+        }),
+        economy: economySignals({
+          planExists: planSnap.exists(),
+          items: planSnap.exists() ? planSnap.data()?.items : {},
+          projectionBerthCents: projectionsSnap.docs.map((projection) => projection.data()?.berthCents),
+        }),
+      });
+      const transferPending = (breakdown.outbound.pending || 0) + (breakdown.return.pending || 0);
+      return openTodoKeys({ readiness, transferPending, skipperStatus }).length > 0;
+    }));
+    paintOrganizerTodoCount(openBoats.filter(Boolean).length);
+  } catch (error) {
+    // Senza numero la card resta esattamente quella di prima, e la console
+    // continua a funzionare: meglio nessun numero che un conteggio falso.
+    // Nessun nuovo tentativo, per non ripetere la lettura a ogni render.
+    console.info('Conteggio barche da sollecitare non disponibile.', error?.code || error);
+  }
+}
+
 function renderSkipperDashboardOverview() {
   if (!skipperDashboardInitialized) return;
   pendingChecklistIssues = [];
   document.querySelector('#skipperTransferHubCard')?.toggleAttribute('hidden', !isOrganizerAccount);
   document.querySelector('#skipperTransferNavLink')?.toggleAttribute('hidden', !isOrganizerAccount);
+  if (isOrganizerAccount) void loadOrganizerTodoCount();
   const capacity = crewSeatLimit();
   const allocated = allocatedCrewSeatCount();
   const pendingInvites = activeInvites.filter((invite) => invite.status === 'pending').length;
@@ -3441,6 +3524,8 @@ async function publishExistingBoatToFleet(boat) {
 
 function resetPrivateView() {
   isOrganizerAccount = false;
+  // Cambio di account: il conteggio va riletto, non riusato.
+  organizerTodoCountRequested = false;
   resetSkipperDocumentCopies('idle');
   activeBoat = null;
   activeMembers = [];

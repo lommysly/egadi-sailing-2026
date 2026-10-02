@@ -110,6 +110,9 @@ body.menu-open { overflow:hidden; }
 .dashboard-hub-card--attention:hover { background:rgba(255,183,3,.24); }
 .dashboard-hub-status { position:absolute; top:14px; right:14px; display:grid; width:24px; height:24px; place-items:center; border-radius:50%; background:#ffb703; color:#402c00; font:800 .85rem "DM Sans",sans-serif; box-shadow:0 2px 6px rgba(2,43,58,.35); }
 .dashboard-hub-status[hidden] { display:none; }
+/* Sulla card della console organizzatore il pallino porta un numero, non un
+   punto esclamativo: deve poter crescere a due cifre senza tagliarsi. */
+#skipperTransferHubCount { width:auto; min-width:24px; padding:0 7px; border-radius:999px; }
 /* Presenza editoriale di That's A Blast dentro le aree private. Il modulo
    usa il simbolo Orbit e la palette reale dell'app, ma i link si aprono in
    una nuova scheda: non deve interrompere un'operazione già in corso. */
