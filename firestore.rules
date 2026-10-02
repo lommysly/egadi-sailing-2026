@@ -2478,11 +2478,21 @@ service cloud.firestore {
               && isValidCrewProjectionInviteTransition(boatId, projectionId)));
         // Si libera solo una bozza senza accesso. Dopo l'invito il record
         // resta la traccia privata che collega lo stesso posto alla Crew List.
+        // Due casi distinti, non uno solo: la scheda mai invitata si cancella
+        // com'è sempre stato, e da oggi anche quella di chi ha ricevuto il
+        // link ma non si è mai registrato (rinuncia dell'ultima settimana:
+        // caso reale Antonio Lorenzon su Karibu, 2/10/2026, che prima
+        // richiedeva un intervento manuale sul database).
+        // Il confine è la Crew List: se la persona ha già una riga lì, i suoi
+        // dati sono reali e la scheda non si tocca — si rimuove dalla Crew
+        // List, dove l'azione dichiara cosa sta cancellando.
         allow delete: if isPrivateAreaOpen()
           && (isOrganizer() || isSkipper(boatId))
-          && resource.data.status == 'projected'
-          && resource.data.inviteId == null
-          && resource.data.invitedAt == null;
+          && ((resource.data.status == 'projected'
+              && resource.data.inviteId == null
+              && resource.data.invitedAt == null)
+            || (resource.data.status == 'invited'
+              && !exists(/databases/$(database)/documents/boats/$(boatId)/members/$(projectionId))));
       }
 
       match /members/{memberId} {

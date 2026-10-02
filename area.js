@@ -6493,6 +6493,17 @@ function cancellableActivePaymentsForProjection(projection) {
     .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
 }
 
+// Una scheda si libera finché la persona non è davvero entrata: nessuna riga
+// in Crew List (le Rules impongono la stessa condizione) e nessun versamento
+// o richiesta ancora aperta, che le Rules non possono controllare perché non
+// esiste una query per campo.
+function projectionCanBeReleased(projection) {
+  if (!projection) return false;
+  if (projectionHasVerifiedContribution(projection)) return false;
+  if (activeMembers.some((member) => member.id === projection.id)) return false;
+  return cancellableActivePaymentsForProjection(projection).length === 0;
+}
+
 function projectionCardActions(projection, invite) {
   const actions = [];
   const secondaryActions = [];
@@ -6530,7 +6541,9 @@ function projectionCardActions(projection, invite) {
     actions.unshift(projectionActionTextButton('send-projection', projection.id, 'Crea invito WhatsApp', '🔗', 'primary'));
     if (!contributionVerified) {
       actions.push(editAction);
-      secondaryActions.push(projectionActionTextButton('release-projection', projection.id, 'Libera posto', '×', 'release'));
+      if (projectionCanBeReleased(projection)) {
+        secondaryActions.push(projectionActionTextButton('release-projection', projection.id, 'Libera posto', '×', 'release'));
+      }
     }
     return [...actions, projectionMoreActions(secondaryActions)].join('');
   }
@@ -6548,6 +6561,14 @@ function projectionCardActions(projection, invite) {
     secondaryActions.push(inviteRenewalAction(invite, projection.displayName));
   } else {
     actions.unshift(inviteRenewalAction(invite, projection.displayName));
+  }
+  // Chi rinuncia dopo aver ricevuto il link: finché non si è registrato il
+  // posto deve tornare libero dall'app (caso Antonio Lorenzon su Karibu,
+  // 2/10/2026). Chi è già in Crew List si rimuove da lì, dove l'azione
+  // dichiara che sta cancellando dati veri; con versamenti o richieste
+  // attive si annullano prima, così non restano importi orfani.
+  if (projectionCanBeReleased(projection)) {
+    secondaryActions.push(projectionActionTextButton('release-projection', projection.id, 'Libera posto', '×', 'release'));
   }
   return [...actions, projectionMoreActions(secondaryActions)].join('');
 }
@@ -8210,10 +8231,18 @@ document.querySelector('#projectionList').addEventListener('click', async (event
   const releaseButton = event.target.closest('[data-release-projection]');
   if (releaseButton) {
     const projection = activeProjections.find((candidate) => candidate.id === releaseButton.dataset.releaseProjection);
-    if (!projection || projectionInvite(projection)) return;
-    if (!window.confirm(`Liberare il posto riservato per ${projection.displayName}? Non è stato creato alcun invito.`)) return;
+    if (!projection || !projectionCanBeReleased(projection)) return;
+    const invite = projectionInvite(projection);
+    const confirmText = invite
+      ? `Liberare il posto di ${projection.displayName}? Il link che gli hai inviato smette di funzionare e la scheda viene cancellata. ${projection.displayName} non risulta ancora registrato, quindi non si perde nessun dato compilato da lui.`
+      : `Liberare il posto riservato per ${projection.displayName}? Non è stato creato alcun invito.`;
+    if (!window.confirm(confirmText)) return;
     releaseButton.disabled = true;
     try {
+      // Prima il link, poi la scheda: se la seconda cancellazione fallisce
+      // resta una scheda senza invito, che si libera com'è sempre stato.
+      // L'ordine inverso lascerebbe invece un link ancora valido.
+      if (invite) await deleteDoc(doc(db, 'boats', activeBoat.id, 'invites', invite.id));
       await deleteDoc(doc(db, 'boats', activeBoat.id, 'crewProjections', projection.id));
       if (editingProjectionId === projection.id) closeProjectionEditor();
       setMessage(message, 'Posto liberato: torna disponibile per una nuova scheda equipaggio.');

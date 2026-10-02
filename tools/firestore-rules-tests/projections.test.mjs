@@ -945,9 +945,34 @@ test('liberazione: SKIPPER_A puo cancellare una proiezione ancora status project
   await assertSucceeds(deleteDoc(doc(skipper.firestore(), `boats/${SKIPPER_A}/crewProjections/${PROJECTION_A_ID}`)));
 });
 
-test('liberazione: SKIPPER_A non puo cancellare una proiezione gia in status invited', async () => {
+// Chi riceve il link e poi rinuncia prima di registrarsi deve liberare il
+// posto dall'app: fino al 2/10/2026 serviva un intervento manuale sul
+// database (caso Antonio Lorenzon su Karibu, a sei giorni dalla partenza).
+test('liberazione: SKIPPER_A puo cancellare una proiezione invited se la persona non si e mai registrata', async () => {
   await seedOpenEventAndBoat();
   await seedProjection({ status: 'invited', inviteId: PROJECTION_A_ID, invitedAt: serverTimestamp() });
   const skipper = skipperContext(testEnv);
+  await assertSucceeds(deleteDoc(doc(skipper.firestore(), `boats/${SKIPPER_A}/crewProjections/${PROJECTION_A_ID}`)));
+});
+
+// Il confine della nuova permissione: con una riga in Crew List i dati sono
+// reali e la scheda resta protetta, si rimuove dalla Crew List.
+test('liberazione: SKIPPER_A non puo cancellare una proiezione invited se la persona e gia in Crew List', async () => {
+  await seedOpenEventAndBoat();
+  await seedProjection({ status: 'invited', inviteId: PROJECTION_A_ID, invitedAt: serverTimestamp() });
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), `boats/${SKIPPER_A}/members/${PROJECTION_A_ID}`), {
+      displayName: 'Carla Bianchi',
+      updatedAt: serverTimestamp(),
+    });
+  });
+  const skipper = skipperContext(testEnv);
   await assertFails(deleteDoc(doc(skipper.firestore(), `boats/${SKIPPER_A}/crewProjections/${PROJECTION_A_ID}`)));
+});
+
+test('liberazione: un estraneo non puo cancellare una proiezione invited liberabile', async () => {
+  await seedOpenEventAndBoat();
+  await seedProjection({ status: 'invited', inviteId: PROJECTION_A_ID, invitedAt: serverTimestamp() });
+  const outsider = outsiderContext(testEnv);
+  await assertFails(deleteDoc(doc(outsider.firestore(), `boats/${SKIPPER_A}/crewProjections/${PROJECTION_A_ID}`)));
 });
