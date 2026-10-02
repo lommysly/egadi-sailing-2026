@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+
+import {
+  assertEveryLocalAssetIsVersioned,
+  assertLoadsVersionedAsset,
+  assertOneVersionPerAsset,
+  assertOneVersionPerModuleImport,
+  htmlFileNames,
+} from './asset-version-utils.mjs';
 
 const areaSource = readFileSync(new URL('../area.js', import.meta.url), 'utf8');
 const areaHtml = readFileSync(new URL('../area.html', import.meta.url), 'utf8');
@@ -276,14 +284,25 @@ test('le azioni della panoramica aprono direttamente il pannello utile', () => {
   assert.match(checklistWriter, /setSkipperButtonDestination\(button, issue\)/);
 });
 
-test('tutte le pagine caricano il nuovo CSS versionato e area usa il nuovo JS', () => {
-  const htmlFiles = readdirSync(rootUrl).filter((name) => name.endsWith('.html'));
+// Questo test sostituisce quello che confrontava le pagine con una stringa di
+// versione scritta a mano (`styles.css?v=20260929-skipper-transfer-lists-v2`).
+// Quel confronto falliva ogni volta che la regola 10 di AGENTS.md veniva
+// applicata correttamente, perché la versione giusta è proprio quella nuova:
+// l'unico modo di farlo ripassare era ricopiarci dentro la versione del giorno.
+// Qui si verifica invece la proprietà che la regola 10 vuole davvero garantire —
+// ogni file locale è linkato con un `?v=`, e tutte le pagine che caricano lo
+// stesso file usano la stessa identica stringa — che è esattamente ciò che era
+// stato violato il 22/9/2026 (CSS aggiornato solo in parte delle pagine).
+test('ogni pagina carica CSS e JS versionati, con la stessa versione ovunque', () => {
+  const htmlFiles = htmlFileNames();
   assert.equal(htmlFiles.length, 13);
+  assertEveryLocalAssetIsVersioned(assert, htmlFiles);
+  assertOneVersionPerAsset(assert, htmlFiles);
+  assertOneVersionPerModuleImport(assert);
   for (const name of htmlFiles) {
-    const source = readFileSync(new URL(name, rootUrl), 'utf8');
-    assert.match(source, /styles\.css\?v=20260929-skipper-transfer-lists-v2/, `${name}: versione CSS non aggiornata`);
+    assertLoadsVersionedAsset(assert, readFileSync(new URL(name, rootUrl), 'utf8'), 'styles.css', name);
   }
-  assert.match(areaHtml, /area\.js\?v=20260929-skipper-transfer-lists-v2/);
+  assertLoadsVersionedAsset(assert, areaHtml, 'area.js', 'area.html');
 });
 
 test('la pagina conserva ID statici univoci dopo il riordino dei pannelli', () => {

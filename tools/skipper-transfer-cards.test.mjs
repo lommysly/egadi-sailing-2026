@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { assertLoadsVersionedAsset, assertOneVersionPerAsset } from './asset-version-utils.mjs';
+
 const html = await readFile(new URL('../area.html', import.meta.url), 'utf8');
 const source = await readFile(new URL('../area.js', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
@@ -51,7 +53,16 @@ test('l’elenco resta visibile in Equipaggio e in Viaggi equipaggio con due gru
   assert.match(source, /Nessuna persona in attesa/);
 });
 
-test('area skipper forza il caricamento della versione aggiornata', () => {
-  assert.match(html, /styles\.css\?v=20260929-skipper-transfer-lists-v2/);
-  assert.match(html, /area\.js\?v=20260929-skipper-transfer-lists-v2/);
+// Il test precedente confrontava `styles.css`/`area.js` con una stringa di
+// versione fissa: diceva "la versione è quella di ieri", non "la versione è
+// aggiornata", e nessun test può sapere quale sia quella giusta oggi. Resta
+// però vero che le card viaggio di questa pagina sono inutili se l'utente le
+// riceve dalla cache vecchia: quello che si può verificare davvero è che
+// area.html non carichi mai quei due file senza `?v=`, e che la stringa che usa
+// sia la stessa delle altre pagine (un `?v=` aggiornato solo qui o solo altrove
+// è l'errore del 22/9/2026 descritto in AGENTS.md).
+test('area skipper carica CSS e JS versionati, allineati alle altre pagine', () => {
+  assertLoadsVersionedAsset(assert, html, 'styles.css', 'area.html');
+  assertLoadsVersionedAsset(assert, html, 'area.js', 'area.html');
+  assertOneVersionPerAsset(assert);
 });
