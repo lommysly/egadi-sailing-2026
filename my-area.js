@@ -1411,7 +1411,22 @@ const FINANCE_ICONS = {
   muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12h7"/></svg>',
   bank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9.5 12 4.5l8.5 5"/><path d="M5.5 9.5v8M10 9.5v8M14 9.5v8M18.5 9.5v8"/><path d="M3.5 20.5h17"/></svg>',
   cash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="19" height="11.5" rx="1.6"/><circle cx="12" cy="12.25" r="2.6"/><path d="M5.5 9v0M18.5 15.5v0"/></svg>',
+  extra: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11.8V4.6a1 1 0 0 1 1-1h7.2l8.8 8.8-8.2 8.2-8.8-8.8Z"/><circle cx="7.8" cy="7.8" r="1.3"/></svg>',
 };
+
+// Un'icona per le voci richieste a parte più comuni, con un ripiego generico:
+// una voce nuova nel piano contributi compare comunque, senza codice nuovo.
+const EXTRA_FINANCE_ICONS = {
+  shore_dinner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="14.5" cy="12" r="6"/><circle cx="14.5" cy="12" r="2.5"/><path d="M4.5 3.5v6.5M7.5 3.5v6.5M6 10v10.5"/></svg>',
+  mooring_fee: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.6" r="2.1"/><path d="M12 6.7v13.8M7.6 10h8.8"/><path d="M4 14.4c0 3.5 3.6 6.1 8 6.1s8-2.6 8-6.1"/></svg>',
+  provisions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.4 8h13.2l-1.3 11a1.6 1.6 0 0 1-1.6 1.4H8.3A1.6 1.6 0 0 1 6.7 19Z"/><path d="M9 8V6.2a3 3 0 0 1 6 0V8"/></svg>',
+  fuel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.4c3.2 4.1 5.4 7.3 5.4 10.2a5.4 5.4 0 0 1-10.8 0c0-2.9 2.2-6.1 5.4-10.2Z"/></svg>',
+  transfer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="12.5" height="8" rx="1.5"/><path d="M15 10h3.3l3.2 3.2V15H15z"/><circle cx="7" cy="17.4" r="1.7"/><circle cx="17.2" cy="17.4" r="1.7"/></svg>',
+};
+
+// Le voci che hanno già una card dedicata sopra: tutto il resto del piano
+// contributi diventa automaticamente una card "richiesta a parte".
+const DEDICATED_FINANCE_CARD_ITEM_IDS = new Set(['berth', 'starter_pack', 'linen_towels', 'protection_insurance', 'refundable_deposit']);
 
 // Una card con un'icona di stato grande, non una tabella da leggere riga per
 // riga: "saldato"/"da versare" deve capirsi dal colore e dall'icona prima
@@ -1430,6 +1445,86 @@ function financeStatusCard({ icon, label, totalLabel, statusTone, statusText, me
       ${note ? `<p class="finance-card-note">${note}</p>` : ''}
     </div>
   </article>`;
+}
+
+// Quanto è già stato chiesto e confermato per una singola voce (cena a terra,
+// ormeggio, cambusa...): le richieste di quella voce non entrano nel saldo del
+// posto barca, quindi si contano a parte sul loro importo pieno.
+function extraItemPaymentTotals(itemId) {
+  const rows = activeCrewPayments.filter((payment) => payment.status !== 'cancelled' && payment.contributionItemId === itemId);
+  const sumFor = (predicate) => rows
+    .filter(predicate)
+    .reduce((total, payment) => total + (Number.isInteger(payment.amountCents) ? payment.amountCents : 0), 0);
+  return {
+    verifiedCents: sumFor((payment) => payment.status === 'verified'),
+    pendingCents: sumFor(isPendingCrewPayment),
+  };
+}
+
+// Una card per ogni voce che lo skipper ha segnato "da richiedere a parte" o
+// "da regolare a parte" nel piano contributi: nasce dal piano, non da un
+// elenco scritto a mano, così la cena di Egadi e qualunque voce futura
+// (ormeggio, cambusa, gasolio) compaiono senza toccare il codice — richiesta
+// di Silvio, 2/10/2026: "semplice da gestire, la complessità dietro le quinte".
+function extraContributionCards() {
+  const cashMethod = localized('Contanti all’imbarco', 'Cash at boarding');
+  const bankTransferMethod = localized('Bonifico allo skipper', 'Bank transfer to the skipper');
+  return contributionPlanItems()
+    .filter((item) => !DEDICATED_FINANCE_CARD_ITEM_IDS.has(item.id) && !item.hideFromCrew)
+    .filter((item) => (item.state === 'extra' || item.state === 'local') && item.amountCents > 0)
+    .map((item) => {
+      const icon = EXTRA_FINANCE_ICONS[item.id] || FINANCE_ICONS.extra;
+      const amountLabel = formatCurrency(item.amountCents / 100);
+      const note = item.description ? escapeHtml(item.description) : '';
+      if (item.state === 'local') {
+        return financeStatusCard({
+          icon,
+          label: item.label,
+          totalLabel: amountLabel,
+          statusTone: 'pending',
+          statusText: localized(`Da versare ${amountLabel}`, `${amountLabel} still to pay`),
+          methodIcon: 'cash',
+          methodText: cashMethod,
+          note,
+        });
+      }
+      const totals = extraItemPaymentTotals(item.id);
+      if (totals.verifiedCents >= item.amountCents) {
+        return financeStatusCard({
+          icon,
+          label: item.label,
+          totalLabel: amountLabel,
+          statusTone: 'ok',
+          statusText: localized('Saldato', 'Fully paid'),
+          methodText: localized(`Hai versato ${formatCurrency(totals.verifiedCents / 100)}`, `You paid ${formatCurrency(totals.verifiedCents / 100)}`),
+          note,
+        });
+      }
+      if (totals.pendingCents > 0) {
+        return financeStatusCard({
+          icon,
+          label: item.label,
+          totalLabel: amountLabel,
+          statusTone: 'pending',
+          statusText: localized(`Da versare ${formatCurrency(totals.pendingCents / 100)}`, `${formatCurrency(totals.pendingCents / 100)} still to pay`),
+          methodIcon: 'bank',
+          methodText: bankTransferMethod,
+          note: escapeHtml(localized(
+            'Richiesta inviata dallo skipper: resta "in attesa" finché non conferma l’accredito.',
+            'Request sent by the skipper: it stays "pending" until they confirm the payment.',
+          )),
+        });
+      }
+      return financeStatusCard({
+        icon,
+        label: item.label,
+        totalLabel: amountLabel,
+        statusTone: 'muted',
+        statusText: localized('Lo skipper non ha ancora inviato la richiesta', 'The skipper has not sent the request yet'),
+        note,
+      });
+    })
+    .join('');
 }
 
 function renderParticipantFinanceSummary() {
@@ -1537,7 +1632,7 @@ function renderParticipantFinanceSummary() {
     <h4>${escapeHtml(localized('Cosa hai già dato e cosa manca', 'What you’ve already given and what’s left'))}</h4>
     ${participantProjectionRows() ? `<div class="participant-finance-grid participant-finance-grid-compact">${participantProjectionRows()}</div>` : ''}
     ${participantPaymentInstructionsMarkup(onlineContribution)}
-    <div class="finance-cards">${berthRow}${starterPackRow}${depositRow}</div>
+    <div class="finance-cards">${berthRow}${starterPackRow}${extraContributionCards()}${depositRow}</div>
     <div class="participant-finance-acceptance"><strong>${escapeHtml(localized('Regole di bordo accettate', 'Board rules accepted'))}</strong>${acceptedAt ? ` · ${escapeHtml(acceptedAt)}` : ''}. <a href="#crew-bacheca">${escapeHtml(localized('Rileggi il regolamento e la bacheca', 'Read the rules and updates again'))}</a></div>
   `;
 }
