@@ -113,6 +113,14 @@ body.menu-open { overflow:hidden; }
 /* Sulla card della console organizzatore il pallino porta un numero, non un
    punto esclamativo: deve poter crescere a due cifre senza tagliarsi. */
 #skipperTransferHubCount { width:auto; min-width:24px; padding:0 7px; border-radius:999px; }
+/* Le due porte dell'area riservata (accesso skipper, accesso equipaggio) non
+   hanno il piede di pagina pubblico: i suoi link portavano fuori proprio
+   mentre qualcuno sta entrando (richiesta di Silvio, 2/10/2026). Resta la
+   sola informativa privacy, che su una pagina dove si inseriscono i propri
+   dati deve restare raggiungibile. */
+.login-footer { padding:26px 20px 38px; text-align:center; }
+.login-footer a { color:#5b7480; font-size:.8rem; text-decoration:none; border-bottom:1px solid rgba(91,116,128,.35); }
+.login-footer a:hover { color:var(--deep); border-color:var(--deep); }
 .transfer-price-note { margin:2px 0 4px; padding:10px 12px; border-radius:10px; border:1px solid rgba(194,65,12,.3); background:#fdece3; color:#9a3412; }
 /* L'avviso in cima al collegamento aeroporto. Dice che cosa succede adesso —
    "a Marsala ci arrivi tu" — non che cosa manca da compilare: il transfer si

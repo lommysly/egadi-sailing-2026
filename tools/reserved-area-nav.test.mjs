@@ -52,3 +52,28 @@ test('il modulo continua a fare le due cose per cui esiste', () => {
   assert.match(nav, /\.site-footer'\)\?\.setAttribute\('hidden', ''\)/);
   assert.equal(typeof simplifyReservedAreaNavigation, 'function');
 });
+
+// Le due porte dell'area riservata: niente piede di pagina pubblico, perché
+// i suoi link portano fuori proprio mentre qualcuno sta entrando. Resta però
+// l'informativa, che su una pagina dove si inseriscono dati personali non può
+// sparire (richiesta di Silvio, 2/10/2026).
+test('le pagine di accesso non hanno il piede di pagina pubblico', () => {
+  ['accesso.html', 'crew.html'].forEach((pagina) => {
+    const html = read(pagina);
+    assert.doesNotMatch(html, /site-footer/, `${pagina} ha ancora il footer pubblico`);
+    assert.doesNotMatch(html, /thatsablast\.it\/beta/, `${pagina} invita ancora alla Beta`);
+    // Il menu in alto resta: quelle pagine si raggiungono dal sito pubblico e
+    // da lì si deve poter tornare indietro. È il piede di pagina che spariva
+    // sotto il modulo di accesso con otto link verso altre sezioni.
+    assert.match(html, /<nav id="primary-menu"/, `${pagina} ha perso anche il menu`);
+  });
+});
+
+test('le pagine di accesso conservano il link all’informativa', () => {
+  ['accesso.html', 'crew.html'].forEach((pagina) => {
+    const html = read(pagina);
+    assert.match(html, /<footer class="login-footer">/, `${pagina} non ha il piede ridotto`);
+    assert.match(html, /href="privacy\.html"/, `${pagina} non lascia leggere l’informativa`);
+  });
+  assert.match(read('styles.css'), /\.login-footer \{/);
+});
