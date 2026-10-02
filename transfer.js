@@ -138,6 +138,12 @@ const COPY = {
     boatChecklistDossier: 'Dossier',
     boatChecklistQuotes: 'Quote',
     boatChecklistExtras: 'Extra',
+    todoEyebrow: 'Cose da fare',
+    todoTitleOne: 'Una barca da sollecitare',
+    todoTitleMany: '{count} barche da sollecitare',
+    todoAllDone: 'Tutto a posto: nessun sollecito da mandare.',
+    todoHint: 'Chi ha più cose aperte compare per primo. Il messaggio parte già scritto, con il percorso esatto da seguire.',
+    todoTransfer: '{count} transfer da decidere',
     filterSearch: 'Cerca per nome, aeroporto o volo',
     noRecords: 'Non ci sono movimenti con questi filtri.',
     direction: 'Tratta',
@@ -298,6 +304,12 @@ const COPY = {
     boatChecklistDossier: 'Dossier',
     boatChecklistQuotes: 'Contributions',
     boatChecklistExtras: 'Extras',
+    todoEyebrow: 'To do',
+    todoTitleOne: 'One boat to chase',
+    todoTitleMany: '{count} boats to chase',
+    todoAllDone: 'All set: nothing to chase.',
+    todoHint: 'Boats with the most open items come first. The message is pre-written, with the exact steps to follow.',
+    todoTransfer: '{count} transfers undecided',
     filterSearch: 'Search name, airport or flight',
     noRecords: 'There are no journeys matching these filters.',
     direction: 'Journey',
@@ -1286,6 +1298,60 @@ function boatReminderMessage(boat, breakdown, readiness, skipperStatus) {
     : `${greeting} 🌊\n\n${setupBlock}${crewTransferIntro}\n- Il tuo transfer — ${skipperLegLine(t('inbound'), skipperStatus.outbound)}, ${skipperLegLine(t('outbound'), skipperStatus.return)}\n- ${crewLine}\n- ${legLine(t('inbound'), breakdown.outbound)}\n- ${legLine(t('outbound'), breakdown.return)}\n\nPuoi condividerlo anche nel gruppo dell'equipaggio, così chi manca completa la scelta.\n\n${openLine}: ${link}`;
 }
 
+// Le stesse informazioni delle card barca, ma rovesciate: non "ecco lo stato
+// di tutte le barche", bensì "ecco cosa resta da fare, e a chi scrivere".
+// Nessun calcolo nuovo — riusa readiness, breakdown e il messaggio di
+// sollecito già esistenti (richiesta di Silvio, 2/10/2026).
+function boatTodoChips(readiness, transferPending, skipperNeedsFollowUp) {
+  const chips = [];
+  if (!readiness.boatConfigured) chips.push(t('boatChecklistBoat'));
+  if (!readiness.rulesActive) chips.push(t('boatChecklistRules'));
+  if (!readiness.dossierConfirmed) chips.push(t('boatChecklistDossier'));
+  if (readiness.quotesSet === false) chips.push(t('boatChecklistQuotes'));
+  if (readiness.extrasSet === false) chips.push(t('boatChecklistExtras'));
+  if (transferPending > 0) chips.push(t('todoTransfer').replace('{count}', String(transferPending)));
+  if (skipperNeedsFollowUp) chips.push(t('boatChecklistSkipperTransfer'));
+  return chips;
+}
+
+function renderTodoBoard() {
+  if (!state.allBoats.length) return '';
+  const boatIds = state.allBoats.map((boat) => boat.id);
+  void ensureBoatMemberCounts(boatIds);
+  void ensureBoatTravelStatus(boatIds);
+  void ensureBoatSetupStatus(boatIds);
+  void ensureBoatEconomyStatus(boatIds);
+  const rows = state.allBoats.map((boat) => {
+    const skipperStatus = boatSkipperTransferStatus(boat.id);
+    const breakdown = boatTravelBreakdown(boat.id, skipperStatus);
+    const readiness = boatSetupReadiness(boat);
+    const transferPending = (breakdown.outbound.pending || 0) + (breakdown.return.pending || 0);
+    const skipperNeedsFollowUp = !skipperStatus.outbound || !skipperStatus.return;
+    const chips = boatTodoChips(readiness, transferPending, skipperNeedsFollowUp);
+    const reminderUrl = Number.isInteger(breakdown.total)
+      ? whatsappDraftUrl(boatReminderMessage(boat, breakdown, readiness, skipperStatus))
+      : '';
+    return { boat, chips, reminderUrl };
+  })
+    .filter((row) => row.chips.length > 0)
+    // Chi ha più cose aperte compare per primo: la lista è una coda di
+    // lavoro, non un elenco alfabetico.
+    .sort((first, second) => second.chips.length - first.chips.length);
+  if (!rows.length) {
+    return `<section class="transfer-operator-card transfer-todo" aria-label="${escapeHtml(t('todoEyebrow'))}"><p class="eyebrow">${escapeHtml(t('todoEyebrow'))}</p><h2>${escapeHtml(t('todoAllDone'))}</h2></section>`;
+  }
+  const title = rows.length === 1 ? t('todoTitleOne') : t('todoTitleMany').replace('{count}', String(rows.length));
+  const items = rows.map(({ boat, chips, reminderUrl }) => `<li class="transfer-todo-row">
+    <div class="transfer-todo-info">
+      <strong>${escapeHtml(boat.name)}</strong>
+      ${boat.skipperName ? `<small>${escapeHtml(boat.skipperName)}</small>` : ''}
+      <div class="transfer-todo-chips">${chips.map((chip) => `<span class="transfer-todo-chip">${escapeHtml(chip)}</span>`).join('')}</div>
+    </div>
+    ${reminderUrl ? `<a class="button button-whatsapp transfer-todo-action" href="${escapeHtml(reminderUrl)}" target="_blank" rel="noopener noreferrer"><span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${escapeHtml(t('boatReminderAction'))}</a>` : ''}
+  </li>`).join('');
+  return `<section class="transfer-operator-card transfer-todo" aria-label="${escapeHtml(t('todoEyebrow'))}"><p class="eyebrow">${escapeHtml(t('todoEyebrow'))}</p><h2>${escapeHtml(title)}</h2><p class="field-hint">${escapeHtml(t('todoHint'))}</p><ul class="transfer-todo-list">${items}</ul></section>`;
+}
+
 function renderBoatStats() {
   if (!state.allBoats.length) return '';
   const boatIds = state.allBoats.map((boat) => boat.id);
@@ -1454,7 +1520,7 @@ function renderOperatorDashboard() {
   const boatFilterField = boats.length
     ? `<label><span>${escapeHtml(t('filterBoat'))}</span><select name="boat"><option value="all">${escapeHtml(t('allBoats'))}</option>${boatFilterOptions()}</select></label>`
     : '';
-  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-ghost" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section>${state.isOrganizer ? renderBoatStats() : ''}<section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label>${boatFilterField}<label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div id="transferBulkToolbar" class="transfer-bulk-toolbar" hidden></div><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}${state.isOrganizer ? renderAccessLog() : ''}`;
+  root.innerHTML = `<section class="transfer-operator-toolbar"><div><p class="eyebrow">${escapeHtml(t('operatorEyebrow'))}</p><h2>${escapeHtml(t('operatorTitle'))}</h2><p>${escapeHtml(t('operatorText'))}</p>${sheetUrl ? `<p><a class="transfer-sheet-link" href="${escapeHtml(sheetUrl)}" target="_blank" rel="noopener">${escapeHtml(t('sheet'))}</a></p>` : ''}</div><div class="transfer-operator-actions"><button class="button button-ghost" type="button" data-action="sign-out">${escapeHtml(t('signOut'))}</button></div></section><section class="transfer-operator-summary" aria-label="Riepilogo movimenti"><article><span>${escapeHtml(t('records'))}</span><strong>${stats.total}</strong></article><article><span>${escapeHtml(t('inbound'))}</span><strong>${stats.outbound}</strong></article><article><span>${escapeHtml(t('outbound'))}</span><strong>${stats.return}</strong></article><article><span>${escapeHtml(t('newStatus'))}</span><strong>${stats.pending}</strong></article><article><span>${escapeHtml(t('draftsLabel'))}</span><strong>${stats.drafts}</strong></article></section>${state.isOrganizer ? renderTodoBoard() : ''}${state.isOrganizer ? renderBoatStats() : ''}<section class="transfer-operator-card"><form class="transfer-operator-filters" data-filter-form><label><span>${escapeHtml(t('filterStatus'))}</span><select name="status"><option value="all">${escapeHtml(t('allStatuses'))}</option>${statusOptions(state.filters.status, FILTERABLE_STATUSES)}</select></label>${boatFilterField}<label><span>${escapeHtml(t('filterSearch'))}</span><input name="search" type="search" value="${escapeHtml(state.filters.search)}" autocomplete="off" /></label></form></section><div id="transferBulkToolbar" class="transfer-bulk-toolbar" hidden></div><div class="transfer-operator-groups">${renderGroupedRecords(filtered)}</div>${state.isOrganizer ? renderAccessManagement() : ''}${state.isOrganizer ? renderAccessLog() : ''}`;
   renderBulkToolbar();
 }
 
