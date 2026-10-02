@@ -1471,10 +1471,15 @@ function extraContributionCards() {
   const bankTransferMethod = localized('Bonifico allo skipper', 'Bank transfer to the skipper');
   return contributionPlanItems()
     .filter((item) => !DEDICATED_FINANCE_CARD_ITEM_IDS.has(item.id) && !item.hideFromCrew)
-    .filter((item) => (item.state === 'extra' || item.state === 'local') && item.amountCents > 0)
+    .filter((item) => item.state === 'extra' || item.state === 'local')
     .map((item) => {
       const icon = EXTRA_FINANCE_ICONS[item.id] || FINANCE_ICONS.extra;
-      const amountLabel = formatCurrency(item.amountCents / 100);
+      // Una voce può esistere senza prezzo: la cambusa si divide a bordo e
+      // l'importo si sa solo dopo la spesa. Meglio dirlo che inventare una
+      // cifra (richiesta di Silvio, 2/10/2026: "prevedi anche la cambusa").
+      const hasAmount = item.amountCents > 0;
+      const amountLabel = hasAmount ? formatCurrency(item.amountCents / 100) : '';
+      const toBeConfirmed = localized('Importo da definire', 'Amount to be confirmed');
       const note = item.description ? escapeHtml(item.description) : '';
       if (item.state === 'local') {
         return financeStatusCard({
@@ -1482,14 +1487,16 @@ function extraContributionCards() {
           label: item.label,
           totalLabel: amountLabel,
           statusTone: 'pending',
-          statusText: localized(`Da versare ${amountLabel}`, `${amountLabel} still to pay`),
+          statusText: hasAmount
+            ? localized(`Da versare ${amountLabel}`, `${amountLabel} still to pay`)
+            : toBeConfirmed,
           methodIcon: 'cash',
-          methodText: cashMethod,
+          methodText: hasAmount ? cashMethod : localized('Si regola a bordo', 'Settled on board'),
           note,
         });
       }
       const totals = extraItemPaymentTotals(item.id);
-      if (totals.verifiedCents >= item.amountCents) {
+      if (totals.verifiedCents > 0 && (!hasAmount || totals.verifiedCents >= item.amountCents)) {
         return financeStatusCard({
           icon,
           label: item.label,
@@ -1520,7 +1527,9 @@ function extraContributionCards() {
         label: item.label,
         totalLabel: amountLabel,
         statusTone: 'muted',
-        statusText: localized('Lo skipper non ha ancora inviato la richiesta', 'The skipper has not sent the request yet'),
+        statusText: hasAmount
+          ? localized('Lo skipper non ha ancora inviato la richiesta', 'The skipper has not sent the request yet')
+          : toBeConfirmed,
         note,
       });
     })
