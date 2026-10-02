@@ -1497,8 +1497,8 @@ function setupSkipperDashboard() {
         <strong data-skipper-summary="operations">Carico viaggio e regole…</strong><small data-skipper-detail="operations">Transfer, regole di bordo, orari e bacheca.</small>
       </button>
       <a id="skipperTransferHubCard" class="dashboard-hub-card dashboard-hub-card-transfer" href="transfer.html" hidden>
-        <span class="dashboard-hub-icon">${skipperDashboardIcon('transfer')}</span><span class="dashboard-hub-label">Area transfer</span>
-        <strong>Gestione accessi</strong><small>Operatori transfer e movimenti verso l’aeroporto.</small>
+        <span class="dashboard-hub-icon">${skipperDashboardIcon('transfer')}</span><span class="dashboard-hub-label">Console organizzatore</span>
+        <strong>Cose da fare e solleciti</strong><small>Chi ha fatto cosa su tutte le barche, messaggi di sollecito su WhatsApp e movimenti transfer.</small>
       </a>
     </div>
     <div class="dashboard-next-step"><div><span>Prossimo passo</span><strong id="skipperNextActionText">Preparo la tua panoramica.</strong></div><button id="skipperNextActionButton" class="button button-primary" type="button" data-skipper-view="crew">Apri</button></div>
@@ -1510,7 +1510,7 @@ function setupSkipperDashboard() {
   navigation.setAttribute('aria-label', 'Sezioni area skipper');
   navigation.innerHTML = Object.entries(SKIPPER_DASHBOARD_LABELS)
     .map(([view, label]) => `<button type="button" data-skipper-view="${view}">${view === 'overview' ? '← ' : ''}${label}</button>`)
-    .join('') + '<a id="skipperTransferNavLink" href="transfer.html" hidden>Area transfer</a>';
+    .join('') + '<a id="skipperTransferNavLink" href="transfer.html" hidden>Console organizzatore</a>';
 
   grid.before(overview, navigation);
   if (boatQuoteMount) boatQuoteMount.hidden = true;
@@ -9472,7 +9472,7 @@ onAuthStateChanged(auth, async (user) => {
     const isOrganizer = eventSnapshot.exists() && (eventSnapshot.data().organizerIds || []).includes(user.uid);
     isOrganizerAccount = isOrganizer;
     document.querySelector('#accountStatus').textContent = isOrganizer
-      ? 'Organizzatore configurato: nel menu qui sotto trovi anche «Area transfer».'
+      ? 'Organizzatore configurato: in «Console organizzatore» trovi cose da fare, solleciti e transfer di tutte le barche.'
       : 'Accesso skipper attivo.';
   } catch (error) {
     if (auth.currentUser?.uid !== user.uid) return;
