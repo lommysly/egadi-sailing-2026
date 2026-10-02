@@ -15,7 +15,7 @@ import {
   writeBatch,
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
-import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20260928-blast-experience-v1';
+import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20261002-niente-promo-in-area-v1';
 import {
   groupTransferRecords,
   recordClusterMinutes,

@@ -1,4 +1,4 @@
-import { crewAccessErrorMessage, personalAreaUrl, signInCrew, startCrewAreaSession, watchForStaleScript } from './crew-session.js?v=20260928-blast-experience-v1';
+import { crewAccessErrorMessage, personalAreaUrl, signInCrew, startCrewAreaSession, watchForStaleScript } from './crew-session.js?v=20261002-niente-promo-in-area-v1';
 
 watchForStaleScript(import.meta.url);
 

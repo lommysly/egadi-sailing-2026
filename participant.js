@@ -12,7 +12,7 @@ import {
   startInviteActivation,
   watchForStaleScript,
   withSaveRetry,
-} from './crew-session.js?v=20260928-blast-experience-v1';
+} from './crew-session.js?v=20261002-niente-promo-in-area-v1';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { canConfirmCrewBriefing } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260914-en2';
