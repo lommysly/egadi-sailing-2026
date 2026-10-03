@@ -61,3 +61,31 @@ test('finito il controllo si consegna al flusso personale di sempre', () => {
   assert.match(page, /url\.searchParams\.set\('invite', data\.inviteId\)/);
   assert.match(page, /url\.searchParams\.set\('key', data\.accessKey\)/);
 });
+
+// Il prefisso è un campo a parte, non una cosa da indovinare. Finché il campo
+// era uno solo, chi scriveva "348 565 7591" veniva registrato come +34
+// 85657591 — un numero spagnolo valido, con cui poi non riusciva più a
+// entrare, perché l'identità di accesso si calcola proprio dal numero.
+// Cristina Della Moretta e Stefano Arpini ci sono rimasti dentro il 3/10/2026.
+test('il prefisso si sceglie, non si indovina', () => {
+  const html = read('unisciti.html');
+  assert.match(html, /<select name="phonePrefix" required>/);
+  assert.match(html, /<option value="\+39" selected>/);
+  assert.match(html, /name="phone"[^>]*placeholder="333 1234567"/);
+  // Il vecchio campo unico col prefisso dentro non c'è più.
+  assert.doesNotMatch(html, /name="phone"[^>]*placeholder="Es\. \+39/);
+});
+
+test('il numero si compone dai due campi, senza inventare prefissi', () => {
+  const comp = page.slice(page.indexOf('function numeroInternazionale'), page.indexOf('function aggiornaAnteprimaNumero'));
+  assert.match(comp, /function numeroInternazionale\(prefisso, numero\)/);
+  // Un prefisso non valido non diventa un numero: meglio fermarsi che
+  // registrare qualcuno con un'identità che non è la sua.
+  assert.match(comp, /if \(!\/\^\\\+\[1-9\]\\d\{0,3\}\$\/\.test\(pre\)\) return '';/);
+  assert.match(page, /numeroInternazionale\(prefissoScelto\(fields\), phone\)/);
+});
+
+test('la persona vede il numero che il sito ha capito, prima di premere', () => {
+  assert.match(page, /Entrerai con questo numero: \$\{numero\}/);
+  assert.match(read('unisciti.html'), /data-phone-preview/);
+});

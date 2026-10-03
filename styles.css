@@ -122,6 +122,17 @@ body.menu-open { overflow:hidden; }
    grandi, uno per riga sul telefono: si sceglie una persona, non si compila
    un modulo. */
 .join-slots { display:grid; gap:10px; margin:18px 0 4px; }
+/* Prefisso e numero sono due campi distinti: finché erano uno solo, chi
+   scriveva "348 565 7591" finiva registrato con un numero spagnolo e non
+   riusciva più a entrare (3/10/2026). */
+.join-phone { margin:14px 0 0; padding:0; border:0; }
+.join-phone legend { padding:0; font-weight:700; font-size:.9rem; }
+.join-phone-row { display:grid; grid-template-columns:minmax(0,auto) minmax(0,1fr); gap:10px; align-items:end; margin-top:6px; }
+.join-phone-row label { margin:0; }
+.join-phone-row label[hidden] { display:none; }
+.join-phone-number { min-width:0; }
+.join-phone [data-phone-preview] { margin:8px 0 0; }
+@media (max-width:430px) { .join-phone-row { grid-template-columns:1fr; } }
 .join-slot { justify-content:flex-start; width:100%; min-height:54px; font-size:1rem; text-align:left; }
 #joinStepConfirm label { display:block; margin:14px 0 0; }
 #joinStepConfirm .form-actions { margin-top:22px; }
