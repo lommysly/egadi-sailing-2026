@@ -295,7 +295,8 @@ test('le azioni della panoramica aprono direttamente il pannello utile', () => {
 // stato violato il 22/9/2026 (CSS aggiornato solo in parte delle pagine).
 test('ogni pagina carica CSS e JS versionati, con la stessa versione ovunque', () => {
   const htmlFiles = htmlFileNames();
-  assert.equal(htmlFiles.length, 13);
+  // 14 dal 3/10/2026: si aggiunge unisciti.html, il link unico di barca.
+  assert.equal(htmlFiles.length, 14);
   assertEveryLocalAssetIsVersioned(assert, htmlFiles);
   assertOneVersionPerAsset(assert, htmlFiles);
   assertOneVersionPerModuleImport(assert);

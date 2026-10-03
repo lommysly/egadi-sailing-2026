@@ -8534,6 +8534,13 @@ document.querySelector('#memberForm').addEventListener('submit', async (event) =
   const form = event.currentTarget;
   normalizeFormFields(form);
   const fields = new FormData(form);
+  // Senza numero WhatsApp il posto non è valido per le regole e l'accesso
+  // personale non potrà mai essere creato: meglio fermarsi qui che scoprirlo
+  // alla vigilia della partenza.
+  if (!editingMemberId && normalizeWhatsAppNumber(fields.get('phone')).length < 8) {
+    setMessage(document.querySelector('#memberFormMessage'), 'Serve il numero WhatsApp con prefisso internazionale: è quello che permetterà a questa persona di entrare nella sua area. Senza, resterebbe solo un nome sul foglio del charter.', true);
+    return;
+  }
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
   try {
@@ -8549,8 +8556,53 @@ document.querySelector('#memberForm').addEventListener('submit', async (event) =
       await updateDoc(doc(db, 'boats', activeBoat.id, 'members', editingMemberId), memberData);
       setMessage(document.querySelector('#memberFormMessage'), 'Dati della persona aggiornati e ruolo confermato.');
     } else {
-      await addDoc(collection(db, 'boats', activeBoat.id, 'members'), { ...memberData, createdAt: serverTimestamp(), createdBy: auth.currentUser.uid });
-      setMessage(document.querySelector('#memberFormMessage'), 'Persona aggiunta alla Crew List.');
+      // Una porta sola. Fino al 3/10/2026 questo ramo creava una scheda con
+      // un'identità casuale, slegata da tutto: la persona finiva in Crew List
+      // ma non poteva entrare, non vedeva i costi e non compariva nei viaggi,
+      // e nessuno se ne accorgeva. È successo davvero — nove persone su Carpe
+      // Diem, scoperte solo quando una di loro ha provato ad accedere.
+      //
+      // Adesso chi viene aggiunto nasce come posto, esattamente come se fosse
+      // stato creato dall'elenco dei posti: stessa identità per posto, scheda
+      // e futuro invito, così mandarle l'accesso resta un clic e non produce
+      // mai un doppione.
+      const seatId = createInviteId();
+      const berthType = 'to_define';
+      const pricing = dashboardProjectionPreset(berthType, { contributesToCosts: true });
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'boats', activeBoat.id, 'crewProjections', seatId), {
+        id: seatId,
+        firstName: memberData.firstName,
+        lastName: memberData.lastName,
+        displayName: memberData.displayName,
+        whatsappNumber: `+${normalizeWhatsAppNumber(fields.get('phone'))}`,
+        plannedRole: memberData.role,
+        berthType,
+        cabinGroupId: '',
+        pricingMode: 'dashboard',
+        berthCents: pricing.berthCents,
+        starterPackCents: pricing.starterPackCents,
+        protectionInsuranceCents: pricing.protectionInsuranceCents,
+        refundableDepositCents: pricing.refundableDepositCents,
+        preferredLocale: 'it',
+        contributesToCosts: true,
+        contactConsent: false,
+        paymentManagedExternally: false,
+        status: 'projected',
+        inviteId: null,
+        invitedAt: null,
+        createdAt: serverTimestamp(),
+        createdBy: auth.currentUser.uid,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser.uid,
+      });
+      batch.set(doc(db, 'boats', activeBoat.id, 'members', seatId), {
+        ...memberData,
+        createdAt: serverTimestamp(),
+        createdBy: auth.currentUser.uid,
+      });
+      await batch.commit();
+      setMessage(document.querySelector('#memberFormMessage'), 'Persona aggiunta alla Crew List e al tuo elenco posti. Quando vuoi, mandale l’accesso personale dalla sua riga: i dati che hai inserito restano i suoi.');
     }
     resetMemberForm();
   } catch (error) {

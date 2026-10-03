@@ -1533,3 +1533,198 @@ exports.respondToTravelMatch = onCall({
   ]);
   return { status: 'revealed' };
 });
+
+// --- Link unico di barca -----------------------------------------------
+//
+// Nasce da un caso reale (3/10/2026): Michele Pasini aveva compilato a mano
+// le nove schede del suo equipaggio ma non aveva creato nessun accesso, e non
+// rispondeva. Nove persone non potevano entrare e nessuno poteva sbloccarle,
+// perché per creare un invito personale serve il numero di telefono di
+// ciascuno — e quei numeri li aveva solo lui.
+//
+// Il link di barca ribalta la cosa: si pubblica una volta nel gruppo, e ogni
+// persona si crea da sola il proprio invito personale scegliendo il proprio
+// nome fra quelli che lo skipper ha già inserito. Da lì in poi corre il
+// flusso di sempre, quello già collaudato.
+//
+// Il link però è una chiave che apre tutta la barca, e dentro quelle schede
+// ci sono documenti d'identità. Perciò qui dentro succedono tre cose, tutte
+// PRIMA che la persona veda qualunque dato:
+//   1. la data di nascita dichiarata deve coincidere con quella in scheda;
+//   2. uno slot già preso non si può prendere di nuovo;
+//   3. i tentativi sbagliati si contano, e dopo troppi il link si blocca —
+//      senza questo, nove nomi e qualche migliaio di date sarebbero
+//      forzabili da un programma in pochi minuti.
+// Se il controllo non passa non si restituisce nulla: né il nome esatto, né
+// un indizio su quale dato fosse sbagliato.
+const CREW_PHONE_PREFIX = 'egadi-crew-phone-v1:';
+const CREW_LOGIN_PREFIX = 'egadi-crew-login-v1:';
+const CREW_LOGIN_DOMAIN = 'crew.egadi.thatsablast.it';
+const BOAT_LINK_MAX_FAILURES = 10;
+const BOAT_LINK_LOCK_MINUTES = 15;
+
+const sha256Hex = (value) => crypto.createHash('sha256').update(value, 'utf8').digest('hex');
+const isCrewCode = (value) => /^[a-f0-9]{48}$/.test(String(value || ''));
+const newCrewCode = () => crypto.randomBytes(24).toString('hex');
+
+function normalizeCrewPhoneNumber(value) {
+  const normalized = String(value || '').trim().replace(/[ .()\-]/g, '');
+  return /^\+[1-9]\d{7,14}$/.test(normalized) ? normalized : '';
+}
+
+function isIsoDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+}
+
+exports.claimBoatLinkSlot = onCall({
+  region: REGION,
+  serviceAccount: RUNTIME_SERVICE_ACCOUNT,
+  timeoutSeconds: 30,
+  memory: '256MiB',
+}, async (request) => {
+  const boatId = String(request.data?.boatId || '');
+  const linkKey = String(request.data?.linkKey || '');
+  const slotId = String(request.data?.slotId || '');
+  const birthDate = String(request.data?.birthDate || '');
+  const phone = normalizeCrewPhoneNumber(request.data?.phone);
+  const preferredLocale = request.data?.preferredLocale === 'en' ? 'en' : 'it';
+
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(boatId) || !isCrewCode(linkKey) || !slotId || slotId.length > 128) {
+    throw new HttpsError('invalid-argument', 'Link non valido.');
+  }
+  if (!phone) throw new HttpsError('invalid-argument', 'Inserisci il numero WhatsApp con il prefisso internazionale.');
+  if (!isIsoDate(birthDate)) throw new HttpsError('invalid-argument', 'Inserisci la tua data di nascita.');
+
+  const linkRef = db.doc(`boats/${boatId}/boatLinks/default`);
+  const linkSnapshot = await linkRef.get();
+  const link = linkSnapshot.exists ? linkSnapshot.data() : null;
+  const now = Date.now();
+  if (!link || link.status !== 'active' || link.linkKey !== linkKey) {
+    throw new HttpsError('permission-denied', 'Questo link non è più valido: chiedine uno nuovo allo skipper.');
+  }
+  if (link.expiresAt?.toMillis && link.expiresAt.toMillis() < now) {
+    throw new HttpsError('permission-denied', 'Questo link è scaduto: chiedine uno nuovo allo skipper.');
+  }
+  if (link.lockedUntil?.toMillis && link.lockedUntil.toMillis() > now) {
+    throw new HttpsError('resource-exhausted', 'Troppi tentativi non riusciti. Riprova fra un quarto d’ora.');
+  }
+
+  // Un tentativo sbagliato costa: si registra prima di rispondere, così
+  // nemmeno un errore di rete può far perdere il conteggio.
+  const registraFallimento = async () => {
+    const failures = Number(link.failedAttempts || 0) + 1;
+    const patch = { failedAttempts: failures, lastFailureAt: FieldValue.serverTimestamp() };
+    if (failures >= BOAT_LINK_MAX_FAILURES) {
+      // Un quarto d'ora NEL FUTURO: con serverTimestamp() il confronto
+      // lockedUntil > adesso sarebbe sempre falso e il blocco non bloccherebbe.
+      patch.lockedUntil = new Date(Date.now() + BOAT_LINK_LOCK_MINUTES * 60 * 1000);
+      patch.failedAttempts = 0;
+    }
+    await linkRef.set(patch, { merge: true });
+  };
+
+  const slotRef = db.doc(`boats/${boatId}/members/${slotId}`);
+  const slotSnapshot = await slotRef.get();
+  const slot = slotSnapshot.exists ? slotSnapshot.data() : null;
+  // Stesso messaggio per "non esiste", "data sbagliata" e "già preso": chi
+  // prova a indovinare non deve capire quale dei tre ha sbagliato.
+  if (!slot || slot.birthDate !== birthDate) {
+    await registraFallimento();
+    throw new HttpsError('permission-denied', 'I dati non coincidono con nessuna persona di questo equipaggio. Controlla il nome che hai scelto e la tua data di nascita.');
+  }
+
+  const fingerprint = sha256Hex(`${CREW_PHONE_PREFIX}${phone}`);
+  const indexSnapshot = await db.doc(`crewLoginIndex/${fingerprint}`).get();
+  if (indexSnapshot.exists) {
+    throw new HttpsError('already-exists', 'Questo numero ha già un accesso attivo: entra con numero e codice personale.');
+  }
+
+  const inviteId = isCrewCode(slotId) ? slotId : newCrewCode();
+  const accessKey = newCrewCode();
+  const loginEmail = `${sha256Hex(`${CREW_LOGIN_PREFIX}${fingerprint}:${accessKey}`)}@${CREW_LOGIN_DOMAIN}`;
+  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+  await db.runTransaction(async (transaction) => {
+    const [freshSlot, existingInvite] = await Promise.all([
+      transaction.get(slotRef),
+      transaction.get(db.doc(`boats/${boatId}/invites/${inviteId}`)),
+    ]);
+    if (!freshSlot.exists || existingInvite.exists) {
+      throw new HttpsError('aborted', 'Riprova fra un momento.');
+    }
+    if (freshSlot.data()?.claimedByLink === true) {
+      throw new HttpsError('already-exists', 'Questa persona ha già un accesso attivo.');
+    }
+    // La scheda si sposta sull'identità dell'invito: su questo sito la scheda
+    // equipaggio E l'invito sono la stessa cosa, e un invito deve avere un
+    // codice di 48 cifre esadecimali. Le schede scritte a mano dallo skipper
+    // hanno invece un identificativo automatico, che il browser rifiuta.
+    transaction.set(db.doc(`boats/${boatId}/members/${inviteId}`), {
+      ...freshSlot.data(),
+      claimedByLink: true,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    if (inviteId !== slotId) transaction.delete(slotRef);
+    transaction.set(db.doc(`boats/${boatId}/invites/${inviteId}`), {
+      id: inviteId,
+      boatId,
+      displayName: freshSlot.data()?.displayName || '',
+      whatsappNumber: phone,
+      phoneFingerprint: fingerprint,
+      loginEmail,
+      accessKey,
+      participantUid: null,
+      status: 'pending',
+      accessVersion: 1,
+      expiresAt,
+      preferredLocale,
+      createdAt: FieldValue.serverTimestamp(),
+      createdBy: link.createdBy || 'boat-link',
+    });
+  });
+
+  logger.info('Slot equipaggio assegnato dal link di barca.', { boatId, inviteId });
+  return { inviteId, accessKey, displayName: slot.displayName || '' };
+});
+
+
+// L'elenco dei nomi da mostrare a chi apre il link. Chi lo apre non ha ancora
+// un accesso, quindi non può leggere l'equipaggio da solo: le regole lo
+// vietano, ed è giusto così. Qui escono soltanto i nomi delle persone che non
+// hanno ancora un accesso — nessuna data di nascita, nessun documento,
+// nessun contatto. Serve a far scegliere "quale sono io", niente di più.
+exports.listBoatLinkSlots = onCall({
+  region: REGION,
+  serviceAccount: RUNTIME_SERVICE_ACCOUNT,
+  timeoutSeconds: 20,
+  memory: '256MiB',
+}, async (request) => {
+  const boatId = String(request.data?.boatId || '');
+  const linkKey = String(request.data?.linkKey || '');
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(boatId) || !isCrewCode(linkKey)) {
+    throw new HttpsError('invalid-argument', 'Link non valido.');
+  }
+  const linkSnapshot = await db.doc(`boats/${boatId}/boatLinks/default`).get();
+  const link = linkSnapshot.exists ? linkSnapshot.data() : null;
+  if (!link || link.status !== 'active' || link.linkKey !== linkKey) {
+    throw new HttpsError('permission-denied', 'Questo link non è più valido: chiedine uno nuovo allo skipper.');
+  }
+  if (link.expiresAt?.toMillis && link.expiresAt.toMillis() < Date.now()) {
+    throw new HttpsError('permission-denied', 'Questo link è scaduto: chiedine uno nuovo allo skipper.');
+  }
+  const [boatSnapshot, membersSnapshot, invitesSnapshot] = await Promise.all([
+    db.doc(`boats/${boatId}`).get(),
+    db.collection(`boats/${boatId}/members`).get(),
+    db.collection(`boats/${boatId}/invites`).get(),
+  ]);
+  // Libero = non ha ancora un accesso. Non si guarda la forma
+  // dell'identificativo: una scheda creata dall'elenco posti ne ha già una
+  // valida pur non avendo ancora un invito, e deve restare selezionabile.
+  const conAccesso = new Set(invitesSnapshot.docs.map((entry) => entry.id));
+  const slots = membersSnapshot.docs
+    .filter((entry) => !conAccesso.has(entry.id))
+    .map((entry) => ({ slotId: entry.id, displayName: entry.data()?.displayName || '' }))
+    .filter((entry) => entry.displayName)
+    .sort((first, second) => first.displayName.localeCompare(second.displayName, 'it'));
+  return { boatName: boatSnapshot.data()?.name || '', skipperName: boatSnapshot.data()?.skipperName || '', slots };
+});

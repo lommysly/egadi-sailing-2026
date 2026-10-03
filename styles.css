@@ -118,6 +118,13 @@ body.menu-open { overflow:hidden; }
    mentre qualcuno sta entrando (richiesta di Silvio, 2/10/2026). Resta la
    sola informativa privacy, che su una pagina dove si inseriscono i propri
    dati deve restare raggiungibile. */
+/* Link unico di barca: l'elenco dei nomi fra cui riconoscersi. Pulsanti
+   grandi, uno per riga sul telefono: si sceglie una persona, non si compila
+   un modulo. */
+.join-slots { display:grid; gap:10px; margin:18px 0 4px; }
+.join-slot { justify-content:flex-start; width:100%; min-height:54px; font-size:1rem; text-align:left; }
+#joinStepConfirm label { display:block; margin:14px 0 0; }
+#joinStepConfirm .form-actions { margin-top:22px; }
 .login-footer { padding:26px 20px 38px; text-align:center; }
 .login-footer a { color:#5b7480; font-size:.8rem; text-decoration:none; border-bottom:1px solid rgba(91,116,128,.35); }
 .login-footer a:hover { color:var(--deep); border-color:var(--deep); }
