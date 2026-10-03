@@ -74,5 +74,7 @@ Questo è il prompt/contesto da dare a un agente (Codex incluso) quando lavora s
 
 ## 3. Documenti collegati
 
+- `DOPO_EVENTO.md` — lavori concordati e rimandati di proposito a dopo l'8-11 ottobre 2026, ciascuno con il caso reale che lo ha fatto nascere. Leggerlo prima di aprire un lavoro nuovo: potrebbe essere già previsto lì.
+
 - `STATO_PROGETTO_2026-09-22.md` — fotografia completa dello stato reale del progetto (branch, cosa è già mergiato, cosa manca) e audit delle 4 priorità concordate con il titolare (form Arrivi/Partenze, foglio di backup, vista proprietario, vista utenti per fascia oraria).
 - `ARRIVI_PARTENZE_SPEC.md`, `CHECKLIST_PUBBLICAZIONE.md`, `PRIVACY_DA_COMPLETARE.md`, `FIRESTORE_RULES_TEST_MATRIX.md` — documenti di specifica/stato già esistenti nel progetto, ancora validi e da tenere aggiornati.
