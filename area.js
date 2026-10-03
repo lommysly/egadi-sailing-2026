@@ -5482,6 +5482,24 @@ function projectionPaymentBalanceMarkup(projection) {
   return `<div class="projection-payment-balance"><span>Situazione contributi · Starter Pack e cauzione restano separati</span><span>Quota concordata<b>${euro(balance.expectedCents)}</b></span><span>Già ricevuto e verificato<b>${euro(balance.verifiedCents)}</b></span>${advance}<span class="projection-payment-balance-open">Saldo da ricevere<b>${euro(balance.remainingCents)}</b></span>${pending}${warning}${lock}</div>`;
 }
 
+// Confermare una segnalazione non è solo dire "è arrivata": è dire dove va
+// quel denaro. La segnalazione nasce con la voce generica "berth_base" e
+// senza attribuzione, perché la persona non sa come si ripartisce la sua
+// quota; senza questo passaggio l'intero importo finiva sul posto e
+// l'assicurazione restava scoperta anche a conto saldato (caso reale: Fabio
+// Marcomin, 3/10/2026). Si usa lo stesso criterio delle ricevute manuali:
+// prima si copre quanto resta del posto, l'eventuale avanzo va
+// sull'assicurazione.
+function verifiedPaymentAllocation(payment) {
+  const projection = activeProjections.find((candidate) => candidate.id === paymentRecipientId(payment));
+  const amountCents = paymentAmountCents(payment);
+  if (!projection || !Number.isInteger(amountCents) || amountCents <= 0) return null;
+  const allocation = manualReceiptAllocation(projection, 'auto', amountCents);
+  // L'invariante è anche nelle regole: se non pareggia, meglio confermare
+  // senza attribuzione che farsi rifiutare tutta la conferma.
+  return allocation.berthCents + allocation.protectionInsuranceCents === amountCents ? allocation : null;
+}
+
 function manualReceiptAllocation(projection, target, amountCents) {
   if (target === 'berth') return { berthCents: amountCents, protectionInsuranceCents: 0 };
   if (target === 'insurance') return { berthCents: 0, protectionInsuranceCents: amountCents };
@@ -8247,8 +8265,10 @@ document.querySelector('#projectionList').addEventListener('click', async (event
     if (!payment || !isPendingPayment(payment)) return;
     verifyPendingRequestButton.disabled = true;
     try {
+      const allocation = verifiedPaymentAllocation(payment);
       await updateDoc(doc(db, 'boats', activeBoat.id, 'paymentRequests', payment.id), {
         status: 'verified', verifiedAt: serverTimestamp(), verifiedBy: auth.currentUser.uid,
+        ...(allocation ? { allocation } : {}),
       });
       setMessage(message, 'Accredito confermato.');
     } catch (error) {
@@ -9620,8 +9640,10 @@ document.querySelector('#paymentList').addEventListener('click', async (event) =
   if (!payment || !isPendingPayment(payment)) return;
   button.disabled = true;
   try {
+    const allocation = verifiedPaymentAllocation(payment);
     await updateDoc(doc(db, 'boats', activeBoat.id, 'paymentRequests', button.dataset.verifyPayment), {
       status: 'verified', verifiedAt: serverTimestamp(), verifiedBy: auth.currentUser.uid,
+      ...(allocation ? { allocation } : {}),
     });
     setMessage(message, 'Accredito segnato come verificato manualmente.');
   } catch (error) {

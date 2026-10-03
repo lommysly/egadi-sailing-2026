@@ -2060,12 +2060,34 @@ service cloud.firestore {
         && request.resource.data.declaredMethod == null;
     }
 
+    // Un'attribuzione deve sempre pareggiare l'importo: quei 300 euro sono
+    // 270 di posto e 30 di assicurazione, non una cifra qualsiasi spalmata a
+    // piacere. È lo stesso invariante che vale per le ricevute manuali.
+    function hasBalancedPaymentAllocation() {
+      return request.resource.data.allocation.keys().hasOnly(['berthCents', 'protectionInsuranceCents'])
+        && request.resource.data.allocation.berthCents is int
+        && request.resource.data.allocation.berthCents >= 0
+        && request.resource.data.allocation.protectionInsuranceCents is int
+        && request.resource.data.allocation.protectionInsuranceCents >= 0
+        && request.resource.data.allocation.berthCents + request.resource.data.allocation.protectionInsuranceCents == request.resource.data.amountCents;
+    }
+
+    // Confermare una segnalazione della persona significa anche dire DOVE
+    // vanno quei soldi. Fino al 3/10/2026 qui si poteva toccare solo lo stato:
+    // la segnalazione nasce con la voce generica "berth_base" e senza
+    // attribuzione, quindi l'intero importo finiva sul posto e l'assicurazione
+    // restava scoperta. Fabio Marcomin risultava con il posto pagato 30 euro
+    // in più e 30 euro di assicurazione ancora da versare, avendo pagato
+    // esattamente quanto dovuto. L'importo resta immutabile: non è fra le
+    // chiavi modificabili, quindi si può ripartire ma mai cambiare.
     function canVerifyPayment() {
       return (resource.data.status == 'prepared' || resource.data.status == 'requested')
         && request.resource.data.status == 'verified'
         && request.resource.data.verifiedAt == request.time
         && request.resource.data.verifiedBy == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'verifiedAt', 'verifiedBy']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'verifiedAt', 'verifiedBy', 'allocation'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['allocation'])
+          || hasBalancedPaymentAllocation());
     }
 
     function canCancelPayment() {

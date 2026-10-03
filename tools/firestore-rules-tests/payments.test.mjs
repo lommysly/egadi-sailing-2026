@@ -1345,3 +1345,80 @@ test('self_reported: SKIPPER_A verifica il documento appena segnalato con la ste
     status: 'verified', verifiedAt: serverTimestamp(), verifiedBy: SKIPPER_A,
   }));
 });
+
+// Confermare una segnalazione della persona significa anche dire DOVE vanno
+// quei soldi. Prima del 3/10/2026 qui si poteva toccare solo lo stato: la
+// segnalazione nasce senza attribuzione, quindi l'intero importo finiva sul
+// posto e l'assicurazione restava scoperta anche a conto pagato per intero
+// (caso reale: Fabio Marcomin, 300 € versati, 30 € di assicurazione che il
+// sito continuava a chiedere).
+test('conferma: SKIPPER_A attribuisce posto e assicurazione confermando una segnalazione', async () => {
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('segnalazione-da-attribuire', {
+    entryType: 'self_reported', status: 'prepared', recipientId: INVITE_A_ID,
+    amountCents: 30000, allocation: {}, paymentMethods: {},
+    declaredAt: Timestamp.now(), declaredBy: CREW_A, declaredMethod: 'bankTransfer',
+  });
+  const skipper = skipperContext(testEnv);
+  await assertSucceeds(updateDoc(paymentDoc(skipper, 'segnalazione-da-attribuire'), {
+    status: 'verified', verifiedAt: serverTimestamp(), verifiedBy: SKIPPER_A,
+    allocation: { berthCents: 27000, protectionInsuranceCents: 3000 },
+  }));
+  let snap;
+  await testEnv.withSecurityRulesDisabled(async (ctx) => { snap = await getDoc(paymentDoc(ctx, 'segnalazione-da-attribuire')); });
+  assert.equal(snap.data().allocation.berthCents, 27000);
+  assert.equal(snap.data().allocation.protectionInsuranceCents, 3000);
+  assert.equal(snap.data().amountCents, 30000);
+});
+
+test('conferma: un’attribuzione che non pareggia l’importo viene negata', async () => {
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('segnalazione-sbilanciata', {
+    entryType: 'self_reported', status: 'prepared', recipientId: INVITE_A_ID,
+    amountCents: 30000, allocation: {}, paymentMethods: {},
+  });
+  const skipper = skipperContext(testEnv);
+  // 270 + 40 = 310, ma il versamento è di 300: il conto non torna.
+  await assertFails(updateDoc(paymentDoc(skipper, 'segnalazione-sbilanciata'), {
+    status: 'verified', verifiedAt: serverTimestamp(), verifiedBy: SKIPPER_A,
+    allocation: { berthCents: 27000, protectionInsuranceCents: 4000 },
+  }));
+});
+
+test('conferma: confermare senza attribuzione resta possibile', async () => {
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('segnalazione-senza-attribuzione', {
+    entryType: 'self_reported', status: 'prepared', recipientId: INVITE_A_ID,
+    amountCents: 30000, allocation: {}, paymentMethods: {},
+  });
+  const skipper = skipperContext(testEnv);
+  await assertSucceeds(updateDoc(paymentDoc(skipper, 'segnalazione-senza-attribuzione'), {
+    status: 'verified', verifiedAt: serverTimestamp(), verifiedBy: SKIPPER_A,
+  }));
+});
+
+test('conferma: l’importo resta immutabile anche attribuendo', async () => {
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('segnalazione-importo-cambiato', {
+    entryType: 'self_reported', status: 'prepared', recipientId: INVITE_A_ID,
+    amountCents: 30000, allocation: {}, paymentMethods: {},
+  });
+  const skipper = skipperContext(testEnv);
+  await assertFails(updateDoc(paymentDoc(skipper, 'segnalazione-importo-cambiato'), {
+    status: 'verified', verifiedAt: serverTimestamp(), verifiedBy: SKIPPER_A,
+    amountCents: 40000, allocation: { berthCents: 37000, protectionInsuranceCents: 3000 },
+  }));
+});
+
+test('conferma: CREW_A non può attribuire da sé la propria segnalazione', async () => {
+  await seedCrewABaseline();
+  await seedRawPaymentRequest('segnalazione-autoattribuita', {
+    entryType: 'self_reported', status: 'prepared', recipientId: INVITE_A_ID,
+    amountCents: 30000, allocation: {}, paymentMethods: {},
+  });
+  const crew = crewAContext(testEnv);
+  await assertFails(updateDoc(paymentDoc(crew, 'segnalazione-autoattribuita'), {
+    status: 'verified', verifiedAt: serverTimestamp(), verifiedBy: CREW_A,
+    allocation: { berthCents: 27000, protectionInsuranceCents: 3000 },
+  }));
+});
