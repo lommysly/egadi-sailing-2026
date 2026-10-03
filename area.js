@@ -9369,7 +9369,12 @@ manualReceiptForm.addEventListener('submit', async (event) => {
       : 'protection_insurance',
     amountCents,
     currency: 'EUR',
-    reason: 'Acconto registrato',
+    // La causale segue la realtà invece di dire sempre "acconto": se il
+    // versamento chiude il dovuto è un saldo, e chiamarlo acconto fa sembrare
+    // che manchi ancora denaro su un conto chiuso (segnalato da Silvio il
+    // 3/10/2026 sul versamento di Barbara Poletti, che il sistema aveva già
+    // classificato come saldo mentre ogni scritta diceva acconto).
+    reason: amountCents >= balanceBeforeCents ? 'Saldo registrato' : 'Acconto registrato',
     isOptional: false,
     accountingCategory: 'cost_recovery',
     dueDate: '',
@@ -9398,9 +9403,9 @@ manualReceiptForm.addEventListener('submit', async (event) => {
     form.reset();
     manualReceiptTargetProjection = null;
     document.querySelector('#manualReceiptPanel').hidden = true;
-    setMessage(document.querySelector('#projectionFormMessage'), `Acconto registrato per ${projection.displayName}. Il saldo si aggiorna solo perché l'accredito è stato verificato.`);
+    setMessage(document.querySelector('#projectionFormMessage'), `${amountCents >= balanceBeforeCents ? 'Saldo registrato' : 'Acconto registrato'} per ${projection.displayName}. Il saldo si aggiorna solo perché l'accredito è stato verificato.`);
   } catch (error) {
-    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a registrare questo acconto.'), true);
+    setMessage(message, getFirestoreErrorMessage(error, 'Non riesco a registrare questo versamento.'), true);
   } finally {
     submitButton.disabled = false;
   }

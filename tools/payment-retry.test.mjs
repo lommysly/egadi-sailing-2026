@@ -65,3 +65,22 @@ test('una riprova dopo una scrittura riuscita non fa sembrare fallito un pagamen
     'il controllo di esistenza deve precedere la riscrittura',
   );
 });
+
+// "Acconto" in italiano vuol dire pagamento parziale. Scriverlo su un
+// versamento che chiude il dovuto fa sembrare che manchi ancora denaro su un
+// conto chiuso: è successo con Barbara Poletti, i cui 300 € coprivano per
+// intero i 300 € attesi (posto 270 + assicurazione 30, lo starter pack è
+// contato a parte) e che il sistema aveva infatti già classificato "balance",
+// mentre ogni scritta diceva acconto.
+test('la causale di un versamento dice saldo quando chiude il dovuto', () => {
+  const source = read('area.js');
+  assert.match(source, /reason: amountCents >= balanceBeforeCents \? 'Saldo registrato' : 'Acconto registrato'/);
+  assert.doesNotMatch(source, /reason: 'Acconto registrato'/);
+});
+
+test('il modulo non chiama acconto quello che potrebbe essere un saldo', () => {
+  const html = read('area.html');
+  assert.doesNotMatch(html, /Registra acconto verificato/);
+  assert.doesNotMatch(html, /Riferimento dell'acconto/);
+  assert.match(html, /Registra il versamento ricevuto/);
+});
