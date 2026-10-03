@@ -33,11 +33,18 @@ test('il blocco anti-forzatura scatta nel futuro, altrimenti non blocca', () => 
 });
 
 test('chi sbaglia non capisce quale dei dati fosse sbagliato', () => {
-  // Stesso messaggio per slot inesistente, data errata e slot già preso.
   const claim = functions.slice(functions.indexOf('exports.claimBoatLinkSlot'), functions.indexOf('exports.listBoatLinkSlots'));
   const messaggi = claim.match(/I dati non coincidono con nessuna persona/g) || [];
   assert.equal(messaggi.length, 1);
-  assert.match(claim, /if \(!slot \|\| slot\.birthDate !== birthDate\)/);
+  assert.match(claim, /if \(!slot \|\| slot\.birthDate !== birthDate \|\| \(slotPhone && slotPhone !== phone\)\)/);
+});
+
+test('un numero già noto allo skipper entra nella verifica', () => {
+  const claim = functions.slice(functions.indexOf('exports.claimBoatLinkSlot'), functions.indexOf('exports.listBoatLinkSlots'));
+  assert.match(claim, /const slotPhone = slot \? normalizeCrewPhoneNumber\(slot\.phone\) : ''/);
+  // Un numero memorizzato male non deve lasciare fuori una persona vera:
+  // il controllo si applica solo se il numero in scheda è leggibile.
+  assert.match(claim, /slotPhone && slotPhone !== phone/);
 });
 
 test('uno slot già assegnato non ricompare nell’elenco', () => {

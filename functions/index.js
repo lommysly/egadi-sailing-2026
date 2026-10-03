@@ -1626,11 +1626,23 @@ exports.claimBoatLinkSlot = onCall({
   const slotRef = db.doc(`boats/${boatId}/members/${slotId}`);
   const slotSnapshot = await slotRef.get();
   const slot = slotSnapshot.exists ? slotSnapshot.data() : null;
-  // Stesso messaggio per "non esiste", "data sbagliata" e "già preso": chi
-  // prova a indovinare non deve capire quale dei tre ha sbagliato.
-  if (!slot || slot.birthDate !== birthDate) {
+  // Se lo skipper conosceva già il numero di questa persona, quel numero fa
+  // parte della verifica: non basta sapere la data di nascita, bisogna anche
+  // scrivere dal numero giusto. Più lo skipper ha compilato, più il controllo
+  // è stretto — senza strade separate per nessuno (richiesta di Silvio,
+  // 3/10/2026: "una linea unica per tutti, il numero lo mettiamo a sistema
+  // come ordine di verifica").
+  //
+  // Un numero memorizzato in un formato che non si riesce a leggere viene
+  // ignorato invece di bloccare: resta la data di nascita. Una persona vera
+  // non deve restare fuori perché il suo numero era stato scritto storto.
+  const slotPhone = slot ? normalizeCrewPhoneNumber(slot.phone) : '';
+  // Stesso messaggio per "non esiste", "data sbagliata", "numero diverso da
+  // quello che risulta" e "già preso": chi prova a indovinare non deve capire
+  // quale dei quattro ha sbagliato.
+  if (!slot || slot.birthDate !== birthDate || (slotPhone && slotPhone !== phone)) {
     await registraFallimento();
-    throw new HttpsError('permission-denied', 'I dati non coincidono con nessuna persona di questo equipaggio. Controlla il nome che hai scelto e la tua data di nascita.');
+    throw new HttpsError('permission-denied', 'I dati non coincidono con nessuna persona di questo equipaggio. Controlla il nome che hai scelto, la tua data di nascita e il numero da cui stai entrando.');
   }
 
   const fingerprint = sha256Hex(`${CREW_PHONE_PREFIX}${phone}`);
