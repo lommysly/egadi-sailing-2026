@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { auth, crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20261002-niente-promo-in-area-v1';
 import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
@@ -1272,35 +1272,56 @@ async function reportCrewPayment(controls) {
       window.location.reload();
       return;
     }
+    // L'identificativo si decide QUI, una volta sola, prima di qualunque
+    // tentativo. Fino al 3/10/2026 questa scrittura usava addDoc dentro
+    // withSaveRetry: addDoc genera un documento nuovo a ogni chiamata, e
+    // withSaveRetry ritenta dopo 800, 1600 e 3200 ms. Su una rete lenta una
+    // prima scrittura arrivata al server ma con la risposta persa produceva
+    // una SECONDA segnalazione di pagamento. È successo davvero il 2/10/2026:
+    // Fabio Marcomin risultava con due bonifici da 300 € a otto secondi
+    // l'uno dall'altro, e lo skipper ha dovuto annullarne uno a mano.
+    //
+    // withSaveRetry è sicuro solo con scritture ripetibili (setDoc, updateDoc,
+    // transazioni), che ricadono sempre sullo stesso documento. Questo era
+    // l'unico punto del sito dove veniva usato con una scrittura che non lo è.
+    const paymentRef = doc(collection(db, 'boats', activeInvite.boatId, 'paymentRequests'));
     await withSaveRetry(
-      () => addDoc(collection(db, 'boats', activeInvite.boatId, 'paymentRequests'), {
-        recipientId: activeInvite.id,
-        memberId: activeInvite.id,
-        payerInviteId: activeInvite.id,
-        entryType: 'self_reported',
-        amountCents,
-        currency: 'EUR',
-        reason: 'Pagamento segnalato dalla persona',
-        accountingCategory: 'cost_recovery',
-        // Senza questo campo lo skipper può confermare la segnalazione ma il
-        // saldo non si aggiorna mai: paymentAllocation() (area.js) non trova
-        // un importo da contare (bug reale scoperto il 30/09/2026 — vedi
-        // isValidSelfReportedPaymentCreate in firestore.rules).
-        contributionItemId: 'berth_base',
-        isOptional: false,
-        dueDate: '',
-        paymentMethods: {},
-        status: 'prepared',
-        createdAt: serverTimestamp(),
-        createdBy: auth.currentUser.uid,
-        verifiedAt: null,
-        verifiedBy: null,
-        cancelledAt: null,
-        cancelledBy: null,
-        declaredAt: serverTimestamp(),
-        declaredBy: auth.currentUser.uid,
-        declaredMethod: method,
-      }),
+      async () => {
+        // Se il tentativo precedente era in realtà arrivato, non si riscrive:
+        // una seconda setDoc sullo stesso documento verrebbe letta come una
+        // modifica e le regole la rifiuterebbero, facendo sembrare fallito un
+        // pagamento già registrato.
+        const esistente = await getDoc(paymentRef);
+        if (esistente.exists()) return;
+        await setDoc(paymentRef, {
+          recipientId: activeInvite.id,
+          memberId: activeInvite.id,
+          payerInviteId: activeInvite.id,
+          entryType: 'self_reported',
+          amountCents,
+          currency: 'EUR',
+          reason: 'Pagamento segnalato dalla persona',
+          accountingCategory: 'cost_recovery',
+          // Senza questo campo lo skipper può confermare la segnalazione ma il
+          // saldo non si aggiorna mai: paymentAllocation() (area.js) non trova
+          // un importo da contare (bug reale scoperto il 30/09/2026 — vedi
+          // isValidSelfReportedPaymentCreate in firestore.rules).
+          contributionItemId: 'berth_base',
+          isOptional: false,
+          dueDate: '',
+          paymentMethods: {},
+          status: 'prepared',
+          createdAt: serverTimestamp(),
+          createdBy: auth.currentUser.uid,
+          verifiedAt: null,
+          verifiedBy: null,
+          cancelledAt: null,
+          cancelledBy: null,
+          declaredAt: serverTimestamp(),
+          declaredBy: auth.currentUser.uid,
+          declaredMethod: method,
+        });
+      },
       () => setMessage(message, localized('Connessione lenta — verifico se è stato comunque salvato…', 'Slow connection — checking whether it actually saved…')),
     );
     // Nessun messaggio locale aggiuntivo: la sottoscrizione paymentRequests
