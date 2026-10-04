@@ -3,6 +3,7 @@ import { auth, crewAccessErrorMessage, crewSaveErrorMessage, crewAccessUrl, db, 
 import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
+import { rosterEntries, rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-ordine-cognitivo-v2';
 
 watchForStaleScript(import.meta.url);
 
@@ -300,9 +301,9 @@ function renderCrewDashboardShell() {
     </div>
     <section id="boatTravelRoster" class="boat-roster" aria-live="polite" hidden>
       <div class="boat-roster-heading">
-        <p class="eyebrow">${escapeHtml(localized('Chi è a bordo', 'Who is on board'))}</p>
-        <h4>${escapeHtml(localized('Arrivi e partenze della tua barca', 'Arrivals and departures on your boat'))}</h4>
-        <p class="field-hint">${escapeHtml(localized('Per mettervi d’accordo fra voi: chi si imbarca subito, chi passa dalla cambusa, chi divide un passaggio. Compaiono solo nome, orario e mezzo.', 'So you can sort things out between you: who boards straight away, who stops for provisions, who shares a ride. Only name, time and means are shown.'))}</p>
+        <p class="eyebrow">${escapeHtml(rosterHeading(activeLocale() === 'en').eyebrow)}</p>
+        <h4>${escapeHtml(rosterHeading(activeLocale() === 'en').title)}</h4>
+        <p class="field-hint">${escapeHtml(rosterHeading(activeLocale() === 'en').hint)}</p>
       </div>
       <ul class="boat-roster-list"></ul>
     </section>
@@ -588,57 +589,19 @@ function crewTravelProgress(direction) {
   return item('waiting', localized('transfer richiesto', 'transfer requested'), `${localized('Richiesta salvata; il gestore non l’ha ancora confermata.', 'Request saved; the organiser has not confirmed it yet.')} ${crewTransferPaidNote()}`);
 }
 
-// L'elenco di chi arriva e riparte, ordinato per momento di arrivo: in cima
-// chi atterra prima, perché è quello che apre la barca. Lo skipper è marcato,
-// così si vede subito se c'è già lui ad aspettare.
-const ROSTER_MEZZI = { flight: 'volo', train: 'treno', car: 'auto', ferry: 'nave', other: 'altro mezzo' };
-
-function rosterMomento(voce, direzione) {
-  const data = voce[`${direzione}Date`];
-  const ora = voce[`${direzione}Time`];
-  if (!data && !ora) return null;
-  let giorno = '';
-  if (typeof data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data)) {
-    const [anno, mese, numero] = data.split('-').map(Number);
-    giorno = new Date(Date.UTC(anno, mese - 1, numero)).toLocaleDateString(activeLocale() === 'en' ? 'en-GB' : 'it-IT', {
-      weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC',
-    });
-  }
-  const mezzo = ROSTER_MEZZI[voce[`${direzione}Transport`]] || '';
-  return { quando: [giorno, typeof ora === 'string' ? ora : ''].filter(Boolean).join(' · '), mezzo };
-}
-
+// L'elenco è lo stesso che vede lo skipper: vive in boat-roster.js, così le
+// due aree non possono mostrare la stessa barca in due modi diversi.
 function renderBoatTravelRoster() {
   const sezione = document.querySelector('#boatTravelRoster');
   if (!sezione) return;
-  const voci = boatTravelRoster
-    .filter((voce) => voce.displayName && (voce.outbound || voce.return || voce.outboundDate || voce.returnDate))
-    .sort((a, b) => String(a.outboundDate || '9999').localeCompare(String(b.outboundDate || '9999'))
-      || String(a.outboundTime || '99:99').localeCompare(String(b.outboundTime || '99:99'))
-      || String(a.displayName).localeCompare(String(b.displayName), 'it'));
-  if (!voci.length) {
+  if (!rosterEntries(boatTravelRoster).length) {
     sezione.hidden = true;
     return;
   }
-  const riga = (etichetta, momento, transfer) => {
-    if (!momento) return `<span class="boat-roster-leg boat-roster-leg--unknown">${escapeHtml(etichetta)}: ${escapeHtml(localized('non comunicato', 'not shared'))}</span>`;
-    const pulmino = transfer === 'requested' ? ` <em>${escapeHtml(localized('col transfer', 'on the shuttle'))}</em>` : '';
-    return `<span class="boat-roster-leg"><strong>${escapeHtml(etichetta)}</strong> ${escapeHtml(momento.quando)}${momento.mezzo ? ` <small>${escapeHtml(momento.mezzo)}</small>` : ''}${pulmino}</span>`;
-  };
-  sezione.querySelector('.boat-roster-list').innerHTML = voci.map((voce) => {
-    const io = voce.id === activeInvite?.id;
-    return `<li class="boat-roster-row${voce.isSkipper === true ? ' boat-roster-row--skipper' : ''}${io ? ' boat-roster-row--io' : ''}">
-      <div class="boat-roster-person">
-        <strong>${escapeHtml(voce.displayName)}</strong>
-        ${voce.isSkipper === true ? `<small>${escapeHtml(localized('skipper', 'skipper'))}</small>` : ''}
-        ${io ? `<small>${escapeHtml(localized('sei tu', 'that is you'))}</small>` : ''}
-      </div>
-      <div class="boat-roster-legs">
-        ${riga(localized('Arriva', 'Arrives'), rosterMomento(voce, 'outbound'), voce.outboundTransfer)}
-        ${riga(localized('Riparte', 'Leaves'), rosterMomento(voce, 'return'), voce.returnTransfer)}
-      </div>
-    </li>`;
-  }).join('');
+  sezione.querySelector('.boat-roster-list').innerHTML = rosterMarkup(boatTravelRoster, {
+    currentId: activeInvite?.id || '',
+    english: activeLocale() === 'en',
+  });
   sezione.hidden = false;
 }
 

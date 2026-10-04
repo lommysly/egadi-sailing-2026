@@ -136,11 +136,16 @@ body.menu-open { overflow:hidden; }
 .boat-roster-person strong { font-size:1rem; }
 .boat-roster-person small { padding:1px 7px; border-radius:999px; background:rgba(2,43,58,.08); font:700 .62rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; color:#42606b; }
 .boat-roster-legs { display:grid; gap:3px; }
-.boat-roster-leg { font-size:.82rem; line-height:1.45; color:#334e57; }
-.boat-roster-leg strong { display:inline-block; min-width:56px; font:700 .64rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; color:#5b7480; }
+.boat-roster-leg { display:grid; grid-template-columns:60px minmax(0,1fr); gap:6px; align-items:baseline; font-size:.82rem; line-height:1.45; color:#334e57; }
+.boat-roster-leg strong { font:700 .64rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; color:#5b7480; }
 .boat-roster-leg small { color:#6c838d; font-size:.74rem; }
-.boat-roster-leg em { color:#115e59; font-style:normal; font-weight:700; }
-.boat-roster-leg--unknown { color:#8296a0; font-style:italic; }
+.boat-roster-leg em { display:inline-block; margin-left:2px; padding:0 7px; border-radius:999px; background:rgba(13,148,136,.13); color:#115e59; font-style:normal; font-weight:700; font-size:.72rem; white-space:nowrap; }
+.boat-roster-leg--unknown { display:block; color:#8296a0; font-style:italic; }
+.boat-roster-empty { padding:10px 2px; color:#6c838d; font-size:.86rem; font-style:italic; }
+/* Dentro l'area skipper l'elenco sta in cima a "Arrivi e partenze della
+   barca", prima dei gruppi dei solleciti: stesso aspetto che ha per
+   l'equipaggio, perché è la stessa sezione. */
+.boat-roster--skipper { margin:0 0 26px; }
 @media (max-width:430px) { .boat-roster { padding:16px 14px; } }
 /* Prefisso e numero sono due campi distinti: finché erano uno solo, chi
    scriveva "348 565 7591" finiva registrato con un numero spagnolo e non

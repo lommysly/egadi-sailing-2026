@@ -30,7 +30,7 @@ import {
   setupSignals,
   skipperTransferStatus,
   travelBreakdown,
-} from './boat-todo-core.js?v=20261002-transfer-su-richiesta-v1';
+} from './boat-todo-core.js?v=20261004-ordine-cognitivo-v1';
 
 const EVENT_ID = 'egadi-2026';
 const app = initializeApp(firebaseConfig);

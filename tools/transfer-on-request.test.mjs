@@ -130,13 +130,12 @@ test('in andata conta quando arriva, al rientro quando riparte', () => {
   assert.match(fields, /direction === 'return' \? leg\.departureTime : leg\.arrivalTime/);
 });
 
-test('la riga orari è separata dai badge del transfer e non è un allarme', () => {
-  assert.match(area, /function crewTravelSchedule\(status, direction\)/);
-  assert.match(area, /crew-travel-card-legs[\s\S]{0,120}\$\{scheduleLine\(schedule\)\}/);
-  assert.match(area, /non comunicato/);
-  // Nessun tono d'allarme: un orario mancante è informazione, non colpa.
-  const styles = read('styles.css');
-  assert.match(styles, /\.crew-travel-when-entry--unknown \{[^}]*font-style:italic/);
+test('gli orari stanno in un posto solo: l’elenco della barca', () => {
+  // Prima erano ripetuti dentro ogni card dei solleciti. Ora "chi arriva
+  // quando" ha la sua sezione, e le card rispondono solo a "a chi scrivo".
+  assert.doesNotMatch(area, /function crewTravelSchedule/);
+  assert.doesNotMatch(area, /scheduleLine\(schedule\)/);
+  assert.match(area, /rosterMarkup\(activeCrewTravelStatus, \{ currentId: 'skipper' \}\)/);
 });
 
 test('la persona sa esattamente che cosa vede il suo skipper', () => {
@@ -175,10 +174,9 @@ test('anche lo skipper compare fra chi arriva e chi riparte', () => {
   assert.match(functions, /validSkipperSourceLeg\(leg, direction, profile\) \? 'requested' : 'not_requested'/);
 });
 
-test('l’area equipaggio mostra l’elenco della barca ordinato per arrivo', () => {
+test('l’area equipaggio mostra l’elenco della propria barca', () => {
   assert.match(myArea, /function renderBoatTravelRoster\(\)/);
   assert.match(myArea, /collection\(db, 'boats', activeInvite\.boatId, 'crewTravelStatus'\)/);
   assert.match(myArea, /id="boatTravelRoster"/);
-  // Un orario che manca è scritto come informazione, non come allarme.
-  assert.match(myArea, /boat-roster-leg--unknown/);
+  assert.match(myArea, /rosterMarkup\(boatTravelRoster/);
 });

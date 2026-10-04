@@ -13,6 +13,7 @@ import { installInputNormalization, normalizeFormFields } from './input-normaliz
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20261002-niente-promo-in-area-v1';
 import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
+import { rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-ordine-cognitivo-v2';
 import {
   boatFromData,
   boatSetupReadiness,
@@ -21,7 +22,7 @@ import {
   setupSignals,
   skipperTransferStatus,
   travelBreakdown,
-} from './boat-todo-core.js?v=20261002-transfer-su-richiesta-v1';
+} from './boat-todo-core.js?v=20261004-ordine-cognitivo-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -1311,7 +1312,7 @@ function setupSkipperOperationsDashboard(travelPanel, boardPanel, crewTravelOver
     lead: 'I tuoi spostamenti, quelli dell’equipaggio e le regole di bordo restano separati: così ogni aggiornamento finisce nel posto giusto.',
     cards: [
       { view: 'personal', title: 'Il mio viaggio', detail: 'Andata, ritorno e transfer dello skipper.', icon: 'operations', controls: 'skipperTravelPanel' },
-      { view: 'crew', title: 'Viaggi equipaggio', detail: 'Conferme, richieste transfer e solleciti.', icon: 'transfer' },
+      { view: 'crew', title: 'Arrivi e partenze della barca', detail: 'Chi arriva quando, chi è sul transfer e chi va sollecitato.', icon: 'transfer' },
       { view: 'rules', title: 'Regole e avvisi', detail: 'Regolamento, orari e comunicazioni di bordo.', icon: 'board', controls: 'regolamento-di-bordo' },
     ],
   });
@@ -6901,34 +6902,6 @@ function crewTravelLegState(status, direction) {
   return 'missing';
 }
 
-// Quando una persona arriva, e con che mezzo. È l'unica cosa del viaggio che
-// lo skipper può leggere — la tratta completa (volo, vettore, aeroporti,
-// bagagli) resta privata alla persona — e serve a una domanda sola: a che ora
-// si può salpare (richiesta di Silvio, 2/10/2026). Separata dal transfer di
-// proposito: sapere l'orario non ha niente a che vedere con il pulmino.
-const CREW_TRANSPORT_LABELS = {
-  flight: 'volo',
-  train: 'treno',
-  car: 'auto',
-  ferry: 'nave',
-  other: 'altro mezzo',
-};
-
-function crewTravelSchedule(status, direction) {
-  const date = status?.[`${direction}Date`];
-  const time = status?.[`${direction}Time`];
-  if (!date && !time) return null;
-  const transport = CREW_TRANSPORT_LABELS[status?.[`${direction}Transport`]] || '';
-  let dayLabel = '';
-  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    const [year, month, day] = date.split('-').map(Number);
-    dayLabel = new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('it-IT', {
-      weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC',
-    });
-  }
-  return { dayLabel, time: typeof time === 'string' ? time : '', transport };
-}
-
 // Stesso tono e struttura di whatsappUrl() più sotto (messaggio di invito):
 // un promemoria diretto, mai i dettagli del viaggio che lo skipper stesso
 // non può leggere (vedi crewTravelStatusFor).
@@ -6985,17 +6958,12 @@ function crewTravelOverviewCards() {
       outbound: crewTravelLegState(status, 'outbound'),
       return: crewTravelLegState(status, 'return'),
     };
-    const schedule = {
-      outbound: crewTravelSchedule(status, 'outbound'),
-      return: crewTravelSchedule(status, 'return'),
-    };
     const needsReminder = CREW_TRAVEL_NEEDS_REMINDER.has(legStates.outbound)
       || CREW_TRAVEL_NEEDS_REMINDER.has(legStates.return);
     const presentation = crewTravelCardPresentation(legStates);
     return {
       member,
       legStates,
-      schedule,
       needsReminder,
       presentation,
       group: crewTravelOverviewGroup(legStates),
@@ -7027,16 +6995,7 @@ function renderCrewTravelOverview() {
     const label = direction === 'outbound' ? 'Andata' : 'Ritorno';
     return `<span class="crew-travel-leg crew-travel-leg--${legStates[direction]}"><span aria-hidden="true">${info.icon}</span>${escapeHtml(label)} · ${escapeHtml(info.text)}</span>`;
   };
-  const scheduleLine = (schedule) => {
-    const entry = (direction, label) => {
-      const value = schedule[direction];
-      if (!value) return `<span class="crew-travel-when-entry crew-travel-when-entry--unknown">${label}: non comunicato</span>`;
-      const when = [value.dayLabel, value.time].filter(Boolean).join(' · ');
-      return `<span class="crew-travel-when-entry"><strong>${escapeHtml(label)}</strong> ${escapeHtml(when)}${value.transport ? ` <small>${escapeHtml(value.transport)}</small>` : ''}</span>`;
-    };
-    return `<div class="crew-travel-when">${entry('outbound', 'Arriva')}${entry('return', 'Riparte')}</div>`;
-  };
-  const renderCard = ({ member, legStates, schedule, needsReminder, presentation }) => {
+  const renderCard = ({ member, legStates, needsReminder, presentation }) => {
     const useReminder = needsReminder && presentation.tone !== 'cancelled';
     const contactUrl = useReminder ? crewTravelReminderUrl(member, legStates) : crewTravelContactUrl(member);
     const actionLabel = useReminder
@@ -7046,7 +7005,7 @@ function renderCrewTravelOverview() {
       ? `<a class="button button-whatsapp crew-travel-card-whatsapp" href="${escapeHtml(contactUrl)}" target="_blank" rel="noopener noreferrer">${whatsappActionIconMarkup({ external: true })}${escapeHtml(actionLabel)}</a>`
       : '<span class="field-hint crew-travel-card-no-contact">Numero WhatsApp non disponibile</span>';
     const initial = escapeHtml(memberName(member).trim().charAt(0).toUpperCase() || '?');
-    return `<article class="crew-travel-card crew-travel-card--${escapeHtml(presentation.tone)}"><header class="crew-travel-card-heading"><span class="crew-travel-card-avatar" aria-hidden="true">${initial}</span><span class="crew-travel-card-person"><strong>${escapeHtml(memberName(member))}</strong><small>${escapeHtml(presentation.label)}</small></span></header><div class="crew-travel-card-legs">${legBadge(legStates, 'outbound')}${legBadge(legStates, 'return')}</div>${scheduleLine(schedule)}<div class="crew-travel-card-action">${action}</div></article>`;
+    return `<article class="crew-travel-card crew-travel-card--${escapeHtml(presentation.tone)}"><header class="crew-travel-card-heading"><span class="crew-travel-card-avatar" aria-hidden="true">${initial}</span><span class="crew-travel-card-person"><strong>${escapeHtml(memberName(member))}</strong><small>${escapeHtml(presentation.label)}</small></span></header><div class="crew-travel-card-legs">${legBadge(legStates, 'outbound')}${legBadge(legStates, 'return')}</div><div class="crew-travel-card-action">${action}</div></article>`;
   };
   const waitingCards = cards.filter((card) => card.group === 'waiting');
   const submittedCards = cards.filter((card) => card.group === 'submitted');
@@ -7063,7 +7022,18 @@ function renderCrewTravelOverview() {
   const heading = waitingCards.length
     ? `<h4>${waitingCards.length} ${waitingCards.length === 1 ? 'persona ha chiesto il transfer senza completarlo' : 'persone hanno chiesto il transfer senza completarlo'}</h4><p class="panel-lead">Il transfer si chiede: chi non lo chiede arriva per conto suo, e per te non c’è niente da fare. Qui sotto trovi solo chi lo ha chiesto e si è fermato a metà.</p>`
     : '<h4>Nessun transfer in sospeso</h4><p class="panel-lead">Il transfer si chiede: chi non lo chiede arriva per conto suo. I badge mostrano chi sale sul pulmino e a che punto è.</p>';
-  const markup = `<p class="eyebrow">Viaggio equipaggio</p>${heading}<div class="crew-travel-groups">${renderGroup({
+  // In cima, la stessa sezione che vede l'equipaggio nella propria area:
+  // stesso nome, stesso ordine, stesse righe, skipper compreso. Risponde a
+  // "chi arriva quando". Sotto restano i due gruppi, che rispondono a
+  // un'altra domanda: "a chi devo scrivere". Una domanda, un posto solo —
+  // per questo gli orari non sono più ripetuti dentro ogni card (richiesta
+  // di Silvio, 4/10/2026: "che ci sia un ordine cognitivo").
+  const rosterCopy = rosterHeading(false);
+  const roster = `<section class="boat-roster boat-roster--skipper">
+      <div class="boat-roster-heading"><p class="eyebrow">${escapeHtml(rosterCopy.eyebrow)}</p><h4>${escapeHtml(rosterCopy.title)}</h4><p class="field-hint">${escapeHtml(rosterCopy.hint)}</p></div>
+      <ul class="boat-roster-list">${rosterMarkup(activeCrewTravelStatus, { currentId: 'skipper' })}</ul>
+    </section>`;
+  const markup = `${roster}<p class="eyebrow">Transfer e solleciti</p>${heading}<div class="crew-travel-groups">${renderGroup({
     key: 'waiting',
     title: 'Transfer da completare',
     detail: 'Hanno scelto il transfer ma non hanno dato il consenso: la richiesta non è partita e nessuno passerà a prenderli.',

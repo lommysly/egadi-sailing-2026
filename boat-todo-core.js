@@ -113,7 +113,11 @@ export function skipperTransferStatus(records, boatId) {
 // senza dare il consenso: quello sì è un lavoro vero, perché crede di avere
 // il pulmino e non ce l'ha.
 export function travelBreakdown({ travelStatuses, memberCount, skipperStatus } = {}) {
-  const statuses = travelStatuses || [];
+  // Dal 4/10/2026 la collezione contiene anche la riga dello skipper, perché
+  // il suo equipaggio possa vedere quando arriva. Qui va tolta: lo skipper
+  // entra nel conteggio una volta sola, da skipperStatus, e contarlo anche fra
+  // le righe lo farebbe risultare due volte sul pulmino.
+  const statuses = (travelStatuses || []).filter((entry) => entry?.isSkipper !== true && entry?.inviteId !== 'skipper');
   const skipper = skipperStatus || {};
   const total = Number.isInteger(memberCount) ? memberCount + 1 : null;
   const countFor = (key) => ({

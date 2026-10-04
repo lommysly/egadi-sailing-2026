@@ -123,3 +123,19 @@ test('del transfer skipper contano solo i record attivi della sua barca', () => 
   assert.deepEqual(skipperTransferStatus(records, 'barca-ignota'), { outbound: false, return: false });
   assert.deepEqual(skipperTransferStatus(undefined, 'karibu'), { outbound: false, return: false });
 });
+
+test('la riga dello skipper nell’elenco arrivi non lo fa contare due volte', () => {
+  // Lo skipper ha chiesto il transfer: compare sia nella collezione (per
+  // farsi vedere dal suo equipaggio) sia in skipperStatus (per il conteggio).
+  const breakdown = travelBreakdown({
+    travelStatuses: [
+      { inviteId: 'a', outboundTransfer: 'requested' },
+      { inviteId: 'skipper', isSkipper: true, outboundTransfer: 'requested' },
+    ],
+    memberCount: 1,
+    skipperStatus: { outbound: true, return: false },
+  });
+  assert.equal(breakdown.total, 2);
+  // Una persona più lo skipper: due sul pulmino, non tre.
+  assert.deepEqual(breakdown.outbound, { requested: 2, pending: 0, independent: 0 });
+});
