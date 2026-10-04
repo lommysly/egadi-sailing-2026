@@ -129,6 +129,31 @@ export function crewAccessErrorMessage(error, { activation = false } = {}) {
   return translate('crew.errors.completeAccess', 'Non riesco a completare l’accesso. Controlla la connessione e riprova.');
 }
 
+// Perché un salvataggio non è riuscito. Dirlo sempre "controlla la
+// connessione" manda le persone a caccia del problema sbagliato: il
+// 4/10/2026 sette persone di Carpe Diem non riuscivano a confermare i propri
+// dati per il charter — le Rules rifiutavano la scrittura per un campo di
+// troppo scritto dal server — e leggevano un messaggio sulla rete, che
+// funzionava benissimo. Chi legge deve capire se può fare qualcosa lui
+// (riprovare, ricaricare) o se deve chiedere aiuto.
+export function crewSaveErrorMessage(error, fallback) {
+  console.error('Egadi salvataggio equipaggio:', error);
+  const codice = error?.code || '';
+  if (codice === 'permission-denied') {
+    return translate(
+      'crew.errors.saveRefused',
+      'Il salvataggio è stato rifiutato dal sito, non è un problema di rete. Ricarica la pagina e riprova: se succede ancora, scrivi allo skipper — non è colpa tua e non devi ricompilare niente.',
+    );
+  }
+  if (codice === 'unauthenticated') {
+    return translate('crew.errors.sessionExpired', 'La sessione è scaduta. Entra di nuovo con numero e codice, i dati che hai scritto restano salvati.');
+  }
+  if (codice === 'unavailable' || codice === 'deadline-exceeded' || codice === 'aborted') {
+    return translate('crew.errors.offline', 'Non riesco a raggiungere il sito in questo momento. Controlla la connessione e riprova fra poco.');
+  }
+  return fallback;
+}
+
 function ensurePrivateArea() {
   if (!canUsePrivateArea()) throw new CrewAccessError('private-area-disabled');
 }

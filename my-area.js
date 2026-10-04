@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { auth, crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20261002-niente-promo-in-area-v1';
+import { auth, crewAccessErrorMessage, crewSaveErrorMessage, crewAccessUrl, db, isScriptStale, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20261004-messaggi-sinceri-v1';
 import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
@@ -1328,7 +1328,7 @@ async function reportCrewPayment(controls) {
     // ridisegna subito questa sezione con la segnalazione in elenco.
   } catch (error) {
     console.error('Egadi segnalazione pagamento:', error);
-    setMessage(message, localized('Non riesco a registrare la segnalazione. Riprova tra poco, oppure avvisa lo skipper su WhatsApp.', 'I could not save this. Please try again shortly, or let the skipper know on WhatsApp.'), true);
+    setMessage(message, crewSaveErrorMessage(error, localized('Non riesco a registrare la segnalazione. Riprova tra poco, oppure avvisa lo skipper su WhatsApp.', 'I could not save this. Please try again shortly, or let the skipper know on WhatsApp.')), true);
     button.disabled = false;
     select.disabled = false;
     amountInput.disabled = false;

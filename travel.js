@@ -1,7 +1,7 @@
 import { getApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { crewAccessErrorMessage, crewAccessUrl, db, isScriptStale, personalAreaUrl, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20261002-niente-promo-in-area-v1';
+import { crewAccessErrorMessage, crewSaveErrorMessage, crewAccessUrl, db, isScriptStale, personalAreaUrl, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20261004-messaggi-sinceri-v1';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
 
 watchForStaleScript(import.meta.url);
@@ -1009,7 +1009,7 @@ function bindLegForm(form, direction) {
       }
     } catch (error) {
       console.error('Impossibile salvare gli spostamenti dell’equipaggio.', error);
-      setMessage(message, copy.saveError, true);
+      setMessage(message, crewSaveErrorMessage(error, copy.saveError), true);
     } finally {
       setSaving(form, false);
     }

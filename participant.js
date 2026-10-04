@@ -4,6 +4,7 @@ import {
   auth,
   boatId,
   crewAccessErrorMessage,
+  crewSaveErrorMessage,
   db,
   inviteId,
   isScriptStale,
@@ -12,7 +13,7 @@ import {
   startInviteActivation,
   watchForStaleScript,
   withSaveRetry,
-} from './crew-session.js?v=20261002-niente-promo-in-area-v1';
+} from './crew-session.js?v=20261004-messaggi-sinceri-v1';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
 import { collegaCampiNumero, numeroInternazionale } from './phone-prefix.js?v=20261004-prefisso-ovunque-v1';
 import { canConfirmCrewBriefing } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
@@ -751,9 +752,9 @@ document.querySelector('#participantForm').addEventListener('submit', async (eve
   } catch (error) {
     setMessage(
       document.querySelector('#participantFormMessage'),
-      isDraft
-        ? translate('crew.flow.draftNotSaved', 'La bozza non è stata salvata. Controlla la connessione e riprova.')
-        : translate('crew.flow.detailsNotSaved', 'I dati non sono stati inviati. Controlla la connessione e riprova.'),
+      crewSaveErrorMessage(error, isDraft
+        ? translate('crew.flow.draftNotSaved', 'La bozza non è stata salvata. Riprova fra poco.')
+        : translate('crew.flow.detailsNotSaved', 'I dati non sono stati inviati. Riprova fra poco.')),
       true,
     );
   } finally {

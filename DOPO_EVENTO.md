@@ -76,7 +76,21 @@ prima: oggi sarebbe generalizzare su un caso solo.
 
 ---
 
-## 5. Pulizie minori rimaste indietro
+## 5. I messaggi che il sito manda quando qualcosa va storto
+
+Fatto in parte il 4/10/2026: il lato equipaggio ora distingue un rifiuto delle
+Rules (`permission-denied`) da una rete caduta (`unavailable`) e da una
+sessione scaduta, invece di dire sempre "controlla la connessione". E il
+messaggio di attivazione non parla più di invito scaduto quando il problema è
+il prefisso del numero.
+
+Resta da rivedere con la stessa logica il lato skipper e la pagina transfer:
+`getFirestoreErrorMessage` distingue solo due casi, e diversi `catch`
+mostrano ancora una frase unica. La regola da seguire: chi legge deve capire
+se può fare qualcosa lui (riprovare, ricaricare) o se deve chiedere aiuto — e
+non deve mai temere di dover ricompilare quello che ha già scritto.
+
+## 6. Pulizie minori rimaste indietro
 
 - **Passage Plan, sezione sicurezza**: il testo "Prossimi controlli: 28
   settembre · 3 ottobre…" è statico e ormai superato. Va tolto o reso vivo.

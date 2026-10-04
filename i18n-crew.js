@@ -168,6 +168,9 @@
           activationUnavailable: 'Il numero non corrisponde a quello con cui è stato creato questo accesso: controlla il prefisso e riprova. Se hai già scelto un codice, entra con numero e codice. Se non funziona lo stesso, chiedi allo skipper un nuovo link.',
           accessInactive: 'Non risulta un accesso attivo con questo numero. Apri il link WhatsApp ricevuto dallo skipper.',
           completeAccess: 'Non riesco a completare l’accesso. Controlla la connessione e riprova.',
+          saveRefused: 'Il salvataggio è stato rifiutato dal sito, non è un problema di rete. Ricarica la pagina e riprova: se succede ancora, scrivi allo skipper — non è colpa tua e non devi ricompilare niente.',
+          sessionExpired: 'La sessione è scaduta. Entra di nuovo con numero e codice, i dati che hai scritto restano salvati.',
+          offline: 'Non riesco a raggiungere il sito in questo momento. Controlla la connessione e riprova fra poco.',
         },
         briefing: {
           fullRules: 'Regolamento di bordo',
@@ -404,6 +407,9 @@
           activationUnavailable: 'This number does not match the one this access was created with: check the country code and try again. If you already chose a code, sign in with your number and code. If it still fails, ask your skipper for a new link.',
           accessInactive: 'There is no active access linked to this number. Open the WhatsApp link sent by your skipper.',
           completeAccess: 'We could not complete your access. Check your connection and try again.',
+          saveRefused: 'The site refused this save: it is not a connection problem. Reload the page and try again — if it keeps happening, message your skipper. It is not your fault and you do not need to fill anything in again.',
+          sessionExpired: 'Your session expired. Sign in again with your number and code; what you wrote is still saved.',
+          offline: 'I cannot reach the site right now. Check your connection and try again shortly.',
         },
         briefing: {
           fullRules: 'Board rules',

@@ -135,3 +135,34 @@ test('la funzione non scrive nella scheda campi che le Rules non ammettono', () 
   const fuori = scritte.filter((chiave) => !ammesse.has(chiave));
   assert.deepEqual(fuori, [], `campi non ammessi nella scheda: ${fuori.join(', ')}`);
 });
+
+// Un salvataggio rifiutato dalle Rules e una rete caduta non sono la stessa
+// cosa e non si risolvono allo stesso modo. Dirlo sempre "controlla la
+// connessione" manda le persone a caccia del problema sbagliato: è successo
+// due volte in due giorni — "invito scaduto" quando il numero non combaciava,
+// e "controlla la connessione" quando le Rules rifiutavano la scheda.
+test('il lato equipaggio distingue un rifiuto da una rete caduta', () => {
+  const sessione = read('crew-session.js');
+  assert.match(sessione, /export function crewSaveErrorMessage\(error, fallback\)/);
+  assert.match(sessione, /codice === 'permission-denied'/);
+  assert.match(sessione, /non è un problema di rete/);
+  assert.match(sessione, /codice === 'unauthenticated'/);
+  assert.match(sessione, /codice === 'unavailable'/);
+});
+
+test('le schermate che salvano usano quel messaggio invece del generico', () => {
+  ['participant.js', 'travel.js', 'my-area.js'].forEach((file) => {
+    const source = read(file);
+    assert.match(source, /crewSaveErrorMessage/, `${file} non distingue le cause`);
+  });
+  // Nessuna delle tre deve più promettere che è colpa della connessione.
+  const partecipante = read('participant.js');
+  assert.doesNotMatch(partecipante, /non sono stati inviati\. Controlla la connessione/);
+});
+
+test('il messaggio dice alla persona che non deve ricompilare niente', () => {
+  // Chi ha appena scritto venti campi e si vede un errore rosso pensa di
+  // doverli riscrivere: va detto che non serve.
+  assert.match(read('crew-session.js'), /non devi ricompilare niente/);
+  assert.match(read('i18n-crew.js'), /you do not need to fill anything in again/);
+});
