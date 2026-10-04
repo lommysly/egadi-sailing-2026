@@ -144,3 +144,41 @@ test('la persona sa esattamente che cosa vede il suo skipper', () => {
   assert.match(travel, /lo skipper vede soltanto quando arrivi, quando riparti e con che mezzo/);
   assert.match(read('PRIVACY_DA_COMPLETARE.md'), /crewTravel\/\{inviteId\}\/legs` resta owner-only/);
 });
+
+// Chi è a bordo vede quando arrivano e ripartono gli altri della propria
+// barca, skipper compreso: serve a organizzarsi fra compagni senza passare
+// ogni volta dallo skipper (richiesta di Silvio, 4/10/2026). Il confine sono
+// due: la barca, e i dati — nome, orario, mezzo, transfer. Niente documenti.
+test('l’equipaggio vede gli arrivi della propria barca, non le schede', () => {
+  const rules = read('firestore.rules');
+  assert.match(rules, /function isCrewOfBoat\(boatId\)/);
+  const stato = rules.slice(rules.indexOf('match /crewTravelStatus/{inviteId}'));
+  assert.match(stato.slice(0, 1600), /allow list: if isPrivateAreaOpen\(\) && \(isOrganizer\(\) \|\| isSkipper\(boatId\) \|\| isCrewOfBoat\(boatId\)\)/);
+  // members resta chiuso: lì ci sono i documenti d'identità.
+  const membri = rules.slice(rules.indexOf('match /members/{memberId}'));
+  assert.doesNotMatch(membri.slice(0, 300), /isCrewOfBoat/);
+});
+
+test('il nome viaggia con lo stato di viaggio, così members può restare chiuso', () => {
+  const functions = read('functions/index.js');
+  const scrittura = functions.slice(functions.indexOf('async function writeCrewTravelStatus'));
+  assert.match(scrittura.slice(0, 900), /displayName/);
+  assert.match(scrittura.slice(0, 900), /boats\/\$\{boatId\}\/invites\/\$\{inviteId\}/);
+});
+
+test('anche lo skipper compare fra chi arriva e chi riparte', () => {
+  const functions = read('functions/index.js');
+  assert.match(functions, /crewTravelStatus\/skipper/);
+  assert.match(functions, /isSkipper: true/);
+  // La firma completa: con un argomento solo risponderebbe sempre "niente
+  // transfer", errore fatto e corretto scrivendo questa funzione.
+  assert.match(functions, /validSkipperSourceLeg\(leg, direction, profile\) \? 'requested' : 'not_requested'/);
+});
+
+test('l’area equipaggio mostra l’elenco della barca ordinato per arrivo', () => {
+  assert.match(myArea, /function renderBoatTravelRoster\(\)/);
+  assert.match(myArea, /collection\(db, 'boats', activeInvite\.boatId, 'crewTravelStatus'\)/);
+  assert.match(myArea, /id="boatTravelRoster"/);
+  // Un orario che manca è scritto come informazione, non come allarme.
+  assert.match(myArea, /boat-roster-leg--unknown/);
+});

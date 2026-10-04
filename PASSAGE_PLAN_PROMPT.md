@@ -48,9 +48,13 @@ REGOLE DI AFFIDABILITÀ
 12. Distingui sempre una caletta bella da una rada idonea: una cala può essere indicata come scenario di tramonto, alba o sosta diurna, ma non come pernottamento garantito. Per ogni notte indica separatamente porto, campo boe autorizzato o rada da confermare dopo controllo di meteo, onda, fondale, zonazione AMP, ordinanze, autorizzazioni e disponibilità.
 13. Per ogni porto, campo boe o rada usa uno stato esplicito: `idea`, `da verificare` o `confermato dallo skipper`. Non usare mai “confermato” senza indicare ora della verifica di autorizzazione e disponibilità.
 14. Indica sempre eventuali rotte o soste alternative utili se le condizioni previste sconsigliano il piano desiderato (non solo “si valuterà”, ma l'alternativa concreta più sensata secondo le fonti).
+15. Analizza separatamente `uscita`, `navigazione` e `arrivo`: un dato offshore non descrive automaticamente l'imboccatura di un porto e una rada diurna non è automaticamente adatta alla notte.
+16. Ricostruisci una rotta geografica plausibile che non attraversi terra. Riporta distanza orientativa, direzioni vere e scenari di durata a 4, 5 e 6 nodi; sono stime, non ETA certe.
+17. Non mediare modelli divergenti. Mostra gli scenari separati, usa ensemble e osservazioni quando disponibili e spiega quale decisione cambia.
+18. Assegna a uscita, navigazione e arrivo una valutazione editoriale esplicita: `favorable` 🟢, `caution` 🟡, `adverse` 🔴 o `unknown` ⚪. Un dato essenziale mancante non può diventare verde.
 
 FORMATO OBBLIGATORIO
-Restituisci prima una sintesi per l'equipaggio, chiara e non allarmistica; poi quattro schede giornaliere, una per data. Per ogni scheda usa esattamente queste etichette:
+Apri con data e ora del briefing, periodo analizzato, tre elementi decisivi e verifiche ancora mancanti. Mostra una mappa o uno schema dichiarato non utilizzabile per navigare e una tabella `Giorno | Tratta | Uscita | Navigazione | Arrivo | Finestra | Criticità | Incertezza`. Poi presenta quattro schede giornaliere. Per ogni scheda usa esattamente queste etichette:
 - Data e tratta
 - Piano indicativo
 - Notte prevista
@@ -66,13 +70,24 @@ Restituisci prima una sintesi per l'equipaggio, chiara e non allarmistica; poi q
 - Sole
 - Luna
 - Decisione / attenzione skipper (sintesi operativa con consigli pratici per uno skipper esperto)
+- Distanza, direzioni vere e durate indicative a 4, 5 e 6 nodi
+- Valutazioni separate di uscita, navigazione e arrivo
+- Finestra favorevole, fascia da evitare, fase più critica e incertezza
+- Controlli da ripetere prima di salpare
 
 Chiudi con:
 - fonti meteo-marine, URL e orario di consultazione;
 - limiti del dato e variazioni fra modelli;
 - una nota di sicurezza: “La rotta e gli ancoraggi sono confermati dallo skipper in base alle condizioni reali, agli avvisi e alle ordinanze vigenti.”
 
-Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi: updatedAt, publishedAt, validFrom, validUntil, nextUpdateAt, dataMode (`planning`, `trend` o `operational`), phase, confidence, status, summary, sourceNote, stopsNote, mooringGuide e sources. `sources` è un array di oggetti con label, url, scope e checkedAt. Per ogni giorno mantieni: date, route, plan, overnight, overnightType, overnightStatus, alternative, stops, wind, sea, air, water, currents, decision, sun, moon, e `glance` (oggetto breve per la card: wind, windTone, sea, seaTone, sky, skyIcon, skyTone, air — tone è `good`/`caution`/`calm`/`muted`). `stops` è un array di oggetti con moment, title, description e check. Visibilità, tipo di nubi, probabilità di pioggia e zone a rischio meteo non hanno un campo JS dedicato oggi: includili dentro `wind`, `sea`, `air` o `decision` a seconda di dove sono più pertinenti (es. zone a rischio dentro `decision`, visibilità dentro `air`). Se col tempo risultano scomodi da leggere così, valutare l'aggiunta di campi dedicati nel modello dati.
+Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi esistenti e aggiungi:
+
+- a livello generale: `decisiveFactors`, `missingChecks`, `orientationNotes`, `modelComparison`, `nextUpdateReason`;
+- per ogni fonte: `label`, `url`, `scope`, `checkedAt`, `product`, `model`, `availability`;
+- per ogni giorno: `distance`, `course`, `duration`, `window`, `criticality`, `uncertainty`, `ratings`, `operationalChecks`, `visibility`, `phenomena`;
+- in `ratings`: `departure`, `passage`, `arrival`, ciascuno con `tone` e `text`.
+
+La tabella di sintesi viene generata dai campi delle giornate: non duplicarla nei dati. Mantieni inoltre date, route, plan, overnight, overnightType, overnightStatus, alternative, stops, wind, sea, air, water, currents, decision, sun, moon e `glance`. `stops` resta un array di oggetti con moment, title, description e check. L'edizione inglese deve riportare gli stessi fatti con testo editoriale naturale, non con traduzione automatica.
 ```
 
 ## Fonti da confrontare nel briefing reale

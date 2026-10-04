@@ -664,8 +664,14 @@ function crewScheduleFields(direction, leg) {
 }
 
 async function writeCrewTravelStatus(boatId, inviteId, direction, travelState, transferState, leg = null) {
+  // Il nome viaggia insieme allo stato, così chi è a bordo può vedere quando
+  // arrivano gli altri senza che le Rules debbano aprire members, dove stanno
+  // i documenti d'identità (richiesta di Silvio, 4/10/2026).
+  const invito = await db.doc(`boats/${boatId}/invites/${inviteId}`).get();
+  const displayName = invito.exists ? invito.data()?.displayName || '' : '';
   await db.doc(`boats/${boatId}/crewTravelStatus/${inviteId}`).set({
     inviteId,
+    ...(displayName ? { displayName } : {}),
     [direction]: travelState,
     [`${direction}Transfer`]: transferState,
     ...crewScheduleFields(direction, leg),
@@ -891,6 +897,20 @@ exports.materializeSkipperTravel = onDocumentWritten({
     ? profileSnapshot.data()
     : profileDraftSnapshot.exists ? profileDraftSnapshot.data() : null;
   const existingTransfer = transferSnapshot.exists ? transferSnapshot.data() : null;
+
+  // Anche lo skipper compare fra chi arriva e chi riparte: il suo equipaggio
+  // deve sapere quando c'è, per capire chi si imbarca subito e chi deve
+  // aspettarlo (richiesta di Silvio, 4/10/2026). Vale la stessa misura degli
+  // altri: data, ora e mezzo, niente volo, vettore o aeroporto.
+  await db.doc(`boats/${boatId}/crewTravelStatus/skipper`).set({
+    inviteId: 'skipper',
+    displayName: boat?.skipperName || 'Skipper',
+    isSkipper: true,
+    [direction]: leg.state === 'ready' ? 'ready' : 'draft',
+    [`${direction}Transfer`]: validSkipperSourceLeg(leg, direction, profile) ? 'requested' : 'not_requested',
+    ...crewScheduleFields(direction, leg),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
 
   await db.runTransaction(async (transaction) => {
     const existingBackup = await transaction.get(backupRef);

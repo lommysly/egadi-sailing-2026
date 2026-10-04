@@ -499,12 +499,18 @@ test('crewTravelStatus: CREW_B non legge il documento di INVITE_A perche non e i
   await assertFails(getDoc(doc(crewB.firestore(), `boats/${SKIPPER_A}/crewTravelStatus/${INVITE_A_ID}`)));
 });
 
-test('crewTravelStatus: nessuna crew puo fare list sulla collezione', async () => {
+// Fino al 4/10/2026 nessuna crew poteva fare list su questa collezione: ogni
+// persona vedeva soltanto la propria tratta. Silvio ha chiesto il contrario —
+// chi è a bordo deve sapere quando arrivano gli altri della sua barca, per
+// potersi organizzare fra loro (chi si imbarca subito, chi passa dalla
+// cambusa, chi divide un passaggio) senza passare ogni volta dallo skipper.
+// Il confine resta la barca: su quella altrui non si vede niente.
+test('crewTravelStatus: la list è aperta alla propria barca e chiusa alle altre', async () => {
   await seedCrewAFullyOnboarded();
   await seedCrewTravelStatusA();
   const crewA = crewAContext(testEnv);
   const crewB = crewBContext(testEnv);
-  await assertFails(getDocs(collection(crewA.firestore(), `boats/${SKIPPER_A}/crewTravelStatus`)));
+  await assertSucceeds(getDocs(collection(crewA.firestore(), `boats/${SKIPPER_A}/crewTravelStatus`)));
   await assertFails(getDocs(collection(crewB.firestore(), `boats/${SKIPPER_A}/crewTravelStatus`)));
 });
 
@@ -1037,4 +1043,36 @@ test('matchCandidates: nessuna scrittura client e mai consentita, da nessun ruol
       deleteDoc(doc(ctx.firestore(), `boats/${SKIPPER_A}/crewTravel/${INVITE_A_ID}/legs/outbound/matchCandidates/${MATCH_ID}`)),
     );
   }
+});
+
+// Chi è a bordo vede quando arrivano e ripartono gli altri della propria
+// barca: serve a mettersi d'accordo fra compagni — chi si imbarca subito, chi
+// passa dalla cambusa, chi divide un passaggio — senza passare ogni volta
+// dallo skipper (richiesta di Silvio, 4/10/2026). Escono nome, data, ora,
+// mezzo e stato del transfer: i documenti d'identità restano in members, che
+// resta chiuso.
+test('arrivi: CREW_A vede gli arrivi della propria barca, skipper compreso', async () => {
+  await seedCrewAFullyOnboarded();
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), `boats/${SKIPPER_A}/crewTravelStatus/skipper`), {
+      inviteId: 'skipper', displayName: 'Skipper A', isSkipper: true, outbound: 'ready', outboundDate: '2026-10-07',
+    });
+  });
+  const crew = crewAContext(testEnv);
+  const elenco = await assertSucceeds(getDocs(collection(crew.firestore(), `boats/${SKIPPER_A}/crewTravelStatus`)));
+  assert.ok(elenco.size >= 1);
+  assert.ok(elenco.docs.some((d) => d.data().isSkipper === true), 'deve vedere anche quando arriva lo skipper');
+});
+
+test('arrivi: chi è di un\'altra barca non vede quegli arrivi', async () => {
+  await seedCrewAFullyOnboarded();
+  const altro = crewBContext(testEnv);
+  await assertFails(getDocs(collection(altro.firestore(), `boats/${SKIPPER_A}/crewTravelStatus`)));
+});
+
+test('arrivi: le schede equipaggio restano chiuse agli altri della barca', async () => {
+  await seedCrewAFullyOnboarded();
+  const crew = crewAContext(testEnv);
+  // I documenti d'identità non seguono gli orari di arrivo.
+  await assertFails(getDocs(collection(crew.firestore(), `boats/${SKIPPER_A}/members`)));
 });

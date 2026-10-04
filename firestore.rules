@@ -402,6 +402,19 @@ service cloud.firestore {
         && invite.data.participantUid == request.auth.uid;
     }
 
+    // Appartenenza alla barca, senza passare dall'invito specifico: serve per
+    // le letture "di barca" (chi arriva quando) dove non c'è un singolo
+    // documento di cui si è proprietari. Una sola get, per restare lontani dal
+    // tetto di complessità delle Rules (regola 12 di AGENTS.md).
+    function isCrewOfBoat(boatId) {
+      let access = get(/databases/$(database)/documents/crewAccess/$(request.auth.uid));
+      return isPasswordCrew()
+        && exists(/databases/$(database)/documents/crewAccess/$(request.auth.uid))
+        && access.data.userId == request.auth.uid
+        && access.data.loginEmail == request.auth.token.email
+        && access.data.boatId == boatId;
+    }
+
     function hasValidCrewTravelPayload(inviteId, legId) {
       let transferAirport = legId == 'outbound'
         ? request.resource.data.destinationAirport
@@ -2655,7 +2668,17 @@ service cloud.firestore {
               && exists(/databases/$(database)/documents/boats/$(boatId)/members/$(inviteId))
               && hasCurrentBriefingAcceptance(boatId, inviteId))
             || isOrganizer() || isSkipper(boatId));
-        allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId));
+        // Chi è a bordo vede quando arrivano e ripartono gli altri della
+        // propria barca, e chi ha chiesto il transfer. Serve a mettersi
+        // d'accordo fra loro — chi si imbarca subito, chi passa dalla
+        // cambusa, chi condivide un passaggio — senza dover chiedere ogni
+        // volta allo skipper (richiesta di Silvio, 4/10/2026).
+        //
+        // Qui escono soltanto nome, data, ora, mezzo e stato del transfer:
+        // i documenti d'identità restano in members, che resta chiuso a
+        // chiunque non sia il diretto interessato, lo skipper o
+        // l'organizzatore.
+        allow list: if isPrivateAreaOpen() && (isOrganizer() || isSkipper(boatId) || isCrewOfBoat(boatId));
         allow write: if false;
       }
 

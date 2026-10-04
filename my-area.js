@@ -25,6 +25,12 @@ let activePaymentInstructions = null;
 let activeCrewTravelStatus = null;
 let activeTransferPricing = null;
 let crewTravelStatusLoaded = false;
+// Chi altro c'è a bordo e quando arriva. Serve a mettersi d'accordo fra
+// compagni di barca — chi si imbarca subito, chi passa dalla cambusa, chi
+// divide un passaggio — senza dover chiedere ogni volta allo skipper
+// (richiesta di Silvio, 4/10/2026).
+let boatTravelRoster = [];
+let stopBoatTravelSubscription = null;
 let crewTravelStatusReadError = false;
 let stopPaymentSubscription = null;
 let stopAnnouncementSubscription = null;
@@ -292,6 +298,14 @@ function renderCrewDashboardShell() {
         <strong data-crew-summary="activity">${escapeHtml(copy.briefingReady)}</strong><small data-crew-detail="activity">${escapeHtml(copy.activityDetail)}</small>
       </article>
     </div>
+    <section id="boatTravelRoster" class="boat-roster" aria-live="polite" hidden>
+      <div class="boat-roster-heading">
+        <p class="eyebrow">${escapeHtml(localized('Chi è a bordo', 'Who is on board'))}</p>
+        <h4>${escapeHtml(localized('Arrivi e partenze della tua barca', 'Arrivals and departures on your boat'))}</h4>
+        <p class="field-hint">${escapeHtml(localized('Per mettervi d’accordo fra voi: chi si imbarca subito, chi passa dalla cambusa, chi divide un passaggio. Compaiono solo nome, orario e mezzo.', 'So you can sort things out between you: who boards straight away, who stops for provisions, who shares a ride. Only name, time and means are shown.'))}</p>
+      </div>
+      <ul class="boat-roster-list"></ul>
+    </section>
     <section id="crewActivityTimeline" class="crew-activity-timeline" aria-live="polite" aria-labelledby="crewActivityTimelineTitle">
       <div class="crew-activity-timeline-heading"><p class="eyebrow">${escapeHtml(copy.activityTimelineEyebrow)}</p><h4 id="crewActivityTimelineTitle">${escapeHtml(copy.activityTimelineTitle)}</h4></div>
       <ol class="crew-activity-timeline-list"></ol>
@@ -572,6 +586,60 @@ function crewTravelProgress(direction) {
   if (operation === 'completed') return item('complete', localized('transfer concluso', 'transfer completed'), `${localized('Il gestore ha segnato il collegamento come concluso.', 'The organiser marked the connection as completed.')} ${crewTransferPaidNote()}`);
   if (operation === 'cancelled') return item('attention', localized('transfer annullato', 'transfer cancelled'), localized('Contatta lo skipper prima di partire.', 'Contact your skipper before travelling.'));
   return item('waiting', localized('transfer richiesto', 'transfer requested'), `${localized('Richiesta salvata; il gestore non l’ha ancora confermata.', 'Request saved; the organiser has not confirmed it yet.')} ${crewTransferPaidNote()}`);
+}
+
+// L'elenco di chi arriva e riparte, ordinato per momento di arrivo: in cima
+// chi atterra prima, perché è quello che apre la barca. Lo skipper è marcato,
+// così si vede subito se c'è già lui ad aspettare.
+const ROSTER_MEZZI = { flight: 'volo', train: 'treno', car: 'auto', ferry: 'nave', other: 'altro mezzo' };
+
+function rosterMomento(voce, direzione) {
+  const data = voce[`${direzione}Date`];
+  const ora = voce[`${direzione}Time`];
+  if (!data && !ora) return null;
+  let giorno = '';
+  if (typeof data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    const [anno, mese, numero] = data.split('-').map(Number);
+    giorno = new Date(Date.UTC(anno, mese - 1, numero)).toLocaleDateString(activeLocale() === 'en' ? 'en-GB' : 'it-IT', {
+      weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC',
+    });
+  }
+  const mezzo = ROSTER_MEZZI[voce[`${direzione}Transport`]] || '';
+  return { quando: [giorno, typeof ora === 'string' ? ora : ''].filter(Boolean).join(' · '), mezzo };
+}
+
+function renderBoatTravelRoster() {
+  const sezione = document.querySelector('#boatTravelRoster');
+  if (!sezione) return;
+  const voci = boatTravelRoster
+    .filter((voce) => voce.displayName && (voce.outbound || voce.return || voce.outboundDate || voce.returnDate))
+    .sort((a, b) => String(a.outboundDate || '9999').localeCompare(String(b.outboundDate || '9999'))
+      || String(a.outboundTime || '99:99').localeCompare(String(b.outboundTime || '99:99'))
+      || String(a.displayName).localeCompare(String(b.displayName), 'it'));
+  if (!voci.length) {
+    sezione.hidden = true;
+    return;
+  }
+  const riga = (etichetta, momento, transfer) => {
+    if (!momento) return `<span class="boat-roster-leg boat-roster-leg--unknown">${escapeHtml(etichetta)}: ${escapeHtml(localized('non comunicato', 'not shared'))}</span>`;
+    const pulmino = transfer === 'requested' ? ` <em>${escapeHtml(localized('col transfer', 'on the shuttle'))}</em>` : '';
+    return `<span class="boat-roster-leg"><strong>${escapeHtml(etichetta)}</strong> ${escapeHtml(momento.quando)}${momento.mezzo ? ` <small>${escapeHtml(momento.mezzo)}</small>` : ''}${pulmino}</span>`;
+  };
+  sezione.querySelector('.boat-roster-list').innerHTML = voci.map((voce) => {
+    const io = voce.id === activeInvite?.id;
+    return `<li class="boat-roster-row${voce.isSkipper === true ? ' boat-roster-row--skipper' : ''}${io ? ' boat-roster-row--io' : ''}">
+      <div class="boat-roster-person">
+        <strong>${escapeHtml(voce.displayName)}</strong>
+        ${voce.isSkipper === true ? `<small>${escapeHtml(localized('skipper', 'skipper'))}</small>` : ''}
+        ${io ? `<small>${escapeHtml(localized('sei tu', 'that is you'))}</small>` : ''}
+      </div>
+      <div class="boat-roster-legs">
+        ${riga(localized('Arriva', 'Arrives'), rosterMomento(voce, 'outbound'), voce.outboundTransfer)}
+        ${riga(localized('Riparte', 'Leaves'), rosterMomento(voce, 'return'), voce.returnTransfer)}
+      </div>
+    </li>`;
+  }).join('');
+  sezione.hidden = false;
 }
 
 function crewTransferPaidNote() {
@@ -2180,6 +2248,22 @@ function startDashboardSubscriptions() {
         crewTravelStatusReadError = true;
         activeCrewTravelStatus = null;
         renderCrewDashboardOverview();
+      },
+    );
+  }
+  if (!stopBoatTravelSubscription) {
+    stopBoatTravelSubscription = onSnapshot(
+      collection(db, 'boats', activeInvite.boatId, 'crewTravelStatus'),
+      (snapshot) => {
+        boatTravelRoster = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderBoatTravelRoster();
+      },
+      (error) => {
+        // Senza questo elenco la pagina resta quella di prima: è un di più
+        // per coordinarsi, non una cosa da cui dipende l'imbarco.
+        console.info('Elenco arrivi della barca non disponibile.', error?.code || error);
+        boatTravelRoster = [];
+        renderBoatTravelRoster();
       },
     );
   }

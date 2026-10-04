@@ -122,6 +122,26 @@ body.menu-open { overflow:hidden; }
    grandi, uno per riga sul telefono: si sceglie una persona, non si compila
    un modulo. */
 .join-slots { display:grid; gap:10px; margin:18px 0 4px; }
+/* Chi è a bordo e quando arriva, nell'area dell'equipaggio. Serve a mettersi
+   d'accordo fra compagni di barca senza passare dallo skipper: nome, orario,
+   mezzo e se è sul pulmino. Niente documenti, niente contatti. */
+.boat-roster { margin:26px 0 0; padding:20px; border:1px solid rgba(2,43,58,.1); border-radius:16px; background:white; }
+.boat-roster[hidden] { display:none; }
+.boat-roster-heading h4 { margin:4px 0 6px; font:600 1.15rem "Fraunces",serif; }
+.boat-roster-list { display:grid; gap:10px; margin:16px 0 0; padding:0; list-style:none; }
+.boat-roster-row { display:grid; gap:6px; padding:12px 14px; border:1px solid rgba(2,43,58,.08); border-radius:12px; background:#f7fbfb; }
+.boat-roster-row--skipper { border-color:rgba(13,148,136,.35); background:#f0faf8; }
+.boat-roster-row--io { border-color:rgba(2,43,58,.28); }
+.boat-roster-person { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.boat-roster-person strong { font-size:1rem; }
+.boat-roster-person small { padding:1px 7px; border-radius:999px; background:rgba(2,43,58,.08); font:700 .62rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; color:#42606b; }
+.boat-roster-legs { display:grid; gap:3px; }
+.boat-roster-leg { font-size:.82rem; line-height:1.45; color:#334e57; }
+.boat-roster-leg strong { display:inline-block; min-width:56px; font:700 .64rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; color:#5b7480; }
+.boat-roster-leg small { color:#6c838d; font-size:.74rem; }
+.boat-roster-leg em { color:#115e59; font-style:normal; font-weight:700; }
+.boat-roster-leg--unknown { color:#8296a0; font-style:italic; }
+@media (max-width:430px) { .boat-roster { padding:16px 14px; } }
 /* Prefisso e numero sono due campi distinti: finché erano uno solo, chi
    scriveva "348 565 7591" finiva registrato con un numero spagnolo e non
    riusciva più a entrare (3/10/2026). */

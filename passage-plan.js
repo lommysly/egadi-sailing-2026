@@ -39,6 +39,8 @@
       moon: 'Luna',
       wind: 'Vento',
       sea: 'Mare / onda',
+      visibility: 'Visibilità',
+      phenomena: 'Fenomeni e precipitazioni',
       sky: 'Cielo',
       air: 'Aria',
       water: 'Acqua',
@@ -53,6 +55,37 @@
       alternative: 'Alternativa:',
       climateOutlookEyebrow: 'Clima tipico del periodo',
       weatherDetailsToggle: 'Dettagli meteo e fonti',
+      decisionBoardEyebrow: 'Briefing operativo',
+      decisionBoardTitle: 'Le decisioni che contano adesso',
+      decisiveFactorsTitle: 'Tre elementi decisivi',
+      missingChecksTitle: 'Verifiche ancora necessarie',
+      routeMapTitle: 'Schema orientativo della rotta nelle Isole Egadi',
+      routeMapDescription: 'Marsala, Levanzo, Marettimo, Favignana e rientro a Marsala collegati da una linea tratteggiata.',
+      routeMapCaption: 'Schema di orientamento, non utilizzabile per navigare. Rotte, distanze, fondali e accessi vanno verificati su documentazione nautica aggiornata.',
+      orientationNotesTitle: 'Punti esposti e alternative',
+      summaryEyebrow: 'Sintesi giorno per giorno',
+      summaryTitle: 'Uscita, navigazione e arrivo a colpo d’occhio',
+      summaryLegend: '🟢 relativamente favorevole · 🟡 criticità o incertezza · 🔴 condizioni avverse · ⚪ dati insufficienti. Il colore non sostituisce la decisione dello skipper. Da telefono, scorri la tabella verso destra.',
+      summaryHeaders: ['Giorno', 'Tratta', 'Uscita', 'Navigazione', 'Arrivo', 'Finestra favorevole', 'Criticità principale', 'Incertezza'],
+      departureAssessment: 'Uscita dal porto',
+      passageAssessment: 'Navigazione',
+      arrivalAssessment: 'Arrivo o sosta',
+      insufficientData: 'Dati insufficienti per una valutazione',
+      routeDetails: 'Dati indicativi della tratta',
+      distance: 'Distanza',
+      course: 'Direzione',
+      duration: 'Durata indicativa',
+      favourableWindow: 'Finestra favorevole',
+      criticality: 'Fase più critica',
+      uncertainty: 'Incertezza',
+      operationalChecksTitle: 'Da ricontrollare prima di salpare',
+      modelComparisonEyebrow: 'Fonti e confronto',
+      modelComparisonTitle: 'Dove i modelli concordano e dove divergono',
+      modelComparisonIntro: 'Gli scenari restano separati: non facciamo una media che nasconda quello più impegnativo.',
+      modelHeaders: ['Parametro', 'Scenari consultati', 'Divergenza', 'Decisione interessata'],
+      nextUpdateEyebrow: 'Prossimo aggiornamento',
+      nextUpdateTitle: 'Quando ricontrollare il briefing',
+      scheduledUpdate: 'Controllo manuale consigliato:',
     },
     en: {
       visualLabels: [
@@ -89,6 +122,8 @@
       moon: 'Moon',
       wind: 'Wind',
       sea: 'Sea state / waves',
+      visibility: 'Visibility',
+      phenomena: 'Weather and precipitation',
       sky: 'Sky',
       air: 'Air',
       water: 'Water',
@@ -103,18 +138,87 @@
       alternative: 'Alternative:',
       climateOutlookEyebrow: 'Typical climate for the period',
       weatherDetailsToggle: 'Weather details and sources',
+      decisionBoardEyebrow: 'Operational briefing',
+      decisionBoardTitle: 'The decisions that matter now',
+      decisiveFactorsTitle: 'Three decisive factors',
+      missingChecksTitle: 'Checks still required',
+      routeMapTitle: 'Orientation diagram of the route through the Egadi Islands',
+      routeMapDescription: 'Marsala, Levanzo, Marettimo, Favignana and the return to Marsala connected by a dotted line.',
+      routeMapCaption: 'Orientation diagram only; do not use it for navigation. Routes, distances, depths and approaches must be checked against up-to-date nautical information.',
+      orientationNotesTitle: 'Exposed points and alternatives',
+      summaryEyebrow: 'Day-by-day summary',
+      summaryTitle: 'Departure, passage and arrival at a glance',
+      summaryLegend: '🟢 relatively favourable · 🟡 concern or uncertainty · 🔴 adverse conditions · ⚪ insufficient data. The colour does not replace the skipper’s decision. On a phone, swipe the table to the right.',
+      summaryHeaders: ['Day', 'Route', 'Departure', 'Passage', 'Arrival', 'Favourable window', 'Main concern', 'Uncertainty'],
+      departureAssessment: 'Harbour departure',
+      passageAssessment: 'Passage',
+      arrivalAssessment: 'Arrival or stop',
+      insufficientData: 'Insufficient data for an assessment',
+      routeDetails: 'Indicative passage details',
+      distance: 'Distance',
+      course: 'Direction',
+      duration: 'Indicative duration',
+      favourableWindow: 'Favourable window',
+      criticality: 'Most critical phase',
+      uncertainty: 'Uncertainty',
+      operationalChecksTitle: 'Recheck before departure',
+      modelComparisonEyebrow: 'Sources and comparison',
+      modelComparisonTitle: 'Where the models agree and where they differ',
+      modelComparisonIntro: 'Scenarios remain separate: we do not average away the more demanding outcome.',
+      modelHeaders: ['Parameter', 'Scenarios reviewed', 'Divergence', 'Decision affected'],
+      nextUpdateEyebrow: 'Next update',
+      nextUpdateTitle: 'When to review the briefing',
+      scheduledUpdate: 'Recommended manual review:',
     },
   };
   const copy = COPY[locale];
   const $ = (selector) => document.querySelector(selector);
   const departureAt = new Date('2026-10-08T15:00:00+02:00').getTime();
   const returnAt = new Date('2026-10-11T18:00:00+02:00').getTime();
-  const escapeHtml = (value) => String(value || "—")
+  const escapeHtml = (value) => String(value === null || value === undefined || value === '' ? '—' : value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#039;");
+
+  const RATING_TONES = {
+    good: { className: 'good', symbol: '🟢' },
+    favorable: { className: 'good', symbol: '🟢' },
+    favourable: { className: 'good', symbol: '🟢' },
+    caution: { className: 'caution', symbol: '🟡' },
+    warning: { className: 'caution', symbol: '🟡' },
+    danger: { className: 'danger', symbol: '🔴' },
+    adverse: { className: 'danger', symbol: '🔴' },
+    unknown: { className: 'unknown', symbol: '⚪' },
+    insufficient: { className: 'unknown', symbol: '⚪' },
+    muted: { className: 'unknown', symbol: '⚪' },
+  };
+  const normaliseRating = (rating) => {
+    const value = typeof rating === 'string' ? { text: rating } : (rating || {});
+    const tone = RATING_TONES[String(value.tone || 'unknown').toLowerCase()] || RATING_TONES.unknown;
+    return {
+      className: tone.className,
+      symbol: value.label || tone.symbol,
+      text: value.text || copy.insufficientData,
+    };
+  };
+  const renderRating = (rating, compact = false) => {
+    const normalised = normaliseRating(rating);
+    return `
+      <span class="passage-rating passage-rating-${normalised.className}${compact ? ' is-compact' : ''}">
+        <span class="passage-rating-symbol" aria-hidden="true">${escapeHtml(normalised.symbol)}</span>
+        <span>${escapeHtml(normalised.text)}</span>
+      </span>
+    `;
+  };
+  const ratingFor = (day, phase) => {
+    if (phase === 'departure') return day?.ratings?.departure || day?.ratings?.exit;
+    if (phase === 'passage') return day?.ratings?.passage || day?.ratings?.navigation;
+    return day?.ratings?.arrival;
+  };
+  const listValues = (values) => Array.isArray(values) ? values.filter(Boolean) : [];
+  const displayValue = (value) => Array.isArray(value) ? value.filter(Boolean).join(' · ') : value;
 
   // Icone minime per il clima tipico del periodo: stesso stile a tratto
   // usato altrove nel sito, un colpo d'occhio invece di solo testo.
@@ -241,6 +345,10 @@
   });
   window.setInterval(updateDeparturePhase, 60000);
 
+  $("#routeMapTitle").textContent = copy.routeMapTitle;
+  $("#routeMapDescription").textContent = copy.routeMapDescription;
+  $("#routeMapCaption").textContent = copy.routeMapCaption;
+
   if (!data) {
     $("#planStatus").textContent = copy.updateUnavailable;
     $("#planSummary").textContent = copy.unavailableSummary;
@@ -253,6 +361,33 @@
   $("#planNextUpdate").textContent = data.nextUpdateAt || copy.nextUpdateUnknown;
   $("#planSummary").textContent = data.summary || "—";
   $("#planSources").textContent = data.sourceNote || "—";
+
+  const decisiveFactors = listValues(data.decisiveFactors);
+  const missingChecks = listValues(data.missingChecks);
+  const decisionBoard = $("#planDecisionBoard");
+  if (decisiveFactors.length || missingChecks.length) {
+    $("#planDecisionBoardEyebrow").textContent = copy.decisionBoardEyebrow;
+    $("#planDecisionBoardTitle").textContent = copy.decisionBoardTitle;
+    $("#planDecisiveFactorsTitle").textContent = copy.decisiveFactorsTitle;
+    $("#planMissingChecksTitle").textContent = copy.missingChecksTitle;
+    $("#planDecisiveFactors").innerHTML = (decisiveFactors.length ? decisiveFactors : [copy.insufficientData])
+      .map((item) => `<li>${escapeHtml(displayValue(item))}</li>`).join('');
+    $("#planMissingChecks").innerHTML = (missingChecks.length ? missingChecks : [copy.insufficientData])
+      .map((item) => `<li>${escapeHtml(displayValue(item))}</li>`).join('');
+    decisionBoard.hidden = false;
+  }
+
+  const orientationNotes = listValues(data.orientationNotes);
+  const orientationNotesElement = $("#planOrientationNotes");
+  if (orientationNotes.length) {
+    $("#planOrientationNotesTitle").textContent = copy.orientationNotesTitle;
+    $("#planOrientationNotesList").innerHTML = orientationNotes.map((note) => {
+      if (typeof note === 'string') return `<li>${escapeHtml(note)}</li>`;
+      return `<li>${note?.title ? `<strong>${escapeHtml(note.title)}</strong>` : ''}${escapeHtml(note?.text)}</li>`;
+    }).join('');
+    orientationNotesElement.hidden = false;
+  }
+
   const sources = Array.isArray(data.sources)
     ? data.sources
     : data.sourceUrl ? [{ url: data.sourceUrl, label: data.sourceLabel }] : [];
@@ -269,7 +404,7 @@
     sourceLink.rel = 'noopener noreferrer';
     sourceLink.textContent = source.label || copy.openSource;
     const sourceDetails = document.createElement('small');
-    sourceDetails.textContent = [source.scope, source.checkedAt].filter(Boolean).join(' · ');
+    sourceDetails.textContent = [source.product, source.model, source.availability, source.scope, source.checkedAt].filter(Boolean).join(' · ');
     item.append(icon, sourceLink, sourceDetails);
     return item;
   }));
@@ -310,6 +445,28 @@
     mooringGuideElement.hidden = false;
   }
 
+  const days = Array.isArray(data.days) ? data.days : [];
+  const summarySection = $("#planSummarySection");
+  if (days.length) {
+    $("#planSummaryEyebrow").textContent = copy.summaryEyebrow;
+    $("#planSummaryTitle").textContent = copy.summaryTitle;
+    $("#planSummaryLegend").textContent = copy.summaryLegend;
+    $("#planSummaryHead").innerHTML = `<tr>${copy.summaryHeaders.map((header) => `<th scope="col">${escapeHtml(header)}</th>`).join('')}</tr>`;
+    $("#planSummaryBody").innerHTML = days.map((day) => `
+      <tr>
+        <th scope="row">${escapeHtml(day.date)}</th>
+        <td>${escapeHtml(day.route)}</td>
+        <td>${renderRating(ratingFor(day, 'departure'), true)}</td>
+        <td>${renderRating(ratingFor(day, 'passage'), true)}</td>
+        <td>${renderRating(ratingFor(day, 'arrival'), true)}</td>
+        <td>${escapeHtml(day.window)}</td>
+        <td>${escapeHtml(day.criticality)}</td>
+        <td>${escapeHtml(day.uncertainty)}</td>
+      </tr>
+    `).join('');
+    summarySection.hidden = false;
+  }
+
   const planningMode = data.dataMode === 'planning';
   const weatherNoticeTitle = data.weatherNoticeTitle || copy.awaitingWindow;
   const weatherNoticeText = data.weatherNoticeText || copy.awaitingWindowText;
@@ -330,6 +487,8 @@
       <dl class="passage-data-grid">
         <div><dt>${escapeHtml(copy.wind)}</dt><dd>${escapeHtml(day.wind)}</dd></div>
         <div><dt>${escapeHtml(copy.sea)}</dt><dd>${escapeHtml(day.sea)}</dd></div>
+        <div><dt>${escapeHtml(copy.visibility)}</dt><dd>${escapeHtml(day.visibility)}</dd></div>
+        <div><dt>${escapeHtml(copy.phenomena)}</dt><dd>${escapeHtml(day.phenomena)}</dd></div>
         <div><dt>${escapeHtml(copy.air)}</dt><dd>${escapeHtml(day.air)}</dd></div>
         <div><dt>${escapeHtml(copy.water)}</dt><dd>${escapeHtml(day.water)}</dd></div>
         <div><dt>${escapeHtml(copy.currents)}</dt><dd>${escapeHtml(day.currents)}</dd></div>
@@ -339,7 +498,54 @@
     </details>
   `;
 
-  $("#dailyPlan").innerHTML = (data.days || []).map((day, index) => {
+  const renderRouteDetails = (day) => {
+    const details = [
+      [copy.distance, day.distance],
+      [copy.course, day.course],
+      [copy.duration, day.duration],
+      [copy.favourableWindow, day.window],
+      [copy.criticality, day.criticality],
+      [copy.uncertainty, day.uncertainty],
+    ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+    if (!details.length) return '';
+    return `
+      <section class="passage-route-details" aria-label="${escapeHtml(copy.routeDetails)}">
+        ${details.map(([label, value]) => `
+          <div><span>${escapeHtml(label)}</span><strong>${escapeHtml(displayValue(value))}</strong></div>
+        `).join('')}
+      </section>
+    `;
+  };
+
+  const renderPhaseAssessments = (day) => `
+    <section class="passage-phase-assessments" aria-label="${escapeHtml(copy.summaryTitle)}">
+      <article>
+        <h3>${escapeHtml(copy.departureAssessment)}</h3>
+        ${renderRating(ratingFor(day, 'departure'))}
+      </article>
+      <article>
+        <h3>${escapeHtml(copy.passageAssessment)}</h3>
+        ${renderRating(ratingFor(day, 'passage'))}
+      </article>
+      <article>
+        <h3>${escapeHtml(copy.arrivalAssessment)}</h3>
+        ${renderRating(ratingFor(day, 'arrival'))}
+      </article>
+    </section>
+  `;
+
+  const renderOperationalChecks = (day) => {
+    const checks = listValues(day.operationalChecks);
+    if (!checks.length) return '';
+    return `
+      <section class="passage-operational-checks">
+        <h3>${escapeHtml(copy.operationalChecksTitle)}</h3>
+        <ul>${checks.map((check) => `<li>${escapeHtml(displayValue(check))}</li>`).join('')}</ul>
+      </section>
+    `;
+  };
+
+  $("#dailyPlan").innerHTML = days.map((day, index) => {
     const stops = Array.isArray(day.stops) && day.stops.length ? `
       <section class="passage-stop-section" aria-label="${escapeHtml(copy.stopsLabel)}">
         <p class="passage-stop-heading">${escapeHtml(copy.stopsHeading)}</p>
@@ -367,6 +573,7 @@
               <p class="eyebrow">${escapeHtml(day.date)}</p>
               <h2>${escapeHtml(day.route)}</h2>
             </div>
+            ${renderRouteDetails(day)}
             <p class="passage-day-plan">${escapeHtml(day.plan)}</p>
             ${day.navigation ? `<p class="passage-navigation"><strong>${escapeHtml(copy.navigation)}</strong>${escapeHtml(day.navigation)}</p>` : ''}
             <p class="passage-overnight"><span class="passage-overnight-meta">${escapeHtml(day.overnightType || copy.overnightUndefined)} · ${escapeHtml(day.overnightStatus || copy.overnightStatus)}</span><strong>${escapeHtml(copy.indicativeOvernight)}</strong> ${escapeHtml(day.overnight)}</p>
@@ -374,10 +581,42 @@
           </div>
           ${renderDayVisual(DAY_VISUALS[index], day)}
         </div>
+        ${renderPhaseAssessments(day)}
         ${stops}
+        ${renderOperationalChecks(day)}
         ${operationalData(day)}
       </article>
     `;
   }).join("");
+
+  const modelComparison = listValues(data.modelComparison);
+  const modelComparisonSection = $("#planModelComparison");
+  if (modelComparison.length) {
+    $("#planModelComparisonEyebrow").textContent = copy.modelComparisonEyebrow;
+    $("#planModelComparisonTitle").textContent = copy.modelComparisonTitle;
+    $("#planModelComparisonIntro").textContent = copy.modelComparisonIntro;
+    $("#planModelComparisonHead").innerHTML = `<tr>${copy.modelHeaders.map((header) => `<th scope="col">${escapeHtml(header)}</th>`).join('')}</tr>`;
+    $("#planModelComparisonBody").innerHTML = modelComparison.map((comparison) => `
+      <tr>
+        <th scope="row">${escapeHtml(comparison?.parameter)}</th>
+        <td>${escapeHtml(displayValue(comparison?.scenarios))}</td>
+        <td>${escapeHtml(comparison?.divergence)}</td>
+        <td>${escapeHtml(comparison?.decisionImpact)}</td>
+      </tr>
+    `).join('');
+    modelComparisonSection.hidden = false;
+  }
+
+  const nextUpdateSection = $("#planNextUpdateSection");
+  if (data.nextUpdateAt || data.nextUpdateReason) {
+    $("#planNextUpdateEyebrow").textContent = copy.nextUpdateEyebrow;
+    $("#planNextUpdateTitle").textContent = copy.nextUpdateTitle;
+    $("#planNextUpdateText").textContent = data.nextUpdateAt
+      ? `${copy.scheduledUpdate} ${data.nextUpdateAt}`
+      : copy.nextUpdateUnknown;
+    $("#planNextUpdateReason").textContent = data.nextUpdateReason || '';
+    $("#planNextUpdateReason").hidden = !data.nextUpdateReason;
+    nextUpdateSection.hidden = false;
+  }
 
 })();

@@ -1,184 +1,224 @@
 /*
- * Dati pubblici del Passage Plan. Vengono aggiornati dallo skipper dopo ogni
- * briefing: nessun dato personale o informazione di Crew List va inserito qui.
+ * Briefing pubblico Meteo & Passage Plan. Nessun dato personale va inserito
+ * in questo file. Vento e onde indicano la direzione di provenienza.
  */
 window.PASSAGE_PLAN_DATA = {
-  updatedAt: "1 ottobre 2026 · prima tendenza operativa vento/mare",
-  phase: "Tendenza operativa · 7 giorni alla partenza",
-  confidence: "Rotta definita · astronomia verificata · meteo: prima tendenza multi-modello, affidabilità media (i modelli divergono ancora su vento e pioggia)",
-  status: "Dati vento/mare pubblicati giorno per giorno · i modelli professionali non sono ancora allineati, nuovo controllo entro il lunedì 5 ottobre",
-  publishedAt: "1 ottobre 2026 · aggiornamento meteo operativo preliminare",
-  validFrom: "Valido come tendenza operativa preliminare fino al prossimo aggiornamento meteo, atteso il lunedì 5 ottobre quando i bollettini ufficiali ed i servizi nautici copriranno davvero l’8 ottobre",
-  validUntil: "Non è un bollettino di bordo: non conferma vento, onda, porto, boe o rada.",
-  nextUpdateAt: "lunedì 5 ottobre · quando meteoam, Windy e PredictWind copriranno l’8 ottobre con dati affidabili",
+  updatedAt: "4 ottobre 2026 · 21:25 CEST (UTC+2)",
+  phase: "Briefing operativo preliminare · T−4",
+  confidence: "Media-bassa venerdì 9 · media negli altri giorni · bollettini ufficiali ancora da acquisire",
+  status: "Previsione multi-modello disponibile · non è ancora il via libera dello skipper",
+  publishedAt: "4 ottobre 2026 · confronto degli ultimi run disponibili",
+  validFrom: "Periodo analizzato: 8–11 ottobre 2026 · orari locali Europe/Rome (CEST, UTC+2)",
+  validUntil: "Valido come quadro preliminare fino al controllo del 6 ottobre; osservazioni reali, avvisi e bollettini più recenti prevalgono sempre.",
+  nextUpdateAt: "6 ottobre, sera · poi il 7 e prima di ogni partenza",
+  nextUpdateReason: "Non è un aggiornamento automatico. Ricontrollare soprattutto instabilità e salto del vento del 9, onda residua da NO del 10, direzione del vento al rientro e avvisi di porto. Un rinforzo, una rotazione o un avviso ufficiale possono cambiare la rotta.",
   dataMode: "operational",
-  weatherNoticeTitle: "Prima tendenza operativa pubblicata, i modelli non sono ancora allineati.",
-  weatherNoticeText: "Il 1° ottobre abbiamo confrontato più modelli professionali (ECMWF, GFS, ICON, meteoblue AI su Windy): concordano su un giovedì 8 probabilmente asciutto, ma divergono su intensità del vento e su quando arriverà la pioggia. Nuovo controllo con fonti ufficiali il lunedì 5 ottobre.",
-  summary: "La rotta desiderata resta Marsala → Levanzo → Marettimo → Favignana → Marsala. Giovedì 8 si annuncia probabilmente asciutto, ma restiamo prudenti: il rischio di pioggia potrebbe spostarsi su venerdì 9. La decisione finale — partire giovedì o venerdì mattina — arriva con il bollettino ufficiale, 2-4 giorni prima della partenza.",
-  sourceNote: "Controllo del 20 settembre: l’Area Marina Protetta richiede di verificare zonazione, autorizzazioni e campi boe prima della sosta. Le calette qui raccontano possibilità di giornata, non posti assegnati né promesse di rada. Ogni scelta serale resta allo skipper della singola barca, dopo aver letto il mare reale. Il controllo meteo dell’1 ottobre viene dal confronto diretto di più modelli professionali su Windy (vedi le fonti qui sotto).",
-  sources: [
-    { label: "Fonte astronomica", url: "https://aa.usno.navy.mil/data/api", scope: "alba, tramonto e luna · fuso Europe/Rome", checkedAt: "calcolo del piano: 11 settembre 2026" },
-    { label: "Windy · confronto multi-modello (ECMWF, GFS, ICON, meteoblue AI)", url: "https://www.windy.com/multimodel/37.798/12.431?37.495,12.431,9", scope: "vento, pioggia, nuvolosità e stato del mare punto per punto, con confronto diretto fra modelli", checkedAt: "1 ottobre 2026, circa le 11:00" },
-    { label: "Meteo Aeronautica Militare · Sicilia", url: "https://www.meteoam.it/it/sicilia", scope: "previsioni e mare nella finestra utile (non copriva ancora l’8-11 ottobre al controllo del 1° ottobre)", checkedAt: "1 ottobre 2026" },
-    { label: "AMP Egadi · moduli e autorizzazioni", url: "https://www.ampisoleegadi.it/index.php/moduli-e-istanze/", scope: "permessi, ancoraggio e ormeggio", checkedAt: "20 settembre 2026" },
-    { label: "AMP Egadi · campi boe", url: "https://redirect.ampisoleegadi.it/1497.html", scope: "aree e disponibilità da verificare", checkedAt: "20 settembre 2026" },
-    { label: "Medie climatiche · Isole Egadi", url: "https://www.climieviaggi.it/clima/italia/isole-egadi", scope: "temperature, mare, pioggia e sole medi di ottobre (dato storico, non una previsione)", checkedAt: "22 settembre 2026" }
+  weatherNoticeTitle: "La previsione copre il viaggio, ma manca ancora la conferma ufficiale a breve termine.",
+  weatherNoticeText: "Tre modelli atmosferici e tre modelli d’onda sono stati letti separatamente. Non sono stati mediati: quando divergono viene mostrato lo scenario peggiore plausibile.",
+  summary: "La rotta Marsala → Levanzo → Marettimo → Favignana → Marsala resta possibile, ma non è ancora confermata. Giovedì può avere vento da Sud sostenuto e mare corto; venerdì è il nodo del viaggio per temporali possibili e direzioni opposte fra i modelli; sabato va valutata l’onda residua da Nord-Ovest; domenica il mare cala, ma la partenza delle 15:30 lascia pochissimo margine per rientrare entro le 18:00.",
+  decisiveFactors: [
+    "Giovedì 8: ECMWF e GFS indicano 17–20 nodi da S–SSE alla partenza, mentre ICON è molto più debole. Si pianifica sullo scenario più sostenuto.",
+    "Venerdì 9: ECMWF vede temporali tra notte e primo mattino e una rotazione a NO; GFS resta da Sud e ICON da ONO. La traversata per Marettimo richiede una nuova decisione, non una media.",
+    "Domenica 11: Favignana–Marsala richiede circa 2 h 25 min a 5 nodi. Partire alle 15:30 lascia quasi zero margine; a 4 nodi non consente l’arrivo entro le 18:00."
   ],
-  // Media storica del periodo, non una previsione per questo viaggio: serve
-  // solo a farsi un'idea mentre si aspetta la prima tendenza reale del 28/9.
+  missingChecks: [
+    "Bollettino Meteomar/NETTUNO, eventuale allerta della Protezione Civile, radar e osservazioni costiere nella finestra 24–72 ore.",
+    "Posti barca a Marettimo e Favignana, operatività dei campi boe in ottobre e autorizzazioni dell’Area Marina Protetta.",
+    "Condizioni reali alle imboccature, fondali/pescaggio, traffico traghetti e Avvisi ai Naviganti aggiornati prima di ogni ingresso.",
+    "Non è disponibile una misura ufficiale locale di corrente o marea per Marsala–Egadi: il modello largo non sostituisce la verifica a bordo."
+  ],
+  orientationNotes: [
+    "Schema di orientamento: non è una carta nautica e non va usato per navigare.",
+    "Punti esposti: uscita di Marsala con mare da Sud; traversata Levanzo–Marettimo; costa NO e Punta Troia; giro di Punta Marsala al rientro.",
+    "Alternative da verificare: restare a Marsala; rinviare Marettimo; rotta diretta per Favignana; anticipare il rientro. Porto o posto barca vanno sempre confermati."
+  ],
+  sourceNote: "Elaborazione del 4 ottobre su punti in mare lungo le tratte. Run: ECMWF IFS 04/10 12 UTC, GFS 04/10 12 UTC, ICON 04/10 12 UTC; onde ECMWF WAM 06 UTC, GFS-Wave 12 UTC e Météo-France MFWAM 00 UTC. Il modello oceanico per corrente e temperatura superficiale ha risoluzione larga e non è adatto a decidere un accesso costiero. I prodotti ufficiali a corto raggio non coprono ancora l’intero 8–11 ottobre.",
+  sources: [
+    { label: "ECMWF IFS · dati interrogati", url: "https://api.open-meteo.com/v1/forecast?latitude=37.96&longitude=12.20&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation&wind_speed_unit=kn&timezone=Europe%2FRome&start_date=2026-10-08&end_date=2026-10-11&models=ecmwf_ifs&cell_selection=sea", scope: "vento, raffiche e pioggia lungo l’area", checkedAt: "4 ottobre · 21:25 CEST", product: "Open-Meteo Forecast API", model: "ECMWF IFS HRES · run 04/10 12 UTC · circa 9 km", availability: "orario · 8–11 ottobre" },
+    { label: "NOAA GFS · dati interrogati", url: "https://api.open-meteo.com/v1/forecast?latitude=37.96&longitude=12.20&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation&wind_speed_unit=kn&timezone=Europe%2FRome&start_date=2026-10-08&end_date=2026-10-11&models=ncep_gfs_global&cell_selection=sea", scope: "secondo scenario atmosferico indipendente", checkedAt: "4 ottobre · 21:25 CEST", product: "Open-Meteo Forecast API", model: "NOAA GFS · run 04/10 12 UTC · circa 13 km", availability: "orario · 8–11 ottobre" },
+    { label: "DWD ICON · dati interrogati", url: "https://api.open-meteo.com/v1/forecast?latitude=37.96&longitude=12.20&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation&wind_speed_unit=kn&timezone=Europe%2FRome&start_date=2026-10-08&end_date=2026-10-11&models=icon_global&cell_selection=sea", scope: "terzo scenario atmosferico indipendente", checkedAt: "4 ottobre · 21:25 CEST", product: "Open-Meteo Forecast API", model: "DWD ICON globale · run 04/10 12 UTC · circa 11 km", availability: "orario · 8–11 ottobre" },
+    { label: "Open-Meteo Marine · confronto onde", url: "https://open-meteo.com/en/docs/marine-weather-api", scope: "altezza significativa, direzione e periodo d’onda", checkedAt: "4 ottobre · 21:25 CEST", product: "Marine Weather API", model: "ECMWF WAM · NOAA GFS-Wave · Météo-France MFWAM", availability: "copertura 8–11 ottobre; output di griglia offshore" },
+    { label: "Aeronautica Militare · Meteomar", url: "https://www.meteoam.it/it/meteomar", scope: "bollettino marino ufficiale da rileggere a ridosso di ciascuna tratta", checkedAt: "emissione 4 ottobre · 20:00 CEST", product: "Meteomar / NETTUNO", model: "bollettino ufficiale", availability: "quadro corrente e breve termine; non approva ancora il viaggio" },
+    { label: "ISPRA · Rete Ondametrica", url: "https://www.mareografico.it/it/stazioni.html", scope: "osservazione di riferimento più vicina: boa Mazara del Vallo/Capo Granitola", checkedAt: "4 ottobre · 20:30 CEST", product: "RON", model: "osservazione, non previsione", availability: "onda e corrente non disponibili nell’ultima misura; non rappresenta Marsala/Egadi" },
+    { label: "Istituto Idrografico della Marina · Avvisi", url: "https://www.marina.difesa.it/noi-siamo-la-marina/pilastro-logistico/scientifici/idrografico/Pagine/Avvisi.aspx", scope: "relitto/area vietata a Marsala e limiti di ancoraggio a Favignana", checkedAt: "fascicolo 20/2026 del 30 settembre", product: "Avvisi ai Naviganti · carte 258, 259 e 260", model: "fonte ufficiale" },
+    { label: "Area Marina Protetta · Disciplinare 2026", url: "https://www.ampisoleegadi.it/files/Normativa/%20disciplinare_integrativo_2026_mase.pdf", scope: "zonazione, autorizzazioni, fondali sensibili, ancoraggi e campi boe", checkedAt: "4 ottobre 2026 · valido fino al 31 dicembre", product: "Disciplinare integrativo 2026", model: "fonte ufficiale locale", availability: "campi stagionali e disponibilità reale da confermare direttamente" },
+    { label: "US Naval Observatory · astronomia", url: "https://aa.usno.navy.mil/data/api", scope: "alba, tramonto, crepuscolo e luna · 37,9 N / 12,4 E", checkedAt: "4 ottobre 2026", product: "Sun and Moon Data for One Day", model: "calcolo astronomico · Europe/Rome UTC+2" }
+  ],
+  modelComparison: [
+    { parameter: "Vento · 8 ottobre", scenarios: "ECMWF 15–20 kn e GFS 16–21 kn da S–SSE · ICON 6–13 kn, poi O", divergence: "alta sull’intensità e sulla rotazione", decisionImpact: "uscire pianificando sullo scenario 17–20 kn e scegliere il lato di Levanzo solo dopo il controllo reale" },
+    { parameter: "Vento/fenomeni · 9 ottobre", scenarios: "ECMWF S→NO con temporali notturni/mattutini · GFS 9–19 kn da S · ICON 13–17 kn da ONO", divergence: "molto alta: scenari quasi opposti", decisionImpact: "nessuna finestra per Marettimo va data per acquisita; possibile rinvio o rotta alternativa" },
+    { parameter: "Onda · 10 ottobre", scenarios: "ECMWF WAM e MFWAM 0,6–1,2 m da NO · GFS-Wave 0,44–0,50 m", divergence: "alta sull’onda residua", decisionImpact: "ridurre la visita della costa esposta/Punta Troia se il mare reale conferma circa 1 m" },
+    { parameter: "Rientro · 11 ottobre", scenarios: "mare 0,2–0,5 m in calo · vento ECMWF da N, GFS da S–SO, ICON da NO", divergence: "intensità contenuta ma direzione non risolta", decisionImpact: "la velocità reale della flotta e l’orario contano più di una singola freccia del modello" }
+  ],
   climateOutlook: {
-    title: "Cosa aspettarsi di solito a inizio ottobre",
-    disclaimer: "Media storica delle Egadi, non una previsione per questo viaggio: può cambiare. La tendenza operativa reale, giorno per giorno, è qui sotto.",
+    title: "Contesto di inizio ottobre",
+    disclaimer: "Climatologia e previsione non sono la stessa cosa. I valori operativi sono nelle schede qui sotto.",
     items: [
-      { icon: "air", label: "Aria", value: "16–24°C", detail: "mite di giorno, si rinfresca la sera" },
-      { icon: "water", label: "Mare", value: "circa 22°C", detail: "acqua ancora calda, bagno normalmente comodo" },
-      { icon: "wind", label: "Vento", value: "variabile", detail: "spesso brezza, possibili giornate più ventose" },
-      { icon: "rain", label: "Pioggia", value: "circa 7 giorni su 31", detail: "il resto del mese è tipicamente asciutto" },
-      { icon: "sun", label: "Sole", value: "7–8 ore al giorno", detail: "luce piena per gran parte della giornata" }
+      { icon: "air", label: "Aria", value: "mite", detail: "previsione attuale intorno a 21–28°C nelle ore diurne" },
+      { icon: "water", label: "Mare", value: "24–25°C", detail: "temperatura superficiale modellata, non misura in rada" },
+      { icon: "wind", label: "Vento", value: "variabile", detail: "marcata divergenza dei modelli l’8 e il 9" },
+      { icon: "rain", label: "Instabilità", value: "da seguire", detail: "segnale principale nella notte/mattina del 9" },
+      { icon: "sun", label: "Luce", value: "circa 11 h 30 min", detail: "tramonto tra le 18:43 e le 18:39" }
     ]
   },
-  stopsNote: "Per una notte in rada non basta che una cala sia bella: servono ridosso, fondo adatto, spazio di manovra, regole AMP e autorizzazioni effettive. Se uno di questi elementi manca, il piano cambia senza rimpianti: porto o altro riparo sono parte della navigazione, non un ripiego.",
+  stopsNote: "Una cala panoramica non è automaticamente una rada sicura. Ridosso, onda residua, fondo, spazio di manovra, regole AMP, autorizzazione e disponibilità reale vanno controllati insieme; un campo boe stagionale non può essere dato per operativo in ottobre senza conferma.",
   mooringGuide: {
-    title: "Dove si dorme davvero?",
-    introduction: "Rada significa dormire fuori dal porto, con la barca all’ancora. Un campo boe è invece un’area attrezzata dove la barca si ormeggia a un gavitello autorizzato. Le immagini aiutano a immaginare il viaggio; la decisione arriva soltanto dopo i controlli della giornata.",
+    title: "Dove si può dormire o aspettare la luce?",
+    introduction: "Le località sono scenari da verificare, non prenotazioni. I lati occidentali guardano il tramonto, quelli orientali l’alba; la protezione reale dipende però da vento e onda durante tutta la notte.",
     checks: [
-      { title: "1 · Regole e permessi", text: "Lo skipper controlla zonazione, eventuali autorizzazioni e se il campo boe è attivo e disponibile. Una boa vista su una mappa non è una prenotazione e non va data per scontata." },
-      { title: "2 · Il ridosso prima della vista", text: "La stessa cala può essere perfetta per un bagno e scomoda per la notte. Vento, onda residua, profondità e spazio di manovra contano più del nome della cala." },
-      { title: "3 · La scelta che fa stare bene tutti", text: "Quando non c’è una notte davvero tranquilla, si entra in porto o si cambia lato dell’isola. Il viaggio resta bello anche se cambia l’ordine delle tappe; il mare non va forzato." }
+      { title: "Levanzo · tramonto", text: "Cala Tramontana e Capo Grosso guardano a Ovest–Nord-Ovest, ma sono esposti al mare da N e O. Cala del Genovese è soggetta alle regole AMP: sosta e notte vanno verificate." },
+      { title: "Levanzo · alba e piano B", text: "Cala Fredda, Cala Minnola e Cala Dogana sono sul lato E–SE. Cala Dogana ha traffico di linea: manovre e permanenza non si improvvisano." },
+      { title: "Marettimo e Favignana", text: "Le notti in porto valgono solo con posto confermato. A Marettimo il Miglio Blu impone specifici divieti; a Favignana il nuovo Avviso 20.15 modifica limiti vietati all’ancoraggio sulla carta 259." }
     ]
   },
   days: [
     {
       date: "Giovedì 8 ottobre",
       route: "Marsala → Levanzo",
-      glance: { wind: "2-17 nodi (modelli discordi)", windTone: "caution", sea: "0,3-1,0 m", seaTone: "calm", sky: "Probabilmente asciutto", skyIcon: "sun", skyTone: "good", air: "17-26°C" },
-      plan: "Ci si incontra a Marsala con la cambusa già pronta e si parte intorno alle 15:00. La prima uscita serve a prendere il ritmo della flotta, arrivare con luce e cercare un tramonto che non chieda fretta.",
-      navigation: "Una navigazione di apertura, pensata per chiudere la giornata prima del buio. Levanzo è l’orizzonte della prima sera, non un punto da raggiungere a ogni costo.",
-      overnight: "Prima scelta: una rada a Levanzo soltanto se, sul posto, è consentita e realmente calma. In caso contrario si cerca un riparo diverso deciso dallo skipper.",
-      overnightType: "Prima notte · rada da confermare",
-      overnightStatus: "Idea · nessun posto assegnato",
-      alternative: "Se la condizione è già scomoda, si riduce la tratta o si cambia riparo: la prima sera non deve mettere pressione alla giornata successiva.",
+      distance: "circa 12,8 NM",
+      course: "338° veri, poi 351° e 336° evitando Favignana",
+      duration: "4 kn: 3 h 12 min · 5 kn: 2 h 34 min · 6 kn: 2 h 08 min",
+      window: "Partenza prevista 15:00. A 4 nodi l’arrivo è circa 18:12, soltanto 31 minuti prima del tramonto: nessun margine per cercare una rada.",
+      criticality: "Uscita con vento e onda da Sud; scelta notturna a Levanzo ancora aperta.",
+      uncertainty: "Alta sul vento: ECMWF/GFS sono sostenuti, ICON molto più debole e ruota a Ovest.",
+      ratings: {
+        departure: { tone: "caution", text: "Alle 15 ECMWF/GFS indicano circa 19 kn da S–SSE e raffiche 21–26 kn; verificare imboccatura e avvisi." },
+        passage: { tone: "caution", text: "Mare corto da S–SSE, fino a 1,2 m nello scenario GFS-Wave; andatura portante ma comfort da valutare." },
+        arrival: { tone: "unknown", text: "Non è stato scelto un approdo preciso; rada e boe di ottobre non sono confermate." }
+      },
+      operationalChecks: ["Meteomar/NETTUNO e osservazioni reali di Marsala prima di mollare gli ormeggi.", "Avvisi IIM su relitto e area vietata presso Marsala.", "Ridosso, fondale, autorizzazione AMP e piano di uscita dalla rada se il vento ruota."],
+      glance: { wind: "S–SSE 17–20 kn", windTone: "caution", sea: "0,6–1,2 m da S", seaTone: "caution", sky: "Asciutto nei 3 modelli", skyIcon: "sun", skyTone: "good" },
+      plan: "Cambusa già a bordo e partenza intorno alle 15:00. La rotta passa a Ovest di Favignana e raggiunge Levanzo con luce soltanto se velocità e manovre restano nei tempi.",
+      navigation: "Con rotta verso NNO e vento/onda da S–SSE l’andatura è portante. Se si realizza la rotazione a Ovest di ICON, l’ultimo tratto cambia assetto e comfort.",
+      overnight: "Rada sul lato realmente ridossato soltanto dopo verifica; altrimenti porto/posto confermato o un’alternativa più documentata.",
+      overnightType: "Prima notte · scelta aperta",
+      overnightStatus: "Da verificare sul posto",
+      alternative: "Restare a Marsala oppure accorciare su Favignana con posto già confermato. La vicinanza non rende un approdo automaticamente sicuro.",
       stops: [
-        {
-          moment: "Tramonto · lato da scegliere",
-          title: "Cala del Genovese o Cala Tramontana",
-          description: "Due scenari per arrivare a Levanzo con la luce della sera. Sono luoghi da guardare dal mare e valutare lì, non una promessa di pernottamento.",
-          check: "Prima della sosta: esposizione reale, fondo, profondità, traffico, zonazione AMP e autorizzazioni. Se manca anche una sola verifica, la cala resta solo una bella immagine."
-        },
-        {
-          moment: "Alba · alternativa sul lato est",
-          title: "Cala Fredda, Cala Minnola o Cala Dogana",
-          description: "Opzioni da tenere aperte per il mattino dopo, se il lato scelto protegge davvero la barca e permette di partire con serenità verso Marettimo.",
-          check: "La notte non è garantita: ogni barca segue la decisione del proprio skipper, non la lista delle calette."
-        }
+        { moment: "Tramonto · lato O/NO", title: "Cala Tramontana o scenario del Genovese", description: "Luce favorevole verso Ovest, ma esposizione maggiore con onda da Ovest o Nord.", check: "Zonazione AMP, fondo, spazio, onda residua, traffico e possibilità di uscire senza ritardi." },
+        { moment: "Alba · lato E/SE", title: "Cala Fredda, Minnola o Dogana", description: "Lato adatto alla prima luce; Cala Dogana è anche approdo di linea.", check: "Non pernottare per il solo valore panoramico: servono permesso, ridosso e gestione del traffico." }
       ],
-      wind: "I modelli professionali non sono ancora allineati sull’intensità: meteoblue AI indica vento leggero (2-5 nodi, raffiche fino a 11), ECMWF indica invece brezza moderata per l’intera giornata (13-17 nodi). Direzione prevalentemente da terra (quadrante N-NO) in entrambi, ma la lettura va confermata più vicino alla data.",
-      sea: "Da poco mosso a localmente mosso: l’onda combinata varia da 0,3 m (GFS) a 0,6-1,0 m (ECMWF) nell’arco della giornata, periodo breve (circa 5 secondi, onda di vento locale, non swell lungo).",
-      air: "Tra 17°C (notte) e 26°C (primo pomeriggio) secondo i modelli; cielo prevalentemente sereno o poco nuvoloso in giornata.",
-      water: "Non rilevata in questa sessione dai modelli consultati (non espongono la temperatura del mare nella vista oraria): stima storica di inizio ottobre circa 22°C (vedi clima tipico sopra), da confermare con una fonte marina vicino alla partenza.",
-      currents: "Nessuna fonte con dati di corrente puntuali per quest’area a questa distanza: verifica nel briefing operativo e a bordo.",
-      decision: "Giovedì sembra, oggi, la giornata più asciutta — ma restiamo prudenti a 7 giorni dalla partenza. Lo skipper confermerà se partire giovedì o restare a Marsala (cena a terra) e partire venerdì mattina, con il bollettino ufficiale 2-4 giorni prima.",
+      wind: "3–5 Bft secondo il modello. ECMWF 15–20 kn e GFS 16–21 kn da S–SSE, raffiche massime 25–26 kn; ICON 6–13 kn da S con rotazione verso O. Alla partenza ECMWF/GFS sono circa 19 kn.",
+      sea: "Poco mosso, Douglas 3. Hs: ECMWF WAM 0,54–0,84 m; GFS-Wave 0,90–1,22 m; MFWAM 0,58–1,02 m, prevalentemente da S–SSE, periodo 2,9–5,0 s. È soprattutto mare di vento; Hs non è l’onda massima.",
+      visibility: "Buona nella griglia, da verificare localmente all’imboccatura.",
+      phenomena: "Scenario asciutto nei tre deterministici; probabilità ensemble puntuale non disponibile in questa estrazione. Lo sviluppo convettivo reale va comunque osservato.",
+      air: "Circa 24–28°C nel pomeriggio, nuvolosità diversa fra modelli; tipo di nube non risolto dal prodotto consultato.",
+      water: "Temperatura superficiale modellata circa 24,8°C; non è una misura della cala.",
+      currents: "Modello oceanico circa 0,5–0,7 kn; direzione e valore nearshore non bastano per il piano, verifica a bordo.",
+      decision: "Confermare entro il primo pomeriggio sia l’uscita sia la notte. Se il margine di luce si riduce, usare un riparo già verificato.",
       sun: "Alba 07:12 · tramonto 18:43 · crepuscolo civile fino alle 19:09.",
-      moon: "Falce calante · levata 04:45 · tramonto 17:29."
+      moon: "Falce calante, illuminazione 6% · levata 04:45 · tramonto 17:30."
     },
     {
       date: "Venerdì 9 ottobre",
       route: "Levanzo → Marettimo",
-      glance: { wind: "7-19 nodi, in aumento", windTone: "caution", sea: "~1,0-1,1 m", seaTone: "caution", sky: "Pioggia possibile (solo GFS)", skyIcon: "rain", skyTone: "caution", air: "17-26°C" },
-      plan: "Il mattino resta aperto a un bagno o a una piccola esplorazione di Levanzo. Dopo pranzo la flotta punta Marettimo: la serata ha una base precisa, il porto e il borgo.",
-      navigation: "È la tratta che chiede più margine. La sosta a Levanzo deve restare leggera: per Marettimo si parte quando il mare permette a tutte le barche una traversata comoda.",
-      overnight: "Porto di Marettimo: piano della notte, con cena libera a terra o a bordo e ritrovo nel borgo.",
+      distance: "circa 13 NM",
+      course: "uscita a Sud di Levanzo, poi circa 267° veri",
+      duration: "4 kn: 3 h 15 min · 5 kn: 2 h 36 min · 6 kn: 2 h 10 min",
+      window: "Nessuna finestra affidabile oggi. Rivalutare tra 08:00 e 10:00 con radar, bollettino, osservazioni e mare reale.",
+      criticality: "Traversata aperta senza vero riparo intermedio, con temporali possibili e direzioni quasi opposte fra modelli.",
+      uncertainty: "Molto alta: ECMWF ruota da S a NO, GFS resta da S, ICON da ONO.",
+      ratings: {
+        departure: { tone: "adverse", text: "ECMWF segnala temporali 03–05 e piogge/rovesci fino alla mattina: rinvio o alternativa da considerare." },
+        passage: { tone: "adverse", text: "È la tratta più esposta; direzione del vento e del mare può cambiare durante l’attraversamento." },
+        arrival: { tone: "caution", text: "Ingresso a Marettimo da coordinare con porto e traffico; posto non ancora confermato." }
+      },
+      operationalChecks: ["Radar e fulminazioni, osservazione delle nubi e Meteomar prima della traversata.", "Posto, canale di chiamata e istruzioni del porto di Marettimo.", "Se modelli e osservazioni non convergono, rinunciare a Marettimo prima di impegnare il canale."],
+      glance: { wind: "Scenari S / NO · 9–19 kn", windTone: "caution", sea: "0,4–1,0 m, rotazione possibile", seaTone: "caution", sky: "Temporali possibili al mattino", skyIcon: "rain", skyTone: "caution" },
+      plan: "La mattina a Levanzo resta subordinata al cielo e al mare. Marettimo non è un appuntamento da raggiungere a ogni costo: si parte soltanto quando osservazioni e bollettini danno margine.",
+      navigation: "Con GFS il vento da Sud sarebbe al traverso/lasco sulla rotta Ovest; con ICON da ONO diventerebbe contrario; con ECMWF può ruotare durante la traversata.",
+      overnight: "Porto di Marettimo solo con posto e istruzioni confermati.",
       overnightType: "Seconda notte · porto",
-      overnightStatus: "Piano base · posto barca da confermare",
-      alternative: "Se mare e onda non lasciano una finestra confortevole, si ridisegna l’ordine delle tappe. Il porto di Marettimo non si raggiunge forzando una traversata.",
+      overnightStatus: "Disponibilità da confermare",
+      alternative: "Restare in un riparo legale a Levanzo, dirigere su Favignana con posto confermato o rientrare a Marsala. Nessuna alternativa è automatica.",
       stops: [
-        {
-          moment: "Mattino · sosta breve",
-          title: "Cala Fredda o Cala Minnola",
-          description: "Una seconda cala di Levanzo per il primo bagno o per una colazione lenta, senza trasformarla in una lunga giornata ferma.",
-          check: "Sosta diurna soltanto, quando consentita e semplice da gestire. Profondità, fondo e spazio per tutte le barche si controllano sul posto."
-        },
-        {
-          moment: "Marettimo · arrivo serale",
-          title: "Il porto prima della festa",
-          description: "La sera è pensata per vivere il borgo. Arrivare in porto con margine evita di trasformare l’ultimo tratto in una decisione affrettata.",
-          check: "Posto barca, canale di contatto e orario di arrivo vengono confermati dallo skipper con la struttura portuale."
-        }
+        { moment: "Prima della traversata", title: "Cala Fredda o Cala Minnola", description: "Eventuale sosta breve soltanto se non sottrae margine alla decisione meteo.", check: "Temporali, rotazione del vento, ridosso e orario limite per rinunciare." },
+        { moment: "Arrivo", title: "Scalo Nuovo di Marettimo", description: "Approdo con traffico di linea e spazi limitati: l’arrivo va coordinato.", check: "Posto barca, istruzioni locali, vento sull’imboccatura, traghetti e visibilità." }
       ],
-      wind: "Ancora brezza moderata secondo ECMWF (17-19 nodi al mattino presto, poi in attenuazione), più leggera secondo meteoblue AI (fino a 7 nodi); GFS indica invece vento in aumento nel pomeriggio (7-15 nodi), in coincidenza con il possibile arrivo della pioggia.",
-      sea: "Poco mosso: onda combinata intorno a 1,0-1,1 m secondo ECMWF, periodo breve; dato più calmo nelle prime ore secondo GFS.",
-      air: "Tra 17°C e 26°C secondo i modelli. GFS è l’unico a indicare pioggia in aumento durante la giornata (da circa 0,6 mm al mattino presto fino a circa 11 mm nel primo pomeriggio): meteoblue AI ed ECMWF non la mostrano. È il giorno in cui i modelli divergono di più: da riverificare a ridosso della data.",
-      water: "Dato marino non rilevato in questa sessione: stima storica circa 22°C, da aggiornare nella settimana della partenza con una fonte marina.",
-      currents: "Da controllare nella finestra operativa: nessuna fonte con dati puntuali a questa distanza.",
-      decision: "Se giovedì si restasse a Marsala, venerdì mattina diventerebbe la partenza: anche venerdì, però, potrebbe portare più vento e qualche rovescio nel pomeriggio. La partenza si valuta con calma al mattino, non è scontata, e si parte per Marettimo solo con una finestra che lasci margine a tutte le barche.",
+      wind: "1–5 Bft secondo il modello. ECMWF 1–12 kn da S poi NO, raffiche fino a 18,5 kn; GFS 9–19 kn da S, raffiche 20,8 kn; ICON 13–17 kn da ONO, raffiche 21,6 kn.",
+      sea: "Quasi calmo o poco mosso, Douglas 2–3. Hs 0,44–1,00 m. WAM/MFWAM ruotano da S verso NO; GFS-Wave ruota più lentamente. Periodo breve-moderato: possibile mare incrociato/residuo.",
+      visibility: "Può calare rapidamente sotto un rovescio o temporale: la griglia non descrive il bordo della cella.",
+      phenomena: "ECMWF codifica temporali 03–05 e rovesci/piogge 06–11 e 18–21; GFS e ICON restano asciutti. Ensemble pioggia ≥0,1 mm/h alle 06: ECMWF 54%, GEFS 20%, ICON-EPS 46%.",
+      air: "Circa 22–25°C, copertura e precipitazione molto variabili; nubi convettive possibili nello scenario ECMWF.",
+      water: "Temperatura superficiale modellata circa 24,8°C.",
+      currents: "Modello oceanico circa 0,3–0,65 kn; risoluzione insufficiente per rotta costiera e ingresso.",
+      decision: "È la giornata di possibile NO-GO. Temporali, salto del vento o mare disordinato richiedono rinvio o cambio destinazione.",
       sun: "Alba 07:13 · tramonto 18:42 · crepuscolo civile fino alle 19:08.",
-      moon: "Falce calante · levata 05:52 · tramonto 17:54."
+      moon: "Falce calante, illuminazione 2% · levata 05:51 · tramonto 17:54."
     },
     {
       date: "Sabato 10 ottobre",
       route: "Marettimo → Favignana",
-      glance: { wind: "Da confermare", sea: "Fino a ~1,3-1,4 m (bassa affidabilità)", sky: "Da confermare", skyIcon: "sun", air: "Da confermare" },
-      plan: "Marettimo merita una mattina vista dal mare, con calma e senza avvicinamenti inutili. Poi si imposta il trasferimento verso Favignana per entrare in porto nel pomeriggio e vivere la cena collettiva.",
-      navigation: "Si visita Marettimo solo fin dove il mare resta leggibile; la tratta per Favignana va impostata con margine per arrivare in porto ancora con luce.",
-      overnight: "Porto di Favignana: cena collettiva, DJ set e rientro a bordo a fine serata.",
+      distance: "circa 12,1 NM dirette · 14,5–15 NM via Punta Troia",
+      course: "diretta circa 100° veri; deviazione a Nord solo con mare e margine adeguati",
+      duration: "diretta: 4 kn 3 h 02 min · 5 kn 2 h 25 min · 6 kn 2 h 01 min",
+      window: "Preferire tarda mattina/primo pomeriggio dopo aver misurato il mare residuo. Accorciare la visita se riduce il margine d’ingresso a Favignana.",
+      criticality: "Onda residua da NO sulla costa esposta di Marettimo e divergenza sull’altezza significativa.",
+      uncertainty: "Media-alta sull’onda: WAM/MFWAM indicano circa 1 m, GFS-Wave circa 0,5 m.",
+      ratings: {
+        departure: { tone: "caution", text: "Controllare l’onda da NO prima di uscire dal ridosso e avvicinarsi alla costa esposta." },
+        passage: { tone: "caution", text: "Vento perlopiù debole/moderato, ma mare residuo fino a 1,2 m nello scenario WAM/MFWAM." },
+        arrival: { tone: "caution", text: "Posto e ingresso a Favignana vanno confermati; presente traffico di linea." }
+      },
+      operationalChecks: ["Altezza e direzione reale dell’onda sul lato NO di Marettimo.", "Divieti AMP e Miglio Blu: nessun ancoraggio senza verifica.", "Posto barca e istruzioni d’ingresso a Favignana, con luce per la manovra."],
+      glance: { wind: "3–13 kn da O/NO", windTone: "calm", sea: "0,5–1,2 m da NO", seaTone: "caution", sky: "Perlopiù asciutto", skyIcon: "sun", skyTone: "good" },
+      plan: "Visita di Marettimo soltanto fin dove il mare resta semplice, poi trasferimento diretto verso Favignana per entrare con luce.",
+      navigation: "La rotta verso Est mette il vento occidentale alle spalle; il comfort dipende però dall’onda residua, non solo dai nodi di vento locale.",
+      overnight: "Porto di Favignana con posto confermato.",
       overnightType: "Terza notte · porto",
-      overnightStatus: "Piano base · posto barca da confermare",
-      alternative: "Se la costa di Marettimo è esposta o la finestra si accorcia, l’esplorazione si riduce e si anticipa la partenza. Favignana è la base della sera, non una corsa contro il tempo.",
+      overnightStatus: "Disponibilità da confermare",
+      alternative: "Saltare Punta Troia e andare diretti. Se anche la rotta diretta non offre margine, restare a Marettimo in posto confermato.",
       stops: [
-        {
-          moment: "Mattino · costa di Marettimo",
-          title: "Punta Troia, Scalo Maestro o Cala Manione",
-          description: "Punti da osservare dal mare per sentire la scala dell’isola. Distanza dalla costa, rotta e durata restano scelte tecniche dello skipper.",
-          check: "Le zone e i fondali sono tutelati: non sono indicazioni di ancoraggio né di avvicinamento."
-        },
-        {
-          moment: "Favignana · arrivo con luce",
-          title: "Entrare in porto prima che inizi la sera",
-          description: "Il tramonto accompagna l’arrivo in paese; la notte è in porto, per godersi la cena senza una barca da controllare in rada.",
-          check: "Orario e approccio dipendono dalla traversata reale, dagli avvisi e dalla conferma del posto barca."
-        }
+        { moment: "Mattino · Marettimo", title: "Punta Troia solo se il mare lo consente", description: "La deviazione aggiunge circa 2,5–3 NM e porta sul lato più esposto.", check: "Onda da NO, distanza dalla costa, aree protette e tempo residuo." },
+        { moment: "Arrivo · Favignana", title: "Porto prima della sera", description: "L’ingresso con luce protegge la gestione della flotta.", check: "Disponibilità, canale di chiamata, traffico traghetti e Avviso 20.15." }
       ],
-      wind: "A 9 giorni di anticipo il dato non è ancora affidabile: i modelli mostrano un lieve aumento rispetto ai due giorni precedenti, ma il valore puntuale va preso con cautela fino al prossimo controllo (lunedì 5 ottobre).",
-      sea: "Onda in leggero aumento secondo il modello ECMWF-mare (fino a circa 1,3-1,4 m), ma a questa distanza l’affidabilità resta bassa: dettaglio e swell saranno letti meglio quando la previsione entra nella finestra operativa.",
-      air: "Temperatura e copertura del cielo verranno confermate nel prossimo aggiornamento, quando il dato sarà più affidabile.",
-      water: "Dato marino da verificare vicino alla partenza.",
-      currents: "Da verificare nel briefing operativo e durante la navigazione.",
-      decision: "L’ordine tra visita e trasferimento resta flessibile: si sceglie il momento che lascia più margine.",
-      sun: "Alba 07:15 · tramonto 18:42 · crepuscolo civile fino alle 19:08.",
-      moon: "Luna nuova · levata 06:58 · tramonto 18:20."
+      wind: "2–4 Bft secondo il modello. ECMWF 4–13 kn da O poi N, raffiche 18,5 kn; GFS 3–5 kn da SO/O; ICON 5–11 kn da NO, raffiche 15 kn.",
+      sea: "Quasi calmo o poco mosso, Douglas 2–3. WAM 0,66–1,16 m e MFWAM 0,64–1,22 m da NO; GFS-Wave 0,44–0,50 m. Periodo circa 5–6,7 s.",
+      visibility: "Generalmente buona; verificare eventuali rovesci isolati.",
+      phenomena: "ECMWF e GFS asciutti; ICON indica circa 0,6 mm al mattino. Probabilità ensemble puntuale non disponibile; nessun segnale condiviso di fenomeni intensi.",
+      air: "Circa 21–25°C, nuvolosità variabile.",
+      water: "Temperatura superficiale modellata circa 24,5°C.",
+      currents: "Modello oceanico circa 0,2–0,3 kn, direzione variabile; non usarlo per manovre costiere.",
+      decision: "Se l’onda intorno a 1 m si verifica, evitare la costa più esposta e preservare la rotta diretta.",
+      sun: "Alba 07:14 · tramonto 18:40 · crepuscolo civile fino alle 19:07.",
+      moon: "Luna nuova, illuminazione 0% · levata 06:57 · tramonto 18:19."
     },
     {
       date: "Domenica 11 ottobre",
       route: "Favignana → Marsala",
-      glance: { wind: "Non disponibile a 10 giorni", sea: "Da confermare", sky: "Da confermare", skyIcon: "sun", air: "Da confermare" },
-      plan: "L’ultima mattina è per Favignana: Cala Azzurra, Cala Rossa o un’altra sosta scelta sul momento. Alle 15:30 circa si punta Marsala, con l’obiettivo di essere in porto entro le 18:00.",
-      navigation: "È una giornata di rientro: il bagno è un regalo, non un vincolo. Il tempo di uscita da Favignana protegge il viaggio verso Marsala e il check-out della flotta.",
-      overnight: "Nessun pernottamento: rientro a Marsala entro le 18:00.",
+      distance: "circa 11,5–12,5 NM evitando la terra",
+      course: "uscita a Est, costa orientale, giro di Punta Marsala e poi SE",
+      duration: "4 kn: circa 3 h · 5 kn: circa 2 h 25 min · 6 kn: circa 2 h",
+      window: "Partire prima delle 15:30 per avere margine. Alle 15:30, 5 nodi portano vicino alle 17:55 senza riserva; a 4 nodi si arriva dopo le 18:30.",
+      criticality: "Orario di rientro e accesso a Marsala; direzione del vento non ancora risolta.",
+      uncertainty: "Media: mare in calo condiviso, vento da N per ECMWF, S–SO per GFS e NO per ICON.",
+      ratings: {
+        departure: { tone: "caution", text: "Vento e onda generalmente contenuti, ma il bollettino ufficiale della giornata e l’accesso locale non sono ancora disponibili." },
+        passage: { tone: "caution", text: "Meteo relativamente favorevole, ma le 15:30 non lasciano margine a 4–5 nodi." },
+        arrival: { tone: "caution", text: "Ingresso a Marsala con Avvisi IIM e necessità di arrivare prima delle 18:00." }
+      },
+      operationalChecks: ["ETA della barca più lenta prima dell’ultimo bagno.", "Visibilità, traffico e condizioni sull’imboccatura di Marsala.", "Avvisi IIM, carburante e riserva di tempo per check-out."],
+      glance: { wind: "4–10 kn, direzione incerta", windTone: "calm", sea: "0,2–0,5 m da NO", seaTone: "calm", sky: "Mare in calo", skyIcon: "sun", skyTone: "good" },
+      plan: "Ultima sosta a Favignana solo se non intacca il rientro. La rotta deve aggirare l’isola a Est e Punta Marsala: una linea diretta attraverserebbe terra.",
+      navigation: "Con vento leggero la velocità a vela può ridursi: il calcolo dell’arrivo non deve presumere una prestazione che la barca non garantisce.",
+      overnight: "Nessun pernottamento: Marsala entro le 18:00.",
       overnightType: "Rientro · porto di Marsala",
-      overnightStatus: "Orario vincolante",
-      alternative: "Se il mare costruisce o la flotta accumula ritardo, la sosta finale si accorcia o si anticipa la partenza. Tornare bene vale più di un ultimo bagno lungo.",
+      overnightStatus: "Vincolo operativo",
+      alternative: "Ridurre o eliminare la sosta balneare e partire prima. Se il meteo peggiora, entrare nella prima finestra utile.",
       stops: [
-        {
-          moment: "Mattino · luce e bagno",
-          title: "Cala Azzurra, Cala Rossa o Bue Marino",
-          description: "Tre immagini possibili di Favignana, da scegliere solo se mare, affollamento e gestione della barca rendono la sosta semplice.",
-          check: "Sono soste diurne possibili: non sono un programma obbligato e richiedono la verifica delle regole dell’Area Marina Protetta."
-        },
-        {
-          moment: "Piano B · lato alternativo",
-          title: "Cala Rotonda o Preveto",
-          description: "Alternative da tenere aperte se il lato scelto al mattino non è confortevole. Il percorso verso Marsala resta sempre davanti a noi.",
-          check: "La partenza è intorno alle 15:30, salvo anticipo deciso dallo skipper per rientrare con tranquillità."
-        }
+        { moment: "Mattino · lato scelto sul meteo", title: "Cala Rossa, Cala Azzurra o alternativa", description: "Sosta diurna, non promessa: dipende da mare, affollamento e regole AMP.", check: "Orario limite, fondo, traffico, divieti e possibilità di ripartire senza attesa." },
+        { moment: "Rientro", title: "Punta Marsala e accesso al porto", description: "Due passaggi da affrontare con margine; non comprimere l’ETA per salvare l’ultima sosta.", check: "Visibilità, avvisi, traffico, carburante e orario del check-out." }
       ],
-      wind: "A 10 giorni di anticipo nessun modello consultato dà un valore puntuale solido: il dato utile arriverà con il prossimo controllo (lunedì 5 ottobre) e poi nel briefing operativo.",
-      sea: "Mare e onda saranno riletti prima della sosta e prima del rientro, quando il dato sarà più affidabile.",
-      air: "Temperatura, visibilità e fenomeni saranno aggiornati nel briefing operativo.",
-      water: "Dato marino da verificare nella settimana della partenza.",
-      currents: "Nessun valore affidabile anticipato: si controllano con le fonti operative e a bordo.",
-      decision: "Il rientro puntuale a Marsala prevale sempre sulla durata dell’ultima sosta a Favignana.",
+      wind: "2–3 Bft. ECMWF 5–10 kn da N, raffiche fino a 14 kn; GFS 4–7 kn da S–SO; ICON 4–6 kn da NO. Intensità contenuta, direzione non risolta.",
+      sea: "Quasi calmo, Douglas 2. WAM 0,28–0,48 m; GFS-Wave 0,24–0,32 m; MFWAM 0,20–0,40 m, soprattutto da NO, periodo 3,4–5,4 s.",
+      visibility: "Generalmente buona nella griglia; da verificare con le osservazioni del giorno.",
+      phenomena: "Nessun segnale condiviso di fenomeni intensi; probabilità ensemble puntuale non disponibile. Aggiornare con il bollettino a breve termine.",
+      air: "Circa 20–25°C, nuvolosità variabile.",
+      water: "Temperatura superficiale modellata circa 24,3–24,4°C.",
+      currents: "Modello oceanico da circa 0,6 kn a metà giornata a 0,1–0,2 kn verso sera; valore costiero da verificare.",
+      decision: "Fissare la partenza sulla barca più lenta e sul meteo reale. Se alle 15:30 non c’è margine credibile, il bagno finale si accorcia.",
       sun: "Alba 07:15 · tramonto 18:39 · crepuscolo civile fino alle 19:05.",
-      moon: "Falce crescente · levata 08:02 · tramonto 18:45."
+      moon: "Falce crescente, illuminazione 1% · levata 08:01 · tramonto 18:45."
     }
   ]
 };
