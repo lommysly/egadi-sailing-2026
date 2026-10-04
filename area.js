@@ -13,7 +13,7 @@ import { installInputNormalization, normalizeFormFields } from './input-normaliz
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20261002-niente-promo-in-area-v1';
 import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
-import { rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-una-domanda-un-posto-v1';
+import { rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-card-come-il-gestore-v1';
 import {
   boatFromData,
   boatSetupReadiness,
@@ -6868,17 +6868,6 @@ function reflectCreatedProjectionInvite(projection, invite) {
   openProjectionCard(projection.id);
 }
 
-const CREW_TRAVEL_LEG_LABELS = {
-  missing: { icon: '–', text: 'Ci arriva per conto suo' },
-  draft: { icon: '–', text: 'Ci arriva per conto suo' },
-  transfer_pending: { icon: '!', text: 'Transfer da completare' },
-  no_transfer: { icon: '–', text: 'Ci arriva per conto suo' },
-  transfer_ready: { icon: '•', text: 'Transfer richiesto' },
-  transfer_planning: { icon: '•', text: 'In organizzazione' },
-  transfer_confirmed: { icon: '✓', text: 'Transfer confermato' },
-  transfer_completed: { icon: '✓', text: 'Transfer concluso' },
-  transfer_cancelled: { icon: '!', text: 'Transfer annullato' },
-};
 // "ready" da solo non basta: è lo stato del viaggio (volo/orari), non del
 // transfer. Un viaggio "confermato" con la scelta del collegamento
 // aeroporto ancora vuota non comparirà mai nel pannello dell'operatore
@@ -7006,67 +6995,54 @@ function renderCrewTravelOverview() {
     });
     return;
   }
-  const legBadge = (legStates, direction) => {
-    const info = CREW_TRAVEL_LEG_LABELS[legStates[direction]];
-    const label = direction === 'outbound' ? 'Andata' : 'Ritorno';
-    return `<span class="crew-travel-leg crew-travel-leg--${legStates[direction]}"><span aria-hidden="true">${info.icon}</span>${escapeHtml(label)} · ${escapeHtml(info.text)}</span>`;
-  };
-  const renderCard = ({ member, legStates, needsReminder, presentation }) => {
-    const useReminder = needsReminder && presentation.tone !== 'cancelled';
-    const contactUrl = useReminder ? crewTravelReminderUrl(member, legStates) : crewTravelContactUrl(member);
-    const actionLabel = useReminder
-      ? 'Sollecita su WhatsApp'
-      : presentation.tone === 'cancelled' ? 'Contatta su WhatsApp' : 'Scrivi su WhatsApp';
-    const action = contactUrl
-      ? `<a class="button button-whatsapp crew-travel-card-whatsapp" href="${escapeHtml(contactUrl)}" target="_blank" rel="noopener noreferrer">${whatsappActionIconMarkup({ external: true })}${escapeHtml(actionLabel)}</a>`
-      : '<span class="field-hint crew-travel-card-no-contact">Numero WhatsApp non disponibile</span>';
-    const initial = escapeHtml(memberName(member).trim().charAt(0).toUpperCase() || '?');
-    return `<article class="crew-travel-card crew-travel-card--${escapeHtml(presentation.tone)}"><header class="crew-travel-card-heading"><span class="crew-travel-card-avatar" aria-hidden="true">${initial}</span><span class="crew-travel-card-person"><strong>${escapeHtml(memberName(member))}</strong><small>${escapeHtml(presentation.label)}</small></span></header><div class="crew-travel-card-legs">${legBadge(legStates, 'outbound')}${legBadge(legStates, 'return')}</div><div class="crew-travel-card-action">${action}</div></article>`;
-  };
-  const waitingCards = cards.filter((card) => card.group === 'waiting');
-
-  // Una domanda, un posto solo.
+  // Una sola griglia di card, tutto l'equipaggio.
   //
-  // Fino al 4/10/2026 questa vista mostrava l'elenco di chi arriva quando e,
-  // subito sotto, le stesse persone un'altra volta dentro una griglia di card
-  // "Tutti gli altri" — che ripeteva lo stato del transfer e offriva il tasto
-  // WhatsApp. Sette persone, quattordici righe, e nessuna informazione in
-  // più (segnalato da Silvio: "vedo un doppione").
+  // Prima c'erano due elenchi con le stesse persone: quello di chi arriva
+  // quando e, sotto, le card per i solleciti. Poi le card solo per chi andava
+  // sollecitato, ma sempre separate dall'elenco. Silvio l'ha detto chiaro,
+  // 4/10/2026: "è assurdo metterlo due volte" — lo skipper deve vedere tutto
+  // l'equipaggio in un colpo, e capire dalla card stessa se c'è da sollecitare.
   //
-  // Ora l'elenco porta da sé lo stato del transfer e il tasto per scrivere.
-  // Le card restano soltanto per chi va davvero sollecitato, e stanno in
-  // cima perché sono l'unica cosa su cui c'è da agire: quando non c'è
-  // nessuno da sollecitare, non compaiono affatto.
+  // Quindi ogni card porta tutto: quando arriva e riparte, a che punto è il
+  // transfer, e il tasto giusto — "Sollecita" se la richiesta è rimasta a
+  // metà, "Scrivi" altrimenti. Il colore dice a colpo d'occhio dove guardare.
+  // L'equipaggio vede le stesse card nella propria area, senza tasti.
   const members = crewTravelMembers();
+  const cardFor = new Map(cards.map((card) => [card.member.id, card]));
   // Tutte le persone della barca, anche chi non ha mai aperto il modulo
-  // viaggio: senza questo, togliendo le card, sparirebbero dalla vista.
+  // viaggio: l'elenco nasce dall'equipaggio, non dalle sole righe di viaggio,
+  // altrimenti chi non ha comunicato niente non lo vedrebbe più nessuno.
   const rosterRows = [
-    ...members.map((member) => ({ ...(crewTravelStatusFor(member.id) || {}), id: member.id, displayName: memberName(member) })),
+    ...members.map((member) => ({
+      ...(crewTravelStatusFor(member.id) || {}),
+      id: member.id,
+      displayName: memberName(member),
+      preferredLocale: inviteLocale(activeInvites.find((invite) => invite.id === member.id)),
+    })),
     ...activeCrewTravelStatus.filter((entry) => entry.isSkipper === true),
   ];
-  const contactAction = (voce) => {
+  const cardAction = (voce) => {
     if (voce.isSkipper === true) return '';
-    const member = members.find((candidate) => candidate.id === voce.id);
-    const url = member ? crewTravelContactUrl(member) : '';
-    return url
-      ? `<a class="boat-roster-action" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${whatsappActionIconMarkup({ external: true })}Scrivi su WhatsApp</a>`
-      : '';
+    const card = cardFor.get(voce.id);
+    if (!card) return '';
+    const useReminder = card.needsReminder && card.presentation.tone !== 'cancelled';
+    const contactUrl = useReminder ? crewTravelReminderUrl(card.member, card.legStates) : crewTravelContactUrl(card.member);
+    const actionLabel = useReminder
+      ? 'Sollecita su WhatsApp'
+      : card.presentation.tone === 'cancelled' ? 'Contatta su WhatsApp' : 'Scrivi su WhatsApp';
+    return contactUrl
+      ? `<a class="button button-whatsapp crew-travel-card-whatsapp" href="${escapeHtml(contactUrl)}" target="_blank" rel="noopener noreferrer">${whatsappActionIconMarkup({ external: true })}${escapeHtml(actionLabel)}</a>`
+      : '<span class="field-hint crew-travel-card-no-contact">Numero WhatsApp non disponibile</span>';
   };
+  const daSollecitare = cards.filter((card) => card.group === 'waiting').length;
   const rosterCopy = rosterHeading(false);
-  const roster = `<section class="boat-roster boat-roster--skipper">
-      <div class="boat-roster-heading"><p class="eyebrow">${escapeHtml(rosterCopy.eyebrow)}</p><h4>${escapeHtml(rosterCopy.title)}</h4><p class="field-hint">Chi arriva quando, con che mezzo e a che punto è il suo transfer. In cima chi arriva prima.</p></div>
-      <ul class="boat-roster-list">${rosterMarkup(rosterRows, { currentId: 'skipper', azione: contactAction })}</ul>
+  const riepilogo = daSollecitare
+    ? `${daSollecitare === 1 ? 'Una persona da sollecitare' : `${daSollecitare} persone da sollecitare`}: la sua card è evidenziata e ha il tasto per farlo.`
+    : 'Nessuno da sollecitare. In cima chi arriva prima.';
+  const markup = `<section class="boat-roster boat-roster--skipper">
+      <div class="boat-roster-heading"><p class="eyebrow">${escapeHtml(rosterCopy.eyebrow)}</p><h4>${escapeHtml(rosterCopy.title)}</h4><p class="field-hint">${escapeHtml(riepilogo)}</p></div>
+      <div class="crew-travel-list">${rosterMarkup(rosterRows, { currentId: 'skipper', azione: cardAction })}</div>
     </section>`;
-  const solleciti = waitingCards.length
-    ? `<section class="crew-travel-group crew-travel-group--waiting" data-crew-travel-group="waiting">
-      <header class="crew-travel-group-heading">
-        <div><h5>${waitingCards.length === 1 ? 'Una persona da sollecitare' : `${waitingCards.length} persone da sollecitare`}</h5><p>Hanno scelto il transfer ma non hanno dato il consenso: la richiesta non è partita e nessuno passerà a prenderle.</p></div>
-        <strong aria-label="${waitingCards.length} persone">${waitingCards.length}</strong>
-      </header>
-      <div class="crew-travel-list">${waitingCards.map(renderCard).join('')}</div>
-    </section>`
-    : '';
-  const markup = `${solleciti}${roster}`;
   sections.forEach((section) => {
     section.hidden = false;
     section.innerHTML = markup;

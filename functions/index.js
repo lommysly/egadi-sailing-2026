@@ -669,9 +669,13 @@ async function writeCrewTravelStatus(boatId, inviteId, direction, travelState, t
   // i documenti d'identità (richiesta di Silvio, 4/10/2026).
   const invito = await db.doc(`boats/${boatId}/invites/${inviteId}`).get();
   const displayName = invito.exists ? invito.data()?.displayName || '' : '';
+  // La lingua parlata accompagna il nome, come sulle card del gestore
+  // transfer: chi è a bordo sa come rivolgersi a quella persona.
+  const parlata = invito.exists ? invito.data()?.preferredLocale : '';
   await db.doc(`boats/${boatId}/crewTravelStatus/${inviteId}`).set({
     inviteId,
     ...(displayName ? { displayName } : {}),
+    ...(parlata === 'en' || parlata === 'it' ? { preferredLocale: parlata } : {}),
     [direction]: travelState,
     [`${direction}Transfer`]: transferState,
     ...crewScheduleFields(direction, leg),

@@ -53,9 +53,10 @@ test('l’avviso dice che cosa succede adesso e porta il pulsante per chiedere i
 
 test('nell’area skipper resta un solo stato da seguire', () => {
   assert.match(area, /const CREW_TRAVEL_NEEDS_REMINDER = new Set\(\['transfer_pending'\]\);/);
-  // Chi non ha chiesto niente non è più un allarme da sollecitare.
-  assert.doesNotMatch(area, /missing: \{ icon: '•', text: 'Da inserire' \}/);
-  assert.match(area, /missing: \{ icon: '–', text: 'Ci arriva per conto suo' \}/);
+  // Chi non ha chiesto niente non è più un allarme da sollecitare: sulla
+  // card risulta "Arriva per conto suo", in tono neutro.
+  assert.doesNotMatch(area, /text: 'Da inserire'/);
+  assert.match(read('boat-roster.js'), /perContoSuo: 'Arriva per conto suo'/);
 });
 
 test('lo stato della tratta si legge dal transfer, non dallo stato del viaggio', () => {

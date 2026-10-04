@@ -128,28 +128,28 @@ body.menu-open { overflow:hidden; }
 .boat-roster { margin:26px 0 0; padding:20px; border:1px solid rgba(2,43,58,.1); border-radius:16px; background:white; }
 .boat-roster[hidden] { display:none; }
 .boat-roster-heading h4 { margin:4px 0 6px; font:600 1.15rem "Fraunces",serif; }
-.boat-roster-list { display:grid; gap:10px; margin:16px 0 0; padding:0; list-style:none; }
-.boat-roster-row { display:grid; gap:6px; padding:12px 14px; border:1px solid rgba(2,43,58,.08); border-radius:12px; background:#f7fbfb; }
-.boat-roster-row--skipper { border-color:rgba(13,148,136,.35); background:#f0faf8; }
-.boat-roster-row--io { border-color:rgba(2,43,58,.28); }
-.boat-roster-person { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
-.boat-roster-person strong { font-size:1rem; }
-.boat-roster-person small { padding:1px 7px; border-radius:999px; background:rgba(2,43,58,.08); font:700 .62rem "DM Mono",monospace; letter-spacing:.05em; text-transform:uppercase; color:#42606b; }
-.boat-roster-legs { display:grid; gap:3px; }
-.boat-roster-leg { display:grid; grid-template-columns:60px minmax(0,1fr); gap:6px; align-items:baseline; font-size:.82rem; line-height:1.45; color:#334e57; }
-.boat-roster-leg strong { font:700 .64rem "DM Mono",monospace; letter-spacing:.03em; text-transform:uppercase; color:#5b7480; }
-.boat-roster-leg small { color:#6c838d; font-size:.74rem; }
-.boat-roster-leg em { display:inline-block; margin-left:2px; padding:0 7px; border-radius:999px; background:rgba(13,148,136,.13); color:#115e59; font-style:normal; font-weight:700; font-size:.72rem; white-space:nowrap; }
-.boat-roster-leg--unknown { display:block; color:#8296a0; font-style:italic; }
+/* Arrivi e partenze sono card, non righe lunghe: la stessa griglia e gli
+   stessi colori delle card che lo skipper usava già (crew-travel-card), così
+   la barca si legge a colpo d'occhio e non scorrendo un elenco. Dentro la
+   card, andata e ritorno una sotto l'altra. */
+.boat-card-legs { display:grid; gap:12px; align-content:start; }
+/* Ogni tratta: l'etichetta della direzione, l'orario, e sotto lo stato in
+   diretta. Le etichette sono le stesse delle card del gestore transfer
+   (transfer-badge), con gli stessi colori per gli stessi stati. */
+.boat-card-leg { display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px 9px; align-items:center; }
+.boat-card-when { font-size:.9rem; font-weight:700; color:#16343d; }
+.boat-card-when small { font-weight:400; color:#5b7480; font-size:.76rem; }
+.boat-card-when--unknown { font-weight:400; font-style:italic; color:#8296a0; }
+.boat-card-status { grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; }
+.boat-card-meeting { font-size:.76rem; color:#334e57; }
+/* La lingua parlata sta in alto a destra, come sulle card del gestore. */
+.crew-travel-card-heading .transfer-badge--language { margin-left:auto; align-self:flex-start; background:rgba(6,54,68,.1); color:#063644; }
+/* Lo skipper e la propria card si riconoscono dal bordo, non da un colore di
+   fondo: il fondo è già usato per dire a che punto è il transfer. */
+.crew-travel-card.boat-card--skipper { box-shadow:inset 0 0 0 2px rgba(13,148,136,.45); }
+.crew-travel-card.boat-card--io { box-shadow:inset 0 0 0 2px rgba(2,43,58,.5); }
+.crew-travel-card--neutral { --crew-travel-card-bg:#f3f5f5; --crew-travel-card-border:#66757a; }
 .boat-roster-empty { padding:10px 2px; color:#6c838d; font-size:.86rem; font-style:italic; }
-/* Un transfer rimasto a metà o annullato: l'unica etichetta dell'elenco che
-   chiede attenzione, e deve distinguersi dalle altre. */
-.boat-roster-leg em.boat-roster-flag { background:rgba(194,65,12,.14); color:#9a3412; }
-/* Il tasto per scrivere, solo nella vista skipper: piccolo e a fine riga,
-   perché l'elenco serve prima a leggere e solo dopo a contattare. */
-.boat-roster-action { display:inline-flex; align-items:center; gap:6px; justify-self:start; margin-top:4px; font-size:.78rem; font-weight:700; color:#0f5f58; text-decoration:none; border-bottom:1px solid rgba(15,95,88,.35); }
-.boat-roster-action:hover { color:var(--deep); border-color:var(--deep); }
-.boat-roster-action svg { width:15px; height:15px; }
 /* Dentro l'area skipper l'elenco sta in cima a "Arrivi e partenze della
    barca", prima dei gruppi dei solleciti: stesso aspetto che ha per
    l'equipaggio, perché è la stessa sezione. */

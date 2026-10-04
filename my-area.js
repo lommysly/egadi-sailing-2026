@@ -3,7 +3,7 @@ import { auth, crewAccessErrorMessage, crewSaveErrorMessage, crewAccessUrl, db, 
 import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
-import { rosterEntries, rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-una-domanda-un-posto-v1';
+import { rosterEntries, rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-card-come-il-gestore-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -305,7 +305,7 @@ function renderCrewDashboardShell() {
         <h4>${escapeHtml(rosterHeading(activeLocale() === 'en').title)}</h4>
         <p class="field-hint">${escapeHtml(rosterHeading(activeLocale() === 'en').hint)}</p>
       </div>
-      <ul class="boat-roster-list"></ul>
+      <div class="crew-travel-list" data-boat-roster-cards></div>
     </section>
     <section id="crewActivityTimeline" class="crew-activity-timeline" aria-live="polite" aria-labelledby="crewActivityTimelineTitle">
       <div class="crew-activity-timeline-heading"><p class="eyebrow">${escapeHtml(copy.activityTimelineEyebrow)}</p><h4 id="crewActivityTimelineTitle">${escapeHtml(copy.activityTimelineTitle)}</h4></div>
@@ -610,7 +610,9 @@ function renderBoatTravelRoster() {
     sezione.hidden = true;
     return;
   }
-  sezione.querySelector('.boat-roster-list').innerHTML = rosterMarkup(boatTravelRoster, {
+  // Le stesse card dello skipper, senza tasti: chi è a bordo non deve
+  // sollecitare nessuno, deve solo vedere la barca in ordine.
+  sezione.querySelector('[data-boat-roster-cards]').innerHTML = rosterMarkup(boatTravelRoster, {
     currentId: activeInvite?.id || '',
     english: activeLocale() === 'en',
   });

@@ -26,27 +26,32 @@ test('chi non ha un nome non compare, chi non ha orari resta in fondo', () => {
   assert.equal(nomi.at(-1), 'Nessuno');
 });
 
-test('lo skipper è marcato, e ognuno riconosce la propria riga', () => {
+test('lo skipper è marcato, e ognuno riconosce la propria card', () => {
   const perEquipaggio = rosterMarkup(BARCA, { currentId: 'a' });
-  assert.match(perEquipaggio, /boat-roster-row--skipper/);
-  assert.equal((perEquipaggio.match(/sei tu/g) || []).length, 1);
-  assert.match(perEquipaggio, /Carla<\/strong>\s*<small>sei tu<\/small>/);
+  assert.match(perEquipaggio, /boat-card--skipper/);
+  assert.equal((perEquipaggio.match(/boat-card--io/g) || []).length, 1);
+  assert.match(perEquipaggio, /Carla<\/strong><small>sei tu · /);
 
   const perSkipper = rosterMarkup(BARCA, { currentId: 'skipper' });
-  assert.match(perSkipper, /boat-roster-row--skipper boat-roster-row--io/);
+  assert.match(perSkipper, /boat-card--skipper boat-card--io/);
+  assert.match(perSkipper, /Silvio<\/strong><small>skipper · sei tu · /);
 });
 
-test('si legge chi è sul pulmino e con che mezzo arriva', () => {
+test('si legge quando arriva, con che mezzo e se è sul transfer', () => {
   const html = rosterMarkup(BARCA, { currentId: '' });
   assert.match(html, /mer 7 ott · 17:30/);
   assert.match(html, /<small>volo<\/small>/);
-  assert.equal((html.match(/col transfer/g) || []).length, 2);
+  // Fabio e Silvio hanno chiesto il transfer all'andata.
+  assert.equal((html.match(/transfer-badge--new">transfer richiesto/g) || []).length, 2);
+  // Chi non l'ha chiesto ha comunque un'etichetta, neutra: per conto suo.
+  assert.match(html, /transfer-badge--unknown">per conto suo/);
 });
 
 test('un orario che manca è un’informazione, non un allarme', () => {
   const html = rosterMarkup([{ id: 'x', displayName: 'Gaia', returnDate: '2026-10-11', returnTime: '20:35' }]);
-  assert.match(html, /boat-roster-leg--unknown">Arriva: non comunicato/);
-  assert.doesNotMatch(html, /!|attenzione|manca/i);
+  assert.match(html, /boat-card-when--unknown">non comunicato/);
+  assert.match(html, /crew-travel-card--neutral/);
+  assert.doesNotMatch(html, /crew-travel-card--attention|crew-travel-card--cancelled/);
 });
 
 test('i nomi non possono iniettare markup', () => {
@@ -58,8 +63,12 @@ test('i nomi non possono iniettare markup', () => {
 test('in inglese cambia la lingua, non l’ordine', () => {
   const html = rosterMarkup(BARCA, { currentId: 'a', english: true });
   assert.match(html, /Arrives/);
-  assert.match(html, /on the shuttle/);
+  assert.match(html, /transfer requested/);
   assert.match(html, /that is you/);
+  assert.deepEqual(
+    [...html.matchAll(/<strong>([^<]+)<\/strong>/g)].map((m) => m[1]),
+    ['Carla', 'Silvio', 'Fabio', 'Nessuno'],
+  );
 });
 
 test('titolo e spiegazione sono gli stessi dalle due parti', () => {
@@ -80,15 +89,20 @@ test('una barca senza viaggi non mostra un elenco vuoto senza spiegazione', () =
 // Lo stato del transfer sta sulla riga dell'elenco. Prima l'elenco diceva
 // solo "col transfer" e lo stato vero stava in una seconda lista con le
 // stesse persone ripetute sotto.
-test('la riga dice a che punto è il transfer, non solo che c’è', () => {
+// Le etichette sono quelle del gestore transfer: stesse parole, stessi
+// colori per gli stessi stati, così chi passa da una pagina all'altra
+// ritrova lo stesso linguaggio.
+test('lo stato in diretta usa le etichette del gestore transfer', () => {
   const html = rosterMarkup([
     { id: 'a', displayName: 'Anna', outboundDate: '2026-10-08', outboundTime: '10:00', outboundTransfer: 'requested', outboundOperationStatus: 'confirmed' },
     { id: 'b', displayName: 'Bruno', outboundDate: '2026-10-08', outboundTime: '11:00', outboundTransfer: 'requested', outboundOperationStatus: 'planned' },
     { id: 'c', displayName: 'Carlo', outboundDate: '2026-10-08', outboundTime: '12:00', outboundTransfer: 'requested' },
   ]);
-  assert.match(html, /transfer confermato/);
-  assert.match(html, /transfer in organizzazione/);
-  assert.match(html, /col transfer/);
+  assert.match(html, /transfer-badge--confirmed">transfer confermato/);
+  assert.match(html, /transfer-badge--planned">in pianificazione/);
+  assert.match(html, /transfer-badge--new">transfer richiesto/);
+  assert.match(html, /transfer-badge--outbound">Arriva/);
+  assert.match(html, /transfer-badge--return">Riparte/);
 });
 
 test('una richiesta rimasta a metà o annullata si distingue dalle altre', () => {
@@ -96,12 +110,33 @@ test('una richiesta rimasta a metà o annullata si distingue dalle altre', () =>
     { id: 'a', displayName: 'Anna', returnTransfer: 'undecided' },
     { id: 'b', displayName: 'Bruno', outboundDate: '2026-10-08', outboundTransfer: 'requested', outboundOperationStatus: 'cancelled' },
   ]);
-  assert.equal((html.match(/class="boat-roster-flag"/g) || []).length, 2);
-  assert.match(html, /transfer da completare/);
-  assert.match(html, /transfer annullato/);
+  assert.match(html, /transfer-badge--draft">transfer da completare/);
+  assert.match(html, /transfer-badge--cancelled">transfer annullato/);
+  // E il colore della card lo dice prima ancora di leggere.
+  assert.match(html, /crew-travel-card--attention/);
+  assert.match(html, /crew-travel-card--cancelled/);
 });
 
-test('l’azione sulla riga è facoltativa: lo skipper ce l’ha, l’equipaggio no', () => {
+test('il ritrovo compare appena il gestore lo imposta', () => {
+  const senza = rosterMarkup([{ id: 'a', displayName: 'Anna', outboundDate: '2026-10-08', outboundTransfer: 'requested' }]);
+  assert.doesNotMatch(senza, /boat-card-meeting/);
+  const con = rosterMarkup([{ id: 'a', displayName: 'Anna', outboundDate: '2026-10-08', outboundTransfer: 'requested', outboundMeetingTime: '18:10', outboundMeetingPoint: 'Uscita arrivi' }]);
+  assert.match(con, /ritrovo 18:10 · Uscita arrivi/);
+});
+
+test('la lingua parlata è sulla card, come per il gestore transfer', () => {
+  const html = rosterMarkup([
+    { id: 'a', displayName: 'Pauline', preferredLocale: 'en', outboundDate: '2026-10-08' },
+    { id: 'b', displayName: 'Anna', preferredLocale: 'it', outboundDate: '2026-10-08' },
+    { id: 'c', displayName: 'Senza', outboundDate: '2026-10-08' },
+  ]);
+  assert.match(html, /transfer-badge--language-en">EN/);
+  assert.match(html, /transfer-badge--language-it">IT/);
+  // Se la lingua non si conosce non si inventa.
+  assert.equal((html.match(/transfer-badge--language /g) || []).length, 2);
+});
+
+test('il tasto sulla card è facoltativo: lo skipper ce l’ha, l’equipaggio no', () => {
   const barca = [{ id: 'a', displayName: 'Anna', outboundDate: '2026-10-08' }];
   assert.doesNotMatch(rosterMarkup(barca), /SCRIVI/);
   assert.match(rosterMarkup(barca, { azione: (voce) => `<a>SCRIVI a ${voce.displayName}</a>` }), /SCRIVI a Anna/);

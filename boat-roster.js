@@ -20,22 +20,38 @@ const TESTI = {
   it: {
     arriva: 'Arriva', riparte: 'Riparte', nonComunicato: 'non comunicato',
     colTransfer: 'col transfer', skipper: 'skipper', seiTu: 'sei tu',
+    // Le stesse parole che legge chi organizza i transfer, così lo stato si
+    // chiama allo stesso modo per tutti.
     transfer: {
-      planned: 'transfer in organizzazione', confirmed: 'transfer confermato',
-      completed: 'transfer concluso', cancelled: 'transfer annullato',
-      undecided: 'transfer da completare',
+      richiesto: 'transfer richiesto', planned: 'in pianificazione',
+      confirmed: 'transfer confermato', completed: 'transfer concluso',
+      cancelled: 'transfer annullato', undecided: 'transfer da completare',
+      nessuno: 'per conto suo',
     },
+    ritrovo: 'ritrovo', lingua: { it: 'IT', en: 'EN' },
     vuoto: 'Nessuno ha ancora comunicato il proprio viaggio.',
+    sintesi: {
+      annullato: 'Transfer annullato', daCompletare: 'Transfer da completare',
+      sulTransfer: 'Sul transfer', perContoSuo: 'Arriva per conto suo',
+      nonComunicato: 'Viaggio non comunicato',
+    },
   },
   en: {
     arriva: 'Arrives', riparte: 'Leaves', nonComunicato: 'not shared',
     colTransfer: 'on the shuttle', skipper: 'skipper', seiTu: 'that is you',
     transfer: {
-      planned: 'transfer being arranged', confirmed: 'transfer confirmed',
-      completed: 'transfer completed', cancelled: 'transfer cancelled',
-      undecided: 'transfer to complete',
+      richiesto: 'transfer requested', planned: 'planning',
+      confirmed: 'transfer confirmed', completed: 'transfer completed',
+      cancelled: 'transfer cancelled', undecided: 'transfer to complete',
+      nessuno: 'on their own',
     },
+    ritrovo: 'meet at', lingua: { it: 'IT', en: 'EN' },
     vuoto: 'Nobody has shared their journey yet.',
+    sintesi: {
+      annullato: 'Transfer cancelled', daCompletare: 'Transfer to complete',
+      sulTransfer: 'On the shuttle', perContoSuo: 'Getting there on their own',
+      nonComunicato: 'Journey not shared',
+    },
   },
 };
 
@@ -86,45 +102,86 @@ export function rosterEntries(statuses) {
       || String(a.displayName).localeCompare(String(b.displayName), 'it'));
 }
 
-// Le righe dell'elenco come HTML. `currentId` marca "sei tu": l'id dell'invito
-// per l'equipaggio, 'skipper' per lo skipper.
-// `azione(voce)` è facoltativa e restituisce HTML già pronto per quella
-// riga: lo skipper ci mette il tasto WhatsApp, l'equipaggio niente, perché i
-// contatti dei compagni non li vede.
+// Il colore della card e la riga sotto il nome: la stessa sintesi che lo
+// skipper usa per capire se c'è da sollecitare, e che l'equipaggio legge solo
+// come informazione. Un transfer annullato o rimasto a metà viene prima di
+// tutto il resto, perché è l'unico caso in cui qualcuno rischia di restare
+// a piedi.
+export function rosterCardSummary(voce, lingua = 'it') {
+  const t = TESTI[lingua].sintesi;
+  const stati = ['outbound', 'return'].map((direzione) => rosterTransferState(voce, direzione)).filter(Boolean);
+  if (stati.some((stato) => stato.chiave === 'cancelled')) return { tono: 'cancelled', testo: t.annullato };
+  if (stati.some((stato) => stato.chiave === 'undecided')) return { tono: 'attention', testo: t.daCompletare };
+  if (stati.length) {
+    const tuttoConfermato = stati.every((stato) => stato.chiave === 'confirmed' || stato.chiave === 'completed');
+    return { tono: tuttoConfermato ? 'confirmed' : 'planning', testo: t.sulTransfer };
+  }
+  const haViaggio = Boolean(voce.outboundDate || voce.returnDate || voce.outbound || voce.return);
+  return { tono: 'neutral', testo: haViaggio ? t.perContoSuo : t.nonComunicato };
+}
+
+// Le card dell'elenco come HTML: una per persona, nella stessa griglia e con
+// gli stessi colori delle card che lo skipper usava già. `currentId` marca
+// "sei tu": l'id dell'invito per l'equipaggio, 'skipper' per lo skipper.
+//
+// `azione(voce)` è facoltativa e restituisce HTML già pronto per quella card:
+// lo skipper ci mette il tasto WhatsApp (sollecita o scrivi), l'equipaggio
+// niente — non deve sollecitare nessuno e i contatti dei compagni non li vede.
 export function rosterMarkup(statuses, { currentId = '', english = false, azione = null } = {}) {
   const lingua = english ? 'en' : 'it';
   const t = TESTI[lingua];
   const voci = rosterEntries(statuses);
-  if (!voci.length) return `<li class="boat-roster-empty">${escapeHtml(t.vuoto)}</li>`;
-  const etichettaTransfer = (stato) => {
-    if (!stato) return '';
-    const testo = stato.chiave === 'richiesto' ? t.colTransfer : t.transfer[stato.chiave];
-    return ` <em${stato.tono === 'attenzione' ? ' class="boat-roster-flag"' : ''}>${escapeHtml(testo)}</em>`;
-  };
-  const riga = (etichetta, dati, stato) => {
-    const pulmino = etichettaTransfer(stato);
-    // Anche senza orario lo stato del transfer va detto: una richiesta
-    // rimasta a metà è proprio il caso in cui gli orari mancano.
-    if (!dati) return `<span class="boat-roster-leg boat-roster-leg--unknown">${escapeHtml(etichetta)}: ${escapeHtml(t.nonComunicato)}${pulmino}</span>`;
-    // Etichetta e valore sono due colonne: su un telefono il valore va a capo
-    // sotto sé stesso, non sotto l'etichetta.
-    return `<span class="boat-roster-leg"><strong>${escapeHtml(etichetta)}</strong><span class="boat-roster-value">${escapeHtml(dati.quando)}${dati.mezzo ? ` <small>${escapeHtml(dati.mezzo)}</small>` : ''}${pulmino}</span></span>`;
+  if (!voci.length) return `<p class="boat-roster-empty">${escapeHtml(t.vuoto)}</p>`;
+  // Le etichette sono quelle delle card del gestore transfer (transfer-badge),
+  // con gli stessi colori per gli stessi stati: chi passa da una pagina
+  // all'altra ritrova lo stesso linguaggio (richiesta di Silvio, 4/10/2026).
+  const CLASSE_STATO = { richiesto: 'new', planned: 'planned', confirmed: 'confirmed', completed: 'completed', cancelled: 'cancelled', undecided: 'draft' };
+  const tratta = (voce, direzione, etichetta) => {
+    const dati = momento(voce, direzione, lingua);
+    const stato = rosterTransferState(voce, direzione);
+    const badgeStato = stato
+      ? `<span class="transfer-badge transfer-badge--${CLASSE_STATO[stato.chiave]}">${escapeHtml(t.transfer[stato.chiave])}</span>`
+      : `<span class="transfer-badge transfer-badge--unknown">${escapeHtml(t.transfer.nessuno)}</span>`;
+    // Lo stato in diretta comprende il ritrovo, appena il gestore lo imposta.
+    const ora = voce[`${direzione}MeetingTime`];
+    const punto = voce[`${direzione}MeetingPoint`];
+    const ritrovo = stato && (ora || punto)
+      ? `<span class="boat-card-meeting">${escapeHtml(t.ritrovo)} ${escapeHtml([ora, punto].filter(Boolean).join(' · '))}</span>`
+      : '';
+    const quando = dati
+      ? `<span class="boat-card-when">${escapeHtml(dati.quando)}${dati.mezzo ? ` <small>${escapeHtml(dati.mezzo)}</small>` : ''}</span>`
+      : `<span class="boat-card-when boat-card-when--unknown">${escapeHtml(t.nonComunicato)}</span>`;
+    return `<div class="boat-card-leg">
+        <span class="transfer-badge transfer-badge--${direzione === 'return' ? 'return' : 'outbound'}">${escapeHtml(etichetta)}</span>
+        ${quando}
+        <span class="boat-card-status">${badgeStato}${ritrovo}</span>
+      </div>`;
   };
   return voci.map((voce) => {
     const skipper = voce.isSkipper === true;
     const io = Boolean(currentId) && (voce.id === currentId || voce.inviteId === currentId);
-    return `<li class="boat-roster-row${skipper ? ' boat-roster-row--skipper' : ''}${io ? ' boat-roster-row--io' : ''}">
-      <div class="boat-roster-person">
-        <strong>${escapeHtml(voce.displayName)}</strong>
-        ${skipper ? `<small>${escapeHtml(t.skipper)}</small>` : ''}
-        ${io ? `<small>${escapeHtml(t.seiTu)}</small>` : ''}
+    const sintesi = rosterCardSummary(voce, lingua);
+    const sotto = [skipper ? t.skipper : '', io ? t.seiTu : '', sintesi.testo].filter(Boolean).join(' · ');
+    const iniziale = String(voce.displayName).trim().charAt(0).toUpperCase() || '?';
+    const extra = typeof azione === 'function' ? azione(voce) || '' : '';
+    // La lingua parlata, come sulle card del gestore: serve a sapere come
+    // rivolgersi a quella persona prima ancora di incontrarla.
+    const parlata = voce.preferredLocale === 'en' ? 'en' : voce.preferredLocale === 'it' ? 'it' : '';
+    const badgeLingua = parlata
+      ? `<span class="transfer-badge transfer-badge--language transfer-badge--language-${parlata}">${escapeHtml(t.lingua[parlata])}</span>`
+      : '';
+    return `<article class="crew-travel-card crew-travel-card--${sintesi.tono}${skipper ? ' boat-card--skipper' : ''}${io ? ' boat-card--io' : ''}">
+      <header class="crew-travel-card-heading">
+        <span class="crew-travel-card-avatar" aria-hidden="true">${escapeHtml(iniziale)}</span>
+        <span class="crew-travel-card-person"><strong>${escapeHtml(voce.displayName)}</strong><small>${escapeHtml(sotto)}</small></span>
+        ${badgeLingua}
+      </header>
+      <div class="boat-card-legs">
+        ${tratta(voce, 'outbound', t.arriva)}
+        ${tratta(voce, 'return', t.riparte)}
       </div>
-      <div class="boat-roster-legs">
-        ${riga(t.arriva, momento(voce, 'outbound', lingua), rosterTransferState(voce, 'outbound'))}
-        ${riga(t.riparte, momento(voce, 'return', lingua), rosterTransferState(voce, 'return'))}
-      </div>
-      ${typeof azione === 'function' ? azione(voce) || '' : ''}
-    </li>`;
+      ${extra ? `<div class="crew-travel-card-action">${extra}</div>` : ''}
+    </article>`;
   }).join('');
 }
 

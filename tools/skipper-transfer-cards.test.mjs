@@ -7,12 +7,17 @@ import { assertLoadsVersionedAsset, assertOneVersionPerAsset } from './asset-ver
 const html = await readFile(new URL('../area.html', import.meta.url), 'utf8');
 const source = await readFile(new URL('../area.js', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
+const rosterSource = await readFile(new URL('../boat-roster.js', import.meta.url), 'utf8');
 
 test('i viaggi equipaggio usano card compatte coerenti su desktop e mobile', () => {
   assert.match(styles, /\.crew-travel-list \{[^}]*grid-template-columns:repeat\(auto-fill,minmax\(280px,320px\)\)/);
   assert.match(styles, /@media \(max-width:560px\)[\s\S]*\.crew-travel-list \{ grid-template-columns:minmax\(0,320px\); \}/);
   assert.match(styles, /@media \(max-width:560px\)[\s\S]*\.crew-travel-overview \{ padding:0; border:0; background:transparent; \}/);
-  assert.match(source, /class="crew-travel-card crew-travel-card--\$\{escapeHtml\(presentation\.tone\)\}"/);
+  // Le card non si disegnano più dentro area.js: vivono in boat-roster.js,
+  // così skipper ed equipaggio vedono le stesse.
+  const roster = rosterSource;
+  assert.match(roster, /class="crew-travel-card crew-travel-card--\$\{sintesi\.tono\}/);
+  assert.match(source, /<div class="crew-travel-list">\$\{rosterMarkup\(rosterRows/);
 });
 
 test('le card mantengono stati leggibili anche attraverso il colore di sfondo', () => {
@@ -49,29 +54,35 @@ test('solo chi dispone di un invito personale entra nelle card viaggio', () => {
 // segnalato come un doppione. Ora l'elenco della barca porta da sé lo stato del
 // transfer e il tasto per scrivere, e le card restano solo per chi va davvero
 // sollecitato.
-test('l’elenco della barca è uno solo, le card restano solo per i solleciti', () => {
+test('una sola griglia di card: tutto l’equipaggio, una volta', () => {
   assert.match(html, /id="crewTravelOverview"[^>]*data-crew-travel-overview/);
   assert.match(source, /operationsCrewTravelOverview\.id = 'crewTravelOverviewOperations'/);
   assert.match(source, /querySelectorAll\('\[data-crew-travel-overview\]'\)/);
-  // Nessun secondo elenco con le stesse persone.
+  // Nessun secondo elenco con le stesse persone, né sopra né sotto: "è
+  // assurdo metterlo due volte" (Silvio, 4/10/2026).
   assert.doesNotMatch(source, /title: 'Tutti gli altri'/);
   assert.doesNotMatch(source, /submittedCards/);
-  // Il gruppo dei solleciti esiste solo quando c'è qualcuno da sollecitare.
-  assert.match(source, /const solleciti = waitingCards\.length\s*\?/);
-  assert.match(source, /data-crew-travel-group="waiting"/);
-  assert.match(source, /const markup = `\$\{solleciti\}\$\{roster\}`/);
+  assert.doesNotMatch(source, /const solleciti = /);
+  assert.doesNotMatch(source, /data-crew-travel-group=/);
+  assert.equal((source.match(/rosterMarkup\(/g) || []).length, 1);
 });
 
 test('nessuno sparisce dalla vista dello skipper togliendo le card', () => {
   // Chi non ha mai aperto il modulo viaggio non ha una riga di stato: se
   // l'elenco nascesse solo dalle righe di stato, quella persona non la
   // vedrebbe più nessuno. Nasce invece dall'elenco dell'equipaggio.
-  assert.match(source, /\.\.\.members\.map\(\(member\) => \(\{ \.\.\.\(crewTravelStatusFor\(member\.id\) \|\| \{\}\), id: member\.id, displayName: memberName\(member\) \}\)\)/);
+  assert.match(source, /\.\.\.members\.map\(\(member\) => \(\{\s*\.\.\.\(crewTravelStatusFor\(member\.id\) \|\| \{\}\),\s*id: member\.id,\s*displayName: memberName\(member\),/);
 });
 
-test('il tasto per scrivere sta sulla riga dell’elenco, non in una card a parte', () => {
-  assert.match(source, /rosterMarkup\(rosterRows, \{ currentId: 'skipper', azione: contactAction \}\)/);
-  assert.match(source, /class="boat-roster-action"/);
+test('ogni card dice da sé se c’è da sollecitare', () => {
+  assert.match(source, /rosterMarkup\(rosterRows, \{ currentId: 'skipper', azione: cardAction \}\)/);
+  // Il tasto cambia con lo stato: sollecita se la richiesta è rimasta a
+  // metà, scrivi altrimenti.
+  const azione = source.slice(source.indexOf('const cardAction = (voce) => {'), source.indexOf('const daSollecitare'));
+  assert.match(azione, /card\.needsReminder && card\.presentation\.tone !== 'cancelled'/);
+  assert.match(azione, /crewTravelReminderUrl\(card\.member, card\.legStates\)/);
+  // Lo skipper non ha un tasto per scriversi da solo.
+  assert.match(azione, /if \(voce\.isSkipper === true\) return '';/);
 });
 
 // Il test precedente confrontava `styles.css`/`area.js` con una stringa di
