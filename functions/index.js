@@ -1664,16 +1664,20 @@ exports.claimBoatLinkSlot = onCall({
     if (!freshSlot.exists || existingInvite.exists) {
       throw new HttpsError('aborted', 'Riprova fra un momento.');
     }
-    if (freshSlot.data()?.claimedByLink === true) {
-      throw new HttpsError('already-exists', 'Questa persona ha già un accesso attivo.');
-    }
     // La scheda si sposta sull'identità dell'invito: su questo sito la scheda
     // equipaggio E l'invito sono la stessa cosa, e un invito deve avere un
     // codice di 48 cifre esadecimali. Le schede scritte a mano dallo skipper
     // hanno invece un identificativo automatico, che il browser rifiuta.
+    // Soltanto i campi che le Rules ammettono per una scheda equipaggio.
+    // Una marcatura in più qui dentro (c'era "claimedByLink") rende la scheda
+    // non più salvabile dalla persona: hasValidMemberPayload valuta il
+    // documento risultante, e una chiave fuori elenco fa rifiutare ogni
+    // salvataggio successivo con un messaggio che parla di connessione.
+    // È successo il 4/10/2026 a tutte e sette le persone entrate dal link di
+    // barca su Carpe Diem. Che lo slot sia già stato preso si sa dall'invito
+    // che esiste, non da un campo sulla scheda.
     transaction.set(db.doc(`boats/${boatId}/members/${inviteId}`), {
       ...freshSlot.data(),
-      claimedByLink: true,
       updatedAt: FieldValue.serverTimestamp(),
     });
     if (inviteId !== slotId) transaction.delete(slotRef);

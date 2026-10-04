@@ -110,3 +110,28 @@ test('il messaggio di errore non parla più di invito scaduto quando non lo è',
   assert.match(testi, /Il numero non corrisponde a quello con cui è stato creato questo accesso/);
   assert.doesNotMatch(testi, /Questo invito è scaduto, è stato sostituito/);
 });
+
+// Una scheda equipaggio può contenere SOLO le chiavi che le Rules ammettono.
+// hasValidMemberPayload valuta il documento risultante, non i campi toccati:
+// una marcatura in più scritta dal server rende quella scheda non più
+// salvabile dalla persona, e l'errore che vede parla di connessione. È
+// successo il 4/10/2026 a tutte e sette le persone entrate dal link di barca
+// su Carpe Diem — Giuseppina Miccolis non riusciva a confermare i dati per il
+// charter e la connessione non c'entrava niente.
+test('la funzione non scrive nella scheda campi che le Rules non ammettono', () => {
+  const rules = read('firestore.rules');
+  const elenco = rules.slice(rules.indexOf('function hasValidMemberPayload'));
+  const ammesse = new Set(
+    (elenco.slice(elenco.indexOf('hasOnly(['), elenco.indexOf('])', elenco.indexOf('hasOnly(['))).match(/'([^']+)'/g) || [])
+      .map((v) => v.replaceAll("'", '')),
+  );
+  assert.ok(ammesse.has('displayName') && ammesse.size > 10, 'elenco delle chiavi ammesse non riconosciuto');
+
+  const functions = read('functions/index.js');
+  const inizio = functions.indexOf('transaction.set(db.doc(`boats/${boatId}/members/${inviteId}`)');
+  assert.ok(inizio > 0, 'scrittura della scheda non trovata');
+  const blocco = functions.slice(inizio, functions.indexOf('});', inizio));
+  const scritte = (blocco.match(/^\s*([a-zA-Z][a-zA-Z0-9]*):/gm) || []).map((v) => v.trim().replace(':', ''));
+  const fuori = scritte.filter((chiave) => !ammesse.has(chiave));
+  assert.deepEqual(fuori, [], `campi non ammessi nella scheda: ${fuori.join(', ')}`);
+});
