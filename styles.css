@@ -142,6 +142,14 @@ body.menu-open { overflow:hidden; }
 .boat-roster-leg em { display:inline-block; margin-left:2px; padding:0 7px; border-radius:999px; background:rgba(13,148,136,.13); color:#115e59; font-style:normal; font-weight:700; font-size:.72rem; white-space:nowrap; }
 .boat-roster-leg--unknown { display:block; color:#8296a0; font-style:italic; }
 .boat-roster-empty { padding:10px 2px; color:#6c838d; font-size:.86rem; font-style:italic; }
+/* Un transfer rimasto a metà o annullato: l'unica etichetta dell'elenco che
+   chiede attenzione, e deve distinguersi dalle altre. */
+.boat-roster-leg em.boat-roster-flag { background:rgba(194,65,12,.14); color:#9a3412; }
+/* Il tasto per scrivere, solo nella vista skipper: piccolo e a fine riga,
+   perché l'elenco serve prima a leggere e solo dopo a contattare. */
+.boat-roster-action { display:inline-flex; align-items:center; gap:6px; justify-self:start; margin-top:4px; font-size:.78rem; font-weight:700; color:#0f5f58; text-decoration:none; border-bottom:1px solid rgba(15,95,88,.35); }
+.boat-roster-action:hover { color:var(--deep); border-color:var(--deep); }
+.boat-roster-action svg { width:15px; height:15px; }
 /* Dentro l'area skipper l'elenco sta in cima a "Arrivi e partenze della
    barca", prima dei gruppi dei solleciti: stesso aspetto che ha per
    l'equipaggio, perché è la stessa sezione. */

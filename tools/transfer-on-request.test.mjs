@@ -135,7 +135,7 @@ test('gli orari stanno in un posto solo: l’elenco della barca', () => {
   // quando" ha la sua sezione, e le card rispondono solo a "a chi scrivo".
   assert.doesNotMatch(area, /function crewTravelSchedule/);
   assert.doesNotMatch(area, /scheduleLine\(schedule\)/);
-  assert.match(area, /rosterMarkup\(activeCrewTravelStatus, \{ currentId: 'skipper' \}\)/);
+  assert.match(area, /rosterMarkup\(rosterRows, \{ currentId: 'skipper'/);
 });
 
 test('la persona sa esattamente che cosa vede il suo skipper', () => {

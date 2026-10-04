@@ -76,3 +76,33 @@ test('titolo e spiegazione sono gli stessi dalle due parti', () => {
 test('una barca senza viaggi non mostra un elenco vuoto senza spiegazione', () => {
   assert.match(rosterMarkup([]), /Nessuno ha ancora comunicato/);
 });
+
+// Lo stato del transfer sta sulla riga dell'elenco. Prima l'elenco diceva
+// solo "col transfer" e lo stato vero stava in una seconda lista con le
+// stesse persone ripetute sotto.
+test('la riga dice a che punto è il transfer, non solo che c’è', () => {
+  const html = rosterMarkup([
+    { id: 'a', displayName: 'Anna', outboundDate: '2026-10-08', outboundTime: '10:00', outboundTransfer: 'requested', outboundOperationStatus: 'confirmed' },
+    { id: 'b', displayName: 'Bruno', outboundDate: '2026-10-08', outboundTime: '11:00', outboundTransfer: 'requested', outboundOperationStatus: 'planned' },
+    { id: 'c', displayName: 'Carlo', outboundDate: '2026-10-08', outboundTime: '12:00', outboundTransfer: 'requested' },
+  ]);
+  assert.match(html, /transfer confermato/);
+  assert.match(html, /transfer in organizzazione/);
+  assert.match(html, /col transfer/);
+});
+
+test('una richiesta rimasta a metà o annullata si distingue dalle altre', () => {
+  const html = rosterMarkup([
+    { id: 'a', displayName: 'Anna', returnTransfer: 'undecided' },
+    { id: 'b', displayName: 'Bruno', outboundDate: '2026-10-08', outboundTransfer: 'requested', outboundOperationStatus: 'cancelled' },
+  ]);
+  assert.equal((html.match(/class="boat-roster-flag"/g) || []).length, 2);
+  assert.match(html, /transfer da completare/);
+  assert.match(html, /transfer annullato/);
+});
+
+test('l’azione sulla riga è facoltativa: lo skipper ce l’ha, l’equipaggio no', () => {
+  const barca = [{ id: 'a', displayName: 'Anna', outboundDate: '2026-10-08' }];
+  assert.doesNotMatch(rosterMarkup(barca), /SCRIVI/);
+  assert.match(rosterMarkup(barca, { azione: (voce) => `<a>SCRIVI a ${voce.displayName}</a>` }), /SCRIVI a Anna/);
+});

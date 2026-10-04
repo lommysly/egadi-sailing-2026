@@ -9,6 +9,27 @@
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   if (!window.location.hash) window.scrollTo(0, 0);
 
+  // Stesso problema, un livello più giù: dentro le aree riservate aprire una
+  // casella cambia il contenuto della pagina ma non la sposta. Si resta dove
+  // si era — di solito in basso, sopra le caselle appena toccate — davanti a
+  // un contenuto che nel frattempo è un altro, e bisogna risalire a mano per
+  // capire dove si è finiti (segnalato da Silvio, 4/10/2026: "ogni volta che
+  // si entra in un container ti manda in fondo alla pagina").
+  //
+  // Vive qui perché riguarda tutte le aree e perché questo file possiede già
+  // l'orientamento della pagina: una sola regola, invece di una per area.
+  // Lo spostamento è immediato, non animato: aprire una sezione deve
+  // sembrare aprire una pagina, non scorrere fino a un punto.
+  window.EgadiOrientation = {
+    showTopOf(element) {
+      if (!element) return;
+      const header = document.querySelector('.site-header');
+      const headerHeight = header ? header.getBoundingClientRect().height : 0;
+      const top = element.getBoundingClientRect().top + window.scrollY - headerHeight - 14;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+    },
+  };
+
   let hasStarted = false;
 
   const start = () => {

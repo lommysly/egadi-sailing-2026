@@ -3,7 +3,7 @@ import { auth, crewAccessErrorMessage, crewSaveErrorMessage, crewAccessUrl, db, 
 import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
-import { rosterEntries, rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-ordine-cognitivo-v2';
+import { rosterEntries, rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-una-domanda-un-posto-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -383,11 +383,17 @@ function setupCrewDashboard() {
     const nextHash = `#${CREW_DASHBOARD_HASHES[view]}`;
     if (window.location.hash === nextHash) {
       setCrewDashboardView(view);
+      showCrewDashboardTop();
     } else {
       window.location.hash = nextHash;
     }
   });
-  window.addEventListener('hashchange', () => setCrewDashboardView(crewDashboardViewFromHash()));
+  // Cambiare vista non spostava mai la pagina: si restava in fondo, davanti a
+  // un contenuto appena cambiato. Stessa correzione dell'area skipper.
+  window.addEventListener('hashchange', () => {
+    setCrewDashboardView(crewDashboardViewFromHash());
+    showCrewDashboardTop();
+  });
   document.addEventListener('egadi:localechange', () => {
     renderCrewDashboardShell();
     renderParticipantFinanceSummary();
@@ -398,6 +404,12 @@ function setupCrewDashboard() {
   renderCrewDashboardShell();
   setCrewDashboardView(crewDashboardViewFromHash());
   renderCrewDashboardOverview();
+}
+
+function showCrewDashboardTop() {
+  window.requestAnimationFrame(() => {
+    window.EgadiOrientation?.showTopOf(document.querySelector('#crewDashboardNavigation') || document.querySelector('#participantDashboard'));
+  });
 }
 
 function setCrewDashboardView(nextView) {

@@ -20,11 +20,21 @@ const TESTI = {
   it: {
     arriva: 'Arriva', riparte: 'Riparte', nonComunicato: 'non comunicato',
     colTransfer: 'col transfer', skipper: 'skipper', seiTu: 'sei tu',
+    transfer: {
+      planned: 'transfer in organizzazione', confirmed: 'transfer confermato',
+      completed: 'transfer concluso', cancelled: 'transfer annullato',
+      undecided: 'transfer da completare',
+    },
     vuoto: 'Nessuno ha ancora comunicato il proprio viaggio.',
   },
   en: {
     arriva: 'Arrives', riparte: 'Leaves', nonComunicato: 'not shared',
     colTransfer: 'on the shuttle', skipper: 'skipper', seiTu: 'that is you',
+    transfer: {
+      planned: 'transfer being arranged', confirmed: 'transfer confirmed',
+      completed: 'transfer completed', cancelled: 'transfer cancelled',
+      undecided: 'transfer to complete',
+    },
     vuoto: 'Nobody has shared their journey yet.',
   },
 };
@@ -50,6 +60,20 @@ function momento(voce, direzione, lingua) {
   };
 }
 
+// A che punto è il transfer di una tratta. Prima l'elenco diceva soltanto
+// "col transfer" e lo stato vero stava in una seconda lista di card, con le
+// stesse persone ripetute sotto: un doppione (segnalato da Silvio,
+// 4/10/2026). Ora lo stato sta qui, sulla riga.
+export function rosterTransferState(voce, direzione) {
+  const richiesta = voce?.[`${direzione}Transfer`];
+  if (richiesta === 'undecided') return { chiave: 'undecided', tono: 'attenzione' };
+  if (richiesta !== 'requested') return null;
+  const gestore = voce[`${direzione}OperationStatus`];
+  if (gestore === 'cancelled') return { chiave: 'cancelled', tono: 'attenzione' };
+  if (gestore === 'planned' || gestore === 'confirmed' || gestore === 'completed') return { chiave: gestore, tono: 'ok' };
+  return { chiave: 'richiesto', tono: 'ok' };
+}
+
 // Le righe da mostrare, in ordine di arrivo: in cima chi atterra prima,
 // perché è quello che apre la barca. Chi non ha ancora comunicato un orario
 // finisce in fondo, ma resta visibile: sapere che manca è già un'informazione.
@@ -64,14 +88,24 @@ export function rosterEntries(statuses) {
 
 // Le righe dell'elenco come HTML. `currentId` marca "sei tu": l'id dell'invito
 // per l'equipaggio, 'skipper' per lo skipper.
-export function rosterMarkup(statuses, { currentId = '', english = false } = {}) {
+// `azione(voce)` è facoltativa e restituisce HTML già pronto per quella
+// riga: lo skipper ci mette il tasto WhatsApp, l'equipaggio niente, perché i
+// contatti dei compagni non li vede.
+export function rosterMarkup(statuses, { currentId = '', english = false, azione = null } = {}) {
   const lingua = english ? 'en' : 'it';
   const t = TESTI[lingua];
   const voci = rosterEntries(statuses);
   if (!voci.length) return `<li class="boat-roster-empty">${escapeHtml(t.vuoto)}</li>`;
-  const riga = (etichetta, dati, transfer) => {
-    if (!dati) return `<span class="boat-roster-leg boat-roster-leg--unknown">${escapeHtml(etichetta)}: ${escapeHtml(t.nonComunicato)}</span>`;
-    const pulmino = transfer === 'requested' ? ` <em>${escapeHtml(t.colTransfer)}</em>` : '';
+  const etichettaTransfer = (stato) => {
+    if (!stato) return '';
+    const testo = stato.chiave === 'richiesto' ? t.colTransfer : t.transfer[stato.chiave];
+    return ` <em${stato.tono === 'attenzione' ? ' class="boat-roster-flag"' : ''}>${escapeHtml(testo)}</em>`;
+  };
+  const riga = (etichetta, dati, stato) => {
+    const pulmino = etichettaTransfer(stato);
+    // Anche senza orario lo stato del transfer va detto: una richiesta
+    // rimasta a metà è proprio il caso in cui gli orari mancano.
+    if (!dati) return `<span class="boat-roster-leg boat-roster-leg--unknown">${escapeHtml(etichetta)}: ${escapeHtml(t.nonComunicato)}${pulmino}</span>`;
     // Etichetta e valore sono due colonne: su un telefono il valore va a capo
     // sotto sé stesso, non sotto l'etichetta.
     return `<span class="boat-roster-leg"><strong>${escapeHtml(etichetta)}</strong><span class="boat-roster-value">${escapeHtml(dati.quando)}${dati.mezzo ? ` <small>${escapeHtml(dati.mezzo)}</small>` : ''}${pulmino}</span></span>`;
@@ -86,9 +120,10 @@ export function rosterMarkup(statuses, { currentId = '', english = false } = {})
         ${io ? `<small>${escapeHtml(t.seiTu)}</small>` : ''}
       </div>
       <div class="boat-roster-legs">
-        ${riga(t.arriva, momento(voce, 'outbound', lingua), voce.outboundTransfer)}
-        ${riga(t.riparte, momento(voce, 'return', lingua), voce.returnTransfer)}
+        ${riga(t.arriva, momento(voce, 'outbound', lingua), rosterTransferState(voce, 'outbound'))}
+        ${riga(t.riparte, momento(voce, 'return', lingua), rosterTransferState(voce, 'return'))}
       </div>
+      ${typeof azione === 'function' ? azione(voce) || '' : ''}
     </li>`;
   }).join('');
 }

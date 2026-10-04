@@ -43,14 +43,35 @@ test('solo chi dispone di un invito personale entra nelle card viaggio', () => {
   assert.match(source, /renderInvites\(\)[\s\S]*renderCrewTravelOverview\(\)/);
 });
 
-test('l’elenco resta visibile in Equipaggio e in Viaggi equipaggio con due gruppi espliciti', () => {
+// Fino al 4/10/2026 qui c'erano due gruppi di card: chi va sollecitato e
+// "Tutti gli altri". Il secondo ripeteva una per una le persone già elencate
+// sopra con i loro orari — sette persone, quattordici righe — e Silvio l'ha
+// segnalato come un doppione. Ora l'elenco della barca porta da sé lo stato del
+// transfer e il tasto per scrivere, e le card restano solo per chi va davvero
+// sollecitato.
+test('l’elenco della barca è uno solo, le card restano solo per i solleciti', () => {
   assert.match(html, /id="crewTravelOverview"[^>]*data-crew-travel-overview/);
   assert.match(source, /operationsCrewTravelOverview\.id = 'crewTravelOverviewOperations'/);
   assert.match(source, /querySelectorAll\('\[data-crew-travel-overview\]'\)/);
-  assert.match(source, /data-crew-travel-group="\$\{key\}"/);
-  assert.match(source, /Transfer da completare/);
-  assert.match(source, /Tutti gli altri/);
-  assert.match(source, /Nessuna richiesta rimasta a metà/);
+  // Nessun secondo elenco con le stesse persone.
+  assert.doesNotMatch(source, /title: 'Tutti gli altri'/);
+  assert.doesNotMatch(source, /submittedCards/);
+  // Il gruppo dei solleciti esiste solo quando c'è qualcuno da sollecitare.
+  assert.match(source, /const solleciti = waitingCards\.length\s*\?/);
+  assert.match(source, /data-crew-travel-group="waiting"/);
+  assert.match(source, /const markup = `\$\{solleciti\}\$\{roster\}`/);
+});
+
+test('nessuno sparisce dalla vista dello skipper togliendo le card', () => {
+  // Chi non ha mai aperto il modulo viaggio non ha una riga di stato: se
+  // l'elenco nascesse solo dalle righe di stato, quella persona non la
+  // vedrebbe più nessuno. Nasce invece dall'elenco dell'equipaggio.
+  assert.match(source, /\.\.\.members\.map\(\(member\) => \(\{ \.\.\.\(crewTravelStatusFor\(member\.id\) \|\| \{\}\), id: member\.id, displayName: memberName\(member\) \}\)\)/);
+});
+
+test('il tasto per scrivere sta sulla riga dell’elenco, non in una card a parte', () => {
+  assert.match(source, /rosterMarkup\(rosterRows, \{ currentId: 'skipper', azione: contactAction \}\)/);
+  assert.match(source, /class="boat-roster-action"/);
 });
 
 // Il test precedente confrontava `styles.css`/`area.js` con una stringa di

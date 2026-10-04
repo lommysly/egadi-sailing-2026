@@ -13,7 +13,7 @@ import { installInputNormalization, normalizeFormFields } from './input-normaliz
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20261002-niente-promo-in-area-v1';
 import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
-import { rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-ordine-cognitivo-v2';
+import { rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-una-domanda-un-posto-v1';
 import {
   boatFromData,
   boatSetupReadiness,
@@ -1329,7 +1329,7 @@ function setupSkipperOperationsDashboard(travelPanel, boardPanel, crewTravelOver
   crewPanel.hidden = true;
   const crewHeading = document.createElement('div');
   crewHeading.className = 'skipper-subdashboard-section-heading';
-  crewHeading.innerHTML = '<p class="eyebrow">Viaggi equipaggio</p><h3>Chi ha confermato e chi va aiutato</h3><p class="panel-lead">Qui trovi soltanto lo stato operativo delle persone della tua barca e i solleciti necessari.</p>';
+  crewHeading.innerHTML = '<p class="eyebrow">Arrivi e partenze della barca</p><h3>Chi arriva quando, e chi è sul transfer</h3><p class="panel-lead">In cima chi va sollecitato, se c’è qualcuno. Sotto, tutta la barca in ordine di arrivo.</p>';
   crewHeading.querySelector('h3')?.setAttribute('tabindex', '-1');
   const operationsCrewTravelOverview = document.createElement('section');
   operationsCrewTravelOverview.id = 'crewTravelOverviewOperations';
@@ -1439,7 +1439,17 @@ function openSkipperDestination(button) {
   if (button.dataset.skipperAction === 'new-participant') startNewProjection();
   if (button.dataset.skipperTarget) {
     window.requestAnimationFrame(() => focusSkipperDestination(button.dataset.skipperTarget));
+  } else {
+    // Senza un punto preciso a cui mirare la pagina restava dov'era: di
+    // solito in fondo, davanti a un contenuto appena cambiato.
+    window.requestAnimationFrame(showSkipperDashboardTop);
   }
+}
+
+// La sezione appena aperta si legge dall'inizio: menu delle sezioni in cima,
+// titolo subito sotto.
+function showSkipperDashboardTop() {
+  window.EgadiOrientation?.showTopOf(document.querySelector('#skipperDashboardNavigation') || dashboard);
 }
 
 function setupSkipperDashboard() {
@@ -1531,8 +1541,14 @@ function setupSkipperDashboard() {
     if (!button || !dashboard.contains(button)) return;
     openSkipperDestination(button);
   });
-  window.addEventListener('hashchange', applySkipperDashboardHash);
-  window.addEventListener('popstate', applySkipperDashboardHash);
+  // Anche tornando indietro col tasto del browser si arriva in cima alla
+  // sezione, non a metà di quella che si è appena lasciata.
+  const applyHashAndShowTop = () => {
+    applySkipperDashboardHash();
+    window.requestAnimationFrame(showSkipperDashboardTop);
+  };
+  window.addEventListener('hashchange', applyHashAndShowTop);
+  window.addEventListener('popstate', applyHashAndShowTop);
   skipperDashboardInitialized = true;
   applySkipperDashboardHash();
   renderSkipperDashboardOverview();
@@ -7008,44 +7024,49 @@ function renderCrewTravelOverview() {
     return `<article class="crew-travel-card crew-travel-card--${escapeHtml(presentation.tone)}"><header class="crew-travel-card-heading"><span class="crew-travel-card-avatar" aria-hidden="true">${initial}</span><span class="crew-travel-card-person"><strong>${escapeHtml(memberName(member))}</strong><small>${escapeHtml(presentation.label)}</small></span></header><div class="crew-travel-card-legs">${legBadge(legStates, 'outbound')}${legBadge(legStates, 'return')}</div><div class="crew-travel-card-action">${action}</div></article>`;
   };
   const waitingCards = cards.filter((card) => card.group === 'waiting');
-  const submittedCards = cards.filter((card) => card.group === 'submitted');
-  const renderGroup = ({ key, title, detail, entries, emptyText }) => `
-    <section class="crew-travel-group crew-travel-group--${key}" data-crew-travel-group="${key}">
-      <header class="crew-travel-group-heading">
-        <div><h5>${escapeHtml(title)}</h5><p>${escapeHtml(detail)}</p></div>
-        <strong aria-label="${entries.length} persone">${entries.length}</strong>
-      </header>
-      ${entries.length
-        ? `<div class="crew-travel-list">${entries.map(renderCard).join('')}</div>`
-        : `<p class="crew-travel-group-empty">${escapeHtml(emptyText)}</p>`}
-    </section>`;
-  const heading = waitingCards.length
-    ? `<h4>${waitingCards.length} ${waitingCards.length === 1 ? 'persona ha chiesto il transfer senza completarlo' : 'persone hanno chiesto il transfer senza completarlo'}</h4><p class="panel-lead">Il transfer si chiede: chi non lo chiede arriva per conto suo, e per te non c’è niente da fare. Qui sotto trovi solo chi lo ha chiesto e si è fermato a metà.</p>`
-    : '<h4>Nessun transfer in sospeso</h4><p class="panel-lead">Il transfer si chiede: chi non lo chiede arriva per conto suo. I badge mostrano chi sale sul pulmino e a che punto è.</p>';
-  // In cima, la stessa sezione che vede l'equipaggio nella propria area:
-  // stesso nome, stesso ordine, stesse righe, skipper compreso. Risponde a
-  // "chi arriva quando". Sotto restano i due gruppi, che rispondono a
-  // un'altra domanda: "a chi devo scrivere". Una domanda, un posto solo —
-  // per questo gli orari non sono più ripetuti dentro ogni card (richiesta
-  // di Silvio, 4/10/2026: "che ci sia un ordine cognitivo").
+
+  // Una domanda, un posto solo.
+  //
+  // Fino al 4/10/2026 questa vista mostrava l'elenco di chi arriva quando e,
+  // subito sotto, le stesse persone un'altra volta dentro una griglia di card
+  // "Tutti gli altri" — che ripeteva lo stato del transfer e offriva il tasto
+  // WhatsApp. Sette persone, quattordici righe, e nessuna informazione in
+  // più (segnalato da Silvio: "vedo un doppione").
+  //
+  // Ora l'elenco porta da sé lo stato del transfer e il tasto per scrivere.
+  // Le card restano soltanto per chi va davvero sollecitato, e stanno in
+  // cima perché sono l'unica cosa su cui c'è da agire: quando non c'è
+  // nessuno da sollecitare, non compaiono affatto.
+  const members = crewTravelMembers();
+  // Tutte le persone della barca, anche chi non ha mai aperto il modulo
+  // viaggio: senza questo, togliendo le card, sparirebbero dalla vista.
+  const rosterRows = [
+    ...members.map((member) => ({ ...(crewTravelStatusFor(member.id) || {}), id: member.id, displayName: memberName(member) })),
+    ...activeCrewTravelStatus.filter((entry) => entry.isSkipper === true),
+  ];
+  const contactAction = (voce) => {
+    if (voce.isSkipper === true) return '';
+    const member = members.find((candidate) => candidate.id === voce.id);
+    const url = member ? crewTravelContactUrl(member) : '';
+    return url
+      ? `<a class="boat-roster-action" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${whatsappActionIconMarkup({ external: true })}Scrivi su WhatsApp</a>`
+      : '';
+  };
   const rosterCopy = rosterHeading(false);
   const roster = `<section class="boat-roster boat-roster--skipper">
-      <div class="boat-roster-heading"><p class="eyebrow">${escapeHtml(rosterCopy.eyebrow)}</p><h4>${escapeHtml(rosterCopy.title)}</h4><p class="field-hint">${escapeHtml(rosterCopy.hint)}</p></div>
-      <ul class="boat-roster-list">${rosterMarkup(activeCrewTravelStatus, { currentId: 'skipper' })}</ul>
+      <div class="boat-roster-heading"><p class="eyebrow">${escapeHtml(rosterCopy.eyebrow)}</p><h4>${escapeHtml(rosterCopy.title)}</h4><p class="field-hint">Chi arriva quando, con che mezzo e a che punto è il suo transfer. In cima chi arriva prima.</p></div>
+      <ul class="boat-roster-list">${rosterMarkup(rosterRows, { currentId: 'skipper', azione: contactAction })}</ul>
     </section>`;
-  const markup = `${roster}<p class="eyebrow">Transfer e solleciti</p>${heading}<div class="crew-travel-groups">${renderGroup({
-    key: 'waiting',
-    title: 'Transfer da completare',
-    detail: 'Hanno scelto il transfer ma non hanno dato il consenso: la richiesta non è partita e nessuno passerà a prenderli.',
-    entries: waitingCards,
-    emptyText: 'Nessuna richiesta rimasta a metà.',
-  })}${renderGroup({
-    key: 'submitted',
-    title: 'Tutti gli altri',
-    detail: 'Chi ha chiesto il transfer e chi ci arriva per conto suo: in entrambi i casi non devi fare niente.',
-    entries: submittedCards,
-    emptyText: 'Nessuna persona in questo elenco.',
-  })}</div>`;
+  const solleciti = waitingCards.length
+    ? `<section class="crew-travel-group crew-travel-group--waiting" data-crew-travel-group="waiting">
+      <header class="crew-travel-group-heading">
+        <div><h5>${waitingCards.length === 1 ? 'Una persona da sollecitare' : `${waitingCards.length} persone da sollecitare`}</h5><p>Hanno scelto il transfer ma non hanno dato il consenso: la richiesta non è partita e nessuno passerà a prenderle.</p></div>
+        <strong aria-label="${waitingCards.length} persone">${waitingCards.length}</strong>
+      </header>
+      <div class="crew-travel-list">${waitingCards.map(renderCard).join('')}</div>
+    </section>`
+    : '';
+  const markup = `${solleciti}${roster}`;
   sections.forEach((section) => {
     section.hidden = false;
     section.innerHTML = markup;

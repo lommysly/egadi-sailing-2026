@@ -328,3 +328,24 @@ test('il layout mobile non comprime pagamenti e pannelli annidati', () => {
   assert.match(areaSource, /navigation\.scrollTo\(\{ left: Math\.max\(0, targetLeft\), behavior: 'auto' \}\)/);
   assert.match(styles, /\.skipper-checklist-dialog \{ max-height:calc\(100dvh - 24px\);/);
 });
+
+// Aprire una casella cambiava il contenuto della pagina ma non la spostava:
+// si restava in fondo, davanti a un contenuto appena cambiato (segnalato da
+// Silvio, 4/10/2026: "ogni volta che si entra in un container ti manda in
+// fondo alla pagina"). La regola vive in app.js, una volta, per tutte le aree.
+test('aprire una sezione porta in cima a quella sezione, in tutte le aree', () => {
+  const read = (name) => readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
+  const app = read('app.js');
+  assert.match(app, /window\.EgadiOrientation = \{/);
+  assert.match(app, /showTopOf\(element\)/);
+  // Immediato, non animato: aprire una sezione deve sembrare aprire una pagina.
+  assert.match(app, /behavior: 'auto'/);
+
+  const skipper = read('area.js');
+  assert.match(skipper, /window\.requestAnimationFrame\(showSkipperDashboardTop\)/);
+  assert.match(skipper, /window\.addEventListener\('popstate', applyHashAndShowTop\)/);
+
+  const equipaggio = read('my-area.js');
+  assert.match(equipaggio, /function showCrewDashboardTop\(\)/);
+  assert.match(equipaggio, /setCrewDashboardView\(crewDashboardViewFromHash\(\)\);\s*showCrewDashboardTop\(\);/);
+});
