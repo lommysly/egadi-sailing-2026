@@ -13,6 +13,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
 import { firebaseConfig } from './firebase-config.js';
+import { collegaCampiNumero, numeroInternazionale } from './phone-prefix.js?v=20261004-prefisso-ovunque-v1';
 
 const app = initializeApp(firebaseConfig);
 const functions = getFunctions(app, 'europe-west8');
@@ -51,52 +52,6 @@ function readableError(error) {
   return 'Non riesco a completare l’attivazione in questo momento. Riprova fra poco.';
 }
 
-// Il prefisso è un campo a parte, non una cosa da indovinare.
-//
-// Quasi nessuno scrive il proprio numero in forma internazionale: si scrive
-// "348 565 7591". Finché il campo era uno solo, mettere davanti il "+"
-// trasformava un numero italiano in uno spagnolo (+34 85657591) — accettato
-// come valido, e con cui poi la persona non riesce più a entrare, perché
-// l'identità di accesso si calcola proprio dal numero. È successo il
-// 3/10/2026 a Cristina Della Moretta e Stefano Arpini, rimasti bloccati a
-// metà strada con un numero che non era il loro.
-//
-// Ora il prefisso si sceglie da un elenco e il numero si scrive senza. Se
-// qualcuno lo riscrive lo stesso dentro il campo numero, quello che ha
-// scritto lui vince: è più probabile che sappia il proprio prefisso di
-// quanto sia probabile che abbia cambiato la tendina per sbaglio.
-function numeroInternazionale(prefisso, numero) {
-  const pulisci = (v) => String(v || '').trim().replace(/[ .()\-\/]/g, '');
-  const parte = pulisci(numero);
-  if (/^\+[1-9]\d{7,14}$/.test(parte)) return parte;
-  if (/^00[1-9]\d{7,14}$/.test(parte)) return `+${parte.slice(2)}`;
-  const pre = pulisci(prefisso).replace(/^00/, '+');
-  if (!/^\+[1-9]\d{0,3}$/.test(pre)) return '';
-  // Un numero nazionale può cominciare con uno zero da togliere (fissi
-  // italiani, mobili di altri Paesi): il prefisso internazionale lo sostituisce.
-  const nazionale = parte.replace(/^0+/, '');
-  if (!/^[1-9]\d{5,13}$/.test(nazionale)) return '';
-  const completo = `${pre}${nazionale}`;
-  return /^\+[1-9]\d{7,14}$/.test(completo) ? completo : '';
-}
-
-// Il numero che il sito ha capito, mostrato mentre si scrive: se è sbagliato
-// lo si vede prima di premere, non dopo essere rimasti fuori.
-function aggiornaAnteprimaNumero() {
-  const anteprima = stepConfirm.querySelector('[data-phone-preview]');
-  if (!anteprima) return;
-  const campi = new FormData(stepConfirm);
-  const numero = numeroInternazionale(prefissoScelto(campi), campi.get('phone'));
-  anteprima.textContent = numero
-    ? `Entrerai con questo numero: ${numero}`
-    : 'Scrivi il numero senza il prefisso: quello lo scegli qui accanto.';
-}
-
-function prefissoScelto(campi) {
-  const scelto = String(campi.get('phonePrefix') || '');
-  return scelto === 'altro' ? String(campi.get('phonePrefixCustom') || '') : scelto;
-}
-
 async function start() {
   if (!boatId || !linkKey) {
     setMessage(message, 'Questo indirizzo non è completo. Apri il link esattamente come lo hai ricevuto nel gruppo.', true);
@@ -133,16 +88,7 @@ slotsBox.addEventListener('click', (event) => {
   stepConfirm.querySelector('[name="birthDate"]').focus();
 });
 
-stepConfirm.addEventListener('input', aggiornaAnteprimaNumero);
-stepConfirm.addEventListener('change', () => {
-  const scelto = String(new FormData(stepConfirm).get('phonePrefix') || '');
-  const altro = stepConfirm.querySelector('[data-phone-custom]');
-  if (altro) {
-    altro.hidden = scelto !== 'altro';
-    if (scelto === 'altro') altro.querySelector('input')?.focus();
-  }
-  aggiornaAnteprimaNumero();
-});
+collegaCampiNumero(stepConfirm);
 
 document.querySelector('#joinBack').addEventListener('click', () => {
   chosen = null;
@@ -161,7 +107,8 @@ stepConfirm.addEventListener('submit', async (event) => {
     setMessage(confirmMessage, 'Inserisci la tua data di nascita.', true);
     return;
   }
-  const numero = numeroInternazionale(prefissoScelto(fields), phone);
+  const scelto = String(fields.get('phonePrefix') || '');
+  const numero = numeroInternazionale(scelto === 'altro' ? fields.get('phonePrefixCustom') : scelto, phone);
   if (!numero) {
     setMessage(confirmMessage, 'Questo numero non mi torna. Controlla il prefisso e scrivi il numero senza, per esempio 333 1234567.', true);
     return;

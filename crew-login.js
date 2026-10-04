@@ -1,4 +1,5 @@
 import { crewAccessErrorMessage, personalAreaUrl, signInCrew, startCrewAreaSession, watchForStaleScript } from './crew-session.js?v=20261002-niente-promo-in-area-v1';
+import { collegaCampiNumero, numeroInternazionale } from './phone-prefix.js?v=20261004-prefisso-ovunque-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -36,10 +37,18 @@ form.addEventListener('submit', async (event) => {
   submitButton.disabled = true;
   setMessage(translate('crew.login.checking', 'Verifico il tuo accesso personale…'));
   try {
-    await signInCrew({ phone: fields.get('phone').trim(), pin: fields.get('pin').trim() });
+    const phone = numeroInternazionale(
+      String(fields.get('phonePrefix')) === 'altro' ? fields.get('phonePrefixCustom') : fields.get('phonePrefix'),
+      fields.get('phone'),
+    );
+    await signInCrew({ phone, pin: fields.get('pin').trim() });
     window.location.replace(personalAreaUrl());
   } catch (error) {
     setMessage(crewAccessErrorMessage(error), true);
     submitButton.disabled = false;
   }
 });
+
+// I due campi del numero vanno collegati anche qui: chi torna per entrare
+// con numero e codice deve scriverlo esattamente come quando si e' attivato.
+collegaCampiNumero(document.querySelector('#crewLoginForm'));

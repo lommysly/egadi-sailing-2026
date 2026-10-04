@@ -77,15 +77,36 @@ test('il prefisso si sceglie, non si indovina', () => {
 });
 
 test('il numero si compone dai due campi, senza inventare prefissi', () => {
-  const comp = page.slice(page.indexOf('function numeroInternazionale'), page.indexOf('function aggiornaAnteprimaNumero'));
-  assert.match(comp, /function numeroInternazionale\(prefisso, numero\)/);
-  // Un prefisso non valido non diventa un numero: meglio fermarsi che
-  // registrare qualcuno con un'identità che non è la sua.
-  assert.match(comp, /if \(!\/\^\\\+\[1-9\]\\d\{0,3\}\$\/\.test\(pre\)\) return '';/);
-  assert.match(page, /numeroInternazionale\(prefissoScelto\(fields\), phone\)/);
+  const modulo = read('phone-prefix.js');
+  assert.match(modulo, /export function numeroInternazionale\(prefisso, numero\)/);
+  // Un prefisso che non è un prefisso non diventa un numero: meglio fermarsi
+  // che registrare qualcuno con un'identità che non è la sua.
+  assert.match(modulo, /if \(!\/\^\\\+\[1-9\]\\d\{0,3\}\$\/\.test\(pre\)\) return '';/);
+});
+
+test('tutte le schermate che chiedono un numero usano la stessa regola', () => {
+  // Il numero è l'identità con cui si entra: scriverlo in due modi diversi in
+  // due schermate diverse significa non entrare più. Era il caso di Cristina
+  // Della Moretta e Stefano Arpini, 3-4/10/2026.
+  ['boat-link.js', 'participant.js', 'crew-login.js'].forEach((file) => {
+    const source = read(file);
+    assert.match(source, /from '\.\/phone-prefix\.js/, `${file} non usa il modulo condiviso`);
+    assert.match(source, /numeroInternazionale\(/, `${file} non compone il numero dai due campi`);
+  });
+  ['unisciti.html', 'participant.html', 'crew.html'].forEach((pagina) => {
+    const html = read(pagina);
+    assert.match(html, /name="phonePrefix"/, `${pagina} non ha il campo prefisso`);
+    assert.match(html, /data-phone-preview/, `${pagina} non mostra il numero capito`);
+    assert.doesNotMatch(html, /placeholder="Es\. \+39 333 1234567"/, `${pagina} ha ancora il campo unico`);
+  });
 });
 
 test('la persona vede il numero che il sito ha capito, prima di premere', () => {
-  assert.match(page, /Entrerai con questo numero: \$\{numero\}/);
-  assert.match(read('unisciti.html'), /data-phone-preview/);
+  assert.match(read('phone-prefix.js'), /Entrerai con questo numero: \$\{numero\}/);
+});
+
+test('il messaggio di errore non parla più di invito scaduto quando non lo è', () => {
+  const testi = read('i18n-crew.js');
+  assert.match(testi, /Il numero non corrisponde a quello con cui è stato creato questo accesso/);
+  assert.doesNotMatch(testi, /Questo invito è scaduto, è stato sostituito/);
 });

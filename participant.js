@@ -14,6 +14,7 @@ import {
   withSaveRetry,
 } from './crew-session.js?v=20261002-niente-promo-in-area-v1';
 import { canUsePrivateArea, privateAreaBlockMessage } from './private-area-access.js?v=20260919-live-privacy-v1';
+import { collegaCampiNumero, numeroInternazionale } from './phone-prefix.js?v=20261004-prefisso-ovunque-v1';
 import { canConfirmCrewBriefing } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { fillRoleFields, roleFromFields } from './crew-roles.js?v=20260914-en2';
 import { installInputNormalization, normalizeFormFields } from './input-normalization.js?v=20260915-input-format-v2';
@@ -337,6 +338,7 @@ function showActivation() {
   document.querySelector('#preRegistrationBriefing').hidden = true;
   document.querySelector('#profileSection').hidden = true;
   document.querySelector('#activationSection').hidden = false;
+  collegaCampiNumero(document.querySelector('#activationForm'));
   document.querySelector('#activationForm [name="phone"]').focus();
 }
 
@@ -616,7 +618,10 @@ document.querySelector('#activationForm').addEventListener('submit', async (even
   event.preventDefault();
   const form = event.currentTarget;
   const fields = new FormData(form);
-  const phone = fields.get('phone').trim();
+  const phone = numeroInternazionale(
+    String(fields.get('phonePrefix')) === 'altro' ? fields.get('phonePrefixCustom') : fields.get('phonePrefix'),
+    fields.get('phone'),
+  );
   const pin = fields.get('pin').trim();
   const pinConfirmation = fields.get('pinConfirmation').trim();
   const submitButton = form.querySelector('button[type="submit"]');
@@ -651,7 +656,10 @@ function profilePayloadFromFields(fields, { allowEmptyRole = false } = {}) {
     documentExpiry: String(fields.get('documentExpiry') || ''),
     role: roleFromFields(fields, 'role', { allowEmpty: allowEmptyRole }),
     email: String(fields.get('email') || '').trim().toLowerCase(),
-    phone: String(fields.get('phone') || '').trim() || activatedPhone,
+    phone: numeroInternazionale(
+      String(fields.get('phonePrefix')) === 'altro' ? fields.get('phonePrefixCustom') : fields.get('phonePrefix'),
+      fields.get('phone'),
+    ) || activatedPhone,
     charterConsent: fields.get('charterConsent') === 'on',
     displayName: [firstName, lastName].filter(Boolean).join(' '),
   };
