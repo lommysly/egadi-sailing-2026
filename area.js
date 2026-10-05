@@ -1297,7 +1297,7 @@ function setSkipperCharterDashboardView(nextView, { focus = false } = {}) {
   }
 }
 
-function setupSkipperOperationsDashboard(travelPanel, boardPanel, crewTravelOverview, grid) {
+function setupSkipperOperationsDashboard(travelPanel, boardPanel, grid) {
   if (skipperOperationsDashboardInitialized || !travelPanel || !boardPanel || !grid) return;
   const shell = document.createElement('section');
   shell.id = 'skipperOperationsShell';
@@ -1329,15 +1329,18 @@ function setupSkipperOperationsDashboard(travelPanel, boardPanel, crewTravelOver
   crewPanel.hidden = true;
   const crewHeading = document.createElement('div');
   crewHeading.className = 'skipper-subdashboard-section-heading';
-  crewHeading.innerHTML = '<p class="eyebrow">Arrivi e partenze della barca</p><h3>Chi arriva quando, e chi è sul transfer</h3><p class="panel-lead">In cima chi va sollecitato, se c’è qualcuno. Sotto, tutta la barca in ordine di arrivo.</p>';
+  crewHeading.innerHTML = '<p class="eyebrow">Arrivi e partenze della barca</p><h3>Chi arriva quando, e chi è sul transfer</h3><p class="panel-lead">Una card per persona, in ordine di arrivo. Chi va sollecitato è evidenziato e ha il tasto per farlo.</p>';
   crewHeading.querySelector('h3')?.setAttribute('tabindex', '-1');
+  // Questa è l'unica sezione in cui compaiono le card di arrivi e partenze.
+  // Fino al 5/10/2026 le stesse card venivano scritte anche in cima alla vista
+  // Equipaggio, subito sopra l'elenco dei posti: stesse persone due volte
+  // nella stessa schermata, card e righe lunghe. Lì ora c'è solo un rimando.
   const operationsCrewTravelOverview = document.createElement('section');
   operationsCrewTravelOverview.id = 'crewTravelOverviewOperations';
   operationsCrewTravelOverview.className = 'crew-travel-overview';
   operationsCrewTravelOverview.dataset.crewTravelOverview = '';
   operationsCrewTravelOverview.setAttribute('aria-live', 'polite');
   operationsCrewTravelOverview.hidden = true;
-  if (crewTravelOverview) crewTravelOverview.dataset.crewTravelOverview = '';
   crewPanel.append(
     skipperSubdashboardBackButton('operations', 'Viaggio e comunicazioni'),
     crewHeading,
@@ -1465,7 +1468,6 @@ function setupSkipperDashboard() {
   const costPlanPanel = document.querySelector('#costPlanPanel');
   const contributionCatalogPanel = document.querySelector('#contributionCatalogPanel');
   const boardPanel = document.querySelector('#briefingForm')?.closest('.dashboard-panel');
-  const crewTravelOverview = document.querySelector('#crewTravelOverview');
   if (!dashboard || !grid || !crewPanel || !profilePanel || !travelPanel || !moneyPanel || !boatPanel || !financeOverview || !costPlanPanel || !contributionCatalogPanel || !boardPanel) return;
 
   crewPanel.dataset.skipperPanel = 'crew';
@@ -1475,7 +1477,7 @@ function setupSkipperDashboard() {
 
   setupCharterCrewWorkspace(crewPanel, profilePanel);
   setupSkipperCharterDashboard(profilePanel);
-  setupSkipperOperationsDashboard(travelPanel, boardPanel, crewTravelOverview, grid);
+  setupSkipperOperationsDashboard(travelPanel, boardPanel, grid);
   setupBoatWorkspace(boatPanel);
 
   const overview = document.createElement('section');

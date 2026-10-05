@@ -55,7 +55,14 @@ test('solo chi dispone di un invito personale entra nelle card viaggio', () => {
 // transfer e il tasto per scrivere, e le card restano solo per chi va davvero
 // sollecitato.
 test('una sola griglia di card: tutto l’equipaggio, una volta', () => {
-  assert.match(html, /id="crewTravelOverview"[^>]*data-crew-travel-overview/);
+  // Le card vivono in un posto solo: Viaggio e comunicazioni. Fino al
+  // 5/10/2026 la pagina ne aveva una seconda copia in cima alla vista
+  // Equipaggio, sopra l'elenco dei posti: le stesse persone due volte nella
+  // stessa schermata, card e righe lunghe. Lì resta soltanto il rimando.
+  assert.doesNotMatch(html, /data-crew-travel-overview/);
+  assert.doesNotMatch(html, /id="crewTravelOverview"/);
+  assert.equal((source.match(/dataset\.crewTravelOverview = ''/g) || []).length, 1);
+  assert.match(html, /class="crew-roster-pointer"[^>]*>[^<]*<button[^>]*data-skipper-view="operations"[^>]*data-operations-view="crew"/);
   assert.match(source, /operationsCrewTravelOverview\.id = 'crewTravelOverviewOperations'/);
   assert.match(source, /querySelectorAll\('\[data-crew-travel-overview\]'\)/);
   // Nessun secondo elenco con le stesse persone, né sopra né sotto: "è

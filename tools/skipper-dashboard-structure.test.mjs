@@ -124,7 +124,7 @@ test('il registro charter resta separato dagli incassi equipaggio', () => {
 
 test('Viaggio e comunicazioni separa i tre flussi dentro una sola categoria operativa', () => {
   const operationsSetup = sourceBetween(
-    'function setupSkipperOperationsDashboard(travelPanel, boardPanel, crewTravelOverview, grid)',
+    'function setupSkipperOperationsDashboard(travelPanel, boardPanel, grid)',
     'function setSkipperOperationsDashboardView(nextView',
   );
   assert.match(operationsSetup, /shell\.dataset\.skipperPanel = 'operations'/);
@@ -140,7 +140,8 @@ test('Viaggio e comunicazioni separa i tre flussi dentro una sola categoria oper
   }
   assert.match(operationsSetup, /operationsCrewTravelOverview\.id = 'crewTravelOverviewOperations'/);
   assert.match(operationsSetup, /operationsCrewTravelOverview\.dataset\.crewTravelOverview = ''/);
-  assert.match(operationsSetup, /if \(crewTravelOverview\) crewTravelOverview\.dataset\.crewTravelOverview = ''/);
+  // Una sola sezione riceve le card: nessuna seconda copia nella vista Equipaggio.
+  assert.doesNotMatch(operationsSetup, /if \(crewTravelOverview\)/);
   assert.match(operationsSetup, /shell\.append\(overview, travelPanel, crewPanel, boardPanel\)/);
   assert.match(operationsSetup, /history\.pushState\(null, '', `#\$\{hash\}`\)/);
 
