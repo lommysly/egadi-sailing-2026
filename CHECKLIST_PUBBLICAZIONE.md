@@ -1,11 +1,15 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 28 settembre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+Ultimo aggiornamento: 5 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
 
 ## Sito pubblico e contenuti
 
 - [x] Programma pubblico flessibile Marsala, Levanzo, Marettimo e Favignana.
 - [x] Unica pagina pubblica Meteo & Passage Plan, con file dati separato e prompt operativo per aggiornamenti progressivi.
+- [x] Briefing 05/10 ore 08:09 CEST: due gruppi da Marsala, obiettivo comune Marettimo venerdì e Favignana sabato, confronto separato IFS/GFS/ICON e WAM/GFS-Wave/MFWAM; domenica senza attribuzioni oltre il run corto ECMWF. IT/EN, ora visibile nell'hero, schede di partenza e controlli porti/boe; versione `20261005-two-departures-v2`.
+- [x] Controllo unico programmato oggi alle 19:00 prima della call skipper delle 20:00, con aggiornamento autorizzato del sito. Non è un monitoraggio continuo.
+- [ ] Confermare direttamente gestori porti: Scalo Nuovo di Marettimo venerdì, pontile preciso di Favignana sabato, accesso, fondali, risacca, condizioni notturne e disponibilità per tutte le barche. Nessun dato offshore equivale a una conferma locale.
+- [ ] Verificare con AMP il campo boe candidato a sud di Favignana, installazione in ottobre, disponibilità, limiti barca e autorizzazione notturna. Non usare come rifugio il campo non identificato «dall’altra parte del porto».
 - [x] Storyboard video in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
 - [x] Sorgente: richieste di contributo con tag dei metodi e messaggio WhatsApp diretto; nessun checkout, API dei provider o conferma automatica. I dettagli di incasso restano nel solo profilo privato dello skipper e non sono copiati nella richiesta.
 - [x] Sorgente: l’invito WhatsApp non blocca più la scheda equipaggio. Fino a un contributo della quota verificato, lo skipper può correggere ruolo, partecipazione alle quote, sistemazione, cabina e importi nella stessa scheda; dopo la verifica la card indica chiaramente che quota e posto sono protetti. Nome, WhatsApp e link restano separati perché sono credenziali di accesso.

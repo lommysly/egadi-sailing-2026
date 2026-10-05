@@ -27,7 +27,7 @@
       sailingNow: 'Siamo in navigazione',
       tripFinished: 'Viaggio concluso',
       openSource: 'Apri la fonte',
-      updated: 'Aggiornato il',
+      updated: 'Dati meteo aggiornati al',
       noOperationalBulletin: 'Nessun bollettino meteo operativo ancora pubblicato.',
       published: 'Pubblicato',
       operationalWeatherLabel: 'Meteo operativo non ancora pubblicato',
@@ -53,15 +53,15 @@
       overnightStatus: 'Da verificare',
       indicativeOvernight: 'Piano notte indicativo:',
       alternative: 'Alternativa:',
-      climateOutlookEyebrow: 'Clima tipico del periodo',
+      climateOutlookEyebrow: 'Aria, acqua e luce',
       weatherDetailsToggle: 'Dettagli meteo e fonti',
       decisionBoardEyebrow: 'Briefing operativo',
       decisionBoardTitle: 'Le decisioni che contano adesso',
       decisiveFactorsTitle: 'Tre elementi decisivi',
       missingChecksTitle: 'Verifiche ancora necessarie',
       routeMapTitle: 'Schema orientativo della rotta nelle Isole Egadi',
-      routeMapDescription: 'Marsala, Levanzo, Marettimo, Favignana e rientro a Marsala collegati da una linea tratteggiata.',
-      routeMapCaption: 'Schema di orientamento, non utilizzabile per navigare. Rotte, distanze, fondali e accessi vanno verificati su documentazione nautica aggiornata.',
+      routeMapDescription: 'Traccia verde: gruppo del giovedì via Levanzo. Traccia blu: gruppo del venerdì da Marsala verso Marettimo, a Sud e Ovest di Favignana. Programma comune successivo solo se consentito.',
+      routeMapCaption: 'Schema non utilizzabile per navigare. Verde: giovedì via Levanzo; blu: scenario venerdì diretto a Marettimo. Non mostra imboccature, distanze in scala o rifugi garantiti. Verificare rotte, fondali e accessi su carta aggiornata.',
       orientationNotesTitle: 'Punti esposti e alternative',
       summaryEyebrow: 'Sintesi giorno per giorno',
       summaryTitle: 'Uscita, navigazione e arrivo a colpo d’occhio',
@@ -85,7 +85,13 @@
       modelHeaders: ['Parametro', 'Scenari consultati', 'Divergenza', 'Decisione interessata'],
       nextUpdateEyebrow: 'Prossimo aggiornamento',
       nextUpdateTitle: 'Quando ricontrollare il briefing',
-      scheduledUpdate: 'Controllo manuale consigliato:',
+      scheduledUpdate: 'Prossimo controllo:',
+      departureSchedule: 'Partenze · giovedì e venerdì',
+      callDecisionsTitle: 'Da decidere insieme nella call',
+      harbourExposure: 'Esposizione e limiti',
+      harbourForecast: 'Arrivo e notte · dato al largo',
+      harbourChecks: 'Conferma locale necessaria',
+      harbourDetails: 'Leggi esposizione, verifiche e alternativa',
     },
     en: {
       visualLabels: [
@@ -110,7 +116,7 @@
       sailingNow: 'We are sailing',
       tripFinished: 'Trip completed',
       openSource: 'Open source',
-      updated: 'Updated',
+      updated: 'Weather data checked on',
       noOperationalBulletin: 'No operational weather bulletin has been published yet.',
       published: 'Published',
       operationalWeatherLabel: 'Operational weather not yet published',
@@ -136,15 +142,15 @@
       overnightStatus: 'To be checked',
       indicativeOvernight: 'Indicative overnight plan:',
       alternative: 'Alternative:',
-      climateOutlookEyebrow: 'Typical climate for the period',
+      climateOutlookEyebrow: 'Air, water and daylight',
       weatherDetailsToggle: 'Weather details and sources',
       decisionBoardEyebrow: 'Operational briefing',
       decisionBoardTitle: 'The decisions that matter now',
       decisiveFactorsTitle: 'Three decisive factors',
       missingChecksTitle: 'Checks still required',
       routeMapTitle: 'Orientation diagram of the route through the Egadi Islands',
-      routeMapDescription: 'Marsala, Levanzo, Marettimo, Favignana and the return to Marsala connected by a dotted line.',
-      routeMapCaption: 'Orientation diagram only; do not use it for navigation. Routes, distances, depths and approaches must be checked against up-to-date nautical information.',
+      routeMapDescription: 'Green: Thursday group via Levanzo. Blue: Friday group from Marsala towards Marettimo, south and west of Favignana. Shared later programme only if conditions allow.',
+      routeMapCaption: 'Not for navigation. Green: Thursday via Levanzo; blue: Friday’s direct Marettimo scenario. No entrance detail, scaled distances or guaranteed shelters. Check routes, depths and access on current charts.',
       orientationNotesTitle: 'Exposed points and alternatives',
       summaryEyebrow: 'Day-by-day summary',
       summaryTitle: 'Departure, passage and arrival at a glance',
@@ -168,7 +174,13 @@
       modelHeaders: ['Parameter', 'Scenarios reviewed', 'Divergence', 'Decision affected'],
       nextUpdateEyebrow: 'Next update',
       nextUpdateTitle: 'When to review the briefing',
-      scheduledUpdate: 'Recommended manual review:',
+      scheduledUpdate: 'Next check:',
+      departureSchedule: 'Departures · Thursday and Friday',
+      callDecisionsTitle: 'Decisions for the skippers’ call',
+      harbourExposure: 'Exposure and limitations',
+      harbourForecast: 'Arrival and night · offshore data',
+      harbourChecks: 'Local confirmation required',
+      harbourDetails: 'Read exposure, checks and fallback',
     },
   };
   const copy = COPY[locale];
@@ -378,6 +390,54 @@
   }
 
   const orientationNotes = listValues(data.orientationNotes);
+  const departureBriefing = data.callBriefing;
+  if (departureBriefing?.options?.length) {
+    $('#planDepartureTitle').textContent = departureBriefing.title;
+    $('#planDepartureIntroduction').textContent = departureBriefing.introduction;
+    $('#planDepartureOptions').innerHTML = departureBriefing.options.map((option) => `
+      <article class="passage-departure-option">
+        <h3>${escapeHtml(option.title)}</h3>
+        <p class="passage-option-route">${escapeHtml(option.route)}</p>
+        <dl class="passage-option-facts">
+          <div><dt>${escapeHtml(copy.course)}</dt><dd>${escapeHtml(option.course)}</dd></div>
+          <div><dt>${escapeHtml(copy.duration)}</dt><dd>${escapeHtml(option.duration)}</dd></div>
+        </dl>
+        <div class="passage-option-ratings">
+          ${['departure', 'passage', 'arrival'].map((phase) => `<div><h4>${escapeHtml(copy[`${phase}Assessment`])}</h4>${renderRating(ratingFor(option, phase))}</div>`).join('')}
+        </div>
+        <p><strong>${escapeHtml(copy.favourableWindow)}</strong><br>${escapeHtml(option.window)}</p>
+        <p class="passage-option-decision">${escapeHtml(option.decision)}</p>
+        <details class="passage-option-details"><summary>${escapeHtml(copy.weatherDetailsToggle)}</summary>
+          <p><strong>${escapeHtml(copy.wind)}</strong><br>${escapeHtml(option.wind)}</p>
+          <p><strong>${escapeHtml(copy.sea)}</strong><br>${escapeHtml(option.sea)}</p>
+          <p><strong>${escapeHtml(copy.alternative)}</strong><br>${escapeHtml(option.alternative)}</p>
+        </details>
+      </article>`).join('');
+    $('#planCallDecisionsTitle').textContent = copy.callDecisionsTitle;
+    $('#planCallDecisions').innerHTML = departureBriefing.decisions.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+    $('#planDepartureBriefing').hidden = false;
+    const departureStop = $('.passage-route-line li:first-child small');
+    departureStop.removeAttribute('data-i18n');
+    departureStop.textContent = copy.departureSchedule;
+  }
+  const harbourChecks = data.harbourChecks;
+  if (harbourChecks?.items?.length) {
+    $('#planHarbourTitle').textContent = harbourChecks.title;
+    $('#planHarbourIntroduction').textContent = harbourChecks.introduction;
+    $('#planHarbourItems').innerHTML = harbourChecks.items.map((item) => `
+      <article class="passage-harbour-item">
+        <h3>${escapeHtml(item.title)}</h3>
+        ${renderRating(item.rating)}
+        <p><strong>${escapeHtml(copy.harbourForecast)}</strong><br>${escapeHtml(item.forecast)}</p>
+        <details class="passage-option-details"><summary>${escapeHtml(copy.harbourDetails)}</summary>
+          <p><strong>${escapeHtml(copy.harbourExposure)}</strong><br>${escapeHtml(item.exposure)}</p>
+          <p><strong>${escapeHtml(copy.harbourChecks)}</strong><br>${escapeHtml(item.check)}</p>
+          <p><strong>${escapeHtml(copy.alternative)}</strong><br>${escapeHtml(item.alternative)}</p>
+          <a href="${escapeHtml(item.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.sourceLabel)}</a>
+        </details>
+      </article>`).join('');
+    $('#planHarbourChecks').hidden = false;
+  }
   const orientationNotesElement = $("#planOrientationNotes");
   if (orientationNotes.length) {
     $("#planOrientationNotesTitle").textContent = copy.orientationNotesTitle;
@@ -452,7 +512,14 @@
     $("#planSummaryTitle").textContent = copy.summaryTitle;
     $("#planSummaryLegend").textContent = copy.summaryLegend;
     $("#planSummaryHead").innerHTML = `<tr>${copy.summaryHeaders.map((header) => `<th scope="col">${escapeHtml(header)}</th>`).join('')}</tr>`;
-    $("#planSummaryBody").innerHTML = days.map((day) => `
+    // Il venerdì ha due origini: non nascondere il gruppo ancora a Marsala
+    // dietro alla sola riga Levanzo–Marettimo del programma giornaliero.
+    const fridayDeparture = data.callBriefing?.options?.[1];
+    const summaryDays = days.flatMap((day, index) => index === 1 && fridayDeparture ? [
+      { ...day, ...fridayDeparture, criticality: fridayDeparture.ratings.passage.text, uncertainty: data.confidence },
+      day,
+    ] : [day]);
+    $("#planSummaryBody").innerHTML = summaryDays.map((day) => `
       <tr>
         <th scope="row">${escapeHtml(day.date)}</th>
         <td>${escapeHtml(day.route)}</td>

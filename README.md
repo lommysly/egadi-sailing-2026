@@ -5,6 +5,7 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 ## Stato reale
 
 - Il sito pubblico è raggiungibile su `https://egadi.thatsablast.it/`.
+- Passage Plan del 05/10/2026: dati controllati alle 08:09 CEST, due partenze da Marsala (giovedì via Levanzo; venerdì diretto a Marettimo), obiettivo comune in porto venerdì/sabato subordinato a meteo e disponibilità. Schede di porto distinte dal dato offshore; boe meridionali di Favignana non confermate per ottobre/notte. IT/EN coerenti; fonte, run e copertura effettiva sono separati. Evidenze e prossimo controllo unico alle 19:00 prima della call delle 20:00 in `METEO_BRIEFING_2026-10-05.md`.
 - Il sito usa un solo sorgente bilingue IT / EN: il selettore conserva lingua, query e hash. L'inglese è copy editoriale scritto e revisionato nel progetto, non un widget Google Translate o una traduzione al volo.
 - L'area privata è attiva su HTTPS per autorizzazione esplicita del titolare: skipper con Google, equipaggio solo tramite invito WhatsApp personale e codice di sei cifre.
 - L’area skipper può essere aperta senza selezionare alcuna scheda equipaggio: l’inizializzazione dell’accesso Google non dipende dalla lettura delle quote. Google si apre nella sua finestra anche su telefono: il reindirizzamento forzato non è usato, perché può essere bloccato dai browser mobili su un dominio custom.

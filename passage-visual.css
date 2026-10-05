@@ -48,7 +48,7 @@
 .passage-decision-columns h3 { margin:0; color:#7fe9de; font:500 .72rem "DM Mono",monospace; letter-spacing:.07em; text-transform:uppercase; }
 .passage-decision-columns ul { display:grid; gap:11px; margin:16px 0 0; padding:0; list-style:none; }
 .passage-decision-columns li { position:relative; padding-left:22px; line-height:1.5; }
-.passage-decision-columns li::before { content:"✓"; position:absolute; left:0; color:#7fe9de; font-weight:700; }
+.passage-decision-columns li::before { content:"•"; position:absolute; left:0; color:#7fe9de; font-weight:700; }
 .passage-decision-columns article:last-child li::before { content:"!"; color:#e7b35f; }
 
 .passage-table-scroll { margin:24px 0 0; overflow-x:auto; border:1px solid rgba(234,248,246,.16); border-radius:14px; background:rgba(255,255,255,.04); -webkit-overflow-scrolling:touch; }
@@ -314,3 +314,42 @@
 .passage-plan-main .passage-navigation strong { color:#7fe9de; }
 .passage-plan-main .eyebrow { color:#7fe9de; }
 .passage-plan-main .passage-stop-heading { color:#7fe9de; }
+
+/* Due gruppi di partenza e controlli dei porti: schede leggibili senza
+   aggiungere colonne o rientri sui telefoni stretti. */
+.passage-plan-main .passage-update-badge {
+  display:inline-block; padding:12px 16px; margin:12px 0 18px;
+  border:1px solid #0e7b8b; border-radius:12px; background:#d5f5ef;
+  color:#083e49; font-size:1rem; line-height:1.5; font-weight:700;
+}
+.passage-departure-briefing,.passage-harbour-checks {
+  margin:18px 0; padding:clamp(22px,4vw,38px); border-radius:18px;
+  background:#0b3744; color:#eaf8f6; overflow-wrap:anywhere;
+}
+.passage-departure-briefing h2,.passage-harbour-checks h2 { color:#eaf8f6; }
+.passage-departure-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.passage-departure-option,.passage-harbour-item {
+  min-width:0; padding:20px; border:1px solid rgba(234,248,246,.22); border-radius:14px;
+  background:rgba(255,255,255,.04);
+}
+.passage-departure-option h3,.passage-harbour-item h3 { margin:0 0 12px; color:#7fe9de; font-size:1.3rem; line-height:1.35; }
+.passage-option-route { font-weight:700; }
+.passage-option-facts { margin:16px 0; }
+.passage-option-facts div { margin-top:10px; }
+.passage-option-facts dt { color:#9fd4d1; font-size:.85rem; font-weight:700; }
+.passage-option-facts dd { margin:4px 0 0; line-height:1.6; }
+.passage-option-ratings { display:grid; gap:12px; margin:18px 0; }
+.passage-option-ratings h4 { margin:0 0 6px; color:#cdeeea; }
+.passage-option-decision { border-left:3px solid #7fe9de; padding-left:12px; }
+.passage-option-details { margin-top:16px; padding-top:14px; border-top:1px solid rgba(234,248,246,.18); }
+.passage-option-details summary { cursor:pointer; color:#9fd4d1; font-weight:700; line-height:1.5; }
+.passage-option-details a { color:#7fe9de; }
+.passage-harbour-items { display:grid; gap:16px; margin-top:20px; }
+.passage-departure-option p,.passage-harbour-item p { line-height:1.65; }
+@media (max-width:800px) {
+  .passage-departure-options { grid-template-columns:1fr; }
+}
+@media (max-width:520px) {
+  .passage-departure-briefing,.passage-harbour-checks { padding:22px 14px; }
+  .passage-departure-option,.passage-harbour-item { padding:16px 12px; }
+}

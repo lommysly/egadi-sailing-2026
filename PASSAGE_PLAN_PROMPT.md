@@ -1,6 +1,6 @@
 # Prompt operativo · Meteo & Passage Plan Egadi 2026
 
-Usare questo prompt per ogni aggiornamento. Prima di pubblicarlo sul sito, lo skipper controlla l'output e sostituisce soltanto i campi corrispondenti in `passage-plan-data.js`.
+Usare questo prompt per ogni aggiornamento. Prima di pubblicarlo sul sito, lo skipper controlla l'output; aggiornare soltanto i campi corrispondenti in `passage-plan-data.js` e l'edizione editoriale `passage-plan-data-en.js`, mantenendole coerenti. Distinguere sempre l'ora di consultazione dall'emissione e dalla copertura del singolo run.
 
 ## Quando aggiornare
 
@@ -22,11 +22,13 @@ EVENTO
 - Date: 8–11 ottobre 2026.
 - Base: porto di Marsala.
 - Barca di riferimento: catamarano Fountaine Pajot Isla 40; possono esserci più barche, ognuna con il proprio skipper.
-- Partenza: giovedì 8 ottobre, circa 15:00, con cambusa già pronta.
-- Rientro: domenica 11 ottobre, Marsala entro le 18:00; lascia Favignana intorno alle 15:30 salvo decisione dello skipper.
+- Due gruppi: partenza da Marsala giovedì 8 ottobre circa 15:00 via Levanzo; partenza da Marsala venerdì 9 ottobre al mattino direttamente verso Marettimo, saltando Levanzo se le condizioni consentono la traversata.
+- Obiettivo comune: venerdì 9 sera tutti dentro il porto di Marettimo (Scalo Nuovo da confermare con il gestore), sabato 10 sera dentro il porto di Favignana. Nessun appuntamento impone una traversata o ingresso con condizioni inadeguate.
+- Rientro: domenica 11 ottobre, Marsala entro le 18:00. Confrontare partenza 14:00–14:30 con 15:30 sulla barca più lenta; non dare per sufficiente quest'ultimo orario.
 - Itinerario desiderato ma non garantito: Marsala → Levanzo → Marettimo → Favignana → Marsala.
 - Soste possibili: Levanzo (Cala Dogana, Cala Fredda, Cala Minnola, Cala Calcara, Cala Tramontana); Marettimo (porto, Punta Troia, Scalo Maestro, Cala Bianca, Punta Bassana, Cretazzo); Favignana (Cala Azzurra, Cala Rossa, Bue Marino, Cala Rotonda, Punta Lunga, Preveto, Grotta Perciata).
-- Pernottamenti desiderati: prima notte in rada a Levanzo solo se ammessa e confortevole; seconda notte in porto a Marettimo; terza notte in porto a Favignana; domenica rientro a Marsala.
+- Pernottamenti desiderati: giovedì Levanzo solo se consentito e adatto anche alla rotazione notturna; venerdì Marettimo e sabato Favignana dentro il porto solo con accesso, banchina e posti verificati.
+- Possibile piano B a Favignana: campi boe meridionali del disciplinare AMP (Cala Azzurra, Marasolo, Scindo Passo, Preveto), non automaticamente operativi in ottobre o autorizzati al pernottamento. Il campo «dall'altra parte del porto» citato dal gruppo non è identificato: non inventarne nome/posizione o disponibilità.
 - Vincolo: vento, onda, fondali, traffico, ordinanze, disponibilità di ormeggio e decisione dello skipper possono cambiare la rotta.
 
 FINESTRA DI AGGIORNAMENTO
@@ -52,6 +54,10 @@ REGOLE DI AFFIDABILITÀ
 16. Ricostruisci una rotta geografica plausibile che non attraversi terra. Riporta distanza orientativa, direzioni vere e scenari di durata a 4, 5 e 6 nodi; sono stime, non ETA certe.
 17. Non mediare modelli divergenti. Mostra gli scenari separati, usa ensemble e osservazioni quando disponibili e spiega quale decisione cambia.
 18. Assegna a uscita, navigazione e arrivo una valutazione editoriale esplicita: `favorable` 🟢, `caution` 🟡, `adverse` 🔴 o `unknown` ⚪. Un dato essenziale mancante non può diventare verde.
+19. Confronta separatamente le partenze da Marsala del giovedì e del venerdì, e la traversata Levanzo–Marettimo di chi è già partito. Analizza anche punti a Sud/Ovest di Favignana sullo scenario diretto Marsala–Marettimo: non riutilizzare soltanto il canale settentrionale.
+20. Approfondisci Marettimo venerdì sera/notte e Favignana sabato sera/notte: esposizione del singolo accesso/pontile, mare residuo, rotazioni, risacca, raffiche sottovento, fondali, traffico, lavori/restrizioni e posti per tutta la flotta. Distingui dati documentati, inferenza geografica e conferma del gestore; un grid point al largo non risolve l'imboccatura.
+21. Per i campi boe verifica con l'AMP installazione di ottobre, autorizzazione notturna, disponibilità e limiti della barca. Un campo a Sud può essere un candidato con NO, non un rifugio certificato; onda aggirante e cambi del vento contano. Boa e ancoraggio hanno regole diverse.
+22. Controlla `latest run` e `data_end_time`: le API possono restituire valori precedenti oltre il run corto. Non attribuirli all'ultima emissione. Se mancano ensemble recenti, non riciclare percentuali da un aggiornamento precedente.
 
 FORMATO OBBLIGATORIO
 Apri con data e ora del briefing, periodo analizzato, tre elementi decisivi e verifiche ancora mancanti. Mostra una mappa o uno schema dichiarato non utilizzabile per navigare e una tabella `Giorno | Tratta | Uscita | Navigazione | Arrivo | Finestra | Criticità | Incertezza`. Poi presenta quattro schede giornaliere. Per ogni scheda usa esattamente queste etichette:
@@ -82,7 +88,9 @@ Chiudi con:
 
 Poi restituisci lo stesso contenuto in un oggetto JavaScript compatibile con `passage-plan-data.js`, senza dati personali e senza testo HTML. Mantieni i campi esistenti e aggiungi:
 
-- a livello generale: `decisiveFactors`, `missingChecks`, `orientationNotes`, `modelComparison`, `nextUpdateReason`;
+- a livello generale: `decisiveFactors`, `missingChecks`, `orientationNotes`, `modelComparison`, `nextUpdateReason`, `callBriefing`, `harbourChecks`;
+- `callBriefing`: `title`, `introduction`, `options` (due gruppi da Marsala, ciascuno con `title`, `route`, `course`, `duration`, `ratings`, `wind`, `sea`, `window`, `decision`, `alternative`) e `decisions` per la call;
+- `harbourChecks`: `title`, `introduction`, `items` con `title`, `rating`, `exposure`, `forecast`, `check`, `alternative`, `sourceLabel`, `sourceUrl`;
 - per ogni fonte: `label`, `url`, `scope`, `checkedAt`, `product`, `model`, `availability`;
 - per ogni giorno: `distance`, `course`, `duration`, `window`, `criticality`, `uncertainty`, `ratings`, `operationalChecks`, `visibility`, `phenomena`;
 - in `ratings`: `departure`, `passage`, `arrival`, ciascuno con `tone` e `text`.
