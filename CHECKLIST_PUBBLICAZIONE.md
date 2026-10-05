@@ -6,8 +6,8 @@ Ultimo aggiornamento: 5 ottobre 2026. Le caselle descrivono lo stato verificato;
 
 - [x] Programma pubblico flessibile Marsala, Levanzo, Marettimo e Favignana.
 - [x] Unica pagina pubblica Meteo & Passage Plan, con file dati separato e prompt operativo per aggiornamenti progressivi.
-- [x] Briefing 05/10 ore 08:09 CEST: due gruppi da Marsala, obiettivo comune Marettimo venerdì e Favignana sabato, confronto separato IFS/GFS/ICON e WAM/GFS-Wave/MFWAM; domenica senza attribuzioni oltre il run corto ECMWF. IT/EN, ora visibile nell'hero, schede di partenza e controlli porti/boe; versione `20261005-two-departures-v2`.
-- [x] Controllo unico programmato oggi alle 19:00 prima della call skipper delle 20:00, con aggiornamento autorizzato del sito. Non è un monitoraggio continuo.
+- [x] Briefing serale 05/10 ore 18:50 CEST: due gruppi da Marsala, confronto aggiornato IFS/GFS 06 UTC, ICON 12 UTC e WAM/GFS-Wave/MFWAM. Meno onda venerdì rispetto al mattino, temporali IFS all’alba/mezzogiorno; sabato IFS/WAM più sostenuti. Domenica senza valori attribuiti oltre il run corto ECMWF. IT/EN, ora visibile, due partenze e tre controlli porti/boe; versione `20261005-call-evening-v1`.
+- [x] Controllo serale per la call delle 20 eseguito su richiesta anticipata del titolare. L’automazione unica delle 19 è allineata per riusare le prove ed evitare modifiche/pubblicazioni sovrapposte. Non è un monitoraggio continuo; nuove verifiche il 7 e prima di ogni partenza ancora da eseguire.
 - [ ] Confermare direttamente gestori porti: Scalo Nuovo di Marettimo venerdì, pontile preciso di Favignana sabato, accesso, fondali, risacca, condizioni notturne e disponibilità per tutte le barche. Nessun dato offshore equivale a una conferma locale.
 - [ ] Verificare con AMP il campo boe candidato a sud di Favignana, installazione in ottobre, disponibilità, limiti barca e autorizzazione notturna. Non usare come rifugio il campo non identificato «dall’altra parte del porto».
 - [x] Storyboard video in `VIDEO_STORYBOARD.md`; non sono incorporati filmati di terzi.
