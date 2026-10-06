@@ -4,6 +4,8 @@ Sito pubblico e area privata per skipper ed equipaggi della flotta Egadi. Il pro
 
 ## Stato reale
 
+**Transfer · accompagnatori (06/10/2026):** il referente può indicare da +0 a +8 accompagnatori per singola tratta. La scheda chiusa mostra il totale delle persone; i riepiloghi per direzione, data, aeroporto e fascia sommano i posti effettivi (annullati/revocati esclusi), non le schede. Le fasce hanno un'estensione massima di due ore e non sono una conferma di navetta. Nel foglio privato Arrivi/Partenze le colonne N/O riportano accompagnatori e persone totali. Contratto e casi di test in `ARRIVI_PARTENZE_SPEC.md` e `FIRESTORE_RULES_TEST_MATRIX.md`; lo stato del rilascio è nella checklist.
+
 - Il sito pubblico è raggiungibile su `https://egadi.thatsablast.it/`.
 - Passage Plan del 05/10/2026: nuova edizione serale, dati ricontrollati alle 18:50 CEST per la call delle 20:00. Due partenze da Marsala (giovedì via Levanzo; venerdì diretto a Marettimo). Venerdì meno onda rispetto al mattino, ma temporali ECMWF ancora possibili; sabato scenario IFS/WAM più sostenuto degli altri. Porti e boe non confermati; IT/EN coerenti, fonte/run/copertura separati, inclusa esclusione del run corto ECMWF dalle ore del rientro domenicale. Evidenze in `METEO_BRIEFING_2026-10-05.md`; il controllo unico delle 19 riusa il lavoro serale senza pubblicazioni parallele. Nuove verifiche il 7 e prima di ogni tratta, non automatiche.
 - Il sito usa un solo sorgente bilingue IT / EN: il selettore conserva lingua, query e hash. L'inglese è copy editoriale scritto e revisionato nel progetto, non un widget Google Translate o una traduzione al volo.

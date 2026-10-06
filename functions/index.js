@@ -7,6 +7,7 @@ const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { google } = require('googleapis');
 const { sheetTransferRequestLabel, sheetTravelStatusLabel } = require('./sheet-status');
+const { additionalPassengerCount, transferPassengerCount, transferSeatCount } = require('./transfer-party');
 
 initializeApp();
 
@@ -439,6 +440,7 @@ function safeOperationalFields(source = {}) {
     meetingDate: asText(record.meetingDate, 10),
     meetingTime: asText(record.meetingTime, 5),
     operatorNotes: asText(record.operatorNotes, 500),
+    additionalPassengers: additionalPassengerCount(record),
   };
 }
 
@@ -705,10 +707,10 @@ async function refreshTransferCompanionCounts(direction, airport, date) {
   const records = snapshot.docs
     .map((doc) => doc.data())
     .filter((record) => asUid(record.boatId) && asUid(record.inviteId));
-  const companions = Math.max(0, records.length - 1);
+  const totalPeople = records.reduce((total, record) => total + transferSeatCount(record), 0);
   await Promise.all(records.map((record) => db.doc(`boats/${record.boatId}/crewTravelStatus/${record.inviteId}`).set({
     inviteId: record.inviteId,
-    [`${direction}TransferCompanions`]: companions,
+    [`${direction}TransferCompanions`]: transferSeatCount(record) ? Math.max(0, totalPeople - 1) : 0,
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true })));
 }
@@ -1001,11 +1003,19 @@ exports.copyTransferOperationsToBackup = onDocumentWritten({
           meetingDate: '',
           meetingTime: '',
           operatorNotes: '',
+          additionalPassengers: 0,
           operatorRevision: revision,
           updatedAt: FieldValue.serverTimestamp(),
         };
     transaction.set(backupRef, changes, { merge: true });
   });
+  // Anche un accompagnatore aggiunto dall'operatore cambia i posti reali;
+  // non modifica i voli né dichiara un consenso al posto del partecipante.
+  const before = event.data?.before?.data();
+  if (transferSeatCount(source) !== transferSeatCount(before)) {
+    const record = source || before;
+    if (record) await refreshTransferCompanionCounts(record.direction, record.airport, record.date);
+  }
 });
 
 // Tre fogli separati invece di uno solo "ingegneristico": Arrivi e Partenze
@@ -1017,12 +1027,12 @@ const TECHNICAL_SHEET_NAME = 'Tecnico';
 // EGADI 2025" già collaudato dal titolare l'anno scorso (chiaro, essenziale,
 // niente colonne che non servono a organizzare i transfer): nome/cognome
 // separati, un Sì/No colorato per la richiesta transfer, colore per barca.
-const HUMAN_SHEET_HEADER = ['Nome', 'Cognome', 'Telefono', 'Barca', 'Compagnia aerea', 'Volo', 'Aeroporto di partenza', 'Aeroporto di arrivo', 'Data', 'Ora', 'Richiesta transfer', 'Navetta da Marsala', 'Stato'];
+const HUMAN_SHEET_HEADER = ['Nome', 'Cognome', 'Telefono', 'Barca', 'Compagnia aerea', 'Volo', 'Aeroporto di partenza', 'Aeroporto di arrivo', 'Data', 'Ora', 'Richiesta transfer', 'Navetta da Marsala', 'Stato', 'Accompagnatori', 'Persone totali'];
 const TECHNICAL_SHEET_HEADER = ['ID record', 'Nome', 'Barca', 'Direzione', 'Stato interno', 'Traccia', 'Bozza o confermata', 'Aggiornato il'];
 
 function humanSheetRow(record) {
   if (record?.recordState !== 'active') {
-    return ['— Revocata —', '', '', '', '', '', '', '', '', '', '', '', ''];
+    return ['— Revocata —', '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
   }
   return [
     record.firstName || '',
@@ -1038,6 +1048,8 @@ function humanSheetRow(record) {
     sheetTransferRequestLabel(record),
     [record.meetingPoint, record.meetingDate, record.meetingTime].filter(Boolean).join(' · '),
     sheetTravelStatusLabel(record),
+    additionalPassengerCount(record),
+    transferPassengerCount(record),
   ];
 }
 

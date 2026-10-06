@@ -2,10 +2,56 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   groupTransferRecords,
+  groupByTimeBand,
+  additionalPassengerCount,
+  transferPassengerCount,
+  transferSeatCount,
+  totalTransferSeats,
   sortTransferRecords,
   suggestedMarsalaDeparture,
   transferOperationalDate,
 } from '../transfer-ordering.js';
+import serverParty from '../functions/transfer-party.js';
+
+test('posti: legacy, +1/+2, annullamenti e validazione coincidono tra browser e server', () => {
+  for (const value of [undefined, 0, 1, 2, 8, -1, 9, 1.5, '2', null]) {
+    for (const status of ['new', 'planned', 'confirmed', 'completed', 'cancelled', 'revoked']) {
+      const item = { additionalPassengers: value, status, recordState: 'active' };
+      assert.equal(additionalPassengerCount(item), serverParty.additionalPassengerCount(item));
+      assert.equal(transferPassengerCount(item), serverParty.transferPassengerCount(item));
+      assert.equal(transferSeatCount(item), serverParty.transferSeatCount(item));
+    }
+  }
+  assert.equal(transferSeatCount(null), 0);
+  assert.equal(transferPassengerCount({}), 1);
+  assert.equal(totalTransferSeats([{ additionalPassengers: 2 }, {}, { additionalPassengers: 1 }]), 6);
+  assert.equal(totalTransferSeats([{ additionalPassengers: 2, status: 'cancelled' }, { recordState: 'revoked' }]), 0);
+});
+
+test('fasce: anche due sole schede contano quattro posti; nessuna catena oltre due ore', () => {
+  const bands = groupByTimeBand([
+    record('oltre', { time: '13:01' }),
+    record('carlo', { time: '11:00', additionalPassengers: 2 }),
+    record('vicino', { time: '12:30' }),
+    record('senza-orario', { time: '' }),
+  ], 'outbound');
+  assert.deepEqual(bands.map(({ records }) => records.map(({ id }) => id)), [['carlo', 'vicino'], ['oltre'], ['senza-orario']]);
+  assert.equal(totalTransferSeats(bands[0].records), 4);
+  assert.equal(bands[2].minMinutes, null);
+});
+
+test('posti distinti per direzione, data e aeroporto; ritorno con partenza stimata', () => {
+  const out = groupTransferRecords([
+    record('carlo', { airport: 'TPS', additionalPassengers: 2 }),
+    record('palermo', { airport: 'PMO', additionalPassengers: 1 }),
+    record('domani', { airport: 'TPS', date: '2026-10-09' }),
+  ], 'outbound');
+  assert.deepEqual(out.map(({ count }) => count), [5, 1]);
+  assert.equal(totalTransferSeats(out[0].airportGroups.find(({ airport }) => airport === 'TPS').records), 3);
+  const ret = groupByTimeBand([record('ritorno', { airport: 'TPS', direction: 'return', time: '20:35', additionalPassengers: 2 })], 'return');
+  assert.equal(ret[0].minMinutes, 18 * 60 + 50);
+  assert.equal(totalTransferSeats(ret[0].records), 3);
+});
 
 function record(id, overrides = {}) {
   return {

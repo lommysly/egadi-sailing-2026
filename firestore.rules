@@ -521,7 +521,11 @@ service cloud.firestore {
     function hasSafeTransferOperationUpdate() {
       return resource.data.recordState == 'active'
         && request.resource.data.recordState == 'active'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'assignedOperatorUid', 'groupName', 'meetingPoint', 'meetingTime', 'vehicleName', 'operatorNotes', 'updatedAt', 'updatedBy'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'assignedOperatorUid', 'groupName', 'meetingPoint', 'meetingTime', 'vehicleName', 'operatorNotes', 'additionalPassengers', 'updatedAt', 'updatedBy'])
+        && (!('additionalPassengers' in request.resource.data)
+          || (request.resource.data.additionalPassengers is int
+            && request.resource.data.additionalPassengers >= 0
+            && request.resource.data.additionalPassengers <= 8))
         && request.resource.data.status in ['new', 'planned', 'confirmed', 'completed', 'cancelled']
         && request.resource.data.assignedOperatorUid == request.auth.uid
         && isBoundedText(request.resource.data.groupName, 120)

@@ -2,6 +2,7 @@
 // Vedi FIRESTORE_RULES_TEST_MATRIX.md, riga "Accessi transfer".
 
 import test from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
@@ -140,6 +141,41 @@ function accessRequestPayload(email) {
     email,
   };
 }
+
+for (const role of ['organizer', 'operator']) {
+  test(`accompagnatori: ${role} salva +2 su un record legacy e può correggerlo`, async () => {
+    await seedEvent();
+    await seedManagedOperator();
+    await seedRealisticTransferRecord('party');
+    const context = role === 'organizer' ? organizerContext(testEnv) : operatorContext();
+    const uid = role === 'organizer' ? ORGANIZER_A : OPERATOR_A;
+    const ref = doc(context.firestore(), 'events/egadi-2026/transferOpsRecords/party');
+    const metadata = { assignedOperatorUid: uid, updatedBy: uid, updatedAt: serverTimestamp() };
+    await assertSucceeds(updateDoc(ref, { ...metadata, additionalPassengers: 2 }));
+    assert.equal((await getDoc(ref)).data().additionalPassengers, 2);
+    await assertSucceeds(updateDoc(ref, { ...metadata, additionalPassengers: 0 }));
+    // Il batch esistente non manda il nuovo campo: non deve cancellarlo.
+    await assertSucceeds(updateDoc(ref, { ...metadata, additionalPassengers: 1 }));
+    await assertSucceeds(updateDoc(ref, { ...metadata, status: 'confirmed' }));
+    assert.equal((await getDoc(ref)).data().additionalPassengers, 1);
+  });
+}
+
+test('accompagnatori: rifiuta valori invalidi, modifiche di identità e accessi esterni', async () => {
+  await seedEvent();
+  await seedManagedOperator();
+  await seedRealisticTransferRecord('party');
+  const operator = operatorContext();
+  const ref = doc(operator.firestore(), 'events/egadi-2026/transferOpsRecords/party');
+  const metadata = { assignedOperatorUid: OPERATOR_A, updatedBy: OPERATOR_A, updatedAt: serverTimestamp() };
+  for (const value of [-1, 9, 1.5, '2', null, true]) {
+    await assertFails(updateDoc(ref, { ...metadata, additionalPassengers: value }));
+  }
+  await assertFails(updateDoc(ref, { ...metadata, additionalPassengers: 2, participantName: 'Identità cambiata' }));
+  for (const context of [crewAContext(testEnv), outsiderContext(testEnv)]) {
+    await assertFails(updateDoc(doc(context.firestore(), 'events/egadi-2026/transferOpsRecords/party'), { ...metadata, additionalPassengers: 2 }));
+  }
+});
 
 test('accesso transfer: un account equipaggio non può inviare una richiesta', async () => {
   await seedEvent();

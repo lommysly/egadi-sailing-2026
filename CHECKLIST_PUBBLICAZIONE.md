@@ -1,6 +1,14 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 5 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+Ultimo aggiornamento: 6 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+
+## Transfer: accompagnatori e posti reali · 6 ottobre 2026
+
+- [x] Contratto: una scheda con +2 vale tre persone, senza duplicare identità. Campo per singola tratta, non copiato automaticamente al ritorno.
+- [x] Rules: 528 test superati, inclusi permessi, limiti 0–8 e compatibilità con batch e client precedenti.
+- [x] Gate locale: 141 test unitari, sintassi JS, diff pulito; Flutter analyze senza problemi (preferenza globale). Renderer reali con fixture fittizia IT/EN, desktop 1280 e mobile 320/390 px; a 320 px pagina e scroll misurano entrambi 320 px, form aperto e selettore utilizzabili. Non equivale a un test di dispositivo fisico.
+- [ ] Pubblicazione e lettura dopo salvataggio di Carlo +2 nel record, nel backup e in Arrivi N:O. Autorizzazione esplicita del titolare ricevuta il 06/10/2026.
+- [ ] Allineamento N:O dei record precedenti senza cambiare A:M né creare nuove righe.
 
 ## Sito pubblico e contenuti
 

@@ -30,6 +30,15 @@ Il matching considera stessa tratta, stessa data e stesso aeroporto reale. Per l
 
 ## Ruoli e visibilità
 
+### Accompagnatori e posti transfer · contratto del 06/10/2026
+
+- `transferOpsRecords.additionalPassengers`: intero facoltativo da 0 a 8, modificabile solo da organizzatore o referente transfer abilitato. Assente nei record precedenti significa 0. Non registra nuove identità, inviti o consensi.
+- Una scheda rappresenta il referente più gli accompagnatori **di quella tratta**: `1 + additionalPassengers`. Andata e ritorno sono indipendenti; nessuna copia automatica.
+- I posti da organizzare sommano le persone, non le schede. Richieste revocate e annullate sono escluse; le bozze richieste restano riconoscibili come da verificare. I filtri restringono i subtotali visibili.
+- Ordine: direzione → data operativa → aeroporto → fascia oraria. Ogni fascia copre al massimo 120 minuti dal primo orario, senza concatenare voli lontani. Al ritorno si usa il ritrovo assegnato o la partenza da Marsala stimata, non direttamente l'orario del volo. Le fasce non confermano una navetta comune.
+- Il server conserva il campo quando il partecipante modifica il volo, lo copia nel backup e aggiorna il foglio privato: colonne N `Accompagnatori`, O `Persone totali`, senza spostare A:M o duplicare righe.
+- Verifica: conteggi e fasce con casi legacy, +1/+2, annullati, data diversa e mezzanotte; Rules positive per entrambi i ruoli e negative per valori invalidi, identità alterata ed estranei; lettura dopo salvataggio di record, backup e celle del foglio.
+
 | Ruolo | Cosa vede |
 | --- | --- |
 | Partecipante | Le proprie tratte e i match che ha accettato. |

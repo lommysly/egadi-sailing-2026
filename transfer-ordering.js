@@ -2,6 +2,44 @@ const TRANSFER_TRAVEL_MINUTES = { TPS: 45, PMO: 105 };
 const AIRPORT_BUFFER_WITH_CHECKED_BAG_MINUTES = 90;
 const AIRPORT_BUFFER_HAND_LUGGAGE_MINUTES = 60;
 
+export function additionalPassengerCount(record) {
+  const value = record?.additionalPassengers;
+  return Number.isInteger(value) && value >= 0 && value <= 8 ? value : 0;
+}
+
+export function transferPassengerCount(record) {
+  return 1 + additionalPassengerCount(record);
+}
+
+export function transferSeatCount(record) {
+  return !record || (record.recordState && record.recordState !== 'active') || ['cancelled', 'revoked'].includes(record.status)
+    ? 0 : transferPassengerCount(record);
+}
+
+export function totalTransferSeats(records) {
+  return records.reduce((total, record) => total + transferSeatCount(record), 0);
+}
+
+// Il limite si misura dal primo orario della fascia, non dal precedente:
+// evita che una catena di voli vicini diventi un unico gruppo di molte ore.
+export function groupByTimeBand(records, direction) {
+  const bands = [];
+  const withoutTime = [];
+  sortTransferRecords(records, direction).forEach((record) => {
+    const minutes = recordClusterMinutes(record, direction);
+    if (minutes === null) { withoutTime.push(record); return; }
+    const current = bands[bands.length - 1];
+    if (current && minutes - current.minMinutes <= 120) {
+      current.records.push(record);
+      current.maxMinutes = minutes;
+    } else {
+      bands.push({ records: [record], minMinutes: minutes, maxMinutes: minutes });
+    }
+  });
+  if (withoutTime.length) bands.push({ records: withoutTime, minMinutes: null, maxMinutes: null });
+  return bands;
+}
+
 function normalizedDirection(value) {
   const normalized = String(value ?? '').trim().toLowerCase();
   return normalized === 'return' ? 'return' : 'outbound';
@@ -155,7 +193,7 @@ export function groupTransferRecords(records, direction) {
 
   return [...dateGroups.entries()].map(([date, airportGroups]) => ({
     date: date === 'UNKNOWN' ? '' : date,
-    count: [...airportGroups.values()].reduce((total, group) => total + group.length, 0),
+    count: [...airportGroups.values()].reduce((total, group) => total + totalTransferSeats(group), 0),
     airportGroups: [...airportGroups.entries()].map(([airport, groupedRecords]) => ({
       airport,
       records: groupedRecords,

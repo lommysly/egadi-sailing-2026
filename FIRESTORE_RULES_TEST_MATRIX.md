@@ -4,6 +4,8 @@ Usare esclusivamente UID, nomi, numeri, documenti e contributi fittizi nel Rules
 
 ## Fixture fittizia
 
+Accompagnatori transfer (06/10/2026): `transfer-access.test.mjs` verifica +2→0 per organizzatore e referente gestito, lettura dopo salvataggio e conservazione con batch di solo stato. Negati -1, 9, decimali, stringa, null, booleano, cambio identità e scritture equipaggio/estraneo. Il campo legacy assente resta compatibile: i vecchi client continuano a salvare senza cancellare il conteggio.
+
 - `ORGANIZER_A`: UID presente in `events/egadi-2026.organizerIds`.
 - `SKIPPER_A`: skipper associato a `boats/SKIPPER_A` per l'evento; non implica alcuna proprietà dell'imbarcazione. `OUTSIDER_A`: utente Google non associato.
 - `CREW_A` e `CREW_B`: utenti Firebase Authentication con provider `password`, non anonimi, e token email rispettivamente `crew-a@crew.egadi.thatsablast.it` e `crew-b@crew.egadi.thatsablast.it`.
