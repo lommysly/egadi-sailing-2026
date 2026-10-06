@@ -6,6 +6,8 @@ Usare esclusivamente UID, nomi, numeri, documenti e contributi fittizi nel Rules
 
 Accompagnatori transfer (06/10/2026): `transfer-access.test.mjs` verifica +2→0 per organizzatore e referente gestito, lettura dopo salvataggio e conservazione con batch di solo stato. Negati -1, 9, decimali, stringa, null, booleano, cambio identità e scritture equipaggio/estraneo. Il campo legacy assente resta compatibile: i vecchi client continuano a salvare senza cancellare il conteggio.
 
+Annullamento skipper (06/10/2026): nessuna apertura delle Rules o nuova collezione. `cancelBoatTransfer` verifica lato server skipper della stessa barca/evento oppure organizzatore, area attiva e stato ancora annullabile. `tools/transfer-cancellation.test.mjs` copre positivi, negativi, transazione idempotente e payload client; `tools/transfer-passengers.test.mjs` verifica che il trigger conservi gli accompagnatori, propaghi `cancelled` al solo stato della tratta e ricalcoli i posti. Il gestore conserva la modifica diretta dello stato già coperta da `transfer-access.test.mjs`.
+
 - `ORGANIZER_A`: UID presente in `events/egadi-2026.organizerIds`.
 - `SKIPPER_A`: skipper associato a `boats/SKIPPER_A` per l'evento; non implica alcuna proprietà dell'imbarcazione. `OUTSIDER_A`: utente Google non associato.
 - `CREW_A` e `CREW_B`: utenti Firebase Authentication con provider `password`, non anonimi, e token email rispettivamente `crew-a@crew.egadi.thatsablast.it` e `crew-b@crew.egadi.thatsablast.it`.

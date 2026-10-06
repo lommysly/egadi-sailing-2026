@@ -39,6 +39,16 @@ Il matching considera stessa tratta, stessa data e stesso aeroporto reale. Per l
 - Il server conserva il campo quando il partecipante modifica il volo, lo copia nel backup e aggiorna il foglio privato: colonne N `Accompagnatori`, O `Persone totali`, senza spostare A:M o duplicare righe.
 - Verifica: conteggi e fasce con casi legacy, +1/+2, annullati, data diversa e mezzanotte; Rules positive per entrambi i ruoli e negative per valori invalidi, identità alterata ed estranei; lettura dopo salvataggio di record, backup e celle del foglio.
 
+### Annullamento della singola tratta · contratto del 06/10/2026
+
+- Il gestore usa lo stato operativo **Annullato**. Nelle card viaggio dello skipper compaiono **Annulla transfer andata** e **Annulla transfer ritorno**, separati e con conferma prima di procedere.
+- Callable `cancelBoatTransfer`, regione `europe-west8`: accetta esclusivamente `{ boatId, inviteId, direction }`. Richiede autenticazione, area privata attiva e titolarità skipper della barca nello stesso evento oppure ruolo organizzatore. Non consente lettura della coda globale allo skipper.
+- Una transazione verifica metadati e richiesta attiva; sono annullabili gli stati `new`, `planned`, `confirmed`, non un servizio `completed` né un record revocato. Un secondo annullamento è idempotente.
+- Aggiorna solo `status`, `updatedAt`, `updatedBy`. Non cancella la scheda né modifica voli, registrazione, consenso, quote o pagamenti. Il trigger esistente propaga l'annullamento a stato equipaggio, backup e foglio.
+- La scheda annullata resta nello storico, con il numero originario di persone; tutti i suoi posti, accompagnatori compresi, escono dai totali da organizzare. Il rientro resta invariato se si annulla soltanto l'andata, e viceversa.
+- Il comando non promette annullamento gratuito né registra un rimborso: quando un mezzo è già confermato, va avvisato anche il gestore. Ripristini e accordi economici restano nella gestione operativa autorizzata.
+- Test del contratto: skipper e organizzatore ammessi; equipaggio, altra barca, estraneo, input alterato e servizio concluso negati; verifica payload UI, conferma, errore, idempotenza e conservazione dei campi.
+
 | Ruolo | Cosa vede |
 | --- | --- |
 | Partecipante | Le proprie tratte e i match che ha accettato. |

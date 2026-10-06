@@ -89,7 +89,8 @@ test('ogni card dice da sé se c’è da sollecitare', () => {
   assert.match(azione, /card\.needsReminder && card\.presentation\.tone !== 'cancelled'/);
   assert.match(azione, /crewTravelReminderUrl\(card\.member, card\.legStates\)/);
   // Lo skipper non ha un tasto per scriversi da solo.
-  assert.match(azione, /if \(voce\.isSkipper === true\) return '';/);
+  // Lo skipper non scrive WhatsApp a se stesso; può annullare la propria tratta.
+  assert.match(azione, /if \(voce\.isSkipper === true\) return cancellations \? groupedActions\(cancellations\) : '';/);
 });
 
 // Il test precedente confrontava `styles.css`/`area.js` con una stringa di

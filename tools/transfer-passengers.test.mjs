@@ -61,6 +61,32 @@ test('trigger reale: copia +2 nel backup e ricalcola i posti; non tocca inviti o
   await handler({ params: { recordId: 'test' }, data: { before: { data: () => before }, after: { exists: true, data: () => after } } });
   assert.equal(changes.additionalPassengers, 2);
   assert.deepEqual(refreshed, [['outbound', 'TPS', '2026-10-08']]);
+  refreshed.length = 0;
+  const cancelled = { ...after, status: 'cancelled' };
+  await handler({ params: { recordId: 'test' }, data: { before: { data: () => after }, after: { exists: true, data: () => cancelled } } });
+  assert.equal(changes.status, 'cancelled');
+  assert.equal(changes.additionalPassengers, 2);
+  assert.deepEqual(refreshed, [['outbound', 'TPS', '2026-10-08']]);
+});
+
+test('stato equipaggio: l’annullamento si propaga solo alla tratta scelta, senza perdere il rientro', async () => {
+  let changes;
+  const ctx = context({
+    asUid: (value) => value,
+    FieldValue: { serverTimestamp: () => 'server' },
+    db: {
+      doc: (path) => { assert.equal(path, 'boats/boat/crewTravelStatus/person'); return path; },
+      runTransaction: async (callback) => callback({
+        get: async () => ({ data: () => ({ outboundOperationRevision: 1, returnOperationStatus: 'confirmed' }) }),
+        set: (_, payload, options) => { changes = payload; assert.equal(options.merge, true); },
+      }),
+    },
+  });
+  vm.runInContext(section('async function writeCrewTransferOperationStatus(', 'exports.materializeCrewTravel ='), ctx);
+  await ctx.writeCrewTransferOperationStatus({ boatId: 'boat', inviteId: 'person', direction: 'outbound', recordState: 'active', status: 'cancelled' }, 2);
+  assert.equal(changes.outboundOperationStatus, 'cancelled');
+  assert.equal(changes.outboundOperationRevision, 2);
+  assert.equal(Object.hasOwn(changes, 'returnOperationStatus'), false);
 });
 
 test('conteggio anonimo: considera anche gli accompagnatori propri e ignora gli annullati', async () => {

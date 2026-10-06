@@ -8,6 +8,7 @@ const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { google } = require('googleapis');
 const { sheetTransferRequestLabel, sheetTravelStatusLabel } = require('./sheet-status');
 const { additionalPassengerCount, transferPassengerCount, transferSeatCount } = require('./transfer-party');
+const { createTransferCancellationHandler } = require('./transfer-cancellation');
 
 initializeApp();
 
@@ -18,6 +19,13 @@ const RUNTIME_SERVICE_ACCOUNT = 'egadi-transfer-sheet-writer@egadi-sailing-2026.
 const EVENT_ID = 'egadi-2026';
 const TRANSFER_AIRPORTS = new Set(['TPS', 'PMO']);
 const TRANSFER_RECORD_STATUSES = new Set(['new', 'planned', 'confirmed', 'completed', 'cancelled', 'revoked']);
+
+exports.cancelBoatTransfer = onCall({
+  region: REGION,
+  serviceAccount: RUNTIME_SERVICE_ACCOUNT,
+  timeoutSeconds: 30,
+  memory: '256MiB',
+}, createTransferCancellationHandler({ db, FieldValue, HttpsError }));
 
 function asText(value, maxLength = 180) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';

@@ -7,8 +7,16 @@ Ultimo aggiornamento: 6 ottobre 2026. Le caselle descrivono lo stato verificato;
 - [x] Contratto: una scheda con +2 vale tre persone, senza duplicare identità. Campo per singola tratta, non copiato automaticamente al ritorno.
 - [x] Rules: 528 test superati, inclusi permessi, limiti 0–8 e compatibilità con batch e client precedenti.
 - [x] Gate locale: 141 test unitari, sintassi JS, diff pulito; Flutter analyze senza problemi (preferenza globale). Renderer reali con fixture fittizia IT/EN, desktop 1280 e mobile 320/390 px; a 320 px pagina e scroll misurano entrambi 320 px, form aperto e selettore utilizzabili. Non equivale a un test di dispositivo fisico.
-- [ ] Pubblicazione e lettura dopo salvataggio di Carlo +2 nel record, nel backup e in Arrivi N:O. Autorizzazione esplicita del titolare ricevuta il 06/10/2026.
-- [ ] Allineamento N:O dei record precedenti senza cambiare A:M né creare nuove righe.
+- [x] Backend e Rules pubblicati; Carlo +2 aggiornato esclusivamente sull'andata, con precondizione di revisione. Lettura server: record e backup +2; Arrivi N23:O23 = 2 / 3. Nessun rientro di Carlo creato, nessun volo o registrazione modificato. Autorizzazione esplicita del titolare ricevuta il 06/10/2026.
+- [x] Allineamento delle sole celle N:O vuote dei record precedenti: 79 righe, A:M e righe conservate. Rilettura 80/80 righe coerenti col backup; Carlo 2/3, Andrea 0/1 in entrambi i sensi.
+- [ ] Rilettura esatta frontend pubblico dopo il rilascio.
+
+## Transfer: annullamento per singola tratta · 6 ottobre 2026
+
+- [x] Sorgente: il gestore mantiene lo stato Annullato; lo skipper può annullare andata o ritorno della propria barca con conferma. La scheda resta nello storico, accompagnatori conservati ma esclusi dai posti da organizzare.
+- [x] Test specifici con dati fittizi: titolarità, organizzatore, estranei/crew negati, metadati incoerenti, conclusi/revocati, idempotenza, payload UI, conferma/errore e renderer skipper reale. Nessuna richiesta reale annullata per provare il comando.
+- [x] Gate locale: 150 test unitari passati, sintassi JS e diff puliti, Flutter analyze senza problemi; avvio area anonima senza errori console. Card skipper a 320 px: scroll 320 px, tre pulsanti separati larghi 286 px e alti 44 px. Nessuna modifica ad accesso Google o contabilità.
+- [ ] Gate generale, pubblicazione callable prima del client, lettura esatta dei file pubblici e metadati backend. La prova da dispositivo fisico resta distinta.
 
 ## Sito pubblico e contenuti
 

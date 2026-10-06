@@ -3,6 +3,7 @@ import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signO
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { getBlob, getMetadata, getStorage, ref as storageRef, uploadBytesResumable } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
+import { cancellationActions, bindTransferCancellation } from './area-transfer-cancel.js?v=20261006-annulla-transfer-v1';
 import { getMissingCharterFields, getMissingSkipperProfileFields, isBoatReadyForPdf, isCharterReady, isSkipperProfileCharterReady, openCapitaneriaPdf } from './crew-pdf.js?v=20260915-skipper-documents-v1';
 import { watchForStaleScript } from './stale-script.js?v=20260925-extract-v1';
 import { createCrewInviteIdentity, normalizeCrewPhone } from './crew-identity.js';
@@ -6988,7 +6989,7 @@ function crewTravelOverviewCards() {
 // il bug reale del 22/09/2026 con una persona rimasta invisibile in bozza).
 function renderCrewTravelOverview() {
   const sections = Array.from(document.querySelectorAll('[data-crew-travel-overview]'));
-  if (!sections.length) return;
+  if (!sections.length || !activeBoat?.id) return;
   const cards = crewTravelOverviewCards();
   if (!cards.length) {
     sections.forEach((section) => {
@@ -7024,7 +7025,9 @@ function renderCrewTravelOverview() {
     ...activeCrewTravelStatus.filter((entry) => entry.isSkipper === true),
   ];
   const cardAction = (voce) => {
-    if (voce.isSkipper === true) return '';
+    const cancellations = cancellationActions(voce, voce.isSkipper === true ? 'skipper' : voce.id, escapeHtml, window.EgadiI18n?.getLocale?.() === 'en');
+    const groupedActions = (content) => `<div class="crew-transfer-actions">${content}</div>`;
+    if (voce.isSkipper === true) return cancellations ? groupedActions(cancellations) : '';
     const card = cardFor.get(voce.id);
     if (!card) return '';
     const useReminder = card.needsReminder && card.presentation.tone !== 'cancelled';
@@ -7032,9 +7035,10 @@ function renderCrewTravelOverview() {
     const actionLabel = useReminder
       ? 'Sollecita su WhatsApp'
       : card.presentation.tone === 'cancelled' ? 'Contatta su WhatsApp' : 'Scrivi su WhatsApp';
-    return contactUrl
+    const contactAction = contactUrl
       ? `<a class="button button-whatsapp crew-travel-card-whatsapp" href="${escapeHtml(contactUrl)}" target="_blank" rel="noopener noreferrer">${whatsappActionIconMarkup({ external: true })}${escapeHtml(actionLabel)}</a>`
       : '<span class="field-hint crew-travel-card-no-contact">Numero WhatsApp non disponibile</span>';
+    return cancellations ? groupedActions(contactAction + cancellations) : contactAction;
   };
   const daSollecitare = cards.filter((card) => card.group === 'waiting').length;
   const rosterCopy = rosterHeading(false);
@@ -7048,6 +7052,7 @@ function renderCrewTravelOverview() {
   sections.forEach((section) => {
     section.hidden = false;
     section.innerHTML = markup;
+    bindTransferCancellation(section, { app, boatId: activeBoat.id, english: window.EgadiI18n?.getLocale?.() === 'en' });
   });
 }
 

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import * as ordering from '../transfer-ordering.js';
+import { rosterMarkup } from '../boat-roster.js';
 
 const source = readFileSync(new URL('../transfer.js', import.meta.url), 'utf8');
 const html = readFileSync(new URL('../transfer.html', import.meta.url), 'utf8');
@@ -52,4 +53,21 @@ export function renderFixture(language = 'it') {
     .replace(/<link[^>]+fonts[^>]*>/g, '')
     .replace('<section id="transferHero" class="area-hero transfer-operator-hero"></section>', '<p>Anteprima con soli dati fittizi · nessun salvataggio online</p>')
     .replace('<section id="transferApp" class="transfer-operator-app" aria-live="polite"></section>', `<section id="transferApp" class="transfer-operator-app">${context.renderGroupedRecords(records)}</section>`);
+}
+
+export function renderSkipperFixture(language = 'it') {
+  const ui = readFileSync(new URL('../area-transfer-cancel.js', import.meta.url), 'utf8');
+  const ctx = vm.createContext({});
+  vm.runInContext(ui.slice(ui.indexOf('export function cancellationActions'), ui.indexOf('export function bindTransferCancellation')).replace('export function ', 'function '), ctx);
+  const escape = (value) => String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
+  const rows = [{
+    id: 'person', displayName: 'Partecipante fittizio', preferredLocale: language,
+    outboundDate: '2026-10-08', outboundTime: '13:15', outboundTransport: 'flight',
+    outboundTransfer: 'requested', outboundOperationStatus: 'confirmed',
+    returnDate: '2026-10-11', returnTime: '20:35', returnTransport: 'flight',
+    returnTransfer: 'requested', returnOperationStatus: 'new',
+  }];
+  const markup = rosterMarkup(rows, { english: language === 'en', azione: (row) => `<div class="crew-transfer-actions"><a class="button button-whatsapp" href="#">${language === 'en' ? 'Message on WhatsApp' : 'Scrivi su WhatsApp'}</a>${ctx.cancellationActions(row, row.id, escape, language === 'en')}</div>` });
+  const scopedStyle = readFileSync(new URL('../area.html', import.meta.url), 'utf8').match(/<style>\.crew-transfer-actions[\s\S]*?<\/style>/)?.[0] || '';
+  return `<!doctype html><html lang="${language}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/styles.css">${scopedStyle}<body><main class="container"><p>Anteprima fittizia · nessuna operazione online</p><div class="crew-travel-list">${markup}</div></main></body></html>`;
 }

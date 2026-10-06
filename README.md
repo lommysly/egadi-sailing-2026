@@ -270,6 +270,8 @@ Lo stesso documento `crewTravelStatus` contiene ora soltanto lo stato operativo 
 
 Nel Google Sheet privato le schede aggiornate automaticamente sono **Arrivi** e **Partenze**. La vecchia scheda **Archivio (non aggiornato)** resta conservata, ma non va usata per organizzare i transfer. L'accesso generale del file è limitato al proprietario e all'account tecnico che lo aggiorna; gli operatori leggono le richieste autorizzate nel portale, non attraverso un link pubblico al foglio.
 
+Ogni scheda transfer può indicare da 0 a 8 accompagnatori della stessa tratta: il referente con +2 occupa tre posti, senza tre registrazioni uguali. I subtotali seguono direzione, data, aeroporto e fascia oraria; sono persone da coordinare, non navette già confermate. Il backup privato conserva A:M e aggiunge N **Accompagnatori**, O **Persone totali**. Il gestore può impostare **Annullato**; nelle card viaggio della propria barca lo skipper trova **Annulla transfer andata/ritorno**, con conferma. L'annullamento conserva lo storico ed esclude tutti i posti della scheda dai totali, senza cancellare partecipazione o modificare pagamenti. Il servizio già concluso non è annullabile da questo comando; un mezzo già confermato richiede anche un avviso diretto al gestore. Contratto e permessi in `ARRIVI_PARTENZE_SPEC.md`, test in `tools/transfer-cancellation.test.mjs`.
+
 ## Attivazione operativa
 
 1. Il sorgente, le Security Rules e il dominio HTTPS sono pubblicati.
