@@ -148,7 +148,7 @@ const COPY = {
     boatStatsSummary: '{boats} barche · {members} persone a bordo (equipaggio + skipper) · {outbound} hanno chiesto il transfer in andata, {return} al ritorno.',
     boatStatSkipper: 'Skipper {name}',
     boatStatOnBoard: 'a bordo (equipaggio + skipper)',
-    boatStatRequestedShort: 'transfer',
+    boatStatRequestedShort: 'richieste registrate',
     boatStatIndependentShort: 'per conto loro',
     boatStatPendingShort: 'chiesti a metà',
     boatChecklistCrewTransfer: 'Transfer equipaggio completati',
@@ -321,7 +321,7 @@ const COPY = {
     boatStatsSummary: '{boats} boats · {members} people on board (crew + skipper) · {outbound} requested the outbound transfer, {return} the return.',
     boatStatSkipper: 'Skipper {name}',
     boatStatOnBoard: 'on board (crew + skipper)',
-    boatStatRequestedShort: 'transfer',
+    boatStatRequestedShort: 'registered requests',
     boatStatIndependentShort: 'on their own',
     boatStatPendingShort: 'left half-done',
     boatChecklistCrewTransfer: 'Crew transfers completed',
@@ -1320,6 +1320,16 @@ function renderTodoBoard() {
   return `<section class="transfer-operator-card transfer-todo" aria-label="${escapeHtml(t('todoEyebrow'))}"><p class="eyebrow">${escapeHtml(t('todoEyebrow'))}</p><h2>${escapeHtml(title)}</h2><p class="field-hint">${escapeHtml(t('todoHint'))}</p><ul class="transfer-todo-list">${items}</ul></section>`;
 }
 
+// Le registrazioni a bordo e i posti su un mezzo non sono lo stesso numero:
+// un referente può portare accompagnatori senza nuove registrazioni.
+function boatTransferSeatsMarkup(boatId = null) {
+  const records = state.records.filter((record) => !boatId || record.boatId === boatId);
+  const outbound = totalTransferSeats(records.filter((record) => normalizeDirection(record.direction) === 'outbound'));
+  const returning = totalTransferSeats(records.filter((record) => normalizeDirection(record.direction) === 'return'));
+  const label = locale() === 'en' ? 'Transfer seats, including additional passengers' : 'Posti transfer, accompagnatori compresi';
+  return `<p class="field-hint"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(t('inbound'))} <strong>${outbound}</strong> · ${escapeHtml(t('outbound'))} <strong>${returning}</strong></p>`;
+}
+
 function renderBoatStats() {
   if (!state.allBoats.length) return '';
   const boatIds = state.allBoats.map((boat) => boat.id);
@@ -1376,6 +1386,7 @@ function renderBoatStats() {
         ${legLine(t('inbound'), breakdown.outbound)}
         ${legLine(t('outbound'), breakdown.return)}
       </div>
+      ${boatTransferSeatsMarkup(boat.id)}
       <div class="transfer-boat-stat-footer">
         ${reminderUrl ? `<a class="button button-whatsapp transfer-boat-stat-action" href="${escapeHtml(reminderUrl)}" target="_blank" rel="noopener noreferrer"><span class="whatsapp-action-icon" aria-hidden="true">${whatsappIconSvg()}</span>${escapeHtml(t('boatReminderAction'))}</a>` : ''}
       </div>
@@ -1390,7 +1401,7 @@ function renderBoatStats() {
     .replace('{boats}', String(state.allBoats.length))
     .replace('{members}', String(totals.members))
     .replace('{outbound}', String(totals.outboundRequested))
-    .replace('{return}', String(totals.returnRequested)))}</p>${setupSummary}`;
+    .replace('{return}', String(totals.returnRequested)))}</p>${boatTransferSeatsMarkup()}${setupSummary}`;
   return `<section class="transfer-operator-card transfer-boat-stats" aria-label="${escapeHtml(t('boatStatsTitle'))}"><p class="eyebrow">${escapeHtml(t('boatStatsEyebrow'))}</p><h2>${escapeHtml(t('boatStatsTitle'))}</h2>${summary}<div class="transfer-boat-stat-grid">${cards}</div></section>`;
 }
 

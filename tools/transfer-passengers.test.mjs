@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import { renderFixture } from './transfer-passengers-fixture.mjs';
 import party from '../functions/transfer-party.js';
 import sheetStatus from '../functions/sheet-status.js';
+import { totalTransferSeats } from '../transfer-ordering.js';
 
 const server = readFileSync(new URL('../functions/index.js', import.meta.url), 'utf8');
 function section(start, end) {
@@ -117,4 +118,24 @@ test('interfaccia reale IT/EN: totali per fascia e accompagnatori nel riepilogo 
   assert.match(en, /3 people \(\+2\)/);
   assert.match(en, /Additional passengers with this contact/);
   assert.match(en, /Departure from Marsala 18:50/);
+});
+
+test('riepilogo per barca: tre posti con un referente, annullati e altre barche esclusi', () => {
+  const source = readFileSync(new URL('../transfer.js', import.meta.url), 'utf8');
+  const start = source.indexOf('function boatTransferSeatsMarkup(');
+  const end = source.indexOf('\nfunction renderBoatStats()', start);
+  const ctx = vm.createContext({
+    state: { records: [
+      { boatId: 'boat', direction: 'outbound', additionalPassengers: 2, status: 'new' },
+      { boatId: 'boat', direction: 'return', status: 'confirmed' },
+      { boatId: 'boat', direction: 'outbound', additionalPassengers: 8, status: 'cancelled' },
+      { boatId: 'other', direction: 'outbound', status: 'new' },
+    ] },
+    totalTransferSeats, normalizeDirection: (direction) => direction,
+    locale: () => 'it', escapeHtml: (value) => value, t: (key) => key === 'inbound' ? 'Andata' : 'Rientro',
+  });
+  vm.runInContext(source.slice(start, end), ctx);
+  assert.match(ctx.boatTransferSeatsMarkup('boat'), /Andata <strong>3<\/strong> · Rientro <strong>1<\/strong>/);
+  assert.match(ctx.boatTransferSeatsMarkup(), /Andata <strong>4<\/strong>/);
+  assert.match(source.slice(end), /\$\{boatTransferSeatsMarkup\(boat.id\)\}/);
 });

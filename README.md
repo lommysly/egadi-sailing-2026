@@ -272,6 +272,8 @@ Nel Google Sheet privato le schede aggiornate automaticamente sono **Arrivi** e 
 
 Ogni scheda transfer può indicare da 0 a 8 accompagnatori della stessa tratta: il referente con +2 occupa tre posti, senza tre registrazioni uguali. I subtotali seguono direzione, data, aeroporto e fascia oraria; sono persone da coordinare, non navette già confermate. Il backup privato conserva A:M e aggiunge N **Accompagnatori**, O **Persone totali**. Il gestore può impostare **Annullato**; nelle card viaggio della propria barca lo skipper trova **Annulla transfer andata/ritorno**, con conferma. L'annullamento conserva lo storico ed esclude tutti i posti della scheda dai totali, senza cancellare partecipazione o modificare pagamenti. Il servizio già concluso non è annullabile da questo comando; un mezzo già confermato richiede anche un avviso diretto al gestore. Contratto e permessi in `ARRIVI_PARTENZE_SPEC.md`, test in `tools/transfer-cancellation.test.mjs`.
 
+Anche il riepilogo organizzatore per barca distingue le **richieste registrate** dai **posti transfer, accompagnatori compresi**: Carlo può avere una sola registrazione a bordo ma tre posti sul mezzo. Gli accompagnatori non aumentano automaticamente la Crew List o la capienza della barca.
+
 ## Attivazione operativa
 
 1. Il sorgente, le Security Rules e il dominio HTTPS sono pubblicati.
