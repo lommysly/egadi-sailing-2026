@@ -274,6 +274,8 @@ Ogni scheda transfer può indicare da 0 a 8 accompagnatori della stessa tratta: 
 
 Anche il riepilogo organizzatore per barca distingue le **richieste registrate** dai **posti transfer, accompagnatori compresi**: Carlo può avere una sola registrazione a bordo ma tre posti sul mezzo. Gli accompagnatori non aumentano automaticamente la Crew List o la capienza della barca.
 
+Rilascio verificato il 06/10/2026: funzioni e Rules nel progetto `egadi-sailing-2026`, frontend GitHub Pages `ce88d6d` riletto esattamente, 151 test unitari e 528 test Rules/Storage superati. La vista organizzatore autenticata mostra Carlo +2 / 3 persone e 5 posti nella fascia TPS delle 13:15; backup Arrivi/Partenze allineato su 80 righe. L'annullamento resta verificato automaticamente con dati fittizi, senza annullare richieste reali; la prova su telefono fisico è un gate distinto nella checklist.
+
 ## Attivazione operativa
 
 1. Il sorgente, le Security Rules e il dominio HTTPS sono pubblicati.
