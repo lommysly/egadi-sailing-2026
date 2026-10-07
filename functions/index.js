@@ -6,7 +6,7 @@ const { logger } = require('firebase-functions');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { google } = require('googleapis');
-const { sheetTransferRequestLabel, sheetTravelStatusLabel } = require('./sheet-status');
+const { sheetDate, sheetTimestamp, sheetTransferRequestLabel, sheetTravelStatusLabel } = require('./sheet-status');
 const { additionalPassengerCount, transferPassengerCount, transferSeatCount } = require('./transfer-party');
 const { createTransferCancellationHandler } = require('./transfer-cancellation');
 
@@ -1051,10 +1051,10 @@ function humanSheetRow(record) {
     record.serviceNumber || '',
     [record.originCity, record.originAirport].filter(Boolean).join(' · '),
     [record.destinationCity, record.destinationAirport].filter(Boolean).join(' · ') || record.airport || '',
-    record.date || '',
+    sheetDate(record.date),
     record.time || '',
     sheetTransferRequestLabel(record),
-    [record.meetingPoint, record.meetingDate, record.meetingTime].filter(Boolean).join(' · '),
+    [record.meetingPoint, sheetDate(record.meetingDate), record.meetingTime].filter(Boolean).join(' · '),
     sheetTravelStatusLabel(record),
     additionalPassengerCount(record),
     transferPassengerCount(record),
@@ -1070,7 +1070,10 @@ function technicalSheetRow(record) {
     record.status || 'new',
     record.recordState === 'active' ? 'Attiva' : 'Revocata',
     record.legState || '',
-    new Date().toISOString(),
+    // Quando è cambiato il record, non quando è stata riscritta la riga:
+    // così far riscrivere il foglio (vedi sheetSyncRequestedAt più sotto)
+    // non cancella l'informazione su chi ha aggiornato il viaggio e quando.
+    sheetTimestamp(record.updatedAt) || sheetTimestamp(new Date()),
   ];
 }
 
@@ -1229,6 +1232,12 @@ async function allocateSheetRow(recordId, revision, sheetName) {
   });
 }
 
+// Per far riscrivere una riga senza toccare il viaggio (per esempio dopo aver
+// cambiato come il foglio presenta un dato) basta aggiornare sul record di
+// backup il campo `sheetSyncRequestedAt`: non compare nel foglio e non
+// sposta `updatedAt`, ma è una scrittura e quindi riattiva questa funzione.
+// Farlo una riga alla volta, a distanza di qualche secondo: l'API di Google
+// Sheets accetta circa 60 scritture al minuto e ogni riga ne costa tre.
 exports.syncTravelBackupToGoogleSheet = onDocumentWritten({
   document: `events/${EVENT_ID}/travelBackupRecords/{recordId}`,
   region: REGION,
