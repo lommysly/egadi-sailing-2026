@@ -15,6 +15,7 @@ import { installTravelAutocomplete, setTravelAirportLookup } from './travel-auto
 import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=20261002-niente-promo-in-area-v1';
 import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-card-come-il-gestore-v1';
+import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
 import {
   boatFromData,
   boatSetupReadiness,
@@ -8962,9 +8963,12 @@ function travelRideOfferMessage(form) {
   const time = String(form.elements.namedItem(legId === 'outbound' ? 'arrivalTime' : 'departureTime')?.value || '').trim();
   const date = String(form.elements.namedItem(legId === 'outbound' ? 'arrivalDate' : 'departureDate')?.value || '').trim();
   const seats = Number.parseInt(String(form.elements.namedItem('rideOfferSeats')?.value || '0'), 10);
-  const when = [date, time ? 'alle ' + time : ''].filter(Boolean).join(' ');
+  // Il campo data restituisce AAAA-MM-GG: nel messaggio usciva "Il 2026-10-08
+  // alle 14:30". Ora il giorno è scritto a parole, e la frase regge anche
+  // quando c'è solo l'ora o solo il giorno.
+  const when = [formatIsoDay(date, { weekday: 'long' }), time ? 'alle ' + time : ''].filter(Boolean).join(' ');
   const route = legId === 'outbound' ? airportLabel + ' → porto di Marsala' : 'porto di Marsala → ' + airportLabel;
-  return 'Ciao! ' + (when ? 'Il ' + when + ' ' : '') + 'faccio la tratta ' + route + '. '
+  return 'Ciao! ' + (when ? when.charAt(0).toUpperCase() + when.slice(1) + ' ' : '') + 'faccio la tratta ' + route + '. '
     + 'Noleggio / guido un’auto e posso offrire ' + seats + (seats === 1 ? ' posto' : ' posti') + '. '
     + 'Se ti serve un passaggio, scrivimi qui nel gruppo e ci organizziamo.';
 }

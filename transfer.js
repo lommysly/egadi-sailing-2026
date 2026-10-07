@@ -24,6 +24,7 @@ import {
   totalTransferSeats,
   suggestedMarsalaDeparture,
 } from './transfer-ordering.js?v=20261006-posti-transfer-v1';
+import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
 import {
   boatFromData,
   boatSetupReadiness as readinessFromSignals,
@@ -531,8 +532,13 @@ function formatDateTime(value) {
   }).format(date);
 }
 
+// Il giorno arriva dal database come AAAA-MM-GG: mostrato così si leggeva
+// "mese, poi giorno" sia nella scheda sia nel messaggio WhatsApp.
 function formatSchedule(record) {
-  const date = text(record.transferDate || record.date || record.arrivalDate || record.departureDate, 32);
+  const date = formatIsoDay(
+    text(record.transferDate || record.date || record.arrivalDate || record.departureDate, 32),
+    { english: locale() === 'en' },
+  );
   const time = optionalTime(record.transferTime || record.time || record.arrivalTime || record.departureTime);
   return [date, time].filter(Boolean).join(' · ') || t('unknownDateTime');
 }

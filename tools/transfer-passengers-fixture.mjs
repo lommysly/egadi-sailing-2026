@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import * as ordering from '../transfer-ordering.js';
 import { rosterMarkup } from '../boat-roster.js';
+import { formatIsoDay } from '../date-format.js';
 
 const source = readFileSync(new URL('../transfer.js', import.meta.url), 'utf8');
 const html = readFileSync(new URL('../transfer.html', import.meta.url), 'utf8');
@@ -27,7 +28,7 @@ export function renderFixture(language = 'it') {
     airportCode: (record) => record.airport,
     participantName: (record) => record.participantName,
     routeLabel: (record) => record.direction === 'return' ? `Marsala → ${record.airport}` : `${record.airport} → Marsala`,
-    formatSchedule: (record) => `${record.date} · ${record.time}`,
+    formatSchedule: (record) => `${formatIsoDay(record.date, { english: language === 'en' })} · ${record.time}`,
     recordFlight: () => 'Volo fittizio',
     recordLuggage: () => 'Bagagli da verificare',
     recordContactMarkup: () => 'Contatto fittizio',
