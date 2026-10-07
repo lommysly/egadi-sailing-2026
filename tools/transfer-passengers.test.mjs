@@ -75,6 +75,8 @@ test('stato equipaggio: l’annullamento si propaga solo alla tratta scelta, sen
   const ctx = context({
     asUid: (value) => value,
     FieldValue: { serverTimestamp: () => 'server' },
+    // Il contatto del gestore è una lettura a parte, provata più sotto.
+    transferContact: async () => null,
     db: {
       doc: (path) => { assert.equal(path, 'boats/boat/crewTravelStatus/person'); return path; },
       runTransaction: async (callback) => callback({
@@ -245,4 +247,58 @@ test('"Modifica corsa" seleziona tutta la navetta e apre il modulo di gruppo esi
   assert.match(handler, /cluster\?\.querySelectorAll\('\[data-record-select\]'\)/);
   assert.match(handler, /state\.bulkFormExpanded = true/);
   assert.match(handler, /renderBulkToolbar\(\)/);
+});
+
+// Il numero del gestore arriva alla persona insieme a orario e punto di
+// ritrovo, e solo per una richiesta attiva (richiesta di Silvio, 7/10/2026).
+test('stato equipaggio: il contatto del gestore viaggia con il transfer attivo, non con quello revocato', async () => {
+  const run = async (record, contact) => {
+    let changes;
+    const ctx = context({
+      asUid: (value) => value,
+      FieldValue: { serverTimestamp: () => 'server' },
+      transferContact: async () => contact,
+      db: {
+        doc: (path) => path,
+        runTransaction: async (callback) => callback({ get: async () => ({ data: () => ({}) }), set: (_, payload) => { changes = payload; } }),
+      },
+    });
+    vm.runInContext(section('async function writeCrewTransferOperationStatus(', 'exports.materializeCrewTravel ='), ctx);
+    await ctx.writeCrewTransferOperationStatus(record, 5);
+    return changes;
+  };
+  const base = { boatId: 'boat', inviteId: 'person', direction: 'outbound', status: 'confirmed', meetingTime: '14:30', meetingPoint: 'Hall Arrivi' };
+  const giovanni = { name: 'Giovanni', phone: '+390000000000' };
+  const active = await run({ ...base, recordState: 'active' }, giovanni);
+  assert.equal(active.transferContactName, 'Giovanni');
+  assert.equal(active.transferContactPhone, '+390000000000');
+  assert.equal(active.outboundMeetingTime, '14:30');
+  // Senza contatto configurato non si scrive niente, e non si cancella quello che c'era.
+  const none = await run({ ...base, recordState: 'active' }, null);
+  assert.equal(Object.hasOwn(none, 'transferContactPhone'), false);
+  const revoked = await run({ ...base, recordState: 'revoked' }, giovanni);
+  assert.equal(Object.hasOwn(revoked, 'transferContactPhone'), false);
+});
+
+test('contatto del gestore: letto dal documento solo server, validato e tenuto in memoria', async () => {
+  // Ogni scenario parte da una funzione appena caricata, con la memoria vuota.
+  const fresh = (stored) => {
+    const counter = { reads: 0 };
+    const ctx = context({
+      EVENT_ID: 'egadi-2026',
+      Date,
+      logger: { warn() {} },
+      db: { doc: (path) => { assert.equal(path, 'events/egadi-2026/integrations/transferContact'); return { get: async () => { counter.reads += 1; return { exists: Boolean(stored), data: () => stored }; } }; } },
+    });
+    vm.runInContext(section('const TRANSFER_CONTACT_TTL_MS', 'async function writeCrewTransferOperationStatus('), ctx);
+    return { ctx, counter };
+  };
+  const valid = fresh({ name: 'Giovanni', phone: '+390000000000' });
+  assert.deepEqual({ ...(await valid.ctx.transferContact()) }, { name: 'Giovanni', phone: '+390000000000' });
+  // Seconda richiesta ravvicinata: nessuna nuova lettura.
+  await valid.ctx.transferContact();
+  assert.equal(valid.counter.reads, 1);
+  assert.equal(await fresh({ name: 'Giovanni', phone: '3200000000' }).ctx.transferContact(), null);
+  assert.equal(await fresh({ name: 'Giovanni', phone: '+390000000000', active: false }).ctx.transferContact(), null);
+  assert.equal(await fresh(null).ctx.transferContact(), null);
 });
