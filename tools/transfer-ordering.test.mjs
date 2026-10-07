@@ -10,6 +10,7 @@ import {
   sortTransferRecords,
   suggestedMarsalaDeparture,
   transferOperationalDate,
+  transferTimingCheck,
 } from '../transfer-ordering.js';
 import serverParty from '../functions/transfer-party.js';
 
@@ -166,4 +167,60 @@ test('a parità di orario l ordine resta deterministico per nome e id', () => {
     'anna-2',
     'z-2',
   ]);
+});
+
+// I casi veri della vigilia degli arrivi (7/10/2026): il portale accettava in
+// silenzio un ritrovo prima dell'atterraggio, conferme senza orario e attese
+// di ore. Questi test fissano che cosa deve segnalare e, altrettanto
+// importante, che cosa deve lasciar passare senza disturbare il gestore.
+const arrival = (time, meetingTime, extra = {}) => ({ airport: 'PMO', date: '2026-10-08', time, meetingTime, status: 'confirmed', ...extra });
+const departure = (airport, time, meetingTime, extra = {}) => ({ airport, date: '2026-10-11', time, meetingTime, status: 'confirmed', direction: 'return', ...extra });
+
+test('andata: ritrovo prima dell’atterraggio è un errore, con i minuti di scarto', () => {
+  assert.deepEqual(transferTimingCheck(arrival('21:10', '18:00'), 'outbound'), { level: 'error', code: 'pickup_before_landing', minutes: 190 });
+});
+
+test('andata: oltre due ore di attesa è un avviso, entro due ore non si segnala niente', () => {
+  assert.deepEqual(transferTimingCheck(arrival('07:45', '11:30'), 'outbound'), { level: 'warning', code: 'long_wait', minutes: 225 });
+  assert.deepEqual(transferTimingCheck(arrival('12:55', '14:30'), 'outbound'), { level: 'ok', code: '', minutes: 95 });
+  assert.deepEqual(transferTimingCheck(arrival('12:30', '14:30'), 'outbound'), { level: 'ok', code: '', minutes: 120 });
+  assert.equal(transferTimingCheck(arrival('18:00', '18:00'), 'outbound').level, 'ok');
+});
+
+test('conferma senza orario di ritrovo: avviso; da organizzare senza orario: niente', () => {
+  assert.equal(transferTimingCheck(arrival('23:55', ''), 'outbound').code, 'confirmed_without_time');
+  assert.equal(transferTimingCheck(arrival('23:55', '', { status: 'completed' }), 'outbound').code, 'confirmed_without_time');
+  assert.equal(transferTimingCheck(arrival('23:55', '', { status: 'new' }), 'outbound').level, 'none');
+  assert.equal(transferTimingCheck(arrival('23:55', '', { status: 'planned' }), 'outbound').level, 'none');
+});
+
+test('una scheda annullata non genera avvisi, qualunque orario abbia', () => {
+  assert.equal(transferTimingCheck(arrival('21:10', '18:00', { status: 'cancelled' }), 'outbound').level, 'none');
+  assert.equal(transferTimingCheck(null, 'outbound').level, 'none');
+});
+
+test('volo a ridosso di mezzanotte: il ritrovo dopo le 24 non è "prima dell’atterraggio"', () => {
+  assert.deepEqual(transferTimingCheck(arrival('23:55', '00:20'), 'outbound'), { level: 'ok', code: '', minutes: 25 });
+  // Con la data di ritrovo scritta esplicitamente vale quella, senza correzioni.
+  assert.deepEqual(transferTimingCheck(arrival('23:55', '00:20', { meetingDate: '2026-10-09' }), 'outbound'), { level: 'ok', code: '', minutes: 25 });
+  assert.equal(transferTimingCheck(arrival('23:55', '00:20', { meetingDate: '2026-10-08' }), 'outbound').code, 'pickup_before_landing');
+});
+
+test('ritorno: conta il tempo che resta in aeroporto dopo il viaggio da Marsala', () => {
+  // Palermo: 105 minuti di strada. Partenza 18:45 per il volo delle 21:30.
+  assert.deepEqual(transferTimingCheck(departure('PMO', '21:30', '18:45'), 'return'), { level: 'ok', code: '', minutes: 60 });
+  assert.deepEqual(transferTimingCheck(departure('PMO', '21:30', '19:30'), 'return'), { level: 'warning', code: 'tight_margin', minutes: 15 });
+  assert.deepEqual(transferTimingCheck(departure('PMO', '21:30', '20:00'), 'return'), { level: 'error', code: 'late_for_flight', minutes: 15 });
+  // Trapani: 45 minuti di strada.
+  assert.deepEqual(transferTimingCheck(departure('TPS', '20:35', '18:50'), 'return'), { level: 'ok', code: '', minutes: 60 });
+});
+
+test('ritorno con volo dopo mezzanotte: la partenza della sera prima non sballa il conto', () => {
+  assert.deepEqual(transferTimingCheck(departure('TPS', '00:30', '23:00', { date: '2026-10-12' }), 'return'), { level: 'ok', code: '', minutes: 45 });
+  assert.deepEqual(transferTimingCheck(departure('TPS', '05:55', '04:10', { date: '2026-10-12' }), 'return'), { level: 'ok', code: '', minutes: 60 });
+});
+
+test('senza volo leggibile o con aeroporto sconosciuto non si inventa un avviso', () => {
+  assert.equal(transferTimingCheck(arrival('', '14:30'), 'outbound').level, 'none');
+  assert.equal(transferTimingCheck(departure('XXX', '21:30', '18:45'), 'return').level, 'none');
 });

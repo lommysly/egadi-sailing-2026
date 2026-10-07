@@ -139,3 +139,50 @@ test('riepilogo per barca: tre posti con un referente, annullati e altre barche 
   assert.match(ctx.boatTransferSeatsMarkup(), /Andata <strong>4<\/strong>/);
   assert.match(source.slice(end), /\$\{boatTransferSeatsMarkup\(boat.id\)\}/);
 });
+
+// Richiesta di Silvio, 7/10/2026: a prenotazioni fatte la scheda deve mostrare
+// l'orario deciso dal gestore e lo stato senza doverla aprire, e segnalare da
+// sola gli orari che non tornano. I record sono fittizi; i renderer sono
+// quelli veri della pagina.
+test('scheda chiusa: ritrovo in testa, volo con la sua etichetta, avvisi sugli orari', () => {
+  const records = [
+    { id: 'ok', participantName: 'Persona puntuale', phone: '+39000', airport: 'PMO', date: '2026-10-08', time: '12:55', meetingTime: '14:30', direction: 'outbound', status: 'confirmed' },
+    { id: 'tardi', participantName: 'Atterra dopo', phone: '+39000', airport: 'PMO', date: '2026-10-08', time: '21:10', meetingTime: '18:00', direction: 'outbound', status: 'confirmed' },
+    { id: 'attesa', participantName: 'Aspetta a lungo', phone: '+39000', airport: 'PMO', date: '2026-10-08', time: '07:45', meetingTime: '11:30', direction: 'outbound', status: 'confirmed' },
+    { id: 'senza', participantName: 'Senza orario', airport: 'TPS', date: '2026-10-08', time: '23:55', direction: 'outbound', status: 'confirmed' },
+    { id: 'nuova', participantName: 'Da organizzare', phone: '+39000', airport: 'TPS', date: '2026-10-08', time: '13:15', direction: 'outbound', status: 'new' },
+  ];
+  const html = renderFixture('it', records);
+  const card = (id) => html.slice(html.indexOf(`data-record-id="${id}"`), html.indexOf('</summary>', html.indexOf(`data-record-id="${id}"`)));
+
+  const ok = card('ok');
+  assert.match(ok, /class="transfer-record-pickup"><small>Ritrovo<\/small><b>14:30<\/b>/);
+  assert.match(ok, /<span>Volo in arrivo gio 8 ottobre · 12:55<\/span>/);
+  assert.match(ok, /transfer-badge--confirmed/);
+  assert.doesNotMatch(ok, /transfer-badge--alert-/);
+
+  const late = card('tardi');
+  assert.match(late, /transfer-badge--alert-error">Atterra dopo il ritrovo/);
+  assert.match(html, /data-record-id="tardi" data-timing="error"/);
+  assert.doesNotMatch(html, /data-record-id="ok" data-timing/);
+
+  assert.match(card('attesa'), /transfer-badge--alert-warning">Attesa 3h45/);
+
+  const missing = card('senza');
+  assert.match(missing, /transfer-record-pickup is-missing"><small>Ritrovo<\/small><b>da fissare<\/b>/);
+  assert.match(missing, /transfer-badge--alert-warning">Manca orario di ritrovo/);
+  assert.match(missing, /transfer-badge--alert-note">Senza telefono/);
+
+  // Chi è ancora da organizzare non ha colpe: nessun avviso sugli orari.
+  const fresh = card('nuova');
+  assert.match(fresh, /is-missing/);
+  assert.doesNotMatch(fresh, /transfer-badge--alert-(error|warning)/);
+
+  // L'intestazione della fascia dice quante schede vanno guardate.
+  assert.match(html, /transfer-time-band-alert">1 da controllare/);
+
+  const en = renderFixture('en', records);
+  assert.match(en, /<small>Pick-up<\/small><b>14:30<\/b>/);
+  assert.match(en, /Lands after pick-up/);
+  assert.match(en, /Flight lands/);
+});

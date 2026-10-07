@@ -23,7 +23,8 @@ import {
   transferPassengerCount,
   totalTransferSeats,
   suggestedMarsalaDeparture,
-} from './transfer-ordering.js?v=20261006-posti-transfer-v1';
+  transferTimingCheck,
+} from './transfer-ordering.js?v=20261007-ritrovo-in-evidenza-v1';
 import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
 import {
   boatFromData,
@@ -221,6 +222,17 @@ const COPY = {
     timeBandArrivalPrefix: 'Arrivo / ritrovo',
     timeBandDeparturePrefix: 'Partenza da Marsala',
     timeBandUnscheduled: 'Orario da definire',
+    pickupLabel: 'Ritrovo',
+    pickupMissing: 'da fissare',
+    summaryFlightArrival: 'Volo in arrivo',
+    summaryFlightDeparture: 'Volo in partenza',
+    alertPickupBeforeLanding: 'Atterra dopo il ritrovo',
+    alertLongWait: 'Attesa {time}',
+    alertConfirmedWithoutTime: 'Manca orario di ritrovo',
+    alertLateForFlight: 'Arriva dopo il decollo',
+    alertTightMargin: 'Solo {minutes} min al volo',
+    alertNoPhone: 'Senza telefono',
+    bandAlerts: '{count} da controllare',
   },
   en: {
     heroEyebrow: 'Operations area · transfer company',
@@ -394,6 +406,17 @@ const COPY = {
     timeBandArrivalPrefix: 'Arrival / meeting',
     timeBandDeparturePrefix: 'Departure from Marsala',
     timeBandUnscheduled: 'Time to be defined',
+    pickupLabel: 'Pick-up',
+    pickupMissing: 'to be set',
+    summaryFlightArrival: 'Flight lands',
+    summaryFlightDeparture: 'Flight departs',
+    alertPickupBeforeLanding: 'Lands after pick-up',
+    alertLongWait: 'Wait {time}',
+    alertConfirmedWithoutTime: 'Pick-up time missing',
+    alertLateForFlight: 'Arrives after take-off',
+    alertTightMargin: 'Only {minutes} min to flight',
+    alertNoPhone: 'No phone',
+    bandAlerts: '{count} to check',
   },
 };
 
@@ -873,9 +896,52 @@ function renderRecord(record) {
   // finché i record esistenti non avevano ancora questo campo).
   const spokenLocale = record.preferredLocale === 'en' ? 'en' : 'it';
   const languageBadge = `<span class="transfer-badge transfer-badge--language transfer-badge--language-${spokenLocale}">${escapeHtml(t(spokenLocale === 'en' ? 'languageEn' : 'languageIt'))}</span>`;
+  // La scheda chiusa mostrava soltanto l'orario del volo: quello deciso dal
+  // gestore si vedeva solo aprendola. Ora il ritrovo sta in testa, grande, e
+  // il volo resta accanto con la sua etichetta, così i due orari non si
+  // confondono (richiesta di Silvio, 7/10/2026).
+  const timing = transferTimingCheck(record, direction);
+  const pickupBlock = `<span class="transfer-record-pickup${meetingTime ? '' : ' is-missing'}"><small>${escapeHtml(t('pickupLabel'))}</small><b>${escapeHtml(meetingTime || t('pickupMissing'))}</b></span>`;
+  const summaryFlightLabel = direction === 'return' ? t('summaryFlightDeparture') : t('summaryFlightArrival');
+  const timingBadges = recordAlertBadges(record, timing);
   const passengerBadge = `<span class="transfer-badge transfer-badge--people">${escapeHtml(peopleLabel(transferPassengerCount(record)))}${additionalPassengerCount(record) ? ` (+${additionalPassengerCount(record)})` : ''}</span>`;
   const passengerField = `<label data-wide><span>${escapeHtml(t('additionalPassengers'))}</span><select name="additionalPassengers">${Array.from({ length: 9 }, (_, count) => `<option value="${count}"${count === additionalPassengerCount(record) ? ' selected' : ''}>${count ? `+${count} · ${escapeHtml(peopleLabel(count + 1))}` : escapeHtml(t('solo'))}</option>`).join('')}</select><small>${escapeHtml(t('passengerHelp'))}</small></label>`;
-  return `<div class="transfer-record-row"><label class="transfer-record-select-label" title="${escapeHtml(t('selectRecord'))}"><input type="checkbox" data-record-select="${recordId}"${state.selectedRecordIds.has(record.id) ? ' checked' : ''} aria-label="${escapeHtml(t('selectRecord'))}" /></label><details class="transfer-record transfer-record--${escapeHtml(displayStatus)}" data-record-id="${recordId}"><summary><span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))} · ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges">${passengerBadge}<span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span>${languageBadge}</span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${suggestedDepartureDetail}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}">${passengerField}<label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details></div>`;
+  return `<div class="transfer-record-row"><label class="transfer-record-select-label" title="${escapeHtml(t('selectRecord'))}"><input type="checkbox" data-record-select="${recordId}"${state.selectedRecordIds.has(record.id) ? ' checked' : ''} aria-label="${escapeHtml(t('selectRecord'))}" /></label><details class="transfer-record transfer-record--${escapeHtml(displayStatus)}" data-record-id="${recordId}"${timing.level === 'error' ? ' data-timing="error"' : ''}><summary>${pickupBlock}<span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))}</span><span>${escapeHtml(summaryFlightLabel)} ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges">${timingBadges}${passengerBadge}<span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span>${languageBadge}</span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${suggestedDepartureDetail}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}">${passengerField}<label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details></div>`;
+}
+
+function durationLabel(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours ? `${hours}h${String(rest).padStart(2, '0')}` : `${rest} min`;
+}
+
+// Gli avvisi non bloccano niente: il gestore può avere le sue ragioni (una
+// navetta sola per tre voli). Servono a non scoprirlo in aeroporto.
+function recordAlerts(record, timing) {
+  if (['cancelled', 'revoked'].includes(normalizedStatus(record.status))) return [];
+  const alerts = [];
+  if (timing.code === 'pickup_before_landing') alerts.push({ level: 'error', text: t('alertPickupBeforeLanding') });
+  if (timing.code === 'late_for_flight') alerts.push({ level: 'error', text: t('alertLateForFlight') });
+  if (timing.code === 'long_wait') alerts.push({ level: 'warning', text: t('alertLongWait').replace('{time}', durationLabel(timing.minutes)) });
+  if (timing.code === 'tight_margin') alerts.push({ level: 'warning', text: t('alertTightMargin').replace('{minutes}', String(timing.minutes)) });
+  if (timing.code === 'confirmed_without_time') alerts.push({ level: 'warning', text: t('alertConfirmedWithoutTime') });
+  if (!contactPhone(record)) alerts.push({ level: 'note', text: t('alertNoPhone') });
+  return alerts;
+}
+
+function recordAlertBadges(record, timing) {
+  return recordAlerts(record, timing)
+    .map((alert) => `<span class="transfer-badge transfer-badge--alert-${alert.level}">${escapeHtml(alert.text)}</span>`)
+    .join('');
+}
+
+// Quante schede di una fascia chiedono un'occhiata: errori e avvisi sugli
+// orari, non il telefono mancante, che non cambia l'organizzazione.
+function bandAlertCount(records, direction) {
+  return records.filter((record) => {
+    const recordDirection = normalizeDirection(record.direction || record.legDirection || record.travelDirection) || direction;
+    return ['error', 'warning'].includes(transferTimingCheck(record, recordDirection).level);
+  }).length;
 }
 
 function peopleLabel(count) {
@@ -911,7 +977,7 @@ function renderClusterSelectAll(records) {
 }
 
 function renderAirportGroupBody(groupRecords, direction) {
-  return groupByTimeBand(groupRecords, direction).map((band) => `<div class="transfer-time-band"><h4 class="transfer-time-band-title">${escapeHtml(timeBandTitle(band, direction))}<span>${escapeHtml(peopleLabel(totalTransferSeats(band.records)))}</span></h4><div class="transfer-cluster" data-cluster>${renderClusterSelectAll(band.records)}<div class="transfer-operator-list">${band.records.map(renderRecord).join('')}</div></div></div>`).join('');
+  return groupByTimeBand(groupRecords, direction).map((band) => `<div class="transfer-time-band"><h4 class="transfer-time-band-title">${escapeHtml(timeBandTitle(band, direction))}<span>${escapeHtml(peopleLabel(totalTransferSeats(band.records)))}</span>${bandAlertCount(band.records, direction) ? `<em class="transfer-time-band-alert">${escapeHtml(t('bandAlerts').replace('{count}', String(bandAlertCount(band.records, direction))))}</em>` : ''}</h4><div class="transfer-cluster" data-cluster>${renderClusterSelectAll(band.records)}<div class="transfer-operator-list">${band.records.map(renderRecord).join('')}</div></div></div>`).join('');
 }
 
 function dateGroupLabel(date) {

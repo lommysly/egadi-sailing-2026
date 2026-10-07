@@ -12,7 +12,7 @@ function between(start, end) {
 
 // La prova usa gli stessi renderer della pagina, solo dati fittizi e nessun
 // Firebase/login. Non registra persone e non invia messaggi.
-export function renderFixture(language = 'it') {
+export function renderFixture(language = 'it', customRecords = null) {
   const context = vm.createContext({
     ...ordering,
     Intl, Date, Set,
@@ -32,6 +32,7 @@ export function renderFixture(language = 'it') {
     recordFlight: () => 'Volo fittizio',
     recordLuggage: () => 'Bagagli da verificare',
     recordContactMarkup: () => 'Contatto fittizio',
+    contactPhone: (record) => record.phone || '',
     renderDraftNotice: () => '',
   });
   const code = between('const COPY =', '\nconst state =')
@@ -44,7 +45,7 @@ export function renderFixture(language = 'it') {
     + '\n' + between('function recordDetail(', '\nfunction ')
     + '\n' + between('function renderRecord(', '\nfunction recordStats(');
   vm.runInContext(code, context);
-  const records = [
+  const records = customRecords || [
     { id: 'referente', participantName: 'Referente fittizio', airport: 'TPS', date: '2026-10-08', time: '13:15', additionalPassengers: 2, direction: 'outbound', status: 'new' },
     { id: 'vicino', participantName: 'Persona fittizia', airport: 'TPS', date: '2026-10-08', time: '14:10', direction: 'outbound', status: 'confirmed' },
     { id: 'palermo', participantName: 'Altra persona', airport: 'PMO', date: '2026-10-08', time: '09:15', direction: 'outbound', status: 'planned' },

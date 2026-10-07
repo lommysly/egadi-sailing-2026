@@ -2,6 +2,14 @@
 
 Ultimo aggiornamento: 7 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
 
+## Transfer: ritrovo in evidenza e avvisi sugli orari · 7 ottobre 2026
+
+- [x] Sorgente: la scheda chiusa del portale mostra in testa l'orario di ritrovo deciso dal gestore (o «da fissare») e, su una riga propria, il volo con la sua etichetta; lo stato resta nel badge. Richiesto dal titolare il 07/10/2026 dopo l'analisi delle prenotazioni reali: una persona nella navetta delle 18:00 con il volo in arrivo alle 21:10, due conferme senza orario, attese fino a 3h45.
+- [x] Avvisi automatici, che non bloccano il salvataggio: all'andata «atterra dopo il ritrovo» (errore, bordo rosso) e attesa oltre due ore; al ritorno arrivo in aeroporto dopo il decollo (errore) o con meno di 45 minuti; conferma senza orario di ritrovo; «senza telefono». L'intestazione della fascia conta le schede da controllare. Regola in `transfer-ordering.js` (`transferTimingCheck`).
+- [x] Solo visualizzazione: nessun campo, Rules o Cloud Function modificati. Gate locale: 171 test unitari; renderer reali con dati fittizi a 800 e 375 px, nessuno sfondamento orizzontale.
+- [ ] Verifica autenticata nel portale con le prenotazioni reali.
+- [ ] Secondo passo concordato: vista raggruppata per corsa (giorno, aeroporto, orario di ritrovo) con modifica unica di orario e stato, prima dei rientri dell'11 ottobre.
+
 ## Date in formato italiano · 7 ottobre 2026
 
 - [x] Sorgente: un giorno scritto a schermo passa da `date-format.js` oppure da un formattatore con lingua esplicita (`it-IT`, `en-GB`), quindi il giorno viene sempre prima del mese. Corretti i due punti che mostravano `AAAA-MM-GG` così com'è salvato: scheda movimento e messaggio WhatsApp del portale transfer (`formatSchedule`), messaggio "offro un passaggio" dello skipper. Segnalato dal titolare il 07/10/2026.

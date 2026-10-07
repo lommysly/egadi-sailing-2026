@@ -145,6 +145,55 @@ export function recordClusterMinutes(record, direction) {
   return timeToMinutes(scheduleTime(record));
 }
 
+// Che cosa non torna fra l'orario del volo e quello di ritrovo deciso dal
+// gestore. Nasce dai casi veri del 7/10/2026, vigilia degli arrivi: una
+// persona messa nella navetta delle 18:00 con il volo che atterrava alle
+// 21:10, due conferme senza orario, attese in aeroporto fino a 3h45. Il
+// portale accettava tutto in silenzio, e la scheda chiusa mostrava soltanto
+// l'orario del volo.
+//
+// All'andata si misura quanto la persona aspetta dopo l'atterraggio; al
+// ritorno quanti minuti le restano in aeroporto prima del decollo, tolto il
+// viaggio da Marsala. `minutes` è sempre quel numero, mai negativo.
+const LONG_WAIT_MINUTES = 120;
+const TIGHT_AIRPORT_MARGIN_MINUTES = 45;
+
+export function transferTimingCheck(record, direction) {
+  const nothing = { level: 'none', code: '', minutes: null };
+  if (!record || ['cancelled', 'revoked'].includes(record.status)) return nothing;
+  const hasMeeting = timeToMinutes(record.meetingTime) !== null;
+  if (!hasMeeting) {
+    return ['confirmed', 'completed'].includes(record.status)
+      ? { level: 'warning', code: 'confirmed_without_time', minutes: null }
+      : nothing;
+  }
+  const flight = calculatedOperationalTimestamp(record, 'outbound');
+  const meeting = transferOperationalTimestamp(record, direction);
+  if (flight === null || meeting === null) return nothing;
+  // Senza una data di ritrovo esplicita, un ritrovo dopo mezzanotte per un
+  // volo delle 23:55 (o il contrario al rientro) risulterebbe sfasato di un
+  // giorno: si riporta nella finestra di dodici ore attorno al volo.
+  const explicitDate = Boolean(normalizedDate(record.meetingDate));
+  const wrap = (minutes) => {
+    if (explicitDate) return minutes;
+    if (minutes < -720) return minutes + 1440;
+    if (minutes > 720) return minutes - 1440;
+    return minutes;
+  };
+  if (normalizedDirection(direction) === 'outbound') {
+    const wait = wrap(Math.round((meeting - flight) / 60_000));
+    if (wait < 0) return { level: 'error', code: 'pickup_before_landing', minutes: -wait };
+    if (wait > LONG_WAIT_MINUTES) return { level: 'warning', code: 'long_wait', minutes: wait };
+    return { level: 'ok', code: '', minutes: wait };
+  }
+  const travel = TRANSFER_TRAVEL_MINUTES[airportCode(record)];
+  if (!travel) return nothing;
+  const margin = wrap(Math.round((flight - meeting) / 60_000)) - travel;
+  if (margin < 0) return { level: 'error', code: 'late_for_flight', minutes: -margin };
+  if (margin < TIGHT_AIRPORT_MARGIN_MINUTES) return { level: 'warning', code: 'tight_margin', minutes: margin };
+  return { level: 'ok', code: '', minutes: margin };
+}
+
 function participantName(record) {
   return String(
     record?.participantName
