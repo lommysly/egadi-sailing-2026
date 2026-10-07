@@ -2,6 +2,14 @@
 
 Ultimo aggiornamento: 7 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
 
+## Transfer: finestra all'ingresso e numero di volo · 7 ottobre 2026
+
+- [x] Sorgente: chi entra nell'area equipaggio (`my-area.js`) o skipper (`area.js`) e ha un transfer richiesto trova una finestra «Il tuo transfer» con stato, orario e punto di ritrovo decisi dal gestore e il proprio volo. Compare una volta per ingresso e di nuovo quando il gestore cambia stato, orario o punto; aspetta se è aperto il regolamento. Se il ritrovo risulta prima dell'atterraggio lo dice alla persona. Modulo `transfer-notice.js`. Richiesto dal titolare il 07/10/2026.
+- [x] Nessun dato nuovo esposto: la finestra legge lo stesso `crewTravelStatus` già visibile alla persona; note, mezzo e gruppo del gestore non vengono mai copiati lì (controllato da un test).
+- [x] Portale transfer: sulla scheda chiusa compare il numero del volo («Volo FR4917 · arrivo gio 8 ottobre · 12:55»).
+- [x] Gate locale: 182 test unitari; finestra provata con dati fittizi a 375 px nei casi confermato, richiesta ricevuta, annullato e ritrovo prima dell'atterraggio. Nessuna modifica a Rules, Cloud Functions o dati.
+- [ ] Verifica autenticata con una persona reale che ha un transfer confermato.
+
 ## Transfer: ritrovo in evidenza e avvisi sugli orari · 7 ottobre 2026
 
 - [x] Sorgente: la scheda chiusa del portale mostra in testa l'orario di ritrovo deciso dal gestore (o «da fissare») e, su una riga propria, il volo con la sua etichetta; lo stato resta nel badge. Richiesto dal titolare il 07/10/2026 dopo l'analisi delle prenotazioni reali: una persona nella navetta delle 18:00 con il volo in arrivo alle 21:10, due conferme senza orario, attese fino a 3h45.

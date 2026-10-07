@@ -1221,6 +1221,30 @@ body.menu-open { overflow:hidden; }
    scroll → scheda regola) a stringere il testo, e una tipografia più larga
    e comoda per leggere davvero, non solo per stare nello spazio disponibile
    (segnalato da Silvio, 25/09/2026). */
+/* Il transfer detto a chi entra: una finestra chiara e breve, non il
+   regolamento. L'orario di ritrovo è il dato più grande della scheda. */
+.transfer-notice-dialog { width:min(460px,calc(100vw - 28px)); max-height:calc(100dvh - 28px); margin:auto; padding:0; border:none; border-radius:20px; background:var(--paper); color:var(--ink); overflow:auto; box-shadow:0 24px 70px rgba(1,31,43,.35); }
+.transfer-notice-dialog::backdrop { background:rgba(3,20,26,.62); }
+.transfer-notice { display:grid; gap:14px; padding:24px 22px 22px; }
+.transfer-notice .eyebrow,.transfer-notice h2,.transfer-notice p { margin:0; }
+.transfer-notice h2 { font:600 1.7rem/1.05 "Fraunces",serif; letter-spacing:-.02em; }
+.transfer-notice-lead,.transfer-notice-footer { color:#416b6d; font-size:.88rem; line-height:1.45; }
+.transfer-notice-leg { display:grid; gap:8px; padding:16px; border:1px solid #2f7d4a; border-radius:14px; background:#edf9f1; }
+.transfer-notice-leg--planned { border-color:#356e93; background:#edf8fe; }
+.transfer-notice-leg--new { border-color:#806000; background:#fff5dc; }
+.transfer-notice-leg--cancelled { border-color:#a9473a; background:#fff1ed; }
+.transfer-notice-leg header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+.transfer-notice-leg header strong { font:700 .95rem "DM Sans",sans-serif; }
+.transfer-notice-leg header strong::first-letter { text-transform:uppercase; }
+.transfer-notice-status { padding:4px 10px; border-radius:999px; background:#fff; font:700 .66rem "DM Mono",monospace; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; }
+.transfer-notice-pickup { display:flex; align-items:baseline; gap:10px; }
+.transfer-notice-pickup small { color:#416b6d; font-size:.9rem; }
+.transfer-notice-pickup b { font:700 2.3rem/1 "DM Sans",sans-serif; font-variant-numeric:tabular-nums; }
+.transfer-notice-point { font-weight:700; }
+.transfer-notice-own,.transfer-notice-text { font-size:.92rem; line-height:1.45; }
+.transfer-notice-own { color:#416b6d; }
+.transfer-notice-warning { padding:10px 12px; border-radius:10px; background:#b3261e; color:#fff; font-size:.9rem; font-weight:700; line-height:1.4; }
+.transfer-notice-actions .button { width:100%; justify-content:center; }
 .rules-dialog { width:min(760px,100vw); height:min(90vh,860px); max-width:100vw; max-height:100vh; margin:auto; padding:0; border:none; border-radius:20px; background:#063644; color:white; }
 .rules-dialog::backdrop { background:rgba(3,20,26,.72); }
 .rules-dialog-header { position:sticky; top:0; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,.16); background:#063644; border-radius:20px 20px 0 0; }

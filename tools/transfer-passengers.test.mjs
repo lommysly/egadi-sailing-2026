@@ -157,7 +157,8 @@ test('scheda chiusa: ritrovo in testa, volo con la sua etichetta, avvisi sugli o
 
   const ok = card('ok');
   assert.match(ok, /class="transfer-record-pickup"><small>Ritrovo<\/small><b>14:30<\/b>/);
-  assert.match(ok, /<span>Volo in arrivo gio 8 ottobre · 12:55<\/span>/);
+  // Il numero del volo si legge senza aprire la scheda (richiesta di Silvio).
+  assert.match(ok, /<span>Volo Volo fittizio · arrivo gio 8 ottobre · 12:55<\/span>/);
   assert.match(ok, /transfer-badge--confirmed/);
   assert.doesNotMatch(ok, /transfer-badge--alert-/);
 
@@ -184,5 +185,5 @@ test('scheda chiusa: ritrovo in testa, volo con la sua etichetta, avvisi sugli o
   const en = renderFixture('en', records);
   assert.match(en, /<small>Pick-up<\/small><b>14:30<\/b>/);
   assert.match(en, /Lands after pick-up/);
-  assert.match(en, /Flight lands/);
+  assert.match(en, /Flight Volo fittizio · lands /);
 });

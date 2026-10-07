@@ -4,6 +4,7 @@ import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-st
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
 import { rosterEntries, rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-card-come-il-gestore-v1';
+import { showTransferNotice } from './transfer-notice.js?v=20261007-corse-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -2219,6 +2220,13 @@ function startDashboardSubscriptions() {
         crewTravelStatusReadError = false;
         activeCrewTravelStatus = snapshot.exists() ? snapshot.data() : null;
         renderCrewDashboardOverview();
+        // Chi ha chiesto il transfer lo trova davanti appena entra, e di
+        // nuovo ogni volta che il gestore cambia orario, punto o stato.
+        showTransferNotice({
+          status: activeCrewTravelStatus,
+          english: activeLocale() === 'en',
+          scope: `${activeInvite.boatId}:${activeInvite.id}`,
+        });
       },
       (error) => {
         console.error('Impossibile leggere lo stato personale del transfer.', error);

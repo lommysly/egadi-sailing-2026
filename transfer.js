@@ -24,7 +24,7 @@ import {
   totalTransferSeats,
   suggestedMarsalaDeparture,
   transferTimingCheck,
-} from './transfer-ordering.js?v=20261007-ritrovo-in-evidenza-v1';
+} from './transfer-ordering.js?v=20261007-corse-v1';
 import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
 import {
   boatFromData,
@@ -224,8 +224,9 @@ const COPY = {
     timeBandUnscheduled: 'Orario da definire',
     pickupLabel: 'Ritrovo',
     pickupMissing: 'da fissare',
-    summaryFlightArrival: 'Volo in arrivo',
-    summaryFlightDeparture: 'Volo in partenza',
+    summaryFlight: 'Volo',
+    summaryFlightArrival: 'arrivo',
+    summaryFlightDeparture: 'partenza',
     alertPickupBeforeLanding: 'Atterra dopo il ritrovo',
     alertLongWait: 'Attesa {time}',
     alertConfirmedWithoutTime: 'Manca orario di ritrovo',
@@ -408,8 +409,9 @@ const COPY = {
     timeBandUnscheduled: 'Time to be defined',
     pickupLabel: 'Pick-up',
     pickupMissing: 'to be set',
-    summaryFlightArrival: 'Flight lands',
-    summaryFlightDeparture: 'Flight departs',
+    summaryFlight: 'Flight',
+    summaryFlightArrival: 'lands',
+    summaryFlightDeparture: 'departs',
     alertPickupBeforeLanding: 'Lands after pick-up',
     alertLongWait: 'Wait {time}',
     alertConfirmedWithoutTime: 'Pick-up time missing',
@@ -902,11 +904,14 @@ function renderRecord(record) {
   // confondono (richiesta di Silvio, 7/10/2026).
   const timing = transferTimingCheck(record, direction);
   const pickupBlock = `<span class="transfer-record-pickup${meetingTime ? '' : ' is-missing'}"><small>${escapeHtml(t('pickupLabel'))}</small><b>${escapeHtml(meetingTime || t('pickupMissing'))}</b></span>`;
-  const summaryFlightLabel = direction === 'return' ? t('summaryFlightDeparture') : t('summaryFlightArrival');
+  // Il numero del volo stava solo dentro la scheda aperta: chi aspetta agli
+  // arrivi lo cerca sul tabellone, quindi serve a colpo d'occhio.
+  const flightCode = recordFlight(record);
+  const summaryFlightText = `${t('summaryFlight')}${flightCode ? ` ${flightCode}` : ''} · ${direction === 'return' ? t('summaryFlightDeparture') : t('summaryFlightArrival')} ${formatSchedule(record)}`;
   const timingBadges = recordAlertBadges(record, timing);
   const passengerBadge = `<span class="transfer-badge transfer-badge--people">${escapeHtml(peopleLabel(transferPassengerCount(record)))}${additionalPassengerCount(record) ? ` (+${additionalPassengerCount(record)})` : ''}</span>`;
   const passengerField = `<label data-wide><span>${escapeHtml(t('additionalPassengers'))}</span><select name="additionalPassengers">${Array.from({ length: 9 }, (_, count) => `<option value="${count}"${count === additionalPassengerCount(record) ? ' selected' : ''}>${count ? `+${count} · ${escapeHtml(peopleLabel(count + 1))}` : escapeHtml(t('solo'))}</option>`).join('')}</select><small>${escapeHtml(t('passengerHelp'))}</small></label>`;
-  return `<div class="transfer-record-row"><label class="transfer-record-select-label" title="${escapeHtml(t('selectRecord'))}"><input type="checkbox" data-record-select="${recordId}"${state.selectedRecordIds.has(record.id) ? ' checked' : ''} aria-label="${escapeHtml(t('selectRecord'))}" /></label><details class="transfer-record transfer-record--${escapeHtml(displayStatus)}" data-record-id="${recordId}"${timing.level === 'error' ? ' data-timing="error"' : ''}><summary>${pickupBlock}<span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))}</span><span>${escapeHtml(summaryFlightLabel)} ${escapeHtml(formatSchedule(record))}</span></span><span class="transfer-record-badges">${timingBadges}${passengerBadge}<span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span>${languageBadge}</span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${suggestedDepartureDetail}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}">${passengerField}<label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details></div>`;
+  return `<div class="transfer-record-row"><label class="transfer-record-select-label" title="${escapeHtml(t('selectRecord'))}"><input type="checkbox" data-record-select="${recordId}"${state.selectedRecordIds.has(record.id) ? ' checked' : ''} aria-label="${escapeHtml(t('selectRecord'))}" /></label><details class="transfer-record transfer-record--${escapeHtml(displayStatus)}" data-record-id="${recordId}"${timing.level === 'error' ? ' data-timing="error"' : ''}><summary>${pickupBlock}<span class="transfer-record-summary-copy"><strong>${escapeHtml(participantName(record))}</strong><span>${escapeHtml(routeLabel(record))}</span><span>${escapeHtml(summaryFlightText)}</span></span><span class="transfer-record-badges">${timingBadges}${passengerBadge}<span class="transfer-badge transfer-badge--${directionClass}">${escapeHtml(directionLabel(direction))}</span><span class="transfer-badge transfer-badge--${escapeHtml(displayStatus)}">${escapeHtml(statusLabel(displayStatus))}</span>${languageBadge}</span></summary><div class="transfer-record-body">${renderDraftNotice(record)}<dl class="transfer-record-details">${recordDetail(t('direction'), escapeHtml(directionLabel(direction)))}${recordDetail(scheduleLabel, escapeHtml(formatSchedule(record)))}${suggestedDepartureDetail}${recordDetail(t('route'), escapeHtml(routeLabel(record)))}${recordDetail(t('flight'), escapeHtml(recordFlight(record)))}${recordDetail(t('luggage'), escapeHtml(recordLuggage(record)))}${recordDetail(t('contact'), recordContactMarkup(record), 'transfer-record-contact')}</dl><form class="transfer-record-form" data-record-form="${recordId}">${passengerField}<label><span>${escapeHtml(t('status'))}</span><select name="status">${statusOptions(operationalStatus)}</select></label><label><span>${escapeHtml(t('assignment'))}</span><input name="assignment" maxlength="120" value="${escapeHtml(assignment)}" /></label><label><span>${escapeHtml(t('meetingPoint'))}</span><input name="meetingPoint" maxlength="160" value="${escapeHtml(meetingPoint)}" placeholder="${escapeHtml(meetingPointPlaceholder)}" /></label><label><span>${escapeHtml(t('meetingTime'))}</span><input name="meetingTime" type="time" value="${escapeHtml(meetingTime)}" /></label><label data-wide><span>${escapeHtml(t('vehicle'))}</span><input name="vehicleName" maxlength="120" value="${escapeHtml(vehicleName)}" /></label><label data-wide><span>${escapeHtml(t('notes'))}</span><textarea name="operatorNotes" maxlength="500">${escapeHtml(notes)}</textarea></label><div class="form-actions"><button class="button button-primary" type="submit">${escapeHtml(t('saveRecord'))}</button><p class="form-message" data-message="record-${recordId}" role="status"></p></div></form></div></details></div>`;
 }
 
 function durationLabel(minutes) {

@@ -16,6 +16,7 @@ import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=2026100
 import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-card-come-il-gestore-v1';
 import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
+import { showTransferNotice } from './transfer-notice.js?v=20261007-corse-v1';
 import {
   boatFromData,
   boatSetupReadiness,
@@ -7400,6 +7401,12 @@ function subscribeToBoat(boat) {
   }, () => setMessage(document.querySelector('#memberFormMessage'), 'Impossibile leggere la Crew List.', true));
   stopCrewTravelStatusSubscription = onSnapshot(collection(db, 'boats', boat.id, 'crewTravelStatus'), (snapshot) => {
     activeCrewTravelStatus = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    // Anche lo skipper ha il suo transfer: lo trova davanti all'ingresso
+    // come chiunque altro a bordo, con orario e punto decisi dal gestore.
+    showTransferNotice({
+      status: activeCrewTravelStatus.find((entry) => entry.isSkipper === true || entry.id === 'skipper'),
+      scope: `${activeBoat?.id || ''}:skipper`,
+    });
     renderCrewTravelOverview();
     renderSkipperDashboardOverview();
     // Include il documento "skipper": aggiorna subito il conteggio compagni
