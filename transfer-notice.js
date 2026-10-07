@@ -54,6 +54,22 @@ export function transferNoticeLegs(status) {
   }).filter(Boolean);
 }
 
+// Il numero del gestore dei transfer, se il server lo ha messo nello stato di
+// viaggio. Si mostra solo a chi ha almeno una tratta già presa in carico:
+// chi ha appena chiesto il transfer non ha ancora niente da domandare, e il
+// gestore alla vigilia non deve ricevere cinquanta telefonate.
+export function transferNoticeContact(status, legs) {
+  const phone = text(status?.transferContactPhone, 20);
+  if (!/^\+[1-9]\d{7,14}$/.test(phone)) return null;
+  if (!legs.some((leg) => leg.operation === 'planned' || leg.operation === 'confirmed')) return null;
+  return { name: text(status?.transferContactName, 60), phone };
+}
+
+function phoneLabel(phone) {
+  const italian = /^\+39(\d{3})(\d{3})(\d{3,4})$/.exec(phone);
+  return italian ? `+39 ${italian[1]} ${italian[2]} ${italian[3]}` : phone;
+}
+
 // Cambia quando cambia qualcosa che la persona deve sapere: serve a decidere
 // se la finestra è già stata vista.
 export function transferNoticeSignature(legs) {
@@ -77,6 +93,8 @@ function copy(english) {
       departs: 'Your flight departs at',
       leaves: 'You leave at',
       beforeLanding: 'Careful: the pick-up is set before your landing time. Tell your skipper now.',
+      contact: 'For transfer information:',
+      call: 'Call',
       footer: 'You can always find this under “Arrivals and departures on your boat”. If something looks wrong, message your skipper.',
       close: 'Got it',
     }
@@ -95,6 +113,8 @@ function copy(english) {
       departs: 'Il tuo volo parte alle',
       leaves: 'Parti alle',
       beforeLanding: 'Attenzione: il ritrovo risulta prima del tuo atterraggio. Avvisa subito il tuo skipper.',
+      contact: 'Per informazioni sul transfer:',
+      call: 'Chiama',
       footer: 'Lo ritrovi sempre in «Arrivi e partenze della barca». Se qualcosa non torna, scrivi al tuo skipper.',
       close: 'Ho capito',
     };
@@ -127,13 +147,21 @@ function legMarkup(leg, labels, english) {
   </section>`;
 }
 
-export function transferNoticeMarkup(legs, english = false) {
+function contactMarkup(contact, labels) {
+  if (!contact) return '';
+  const digits = contact.phone.replace(/[^0-9]/g, '');
+  const who = contact.name ? `<strong>${escapeHtml(contact.name)}</strong> · ` : '';
+  return `<p class="transfer-notice-contact">${escapeHtml(labels.contact)} ${who}<span>${escapeHtml(phoneLabel(contact.phone))}</span><span class="transfer-notice-contact-actions"><a href="tel:+${escapeHtml(digits)}">${escapeHtml(labels.call)}</a><a href="https://wa.me/${escapeHtml(digits)}" target="_blank" rel="noopener noreferrer">WhatsApp</a></span></p>`;
+}
+
+export function transferNoticeMarkup(legs, english = false, contact = null) {
   const labels = copy(english);
   return `<div class="transfer-notice">
     <p class="eyebrow">Transfer</p>
     <h2 id="transferNoticeTitle">${escapeHtml(labels.title)}</h2>
     <p class="transfer-notice-lead">${escapeHtml(labels.lead)}</p>
     ${legs.map((leg) => legMarkup(leg, labels, english)).join('')}
+    ${contactMarkup(contact, labels)}
     <p class="transfer-notice-footer">${escapeHtml(labels.footer)}</p>
     <div class="transfer-notice-actions"><button class="button button-primary" type="button" data-transfer-notice-close>${escapeHtml(labels.close)}</button></div>
   </div>`;
@@ -182,7 +210,7 @@ export function showTransferNotice({ status, english = false, scope = '', storag
     other.addEventListener('close', () => showTransferNotice({ status, english, scope, storage, doc }), { once: true });
     return false;
   }
-  element.innerHTML = transferNoticeMarkup(legs, english);
+  element.innerHTML = transferNoticeMarkup(legs, english, transferNoticeContact(status, legs));
   element.onclose = () => {
     try { store?.setItem(key, signature); } catch { /* senza memoria la finestra ricompare: va bene lo stesso */ }
   };

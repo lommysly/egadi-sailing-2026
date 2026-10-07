@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { showTransferNotice, transferNoticeLegs, transferNoticeMarkup, transferNoticeSignature } from '../transfer-notice.js';
+import { showTransferNotice, transferNoticeContact, transferNoticeLegs, transferNoticeMarkup, transferNoticeSignature } from '../transfer-notice.js';
 
 // Richiesta di Silvio alla vigilia degli arrivi (7/10/2026): chi entra
 // nell'area riservata deve trovarsi davanti il proprio transfer — orario e
@@ -150,4 +150,49 @@ test('le note interne del gestore non arrivano mai all’equipaggio', () => {
   const writer = functions.slice(functions.indexOf('async function writeCrewTransferOperationStatus'), functions.indexOf('exports.materializeCrewTravel'));
   assert.doesNotMatch(writer, /operatorNotes|vehicleName|groupName/);
   assert.doesNotMatch(read('transfer-notice.js').replace(/\/\/.*$/gm, ''), /operatorNotes|Notes\b/);
+});
+
+// Silvio, 7/10/2026: nella finestra ci va il numero del gestore dei transfer.
+// Non sta nel codice del sito (lo leggerebbe chiunque): arriva dal server
+// dentro lo stato di viaggio della persona.
+test('il numero del gestore compare a chi ha un transfer già preso in carico', () => {
+  const status = { ...confirmed, transferContactName: 'Giovanni', transferContactPhone: '+393209012100' };
+  const legs = transferNoticeLegs(status);
+  const contact = transferNoticeContact(status, legs);
+  assert.deepEqual(contact, { name: 'Giovanni', phone: '+393209012100' });
+  const html = transferNoticeMarkup(legs, false, contact);
+  assert.match(html, /Per informazioni sul transfer: <strong>Giovanni<\/strong> · <span>\+39 320 901 2100<\/span>/);
+  assert.match(html, /href="tel:\+393209012100">Chiama<\/a>/);
+  assert.match(html, /href="https:\/\/wa\.me\/393209012100"/);
+  assert.match(transferNoticeMarkup(legs, true, contact), /For transfer information:/);
+});
+
+test('niente numero a chi ha solo una richiesta non ancora presa in carico, o un transfer annullato', () => {
+  const pending = { returnTransfer: 'requested', returnDate: '2026-10-11', returnTime: '21:30', transferContactPhone: '+393209012100' };
+  assert.equal(transferNoticeContact(pending, transferNoticeLegs(pending)), null);
+  const cancelled = { ...confirmed, outboundOperationStatus: 'cancelled', transferContactPhone: '+393209012100' };
+  assert.equal(transferNoticeContact(cancelled, transferNoticeLegs(cancelled)), null);
+  assert.doesNotMatch(transferNoticeMarkup(transferNoticeLegs(pending)), /transfer-notice-contact/);
+});
+
+test('un numero mancante o scritto male non viene mostrato', () => {
+  const legs = transferNoticeLegs(confirmed);
+  assert.equal(transferNoticeContact(confirmed, legs), null);
+  assert.equal(transferNoticeContact({ ...confirmed, transferContactPhone: '3209012100' }, legs), null);
+  assert.equal(transferNoticeContact({ ...confirmed, transferContactPhone: 'javascript:alert(1)' }, legs), null);
+});
+
+test('il numero non è scritto nel codice del sito: lo porta il server', () => {
+  for (const name of ['transfer-notice.js', 'my-area.js', 'area.js', 'transfer.js']) {
+    assert.doesNotMatch(read(name), /3209012100|320 901 2100/, name);
+  }
+  const functions = read('functions/index.js');
+  assert.doesNotMatch(functions, /3209012100/);
+  assert.match(functions, /integrations\/transferContact/);
+  const writer = functions.slice(functions.indexOf('async function writeCrewTransferOperationStatus'), functions.indexOf('exports.materializeCrewTravel'));
+  assert.match(writer, /transferContactName: contact\.name, transferContactPhone: contact\.phone/);
+  // Il documento con il numero resta fuori dalla portata del browser.
+  const rules = read('firestore.rules');
+  const block = rules.slice(rules.indexOf('match /events/egadi-2026/integrations/{integrationId}'));
+  assert.match(block.slice(0, 160), /allow read, write: if false;/);
 });

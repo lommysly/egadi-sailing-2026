@@ -2,6 +2,12 @@
 
 Ultimo aggiornamento: 7 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
 
+## Transfer: contatto del gestore nella finestra · 7 ottobre 2026
+
+- [x] Sorgente: la finestra «Il tuo transfer» mostra nome e numero del gestore dei transfer, con i tasti Chiama e WhatsApp, a chi ha almeno una tratta in organizzazione o confermata. Richiesto e confermato dal titolare il 07/10/2026.
+- [x] Il numero non è nel codice del sito: sta in `events/egadi-2026/integrations/transferContact` (solo server) e la funzione `copyTransferOperationsToBackup` lo copia nello stato di viaggio della persona insieme a orario e punto di ritrovo. `PRIVACY_DA_COMPLETARE.md` aggiornato.
+- [x] Gate locale: test unitari verdi, compreso il controllo che il numero non compaia in nessun file del sito e che `integrations` resti chiuso al browser. Nessuna Rules modificata.
+
 ## Transfer: vista per corse · 7 ottobre 2026
 
 - [x] Sorgente: dentro ogni giorno e aeroporto il portale mostra prima le corse già fissate — le persone con lo stesso orario di ritrovo sotto un'unica intestazione con orario, persone, punto, stato e schede da controllare — poi chi è ancora «Da organizzare» nelle fasce di due ore di prima, infine gli annullati. La corsa si ricava dall'orario di ritrovo già salvato (`groupTransferRuns`): nessun campo nuovo, nessuna Rules o Cloud Function modificata.

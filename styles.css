@@ -1245,6 +1245,9 @@ body.menu-open { overflow:hidden; }
 .transfer-notice-own { color:#416b6d; }
 .transfer-notice-warning { padding:10px 12px; border-radius:10px; background:#b3261e; color:#fff; font-size:.9rem; font-weight:700; line-height:1.4; }
 .transfer-notice-actions .button { width:100%; justify-content:center; }
+.transfer-notice-contact { display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; padding:12px 14px; border-radius:12px; background:#e8f4f4; font-size:.92rem; line-height:1.4; }
+.transfer-notice-contact-actions { display:flex; gap:8px; flex:1 0 100%; margin-top:6px; }
+.transfer-notice-contact-actions a { display:inline-flex; align-items:center; min-height:38px; padding:6px 14px; border:1px solid #087b8a; border-radius:999px; color:#075a66; font-weight:700; text-decoration:none; }
 .rules-dialog { width:min(760px,100vw); height:min(90vh,860px); max-width:100vw; max-height:100vh; margin:auto; padding:0; border:none; border-radius:20px; background:#063644; color:white; }
 .rules-dialog::backdrop { background:rgba(3,20,26,.72); }
 .rules-dialog-header { position:sticky; top:0; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,.16); background:#063644; border-radius:20px 20px 0 0; }

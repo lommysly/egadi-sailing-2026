@@ -742,6 +742,29 @@ async function clearTransferCompanionCount(boatId, inviteId, direction) {
 // solo suoi). Prima escludeva lo skipper: anche lui prende un transfer e
 // aspettava "chiedigli i dettagli" come tutti gli altri, senza motivo
 // (richiesta di Silvio, 30/09/2026).
+// Il numero da chiamare per il transfer. Sta in un documento che il browser
+// non può leggere (`integrations`, solo server) e arriva alla persona dentro
+// il suo stato di viaggio, insieme a orario e punto di ritrovo: così lo vede
+// chi ha un transfer organizzato e nessun altro. Scritto nel codice del sito
+// sarebbe stato leggibile da chiunque (richiesta di Silvio, 7/10/2026).
+const TRANSFER_CONTACT_TTL_MS = 5 * 60 * 1000;
+let transferContactCache = { loadedAt: 0, value: null };
+
+async function transferContact() {
+  if (Date.now() - transferContactCache.loadedAt < TRANSFER_CONTACT_TTL_MS) return transferContactCache.value;
+  let value = null;
+  try {
+    const snapshot = await db.doc(`events/${EVENT_ID}/integrations/transferContact`).get();
+    const data = snapshot.exists ? snapshot.data() : null;
+    const phone = asText(data?.phone, 20);
+    if (data?.active !== false && /^\+[1-9]\d{7,14}$/.test(phone)) value = { name: asText(data.name, 60), phone };
+  } catch (error) {
+    logger.warn('Contatto del gestore transfer non leggibile.', { message: error?.message });
+  }
+  transferContactCache = { loadedAt: Date.now(), value };
+  return value;
+}
+
 async function writeCrewTransferOperationStatus(record, revision) {
   const boatId = asUid(record?.boatId);
   const inviteId = asUid(record?.inviteId);
@@ -756,6 +779,7 @@ async function writeCrewTransferOperationStatus(record, revision) {
   const status = isActive ? safeStatus(record.status) : 'revoked';
   const meetingPoint = isActive ? asText(record.meetingPoint, 160) : '';
   const meetingTime = isActive ? asText(record.meetingTime, 5) : '';
+  const contact = isActive ? await transferContact() : null;
   await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(statusRef);
     if (Number(snapshot.data()?.[revisionKey] || 0) >= revision) return;
@@ -765,6 +789,7 @@ async function writeCrewTransferOperationStatus(record, revision) {
       [revisionKey]: revision,
       [meetingPointKey]: meetingPoint,
       [meetingTimeKey]: meetingTime,
+      ...(contact ? { transferContactName: contact.name, transferContactPhone: contact.phone } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
   });
