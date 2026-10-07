@@ -4298,7 +4298,13 @@ function renderCostPlan(plan) {
 }
 
 function formatDate(value, locale = 'it') {
-  return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'it-IT').format(new Date(`${value}T00:00:00`));
+  // Accetta sia il giorno AAAA-MM-GG dei campi data sia una data vera: la
+  // dichiarazione di pagamento passa `declaredAt.toDate()`, e cucita dentro
+  // una stringa diventava una data impossibile su cui il formattatore
+  // lanciava un errore, fermando l'intero elenco dei versamenti.
+  const date = value instanceof Date ? value : new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'it-IT').format(date);
 }
 
 function formatDateTime(value) {

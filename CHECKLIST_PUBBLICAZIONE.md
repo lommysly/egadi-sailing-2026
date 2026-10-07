@@ -1,6 +1,15 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 6 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+Ultimo aggiornamento: 7 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+
+## Date in formato italiano · 7 ottobre 2026
+
+- [x] Sorgente: un giorno scritto a schermo passa da `date-format.js` oppure da un formattatore con lingua esplicita (`it-IT`, `en-GB`), quindi il giorno viene sempre prima del mese. Corretti i due punti che mostravano `AAAA-MM-GG` così com'è salvato: scheda movimento e messaggio WhatsApp del portale transfer (`formatSchedule`), messaggio "offro un passaggio" dello skipper. Segnalato dal titolare il 07/10/2026.
+- [x] `formatDate` dell'area skipper accetta anche una data vera: la dichiarazione di pagamento non lancia più `RangeError: Invalid time value`, che fermava il disegno dell'elenco versamenti. Chiude il punto aperto il 06/10 nella sezione qui sotto.
+- [x] Gate locale: 159 test unitari, compreso il controllo che nessuno script formatti una data senza lingua esplicita. Nessuna modifica a Rules, Cloud Functions o dati.
+- [ ] I campi in cui si inserisce una data (`<input type="date">`) sono disegnati dal dispositivo: l'ordine giorno/mese lo decide la lingua del telefono o del browser, non il sito. Sostituirli con campi disegnati dal sito è un lavoro a parte, da non fare alla vigilia degli arrivi.
+- [ ] Il foglio Google di backup riceve ancora `AAAA-MM-GG` nelle colonne Data e Navetta da Marsala (`humanSheetRow`): cambiarlo richiede di ripubblicare la funzione e riscrivere le righe già presenti. Da decidere col titolare.
+- [ ] Verifica autenticata su portale transfer e area skipper dopo il rilascio.
 
 ## Transfer: accompagnatori e posti reali · 6 ottobre 2026
 
@@ -20,7 +29,7 @@ Ultimo aggiornamento: 6 ottobre 2026. Le caselle descrivono lo stato verificato;
 - [x] Callable `cancelBoatTransfer` pubblicata e riletta nel progetto `egadi-sailing-2026`, regione `europe-west8`, stato ACTIVE. Richiesta HTTPS anonima con dati fittizi rifiutata 401/UNAUTHENTICATED senza scritture; client pubblicato su GitHub Pages.
 - [x] Rilettura esatta dei file pubblici dopo il rilascio; le prove di permessi, scrittura e proiezione dello stato sono automatiche con dati fittizi. Nessuna prova distruttiva su richieste reali.
 - [ ] Prova autenticata completa del nuovo comando su dispositivo fisico, con una richiesta di prova autorizzata; non usare una prenotazione reale per certificare il gate.
-- [ ] Problema distinto osservato nella console dell'area skipper autenticata il 06/10: `formatDate` genera `RangeError: Invalid time value` nel riepilogo dei pagamenti (`paymentDeclaredHint`). Equipaggio e transfer restano leggibili; nessun accredito o dato economico modificato in questa attività. Analisi/correzione da trattare separatamente.
+- [x] Problema distinto osservato nella console dell'area skipper autenticata il 06/10: `formatDate` genera `RangeError: Invalid time value` nel riepilogo dei pagamenti (`paymentDeclaredHint`). Equipaggio e transfer restano leggibili; nessun accredito o dato economico modificato in questa attività. Analisi/correzione da trattare separatamente. Corretto il 07/10/2026: vedi "Date in formato italiano".
 
 ## Sito pubblico e contenuti
 

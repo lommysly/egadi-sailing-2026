@@ -107,3 +107,28 @@ test('nessuna pagina lascia decidere al dispositivo come scrivere una data', () 
   }
   assert.equal(checked >= 9, true, 'il controllo deve trovare le chiamate esistenti');
 });
+
+// Trovato nella console dell'area skipper il 6/10/2026 e corretto il 7/10:
+// la dichiarazione di pagamento passava una data vera a una funzione che si
+// aspettava il testo AAAA-MM-GG. Il formattatore lanciava "Invalid time
+// value" e con lui si fermava l'intero elenco dei versamenti della barca.
+test('la data di una dichiarazione di pagamento non ferma più l’elenco dei versamenti', () => {
+  const area = read('area.js');
+  const context = vm.createContext({
+    Intl,
+    Date,
+    escapeHtml: (value) => String(value),
+    PAYMENT_METHODS: [{ id: 'bank', label: 'bonifico' }],
+    isManualPaymentReceipt: () => false,
+  });
+  vm.runInContext(`${functionSource(area, 'formatDate')}\n${functionSource(area, 'paymentDeclaredHint')}`, context);
+  const declaredAt = { toDate: () => new Date(2026, 9, 4, 10, 30) };
+  const hint = context.paymentDeclaredHint({ declaredAt, declaredMethod: 'bank' });
+  // Lo zero davanti al giorno dipende dal motore: conta l'ordine giorno/mese.
+  assert.match(hint, /dichiara di aver pagato con bonifico il 0?4\/10\/2026\./);
+  // I giorni dei campi data continuano a uscire come prima, giorno/mese/anno.
+  assert.match(context.formatDate('2026-10-08'), /^0?8\/10\/2026$/);
+  // E un valore che non è una data non lancia più niente: resta vuoto.
+  assert.equal(context.formatDate('non una data'), '');
+  assert.equal(context.formatDate(undefined), '');
+});
