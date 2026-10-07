@@ -11,6 +11,7 @@ import {
   suggestedMarsalaDeparture,
   transferOperationalDate,
   transferTimingCheck,
+  groupTransferRuns,
 } from '../transfer-ordering.js';
 import serverParty from '../functions/transfer-party.js';
 
@@ -223,4 +224,43 @@ test('ritorno con volo dopo mezzanotte: la partenza della sera prima non sballa 
 test('senza volo leggibile o con aeroporto sconosciuto non si inventa un avviso', () => {
   assert.equal(transferTimingCheck(arrival('', '14:30'), 'outbound').level, 'none');
   assert.equal(transferTimingCheck(departure('XXX', '21:30', '18:45'), 'return').level, 'none');
+});
+
+// Il gestore ragiona per corse ("Palermo 14:30, tredici persone"): le persone
+// con lo stesso orario di ritrovo stanno insieme, chi non ce l'ha resta da
+// organizzare, gli annullati vanno a parte (richiesta di Silvio, 7/10/2026).
+test('corse: stesso orario di ritrovo insieme, in ordine di orario', () => {
+  const records = [
+    { id: 'c', airport: 'PMO', date: '2026-10-08', time: '15:20', meetingTime: '18:00', status: 'confirmed' },
+    { id: 'a', airport: 'PMO', date: '2026-10-08', time: '12:55', meetingTime: '14:30', status: 'confirmed', meetingPoint: 'Hall Arrivi' },
+    { id: 'b', airport: 'PMO', date: '2026-10-08', time: '14:00', meetingTime: '14:30', status: 'new', meetingPoint: 'HALL ARRIVI' },
+    { id: 'd', airport: 'PMO', date: '2026-10-08', time: '13:15', status: 'new' },
+    { id: 'e', airport: 'PMO', date: '2026-10-08', time: '09:15', meetingTime: '11:30', status: 'cancelled' },
+  ];
+  const { runs, unscheduled, cancelled } = groupTransferRuns(records, 'outbound');
+  assert.deepEqual(runs.map((run) => [run.meetingTime, run.records.map((record) => record.id)]), [['14:30', ['a', 'b']], ['18:00', ['c']]]);
+  assert.deepEqual(unscheduled.map((record) => record.id), ['d']);
+  assert.deepEqual(cancelled.map((record) => record.id), ['e']);
+});
+
+test('corse: il punto di ritrovo scritto in modo diverso non spezza la navetta', () => {
+  const { runs } = groupTransferRuns([
+    { id: 'a', airport: 'PMO', date: '2026-10-08', time: '12:55', meetingTime: '14:30', meetingPoint: 'Hall Arrivi' },
+    { id: 'b', airport: 'PMO', date: '2026-10-08', time: '13:25', meetingTime: '14:30', meetingPoint: 'HALL ARRIVI APT PALERMO' },
+  ], 'outbound');
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].records.length, 2);
+});
+
+test('corse: senza nessun orario di ritrovo non ne nasce nessuna', () => {
+  const result = groupTransferRuns([{ id: 'a', airport: 'TPS', date: '2026-10-11', time: '20:35' }, { id: 'b', airport: 'TPS', date: '2026-10-11', time: '21:15', meetingTime: 'presto' }], 'return');
+  assert.equal(result.runs.length, 0);
+  assert.equal(result.unscheduled.length, 2);
+  assert.deepEqual(groupTransferRuns([], 'outbound'), { runs: [], unscheduled: [], cancelled: [] });
+});
+
+test('corse: dentro la navetta l’ordine è quello dei voli, non l’alfabeto', () => {
+  const r = (id, name, time) => ({ id, participantName: name, airport: 'PMO', date: '2026-10-08', time, meetingTime: '14:30', status: 'confirmed' });
+  const { runs } = groupTransferRuns([r('a', 'Anna', '13:25'), r('c', 'Carlo', '14:00'), r('m', 'Marco', '12:55'), r('b', 'Bruno', '12:55')], 'outbound');
+  assert.deepEqual(runs[0].records.map((record) => record.id), ['b', 'm', 'a', 'c']);
 });

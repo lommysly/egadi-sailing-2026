@@ -4,7 +4,7 @@ import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-st
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
 import { rosterEntries, rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-card-come-il-gestore-v1';
-import { showTransferNotice } from './transfer-notice.js?v=20261007-corse-v1';
+import { showTransferNotice } from './transfer-notice.js?v=20261007-corse-v2';
 
 watchForStaleScript(import.meta.url);
 

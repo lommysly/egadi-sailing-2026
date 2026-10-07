@@ -12,7 +12,7 @@
 // Mostra solo quello che il gestore ha deciso per quella persona; le note
 // interne del gestore non arrivano mai fin qui.
 import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
-import { transferTimingCheck } from './transfer-ordering.js?v=20261007-corse-v1';
+import { transferTimingCheck } from './transfer-ordering.js?v=20261007-corse-v2';
 
 const OPERATIONS = new Set(['planned', 'confirmed', 'cancelled']);
 const HIDDEN_OPERATIONS = new Set(['completed', 'revoked']);

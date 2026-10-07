@@ -2,6 +2,14 @@
 
 Ultimo aggiornamento: 7 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
 
+## Transfer: vista per corse · 7 ottobre 2026
+
+- [x] Sorgente: dentro ogni giorno e aeroporto il portale mostra prima le corse già fissate — le persone con lo stesso orario di ritrovo sotto un'unica intestazione con orario, persone, punto, stato e schede da controllare — poi chi è ancora «Da organizzare» nelle fasce di due ore di prima, infine gli annullati. La corsa si ricava dall'orario di ritrovo già salvato (`groupTransferRuns`): nessun campo nuovo, nessuna Rules o Cloud Function modificata.
+- [x] «Modifica corsa» seleziona tutte le persone della corsa e apre il modulo di gruppo esistente: orario, punto e stato si cambiano una volta sola. Dentro la corsa le schede sono in ordine di volo e non ripetono l'orario.
+- [x] Il punto di ritrovo scritto in modi diversi («HALL ARRIVI», «Hall Arrivi») non spezza la corsa; punti davvero diversi o mancanti sono segnalati sull'intestazione.
+- [x] Gate locale: 190 test unitari; renderer reali con dati fittizi a 400 e 1280 px senza sfondamento orizzontale. Il raggruppamento è stato applicato in sola lettura alle 76 prenotazioni reali: 9 corse all'andata, ritorni tutti da organizzare, nessun errore.
+- [ ] Verifica autenticata nel portale, compreso il pulsante «Modifica corsa» (provato solo nel codice, non con un accesso reale).
+
 ## Transfer: finestra all'ingresso e numero di volo · 7 ottobre 2026
 
 - [x] Sorgente: chi entra nell'area equipaggio (`my-area.js`) o skipper (`area.js`) e ha un transfer richiesto trova una finestra «Il tuo transfer» con stato, orario e punto di ritrovo decisi dal gestore e il proprio volo. Compare una volta per ingresso e di nuovo quando il gestore cambia stato, orario o punto; aspetta se è aperto il regolamento. Se il ritrovo risulta prima dell'atterraggio lo dice alla persona. Modulo `transfer-notice.js`. Richiesto dal titolare il 07/10/2026.
@@ -16,7 +24,7 @@ Ultimo aggiornamento: 7 ottobre 2026. Le caselle descrivono lo stato verificato;
 - [x] Avvisi automatici, che non bloccano il salvataggio: all'andata «atterra dopo il ritrovo» (errore, bordo rosso) e attesa oltre due ore; al ritorno arrivo in aeroporto dopo il decollo (errore) o con meno di 45 minuti; conferma senza orario di ritrovo; «senza telefono». L'intestazione della fascia conta le schede da controllare. Regola in `transfer-ordering.js` (`transferTimingCheck`).
 - [x] Solo visualizzazione: nessun campo, Rules o Cloud Function modificati. Gate locale: 171 test unitari; renderer reali con dati fittizi a 800 e 375 px, nessuno sfondamento orizzontale.
 - [ ] Verifica autenticata nel portale con le prenotazioni reali.
-- [ ] Secondo passo concordato: vista raggruppata per corsa (giorno, aeroporto, orario di ritrovo) con modifica unica di orario e stato, prima dei rientri dell'11 ottobre.
+- [x] Secondo passo concordato: vista raggruppata per corsa, pubblicata la sera del 07/10/2026 (sezione «Transfer: vista per corse»).
 
 ## Date in formato italiano · 7 ottobre 2026
 

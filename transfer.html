@@ -91,6 +91,22 @@
     .transfer-badge--alert-note { background:#eef0f1; color:#54595c; }
     .transfer-badge--alert-error::before,.transfer-badge--alert-warning::before { content:'⚠'; margin-right:5px; font-family:"DM Sans",sans-serif; }
     .transfer-record[data-timing="error"] { --transfer-card-border:#b3261e; box-shadow:0 0 0 1px #b3261e; }
+    /* La corsa: le persone con lo stesso orario di ritrovo, sotto un'unica
+       intestazione. Dentro la corsa l'orario non si ripete su ogni scheda. */
+    .transfer-run { margin-top:14px; padding:14px; border:1px solid rgba(8,123,138,.3); border-radius:16px; background:#f2fbfa; }
+    .transfer-run-head { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; margin-bottom:12px; }
+    .transfer-run-head .transfer-record-pickup { min-width:84px; border-color:#063644; background:#063644; color:#fff; }
+    .transfer-run-head .transfer-record-pickup small { color:#bfe9e4; }
+    .transfer-run-head .transfer-record-pickup b { font-size:1.6rem; }
+    .transfer-run-copy { display:grid; gap:2px; flex:1 1 170px; min-width:0; }
+    .transfer-run-copy strong { font:600 1.15rem/1.1 "Fraunces",serif; }
+    .transfer-run-copy span { color:#416b6d; font-size:.85rem; line-height:1.35; overflow-wrap:anywhere; }
+    .transfer-run-copy span.is-caution { color:#8a5a00; font-weight:700; }
+    .transfer-run-edit { min-height:40px; padding:8px 16px; font-size:.8rem; }
+    .transfer-run .transfer-operator-list .transfer-record-pickup { display:none; }
+    .transfer-run .transfer-operator-list .transfer-record > summary { grid-template-columns:minmax(0,1fr); }
+    .transfer-run-section { margin:22px 0 0; color:#416b6d; font:700 .74rem "DM Mono",monospace; letter-spacing:.06em; text-transform:uppercase; }
+    .transfer-run-section + .transfer-operator-list { margin-top:10px; }
     .transfer-time-band-alert { padding:5px 10px; border-radius:999px; background:#ffd166; color:#4d3800; font:700 .64rem "DM Sans",sans-serif; font-style:normal; letter-spacing:0; white-space:nowrap; }
     .transfer-record-body { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:20px; padding:0 18px 18px; border-top:1px solid var(--line); }
     .transfer-record-details { display:grid; gap:10px; align-content:start; padding-top:18px; }
@@ -190,6 +206,6 @@
   <script src="i18n-public-core.js?v=20260928-blast-brand-v1"></script>
   <script src="i18n-public-support.js?v=20260928-transfer-paid-v1"></script>
   <script src="app.js?v=20261004-una-domanda-un-posto-v1"></script>
-  <script type="module" src="transfer.js?v=20261007-corse-v1"></script>
+  <script type="module" src="transfer.js?v=20261007-corse-v2"></script>
 </body>
 </html>

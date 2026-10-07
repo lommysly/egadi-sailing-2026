@@ -40,6 +40,41 @@ export function groupByTimeBand(records, direction) {
   return bands;
 }
 
+// Una corsa è l'insieme delle persone che il gestore ha messo allo stesso
+// orario di ritrovo: è così che ragiona chi organizza le navette ("Palermo
+// 14:30, tredici persone"), mentre il portale le mostrava sparse in fasce di
+// due ore calcolate sull'orario dei voli. Qui i movimenti di un giorno e di
+// un aeroporto si dividono in tre: le corse già fissate, chi è ancora da
+// organizzare, e gli annullati.
+//
+// La corsa è identificata dal solo orario, non dal punto di ritrovo: il
+// punto è testo libero, e "Hall Arrivi" scritto in tre modi diversi non deve
+// spezzare la stessa navetta in tre.
+export function groupTransferRuns(records, direction) {
+  const runs = new Map();
+  const unscheduled = [];
+  const cancelled = [];
+  sortTransferRecords(records, direction).forEach((record) => {
+    if (transferSeatCount(record) === 0) { cancelled.push(record); return; }
+    const minutes = timeToMinutes(record?.meetingTime);
+    if (minutes === null) { unscheduled.push(record); return; }
+    const meetingTime = minutesToTime(minutes);
+    if (!runs.has(meetingTime)) runs.set(meetingTime, { meetingTime, records: [] });
+    runs.get(meetingTime).records.push(record);
+  });
+  // Dentro la corsa conta l'ordine in cui le persone arrivano (o, al rientro,
+  // in cui hanno il volo): chi atterra prima è quello che aspetta di più.
+  const byFlight = (left, right) => (timeToMinutes(scheduleTime(left)) ?? 9999) - (timeToMinutes(scheduleTime(right)) ?? 9999)
+    || participantName(left).localeCompare(participantName(right), 'it', { sensitivity: 'base' });
+  return {
+    runs: [...runs.values()]
+      .map((run) => ({ ...run, records: [...run.records].sort(byFlight) }))
+      .sort((left, right) => left.meetingTime.localeCompare(right.meetingTime)),
+    unscheduled,
+    cancelled,
+  };
+}
+
 function normalizedDirection(value) {
   const normalized = String(value ?? '').trim().toLowerCase();
   return normalized === 'return' ? 'return' : 'outbound';

@@ -19,12 +19,13 @@ import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=2026100
 import {
   groupTransferRecords,
   groupByTimeBand,
+  groupTransferRuns,
   additionalPassengerCount,
   transferPassengerCount,
   totalTransferSeats,
   suggestedMarsalaDeparture,
   transferTimingCheck,
-} from './transfer-ordering.js?v=20261007-corse-v1';
+} from './transfer-ordering.js?v=20261007-corse-v2';
 import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
 import {
   boatFromData,
@@ -124,7 +125,7 @@ const COPY = {
     solo: 'Nessuno · 1 persona',
     outboundSeats: 'Persone verso Marsala',
     returnSeats: 'Persone verso l’aeroporto',
-    bandHint: 'Fasce entro 2 ore. Al rientro: ritrovo assegnato o partenza da Marsala stimata, da verificare con bagagli e traffico.',
+    bandHint: 'In alto le corse già fissate, una per orario di ritrovo. Sotto, chi è ancora da organizzare: in fasce di due ore per orario del volo all’andata, per partenza stimata da Marsala al rientro (da verificare con bagagli e traffico).',
     skipperArea: 'Torna all’area skipper',
     switchContext: 'Sei nella gestione transfer',
     records: 'movimenti',
@@ -219,8 +220,8 @@ const COPY = {
     meetingPointPlaceholderReturn: 'Es. Molo imbarco, Porto di Marsala',
     suggestedDepartureLabel: 'Partenza da Marsala (stimata)',
     suggestedDepartureHint: 'Include il tempo di viaggio e il margine in aeroporto: verifica sempre il traffico reale del giorno.',
-    timeBandArrivalPrefix: 'Arrivo / ritrovo',
-    timeBandDeparturePrefix: 'Partenza da Marsala',
+    timeBandArrivalPrefix: 'Voli in arrivo',
+    timeBandDeparturePrefix: 'Partenza stimata da Marsala',
     timeBandUnscheduled: 'Orario da definire',
     pickupLabel: 'Ritrovo',
     pickupMissing: 'da fissare',
@@ -234,6 +235,13 @@ const COPY = {
     alertTightMargin: 'Solo {minutes} min al volo',
     alertNoPhone: 'Senza telefono',
     bandAlerts: '{count} da controllare',
+    runEdit: 'Modifica corsa',
+    runPointMissing: 'Punto di ritrovo da indicare',
+    runPointsDiffer: 'Punti di ritrovo diversi',
+    runPendingTitle: 'Da organizzare',
+    runCancelledTitle: 'Annullati',
+    runAssignment: 'Assegnazione',
+    runVehicle: 'Mezzo',
   },
   en: {
     heroEyebrow: 'Operations area · transfer company',
@@ -309,7 +317,7 @@ const COPY = {
     solo: 'None · 1 person',
     outboundSeats: 'People travelling to Marsala',
     returnSeats: 'People travelling to the airport',
-    bandHint: 'Bands span up to 2 hours. Return times use an assigned meeting time or an estimated departure from Marsala; allow for luggage and traffic.',
+    bandHint: 'Runs already set come first, one per pick-up time. Below, people still to be organised: in 2-hour bands by flight time outbound, by estimated departure from Marsala on the way back (allow for luggage and traffic).',
     skipperArea: 'Back to skipper area',
     switchContext: 'You are managing transfers',
     records: 'journeys',
@@ -404,7 +412,7 @@ const COPY = {
     meetingPointPlaceholderReturn: 'E.g. Boarding pontoon, Port of Marsala',
     suggestedDepartureLabel: 'Departure from Marsala (estimated)',
     suggestedDepartureHint: 'Includes travel time and the airport margin: always check the real traffic on the day.',
-    timeBandArrivalPrefix: 'Arrival / meeting',
+    timeBandArrivalPrefix: 'Flights landing',
     timeBandDeparturePrefix: 'Departure from Marsala',
     timeBandUnscheduled: 'Time to be defined',
     pickupLabel: 'Pick-up',
@@ -419,6 +427,13 @@ const COPY = {
     alertTightMargin: 'Only {minutes} min to flight',
     alertNoPhone: 'No phone',
     bandAlerts: '{count} to check',
+    runEdit: 'Edit run',
+    runPointMissing: 'Meeting point to be set',
+    runPointsDiffer: 'Different meeting points',
+    runPendingTitle: 'To be organised',
+    runCancelledTitle: 'Cancelled',
+    runAssignment: 'Assignment',
+    runVehicle: 'Vehicle',
   },
 };
 
@@ -981,8 +996,63 @@ function renderClusterSelectAll(records) {
   return `<label class="transfer-cluster-select"><input type="checkbox" data-select-cluster${allSelected ? ' checked' : ''} />${escapeHtml(label)}</label>`;
 }
 
+// I valori che più persone della stessa corsa hanno in comune, senza contare
+// maiuscole e spazi: "HALL ARRIVI" e "Hall Arrivi" sono lo stesso punto.
+function sharedValues(records, read) {
+  const seen = new Map();
+  records.forEach((record) => {
+    const value = read(record);
+    if (!value) return;
+    const key = value.toLowerCase().replace(/\s+/g, ' ');
+    if (!seen.has(key)) seen.set(key, value);
+  });
+  return [...seen.values()];
+}
+
+function runStatusBadges(records) {
+  const counts = new Map();
+  records.forEach((record) => {
+    const status = recordStatusKey(record);
+    counts.set(status, (counts.get(status) || 0) + 1);
+  });
+  return [...counts.entries()]
+    .map(([status, count]) => `<span class="transfer-badge transfer-badge--${escapeHtml(status)}">${escapeHtml(statusLabel(status))}${counts.size > 1 ? ` ×${count}` : ''}</span>`)
+    .join('');
+}
+
+// La corsa come la pensa il gestore: orario di ritrovo, quante persone, dove,
+// a che punto è. Le schede delle persone restano quelle di sempre, sotto.
+// "Modifica corsa" seleziona tutti e apre il modulo di gruppo che già esiste:
+// orario, punto e stato si cambiano una volta sola per tutta la navetta.
+function renderRun(run, direction) {
+  const points = sharedValues(run.records, (record) => text(record.meetingPoint, 160));
+  const pointText = points.length === 1
+    ? points[0]
+    : points.length ? `${t('runPointsDiffer')}: ${points.join(' / ')}` : t('runPointMissing');
+  const assignments = sharedValues(run.records, (record) => text(record.assignment || record.operatorAssignment || record.groupName, 120));
+  const vehicles = sharedValues(run.records, (record) => text(record.vehicleName || record.assignedVehicle || record.vehicle, 120));
+  const extras = [
+    assignments.length ? `${t('runAssignment')}: ${assignments.join(' / ')}` : '',
+    vehicles.length ? `${t('runVehicle')}: ${vehicles.join(' / ')}` : '',
+  ].filter(Boolean).join(' · ');
+  const alerts = bandAlertCount(run.records, direction);
+  const alertBadge = alerts ? `<em class="transfer-time-band-alert">${escapeHtml(t('bandAlerts').replace('{count}', String(alerts)))}</em>` : '';
+  return `<div class="transfer-run" data-cluster><div class="transfer-run-head"><span class="transfer-record-pickup"><small>${escapeHtml(t('pickupLabel'))}</small><b>${escapeHtml(run.meetingTime)}</b></span><span class="transfer-run-copy"><strong>${escapeHtml(peopleLabel(totalTransferSeats(run.records)))}</strong><span${points.length === 1 ? '' : ' class="is-caution"'}>${escapeHtml(pointText)}</span>${extras ? `<span>${escapeHtml(extras)}</span>` : ''}</span><span class="transfer-record-badges">${runStatusBadges(run.records)}${alertBadge}</span><button class="button button-ghost transfer-run-edit" type="button" data-action="edit-run">${escapeHtml(t('runEdit'))}</button></div>${renderClusterSelectAll(run.records)}<div class="transfer-operator-list">${run.records.map(renderRecord).join('')}</div></div>`;
+}
+
 function renderAirportGroupBody(groupRecords, direction) {
-  return groupByTimeBand(groupRecords, direction).map((band) => `<div class="transfer-time-band"><h4 class="transfer-time-band-title">${escapeHtml(timeBandTitle(band, direction))}<span>${escapeHtml(peopleLabel(totalTransferSeats(band.records)))}</span>${bandAlertCount(band.records, direction) ? `<em class="transfer-time-band-alert">${escapeHtml(t('bandAlerts').replace('{count}', String(bandAlertCount(band.records, direction))))}</em>` : ''}</h4><div class="transfer-cluster" data-cluster>${renderClusterSelectAll(band.records)}<div class="transfer-operator-list">${band.records.map(renderRecord).join('')}</div></div></div>`).join('');
+  const { runs, unscheduled, cancelled } = groupTransferRuns(groupRecords, direction);
+  const runsMarkup = runs.map((run) => renderRun(run, direction)).join('');
+  const bands = groupByTimeBand(unscheduled, direction).map((band) => `<div class="transfer-time-band"><h4 class="transfer-time-band-title">${escapeHtml(timeBandTitle(band, direction))}<span>${escapeHtml(peopleLabel(totalTransferSeats(band.records)))}</span>${bandAlertCount(band.records, direction) ? `<em class="transfer-time-band-alert">${escapeHtml(t('bandAlerts').replace('{count}', String(bandAlertCount(band.records, direction))))}</em>` : ''}</h4><div class="transfer-cluster" data-cluster>${renderClusterSelectAll(band.records)}<div class="transfer-operator-list">${band.records.map(renderRecord).join('')}</div></div></div>`).join('');
+  // Il titolo "Da organizzare" serve solo quando sopra ci sono già delle
+  // corse: finché nessuno ha un orario la schermata resta quella di prima.
+  const pendingTitle = runs.length && unscheduled.length
+    ? `<h5 class="transfer-run-section">${escapeHtml(t('runPendingTitle'))} · ${escapeHtml(peopleLabel(totalTransferSeats(unscheduled)))}</h5>`
+    : '';
+  const cancelledMarkup = cancelled.length
+    ? `<h5 class="transfer-run-section">${escapeHtml(t('runCancelledTitle'))} · ${cancelled.length}</h5><div class="transfer-operator-list">${cancelled.map(renderRecord).join('')}</div>`
+    : '';
+  return runsMarkup + pendingTitle + bands + cancelledMarkup;
 }
 
 function dateGroupLabel(date) {
@@ -2084,6 +2154,19 @@ document.addEventListener('click', async (event) => {
   if (action === 'bulk-toggle-form') {
     state.bulkFormExpanded = !state.bulkFormExpanded;
     renderBulkToolbar();
+  }
+  // Un clic sulla corsa: seleziona tutte le sue persone e apre il modulo di
+  // gruppo, lo stesso che il gestore usa già con "Seleziona tutti".
+  if (action === 'edit-run') {
+    const cluster = button.closest('[data-cluster]');
+    state.selectedRecordIds.clear();
+    cluster?.querySelectorAll('[data-record-select]').forEach((checkbox) => {
+      if (checkbox.dataset.recordSelect) state.selectedRecordIds.add(checkbox.dataset.recordSelect);
+    });
+    state.bulkFormExpanded = true;
+    renderRecordListOnly();
+    renderBulkToolbar();
+    document.querySelector('#transferBulkToolbar')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 });
 

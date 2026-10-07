@@ -187,3 +187,62 @@ test('scheda chiusa: ritrovo in testa, volo con la sua etichetta, avvisi sugli o
   assert.match(en, /Lands after pick-up/);
   assert.match(en, /Flight Volo fittizio · lands /);
 });
+
+test('vista per corse: intestazione con ritrovo, persone, punto e stato; il resto da organizzare', () => {
+  const r = (id, name, time, extra = {}) => ({ id, participantName: name, phone: '+39000', airport: 'PMO', date: '2026-10-08', time, direction: 'outbound', status: 'confirmed', ...extra });
+  const records = [
+    r('a', 'Prima Persona', '12:55', { meetingTime: '14:30', meetingPoint: 'Hall Arrivi' }),
+    r('b', 'Seconda Persona', '13:25', { meetingTime: '14:30', meetingPoint: 'HALL ARRIVI', additionalPassengers: 2 }),
+    r('c', 'Terza Persona', '14:00', { meetingTime: '14:30', meetingPoint: 'Hall Arrivi', status: 'new' }),
+    r('d', 'Atterra Tardi', '21:10', { meetingTime: '18:00', meetingPoint: 'Hall Arrivi' }),
+    r('e', 'Da Organizzare', '13:15', { status: 'new' }),
+    r('f', 'Annullata', '09:15', { status: 'cancelled' }),
+  ];
+  const html = renderFixture('it', records);
+  const firstRun = html.slice(html.indexOf('class="transfer-run"'), html.indexOf('class="transfer-run"', html.indexOf('class="transfer-run"') + 10));
+  // Una corsa per orario: 14:30 con cinque persone (1 + 3 + 1), punto unico
+  // anche se scritto con maiuscole diverse, stati misti contati.
+  assert.equal((html.match(/class="transfer-run"/g) || []).length, 2);
+  assert.match(firstRun, /transfer-run-head"><span class="transfer-record-pickup"><small>Ritrovo<\/small><b>14:30<\/b>/);
+  assert.match(firstRun, /<strong>5 persone<\/strong><span>Hall Arrivi<\/span>/);
+  assert.match(firstRun, /transfer-badge--confirmed">[^<]* ×2<\/span>/);
+  assert.match(firstRun, /transfer-badge--new">[^<]* ×1<\/span>/);
+  assert.match(firstRun, /data-action="edit-run">Modifica corsa/);
+  assert.match(firstRun, /data-cluster/);
+  for (const id of ['a', 'b', 'c']) assert.match(firstRun, new RegExp(`data-record-id="${id}"`));
+  assert.doesNotMatch(firstRun, /data-record-id="d"/);
+  // La seconda corsa segnala chi atterra dopo il ritrovo.
+  const secondRun = html.slice(html.lastIndexOf('class="transfer-run"'));
+  assert.match(secondRun.slice(0, secondRun.indexOf('transfer-operator-list')), /<b>18:00<\/b>[\s\S]*transfer-time-band-alert">1 da controllare/);
+  // Chi non ha orario resta sotto "Da organizzare", gli annullati a parte.
+  assert.match(html, /transfer-run-section">Da organizzare · 1 persona<\/h5>/);
+  assert.match(html, /transfer-run-section">Annullati · 1<\/h5>/);
+  assert.equal(html.indexOf('data-record-id="e"') > html.lastIndexOf('class="transfer-run"'), true);
+  assert.equal(html.indexOf('data-record-id="f"') > html.indexOf('Annullati · 1'), true);
+  // Ogni persona compare una volta sola.
+  for (const id of ['a', 'b', 'c', 'd', 'e', 'f']) assert.equal((html.match(new RegExp(`data-record-id="${id}"`, 'g')) || []).length, 1, id);
+});
+
+test('vista per corse: punti di ritrovo davvero diversi vengono segnalati', () => {
+  const r = (id, point) => ({ id, participantName: id, phone: '+39000', airport: 'TPS', date: '2026-10-08', time: '13:15', meetingTime: '14:00', meetingPoint: point, direction: 'outbound', status: 'confirmed' });
+  const html = renderFixture('it', [r('a', 'Hall Arrivi'), r('b', 'Parcheggio P2'), r('c', '')]);
+  assert.match(html, /<span class="is-caution">Punti di ritrovo diversi: Hall Arrivi \/ Parcheggio P2<\/span>/);
+  const none = renderFixture('it', [r('a', ''), r('b', '')]);
+  assert.match(none, /<span class="is-caution">Punto di ritrovo da indicare<\/span>/);
+});
+
+test('senza orari di ritrovo la schermata resta quella di prima, in fasce per volo', () => {
+  const html = renderFixture('it');
+  assert.doesNotMatch(html, /class="transfer-run"/);
+  assert.doesNotMatch(html, /class="transfer-run-section"/);
+  assert.match(html, /Voli in arrivo 13:15–14:10/);
+});
+
+test('"Modifica corsa" seleziona tutta la navetta e apre il modulo di gruppo esistente', () => {
+  const source = readFileSync(new URL('../transfer.js', import.meta.url), 'utf8');
+  const handler = source.slice(source.indexOf("if (action === 'edit-run')"), source.indexOf("if (action === 'edit-run')") + 700);
+  assert.match(handler, /state\.selectedRecordIds\.clear\(\)/);
+  assert.match(handler, /cluster\?\.querySelectorAll\('\[data-record-select\]'\)/);
+  assert.match(handler, /state\.bulkFormExpanded = true/);
+  assert.match(handler, /renderBulkToolbar\(\)/);
+});
