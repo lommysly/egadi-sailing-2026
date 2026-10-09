@@ -119,7 +119,9 @@ test('interfaccia reale IT/EN: totali per fascia e accompagnatori nel riepilogo 
   const en = renderFixture('en');
   assert.match(en, /3 people \(\+2\)/);
   assert.match(en, /Additional passengers with this contact/);
-  assert.match(en, /Departure from Marsala 18:50/);
+  // Dal 9/10/2026 il rientro si raggruppa per volo; l'orario entro cui
+  // lasciare Marsala resta, ma come indicazione accanto al titolo.
+  assert.match(en, /Flights departing 20:35<span>2 people<\/span><em class="transfer-depart-by">leave Marsala by 18:50<\/em>/);
 });
 
 test('riepilogo per barca: tre posti con un referente, annullati e altre barche esclusi', () => {
@@ -301,4 +303,54 @@ test('contatto del gestore: letto dal documento solo server, validato e tenuto i
   assert.equal(await fresh({ name: 'Giovanni', phone: '3200000000' }).ctx.transferContact(), null);
   assert.equal(await fresh({ name: 'Giovanni', phone: '+390000000000', active: false }).ctx.transferContact(), null);
   assert.equal(await fresh(null).ctx.transferContact(), null);
+});
+
+// Richiesta di Silvio, 9/10/2026: al ritorno il dato da cui si organizza è
+// l'orario di partenza del volo, e va in evidenza sulla scheda.
+test('ritorno: il volo in testa alla scheda, accanto l’orario entro cui lasciare Marsala', () => {
+  const r = (id, name, airport, time, extra = {}) => ({ id, participantName: name, phone: '+39000', airport, date: '2026-10-11', time, direction: 'return', status: 'new', ...extra });
+  const html = renderFixture('it', [
+    r('a', 'Con Bagaglio', 'PMO', '21:45', { luggageCount: 1 }),
+    r('b', 'Solo Mano', 'PMO', '21:45'),
+    r('c', 'Altro Volo', 'PMO', '22:00'),
+    r('d', 'Presto', 'PMO', '18:00'),
+  ]);
+  const card = (id) => html.slice(html.indexOf(`data-record-id="${id}"`), html.indexOf('</summary>', html.indexOf(`data-record-id="${id}"`)));
+  // Il decollo è il riquadro grande; accanto l'orario calcolato, tratteggiato.
+  assert.match(card('a'), /transfer-record-flight"><small>Volo parte<\/small><b>21:45<\/b>/);
+  assert.match(card('a'), /transfer-record-pickup is-suggested"><small>Partire entro<\/small><b>18:30<\/b>/);
+  // Stesso volo, solo bagaglio a mano: mezz'ora in più.
+  assert.match(card('b'), /<small>Partire entro<\/small><b>19:00<\/b>/);
+  // Fascia per volo: 21:45 e 22:00 insieme, con l'orario più stretto; le 18:00 a parte.
+  assert.match(html, /Voli in partenza 21:45–22:00<span>3 persone<\/span><em class="transfer-depart-by">partire da Marsala entro le 18:30<\/em>/);
+  assert.match(html, /Voli in partenza 18:00<span>1 persona<\/span><em class="transfer-depart-by">partire da Marsala entro le 15:15<\/em>/);
+  // Dentro la fascia un gruppo per volo, ciascuno selezionabile da solo.
+  assert.match(html, /transfer-flight-group" data-cluster><h5 class="transfer-flight-group-title">Volo delle 21:45<span>2 persone<\/span><em class="transfer-depart-by">partire da Marsala entro le 18:30<\/em>/);
+  assert.match(html, /transfer-flight-group-title">Volo delle 22:00<span>1 persona<\/span>/);
+  // Con un solo volo nella fascia non serve un secondo titolo.
+  const early = html.slice(html.indexOf('Voli in partenza 18:00'), html.indexOf('Voli in partenza 21:45'));
+  assert.doesNotMatch(early, /transfer-flight-group-title/);
+  for (const id of ['a', 'b', 'c', 'd']) assert.equal((html.match(new RegExp(`data-record-id="${id}"`, 'g')) || []).length, 1, id);
+});
+
+test('ritorno: fissato l’orario, il riquadro diventa "Ritrovo" e la corsa dice primo e ultimo volo', () => {
+  const r = (id, name, time, extra = {}) => ({ id, participantName: name, phone: '+39000', airport: 'PMO', date: '2026-10-11', time, direction: 'return', status: 'confirmed', meetingTime: '18:30', meetingPoint: 'Molo imbarco', ...extra });
+  const html = renderFixture('it', [r('a', 'Primo', '21:15'), r('b', 'Ultimo', '22:00'), r('c', 'Mezzo', '21:45')]);
+  const run = html.slice(html.indexOf('class="transfer-run"'));
+  assert.match(run, /<b>18:30<\/b>[\s\S]*<strong>3 persone<\/strong><span>Molo imbarco<\/span><span class="transfer-run-flights">Primo volo 21:15 · ultimo 22:00 · in aeroporto 60 min prima del primo volo<\/span>/);
+  // Sulla scheda il volo resta, e accanto c'è il ritrovo vero, non più il consiglio.
+  const card = run.slice(run.indexOf('data-record-id="a"'), run.indexOf('</summary>', run.indexOf('data-record-id="a"')));
+  assert.match(card, /transfer-record-flight"><small>Volo parte<\/small><b>21:15<\/b>/);
+  assert.match(card, /transfer-record-pickup"><small>Ritrovo<\/small><b>18:30<\/b>/);
+  assert.doesNotMatch(card, /is-suggested/);
+  // Un solo volo nella corsa: si dice quello.
+  const single = renderFixture('it', [r('a', 'Uno', '21:45'), r('b', 'Due', '21:45')]);
+  assert.match(single, /transfer-run-flights">Volo delle 21:45 · in aeroporto 90 min prima del primo volo/);
+});
+
+test('andata: la scheda resta com’era, senza il riquadro del volo', () => {
+  const html = renderFixture('it', [{ id: 'a', participantName: 'Arrivo', phone: '+39000', airport: 'PMO', date: '2026-10-08', time: '12:55', direction: 'outbound', status: 'new' }]);
+  assert.doesNotMatch(html, /class="transfer-record-flight"/);
+  assert.doesNotMatch(html, /class="transfer-record-times"/);
+  assert.match(html, /Voli in arrivo 12:55/);
 });

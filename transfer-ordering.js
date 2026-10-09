@@ -75,6 +75,87 @@ export function groupTransferRuns(records, direction) {
   };
 }
 
+// Al ritorno il dato fisso è il volo: è da lì che chi organizza parte per
+// decidere la navetta. Prima chi era ancora da organizzare veniva raggruppato
+// per "partenza stimata da Marsala", cioè per un numero calcolato, e due
+// persone sullo stesso volo delle 21:45 finivano con due orari diversi
+// (18:30 e 19:00) solo perché una aveva il bagaglio in stiva. Qui i ritorni
+// senza orario di ritrovo si raggruppano per volo: fasce di due ore dal primo
+// volo, e dentro ogni fascia un gruppo per ciascun orario di decollo.
+// `departBy` è l'orario più stretto del gruppo: quello entro cui la navetta
+// deve lasciare Marsala perché nessuno perda l'aereo (richiesta di Silvio,
+// 9/10/2026).
+function timestampToTime(timestamp) {
+  const date = new Date(timestamp);
+  return minutesToTime(date.getUTCHours() * 60 + date.getUTCMinutes());
+}
+
+function tightestDeparture(records) {
+  const values = records
+    .filter((record) => returnOffsetMinutes(record) > 0)
+    .map((record) => calculatedOperationalTimestamp(record, 'return'))
+    .filter((value) => value !== null);
+  return values.length ? timestampToTime(Math.min(...values)) : '';
+}
+
+export function groupReturnFlights(records) {
+  const timed = [];
+  const untimed = [];
+  records.forEach((record) => {
+    const flight = calculatedOperationalTimestamp(record, 'outbound');
+    if (flight === null) untimed.push(record); else timed.push({ record, flight });
+  });
+  timed.sort((left, right) => left.flight - right.flight
+    || participantName(left.record).localeCompare(participantName(right.record), 'it', { sensitivity: 'base' })
+    || String(left.record?.id ?? '').localeCompare(String(right.record?.id ?? '')));
+  const bands = [];
+  timed.forEach(({ record, flight }) => {
+    let band = bands[bands.length - 1];
+    if (!band || flight - band.first > 120 * 60_000) {
+      band = { first: flight, last: flight, flights: [], records: [] };
+      bands.push(band);
+    }
+    band.last = flight;
+    band.records.push(record);
+    let group = band.flights[band.flights.length - 1];
+    if (!group || group.flight !== flight) {
+      group = { flight, records: [] };
+      band.flights.push(group);
+    }
+    group.records.push(record);
+  });
+  return {
+    bands: bands.map((band) => ({
+      firstFlight: timestampToTime(band.first),
+      lastFlight: timestampToTime(band.last),
+      departBy: tightestDeparture(band.records),
+      records: band.records,
+      flights: band.flights.map((group) => ({
+        flightTime: timestampToTime(group.flight),
+        departBy: tightestDeparture(group.records),
+        records: group.records,
+      })),
+    })),
+    untimed,
+  };
+}
+
+// Per l'intestazione di una corsa di ritorno già fissata: primo e ultimo
+// volo, e quanti minuti restano in aeroporto alla persona messa peggio
+// (negativi se arriverebbe dopo il decollo).
+export function returnRunFlights(records) {
+  const flights = records.map((record) => calculatedOperationalTimestamp(record, 'outbound')).filter((value) => value !== null);
+  const margins = records
+    .map((record) => transferTimingCheck(record, 'return'))
+    .filter((check) => check.minutes !== null && ['ok', 'warning', 'error'].includes(check.level) && check.code !== 'confirmed_without_time')
+    .map((check) => (check.level === 'error' ? -check.minutes : check.minutes));
+  return {
+    first: flights.length ? timestampToTime(Math.min(...flights)) : '',
+    last: flights.length ? timestampToTime(Math.max(...flights)) : '',
+    marginMinutes: margins.length ? Math.min(...margins) : null,
+  };
+}
+
 function normalizedDirection(value) {
   const normalized = String(value ?? '').trim().toLowerCase();
   return normalized === 'return' ? 'return' : 'outbound';

@@ -107,6 +107,20 @@
     .transfer-run .transfer-operator-list .transfer-record > summary { grid-template-columns:minmax(0,1fr); }
     .transfer-run-section { margin:22px 0 0; color:#416b6d; font:700 .74rem "DM Mono",monospace; letter-spacing:.06em; text-transform:uppercase; }
     .transfer-run-section + .transfer-operator-list { margin-top:10px; }
+    /* Ritorno: il decollo in testa alla scheda, accanto l'orario entro cui
+       lasciare Marsala; chi è da organizzare è raggruppato per volo. */
+    .transfer-record-times { grid-column:1 / -1; display:flex; gap:8px; }
+    .transfer-record-times > span { flex:1 1 0; min-width:0; }
+    .transfer-record-times ~ .transfer-record-summary-copy { grid-column:1 / -1; }
+    .transfer-record-flight { display:grid; justify-items:center; align-content:center; gap:3px; padding:7px 9px; border-radius:11px; background:#4a2f80; color:#fff; }
+    .transfer-record-flight small { color:#ddd2f5; font:700 .58rem "DM Mono",monospace; letter-spacing:.06em; text-transform:uppercase; }
+    .transfer-record-flight b { font:700 1.3rem/1 "DM Sans",sans-serif; font-variant-numeric:tabular-nums; }
+    .transfer-record-pickup.is-suggested { border-style:dashed; background:transparent; color:#4a5c60; }
+    .transfer-depart-by { padding:5px 10px; border-radius:999px; background:#e4d9f7; color:#4a2f80; font:700 .64rem "DM Sans",sans-serif; font-style:normal; letter-spacing:0; white-space:nowrap; }
+    .transfer-flight-group { margin-top:14px; }
+    .transfer-flight-group:first-of-type { margin-top:4px; }
+    .transfer-flight-group-title { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 8px; color:#4a2f80; font:700 .82rem "DM Sans",sans-serif; }
+    .transfer-flight-group-title span { padding:4px 9px; border-radius:999px; background:#eef0f1; color:#416b6d; font-size:.64rem; white-space:nowrap; }
     .transfer-time-band-alert { padding:5px 10px; border-radius:999px; background:#ffd166; color:#4d3800; font:700 .64rem "DM Sans",sans-serif; font-style:normal; letter-spacing:0; white-space:nowrap; }
     .transfer-record-body { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:20px; padding:0 18px 18px; border-top:1px solid var(--line); }
     .transfer-record-details { display:grid; gap:10px; align-content:start; padding-top:18px; }
@@ -206,6 +220,6 @@
   <script src="i18n-public-core.js?v=20260928-blast-brand-v1"></script>
   <script src="i18n-public-support.js?v=20260928-transfer-paid-v1"></script>
   <script src="app.js?v=20261004-una-domanda-un-posto-v1"></script>
-  <script type="module" src="transfer.js?v=20261007-corse-v2"></script>
+  <script type="module" src="transfer.js?v=20261009-ritorni-per-volo-v1"></script>
 </body>
 </html>

@@ -16,7 +16,7 @@ import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=2026100
 import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-card-come-il-gestore-v1';
 import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
-import { showTransferNotice } from './transfer-notice.js?v=20261007-contatto-transfer-v1';
+import { showTransferNotice } from './transfer-notice.js?v=20261009-ritorni-per-volo-v1';
 import {
   boatFromData,
   boatSetupReadiness,

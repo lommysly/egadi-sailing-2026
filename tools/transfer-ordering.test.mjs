@@ -12,6 +12,8 @@ import {
   transferOperationalDate,
   transferTimingCheck,
   groupTransferRuns,
+  groupReturnFlights,
+  returnRunFlights,
 } from '../transfer-ordering.js';
 import serverParty from '../functions/transfer-party.js';
 
@@ -263,4 +265,44 @@ test('corse: dentro la navetta l’ordine è quello dei voli, non l’alfabeto',
   const r = (id, name, time) => ({ id, participantName: name, airport: 'PMO', date: '2026-10-08', time, meetingTime: '14:30', status: 'confirmed' });
   const { runs } = groupTransferRuns([r('a', 'Anna', '13:25'), r('c', 'Carlo', '14:00'), r('m', 'Marco', '12:55'), r('b', 'Bruno', '12:55')], 'outbound');
   assert.deepEqual(runs[0].records.map((record) => record.id), ['b', 'm', 'a', 'c']);
+});
+
+// Al ritorno si organizza a partire dal volo (richiesta di Silvio, 9/10/2026).
+const back = (id, airport, time, extra = {}) => ({ id, participantName: id, airport, date: '2026-10-11', time, direction: 'return', status: 'new', ...extra });
+
+test('ritorni per volo: fasce di due ore dal primo volo, un gruppo per orario di decollo', () => {
+  const { bands, untimed } = groupReturnFlights([
+    back('d', 'PMO', '22:00'), back('a', 'PMO', '18:00'), back('c', 'PMO', '21:45', { luggageCount: 1 }), back('b', 'PMO', '21:45'), back('e', 'PMO', ''),
+  ]);
+  assert.deepEqual(bands.map((band) => [band.firstFlight, band.lastFlight, band.records.map((record) => record.id)]), [['18:00', '18:00', ['a']], ['21:45', '22:00', ['b', 'c', 'd']]]);
+  assert.deepEqual(bands[1].flights.map((group) => [group.flightTime, group.records.map((record) => record.id)]), [['21:45', ['b', 'c']], ['22:00', ['d']]]);
+  assert.deepEqual(untimed.map((record) => record.id), ['e']);
+});
+
+test('ritorni per volo: "partire entro" è l’orario più stretto del gruppo', () => {
+  const { bands } = groupReturnFlights([back('b', 'PMO', '21:45'), back('c', 'PMO', '21:45', { luggageCount: 1 }), back('d', 'PMO', '22:00')]);
+  // Palermo: 105 minuti di strada, 60 di margine col solo bagaglio a mano, 90 con la stiva.
+  assert.equal(bands[0].flights[0].departBy, '18:30');
+  assert.equal(bands[0].flights[1].departBy, '19:15');
+  assert.equal(bands[0].departBy, '18:30');
+  // Trapani: 45 minuti di strada.
+  assert.equal(groupReturnFlights([back('t', 'TPS', '20:35')]).bands[0].departBy, '18:50');
+  // Aeroporto sconosciuto: nessun orario inventato.
+  assert.equal(groupReturnFlights([back('x', 'XXX', '20:35')]).bands[0].departBy, '');
+});
+
+test('ritorni per volo: un decollo dopo mezzanotte resta in ordine e non sballa il "partire entro"', () => {
+  const { bands } = groupReturnFlights([back('n', 'TPS', '00:30', { date: '2026-10-12' }), back('s', 'TPS', '23:10')]);
+  assert.deepEqual(bands[0].records.map((record) => record.id), ['s', 'n']);
+  assert.equal(bands[0].firstFlight, '23:10');
+  assert.equal(bands[0].lastFlight, '00:30');
+  assert.equal(bands[0].departBy, '21:25');
+});
+
+test('corsa di ritorno: primo e ultimo volo e margine della persona messa peggio', () => {
+  const run = (meetingTime, ...times) => times.map((time, index) => back(`p${index}`, 'PMO', time, { meetingTime, status: 'confirmed' }));
+  assert.deepEqual(returnRunFlights(run('18:30', '21:15', '22:00', '21:45')), { first: '21:15', last: '22:00', marginMinutes: 60 });
+  // Partenza troppo tardi per il primo volo: margine negativo.
+  assert.equal(returnRunFlights(run('19:45', '21:15', '22:00')).marginMinutes, -15);
+  assert.deepEqual(returnRunFlights([]), { first: '', last: '', marginMinutes: null });
 });

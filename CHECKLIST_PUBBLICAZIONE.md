@@ -1,6 +1,14 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 7 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+Ultimo aggiornamento: 9 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+
+## Transfer: al ritorno il volo in evidenza · 9 ottobre 2026
+
+- [x] Sorgente: sulla scheda di ritorno il riquadro grande in testa è l'orario di partenza del volo; accanto, tratteggiato, l'orario entro cui lasciare Marsala (strada più margine in aeroporto, il calcolo che c'era già), che diventa «Ritrovo» quando il gestore lo fissa. Richiesto dal titolare il 09/10/2026: per organizzare i rientri il dato fisso è il decollo.
+- [x] Chi è ancora da organizzare al ritorno è raggruppato per volo, non più per partenza stimata: fasce di due ore dal primo volo e, dentro, un gruppo per ogni orario di decollo; fascia e gruppo dicono l'orario più stretto entro cui partire. Prima due persone sullo stesso volo finivano con orari diversi per il solo bagaglio in stiva (`groupReturnFlights`).
+- [x] L'intestazione di una corsa di ritorno fissata mostra primo e ultimo volo e i minuti in aeroporto della persona messa peggio (`returnRunFlights`). Le caselle «Seleziona tutti» di fascia e di volo restano coerenti fra loro.
+- [x] Andata invariata. Solo visualizzazione: nessun dato, Rules o Cloud Function modificati. Gate locale: 203 test unitari; renderer reali con dati fittizi a 375 e 1180 px senza sfondamento orizzontale.
+- [ ] Verifica autenticata nel portale con i 33 rientri reali da organizzare.
 
 ## Transfer: contatto del gestore nella finestra · 7 ottobre 2026
 
