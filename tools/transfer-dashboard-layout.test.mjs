@@ -35,7 +35,8 @@ test('la pagina usa card compatte con la stessa larghezza massima su desktop e m
 test('la vista rende data, aeroporto e persone dalla timeline operativa', () => {
   assert.match(source, /groupTransferRecords\(records, direction\)/);
   assert.match(source, /class="transfer-date-group"/);
-  assert.match(source, /renderAirportGroupBody\(records, direction\)/);
+  // Dal 10/10/2026 riceve anche l'ora di adesso, per mettere in fondo le corse già partite.
+  assert.match(source, /renderAirportGroupBody\(records, direction, nowMinutes\)/);
 });
 
 // Il controllo sul `?v=` di transfer.js stava in coda al test qui sopra, con la

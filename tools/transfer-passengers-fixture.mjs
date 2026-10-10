@@ -12,11 +12,20 @@ function between(start, end) {
 
 // La prova usa gli stessi renderer della pagina, solo dati fittizi e nessun
 // Firebase/login. Non registra persone e non invia messaggi.
-export function renderFixture(language = 'it', customRecords = null) {
+export function renderFixture(language = 'it', customRecords = null, options = {}) {
   const context = vm.createContext({
     ...ordering,
     Intl, Date, Set,
-    state: { selectedRecordIds: new Set() },
+    state: {
+      selectedRecordIds: new Set(),
+      openPastDates: new Set(),
+      records: customRecords || [],
+      filters: options.direction ? { direction: options.direction } : undefined,
+      completingPast: false,
+    },
+    // Un "adesso" fisso, prima dell'evento: le prove non devono cambiare
+    // esito col passare dei giorni. Chi vuole provare il passato lo indica.
+    operationalNow: () => ordering.operationalNow(new Date(options.now || '2026-10-06T10:00:00Z')),
     locale: () => language,
     normalizeDirection: (value) => value === 'return' ? 'return' : 'outbound',
     normalizedStatus: (value) => value || 'new',

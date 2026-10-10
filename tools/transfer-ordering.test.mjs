@@ -14,6 +14,9 @@ import {
   groupTransferRuns,
   groupReturnFlights,
   returnRunFlights,
+  operationalNow,
+  transferOverview,
+  defaultTransferDirection,
 } from '../transfer-ordering.js';
 import serverParty from '../functions/transfer-party.js';
 
@@ -305,4 +308,62 @@ test('corsa di ritorno: primo e ultimo volo e margine della persona messa peggio
   // Partenza troppo tardi per il primo volo: margine negativo.
   assert.equal(returnRunFlights(run('19:45', '21:15', '22:00')).marginMinutes, -15);
   assert.deepEqual(returnRunFlights([]), { first: '', last: '', marginMinutes: null });
+});
+
+// Andate e ritorni separati, e ciò che è passato messo da parte (richiesta
+// di Silvio, 10/10/2026): "passato" lo decide la data, non lo stato.
+const at = (iso) => operationalNow(new Date(iso));
+const going = (id, date, time, extra = {}) => ({ id, participantName: id, airport: 'PMO', date, time, direction: 'outbound', status: 'confirmed', ...extra });
+const coming = (id, date, time, extra = {}) => ({ id, participantName: id, airport: 'PMO', date, time, direction: 'return', status: 'confirmed', ...extra });
+
+test('adesso: ora di Marsala, qualunque sia il fuso di chi guarda', () => {
+  // 10 ottobre 2026, 16:30 UTC = 18:30 a Marsala (ora legale).
+  const now = at('2026-10-10T16:30:00Z');
+  assert.equal(now.today, '2026-10-10');
+  assert.equal(new Date(now.timestamp).toISOString().slice(11, 16), '18:30');
+  // Le 23:30 UTC sono già il giorno dopo in Italia.
+  assert.equal(at('2026-10-10T23:30:00Z').today, '2026-10-11');
+});
+
+test('quadro di una direzione: prossima corsa, da organizzare, passato', () => {
+  const now = at('2026-10-11T12:00:00Z'); // domenica 11, le 14:00 a Marsala
+  const records = [
+    coming('a', '2026-10-11', '18:00', { meetingTime: '15:00' }),
+    coming('b', '2026-10-11', '21:30', { meetingTime: '18:00', additionalPassengers: 1 }),
+    coming('c', '2026-10-11', '22:00', { meetingTime: '18:00' }),
+    coming('d', '2026-10-12', '07:50', { status: 'new' }),
+    coming('e', '2026-10-11', '21:30', { status: 'cancelled', meetingTime: '18:00' }),
+  ];
+  const overview = transferOverview(records, 'return', now);
+  assert.equal(overview.upcomingSeats, 5);
+  assert.equal(overview.pendingSeats, 1);
+  assert.equal(overview.runCount, 2);
+  assert.deepEqual(overview.nextRun, { date: '2026-10-11', meetingTime: '15:00', airport: 'PMO', seats: 1 });
+  // Alle 15:20 la corsa delle 15:00 è ancora "la prossima" (mezz'ora di tolleranza), alle 15:40 non più.
+  assert.equal(transferOverview(records, 'return', at('2026-10-11T13:20:00Z')).nextRun.meetingTime, '15:00');
+  assert.equal(transferOverview(records, 'return', at('2026-10-11T13:40:00Z')).nextRun.meetingTime, '18:00');
+});
+
+test('quadro: i giorni passati si contano a parte, con le schede ancora "confermato"', () => {
+  const now = at('2026-10-10T16:00:00Z');
+  const overview = transferOverview([
+    going('a', '2026-10-08', '12:55', { meetingTime: '14:30' }),
+    going('b', '2026-10-08', '13:25', { meetingTime: '14:30', status: 'completed' }),
+    going('c', '2026-10-07', '15:20', { status: 'new' }),
+    going('d', '2026-10-08', '09:15', { status: 'cancelled' }),
+  ], 'outbound', now);
+  assert.equal(overview.upcomingSeats, 0);
+  assert.equal(overview.pastSeats, 3);
+  assert.deepEqual(overview.pastConfirmedIds, ['a']);
+  assert.equal(overview.nextRun, null);
+});
+
+test('scheda da aprire: dove c’è ancora lavoro, e a parità quella che viene prima', () => {
+  const records = [going('a', '2026-10-08', '12:55'), coming('b', '2026-10-11', '21:30')];
+  assert.equal(defaultTransferDirection(records, at('2026-10-07T10:00:00Z')), 'outbound');
+  assert.equal(defaultTransferDirection(records, at('2026-10-08T06:00:00Z')), 'outbound');
+  assert.equal(defaultTransferDirection(records, at('2026-10-09T06:00:00Z')), 'return');
+  // Tutto passato: restano i ritorni, l'ultima fase.
+  assert.equal(defaultTransferDirection(records, at('2026-10-13T06:00:00Z')), 'return');
+  assert.equal(defaultTransferDirection([], at('2026-10-09T06:00:00Z')), 'return');
 });

@@ -12,7 +12,7 @@
 // Mostra solo quello che il gestore ha deciso per quella persona; le note
 // interne del gestore non arrivano mai fin qui.
 import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
-import { transferTimingCheck } from './transfer-ordering.js?v=20261009-ritorni-per-volo-v1';
+import { operationalNow, transferTimingCheck } from './transfer-ordering.js?v=20261010-andate-ritorni-v1';
 
 const OPERATIONS = new Set(['planned', 'confirmed', 'cancelled']);
 const HIDDEN_OPERATIONS = new Set(['completed', 'revoked']);
@@ -28,10 +28,15 @@ function escapeHtml(value = '') {
 
 // Le tratte per cui la persona ha chiesto il transfer e c'è ancora qualcosa
 // da sapere. Una tratta conclusa o una richiesta non più attiva non compare.
-export function transferNoticeLegs(status) {
+export function transferNoticeLegs(status, today = '') {
   if (!status || typeof status !== 'object') return [];
   return ['outbound', 'return'].map((direction) => {
     if (status[`${direction}Transfer`] !== 'requested') return null;
+    // Una tratta di un giorno già trascorso non serve più a nessuno: il
+    // 10/10/2026 chi entrava vedeva ancora, sopra il rientro, il transfer di
+    // andata dell'8 ottobre, perché il gestore non l'aveva segnato concluso.
+    const day = text(status[`${direction}Date`], 10);
+    if (today && /^\d{4}-\d{2}-\d{2}$/.test(day) && day < today) return null;
     const raw = status[`${direction}OperationStatus`];
     if (HIDDEN_OPERATIONS.has(raw)) return null;
     const operation = OPERATIONS.has(raw) ? raw : 'new';
@@ -192,8 +197,8 @@ function ensureDialog(doc) {
 // Restituisce true se la finestra è stata aperta (o aggiornata mentre era
 // aperta). `scope` distingue persona e barca: sullo stesso telefono possono
 // entrare due persone diverse.
-export function showTransferNotice({ status, english = false, scope = '', storage, doc = globalThis.document } = {}) {
-  const legs = transferNoticeLegs(status);
+export function showTransferNotice({ status, english = false, scope = '', storage, doc = globalThis.document, today } = {}) {
+  const legs = transferNoticeLegs(status, today === undefined ? operationalNow().today : today);
   if (!legs.length || !doc?.body) return false;
   const signature = transferNoticeSignature(legs);
   const store = storage === undefined ? sessionStore() : storage;
@@ -207,7 +212,7 @@ export function showTransferNotice({ status, english = false, scope = '', storag
   // che venga chiusa: due finestre una sopra l'altra non le legge nessuno.
   const other = doc.querySelector?.('dialog[open]:not(.transfer-notice-dialog)');
   if (other) {
-    other.addEventListener('close', () => showTransferNotice({ status, english, scope, storage, doc }), { once: true });
+    other.addEventListener('close', () => showTransferNotice({ status, english, scope, storage, doc, today }), { once: true });
     return false;
   }
   element.innerHTML = transferNoticeMarkup(legs, english, transferNoticeContact(status, legs));

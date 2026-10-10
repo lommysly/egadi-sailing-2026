@@ -375,3 +375,78 @@ test('telefono dell’equipaggio: scheda transfer, backup e passaggi condivisi u
   // Il numero resta legato al consenso: senza consenso il backup non lo riceve.
   assert.match(server, /const phone = transferConsent \? crewPhone\(member, invite\) : '';/);
 });
+
+// Richiesta di Silvio, 10/10/2026: andate e ritorni erano uno sotto l'altro,
+// con quaranta schede già passate in cima. Ora sono due schede, e ciò che è
+// passato si ripiega in una riga.
+const mixed = () => {
+  const r = (id, name, direction, date, time, extra = {}) => ({ id, participantName: name, phone: '+39000', airport: 'PMO', date, time, direction, status: 'confirmed', ...extra });
+  return [
+    r('a1', 'Arrivata Uno', 'outbound', '2026-10-08', '12:55', { meetingTime: '14:30', meetingPoint: 'Hall Arrivi' }),
+    r('a2', 'Arrivata Due', 'outbound', '2026-10-08', '13:25', { meetingTime: '14:30', meetingPoint: 'Hall Arrivi' }),
+    r('a3', 'Arrivato Concluso', 'outbound', '2026-10-07', '20:05', { meetingTime: '20:15', status: 'completed' }),
+    r('r1', 'Rientro Presto', 'return', '2026-10-11', '18:00', { meetingTime: '15:00', meetingPoint: 'Porto di Marsala' }),
+    r('r2', 'Rientro Tardi', 'return', '2026-10-11', '21:30', { meetingTime: '18:00', meetingPoint: 'Porto di Marsala' }),
+    r('r3', 'Rientro Lunedì', 'return', '2026-10-12', '07:50', { status: 'new' }),
+  ];
+};
+
+test('due schede: si vede una direzione alla volta, con il quadro di entrambe', () => {
+  const html = renderFixture('it', mixed(), { direction: 'return', now: '2026-10-10T16:00:00Z' });
+  assert.match(html, /class="transfer-tab" type="button" role="tab" aria-selected="false" data-action="set-direction" data-direction="outbound"><strong>Andate<\/strong><small>tutte passate<\/small>/);
+  assert.match(html, /class="transfer-tab is-selected" type="button" role="tab" aria-selected="true" data-action="set-direction" data-direction="return"><strong>Ritorni<\/strong><small>3 persone · 2 fissate · 1 da organizzare<\/small>/);
+  // Nella scheda dei ritorni non compare nessuna andata.
+  for (const id of ['r1', 'r2', 'r3']) assert.match(html, new RegExp(`data-record-id="${id}"`));
+  for (const id of ['a1', 'a2', 'a3']) assert.doesNotMatch(html, new RegExp(`data-record-id="${id}"`));
+  assert.equal((html.match(/class="transfer-direction-panel"/g) || []).length, 1);
+});
+
+test('in testa la prossima corsa e quante persone restano da organizzare', () => {
+  const html = renderFixture('it', mixed(), { direction: 'return', now: '2026-10-10T16:00:00Z' });
+  assert.match(html, /class="transfer-next-run"><div><small>Prossima corsa<\/small><strong>domenica 11 ottobre · 15:00 · Palermo \(PMO\) · 1 persona<\/strong>/);
+  assert.match(html, /transfer-next-run-pending">1 da organizzare/);
+  // Nessun giorno passato fra i ritorni: niente tasto per segnare concluse.
+  assert.doesNotMatch(html, /data-action="complete-past"/);
+});
+
+test('un giorno già passato è una riga sola, che si apre se serve', () => {
+  const html = renderFixture('it', mixed(), { direction: 'outbound', now: '2026-10-10T16:00:00Z' });
+  assert.match(html, /<details class="transfer-date-group transfer-date-group--past" data-past-date="outbound:2026-10-08"><summary>/);
+  assert.match(html, /2 persone<\/span><\/span><em>1 corsa · già passato<\/em><\/summary>/);
+  assert.doesNotMatch(html, /transfer-date-group--past" data-past-date="outbound:2026-10-08" open/);
+  // Le schede restano dentro, per chi apre il giorno.
+  assert.match(html, /data-record-id="a1"/);
+  assert.match(html, /Tutte le corse di questa scheda sono già passate\./);
+  // Solo le schede ancora "confermato" si possono segnare concluse: due su tre.
+  assert.match(html, /data-action="complete-past">Segna concluse le 2 schede passate/);
+});
+
+test('"passato" lo decide la data: prima dell’8 ottobre le stesse andate sono lavoro da fare', () => {
+  const html = renderFixture('it', mixed(), { direction: 'outbound', now: '2026-10-08T06:00:00Z' });
+  assert.match(html, /<section class="transfer-date-group"><h3 class="transfer-date-group-title"><time datetime="2026-10-08">/);
+  assert.match(html, /data-past-date="outbound:2026-10-07"/);
+  assert.match(html, /Prossima corsa<\/small><strong>giovedì 8 ottobre · 14:30 · Palermo \(PMO\) · 2 persone/);
+});
+
+test('oggi: le corse già partite scendono in fondo, sotto "Già partite"', () => {
+  // Domenica 11 alle 16:00 a Marsala: la corsa delle 15:00 è partita, quella delle 18:00 no.
+  const html = renderFixture('it', mixed(), { direction: 'return', now: '2026-10-11T14:00:00Z' });
+  assert.match(html, /transfer-run-section">Già partite · 1<\/h5><div class="transfer-runs-departed">/);
+  assert.equal(html.indexOf('data-record-id="r2"') < html.indexOf('Già partite'), true);
+  assert.equal(html.indexOf('data-record-id="r1"') > html.indexOf('Già partite'), true);
+  assert.match(html, /Prossima corsa<\/small><strong>domenica 11 ottobre · 18:00/);
+});
+
+test('cambio scheda e "segna concluse": la pagina non cambia mai lo stato da sola', () => {
+  const source = readFileSync(new URL('../transfer.js', import.meta.url), 'utf8');
+  const complete = source.slice(source.indexOf('async function completePastRecords'), source.indexOf("document.addEventListener('toggle'"));
+  assert.match(complete, /window\.confirm\(t\('completePastConfirm'\)/);
+  assert.match(complete, /status: 'completed',\s*assignedOperatorUid: state\.user\.uid,\s*updatedAt: serverTimestamp\(\),\s*updatedBy: state\.user\.uid/);
+  assert.match(complete, /pastConfirmedIds/);
+  // L'unico punto in cui lo stato diventa "completed" senza passare dal modulo.
+  assert.equal((source.match(/status: 'completed'/g) || []).length, 1);
+  const tabs = source.slice(source.indexOf("if (action === 'set-direction'"), source.indexOf("if (action === 'complete-past')"));
+  assert.match(tabs, /state\.directionChosen = true/);
+  assert.match(tabs, /state\.selectedRecordIds\.clear\(\)/);
+  assert.doesNotMatch(source, /values\.get\('direction'\)/);
+});

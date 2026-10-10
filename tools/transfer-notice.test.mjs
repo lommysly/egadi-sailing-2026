@@ -101,7 +101,7 @@ test('una volta per ingresso, e di nuovo quando il gestore cambia qualcosa', () 
   // Il modulo tiene una sola finestra: i passi qui sotto la riusano apposta.
   const doc = fakeDocument();
   const storage = fakeStorage();
-  const open = (status) => showTransferNotice({ status, scope: 'barca:persona', storage, doc });
+  const open = (status) => showTransferNotice({ status, scope: 'barca:persona', storage, doc, today: '2026-10-06' });
 
   assert.equal(open(confirmed), true);
   const dialog = doc.created[0];
@@ -120,11 +120,11 @@ test('una volta per ingresso, e di nuovo quando il gestore cambia qualcosa', () 
   dialog.close();
 
   // Un'altra persona sullo stesso telefono ha la sua memoria.
-  assert.equal(showTransferNotice({ status: confirmed, scope: 'barca:altra', storage, doc }), true);
+  assert.equal(showTransferNotice({ status: confirmed, scope: 'barca:altra', storage, doc, today: '2026-10-06' }), true);
   dialog.close();
 
   // Senza transfer richiesto non si apre niente.
-  assert.equal(showTransferNotice({ status: { outboundTransfer: 'not_requested' }, scope: 'barca:terza', storage, doc }), false);
+  assert.equal(showTransferNotice({ status: { outboundTransfer: 'not_requested' }, scope: 'barca:terza', storage, doc, today: '2026-10-06' }), false);
 });
 
 test('se è aperto il regolamento, aspetta che venga chiuso', () => {
@@ -132,7 +132,7 @@ test('se è aperto il regolamento, aspetta che venga chiuso', () => {
   const listeners = [];
   const rules = { addEventListener: (type, handler) => listeners.push([type, handler]) };
   const doc = fakeDocument({ otherDialog: rules });
-  assert.equal(showTransferNotice({ status: { ...confirmed, outboundMeetingTime: '16:45' }, scope: 'barca:attesa', storage, doc }), false);
+  assert.equal(showTransferNotice({ status: { ...confirmed, outboundMeetingTime: '16:45' }, scope: 'barca:attesa', storage, doc, today: '2026-10-06' }), false);
   assert.equal(listeners.length, 1);
   assert.equal(listeners[0][0], 'close');
 });
@@ -195,4 +195,27 @@ test('il numero non è scritto nel codice del sito: lo porta il server', () => {
   const rules = read('firestore.rules');
   const block = rules.slice(rules.indexOf('match /events/egadi-2026/integrations/{integrationId}'));
   assert.match(block.slice(0, 160), /allow read, write: if false;/);
+});
+
+// Silvio, 10/10/2026: chi entra deve vedere quello che lo aspetta, non il
+// transfer di due giorni prima rimasto "confermato".
+test('una tratta di un giorno già passato non compare più nella finestra', () => {
+  const both = {
+    ...confirmed,
+    returnTransfer: 'requested', returnOperationStatus: 'confirmed', returnDate: '2026-10-11', returnTime: '20:35',
+    returnTransport: 'flight', returnMeetingTime: '18:30', returnMeetingPoint: 'Porto di Marsala',
+  };
+  assert.deepEqual(transferNoticeLegs(both, '2026-10-07').map((leg) => leg.direction), ['outbound', 'return']);
+  // Il giorno stesso dell'arrivo l'andata serve ancora.
+  assert.deepEqual(transferNoticeLegs(both, '2026-10-08').map((leg) => leg.direction), ['outbound', 'return']);
+  assert.deepEqual(transferNoticeLegs(both, '2026-10-10').map((leg) => leg.direction), ['return']);
+  assert.deepEqual(transferNoticeLegs(both, '2026-10-12'), []);
+  // Senza una data nota la tratta resta: meglio una riga in più che una in meno.
+  assert.equal(transferNoticeLegs({ returnTransfer: 'requested' }, '2026-10-12').length, 1);
+});
+
+test('con tutte le tratte passate la finestra non si apre', () => {
+  const doc = fakeDocument();
+  assert.equal(showTransferNotice({ status: confirmed, scope: 'barca:passato', storage: fakeStorage(), doc, today: '2026-10-10' }), false);
+  assert.equal(doc.created.length, 0);
 });

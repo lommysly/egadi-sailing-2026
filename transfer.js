@@ -22,12 +22,15 @@ import {
   groupTransferRuns,
   groupReturnFlights,
   returnRunFlights,
+  operationalNow,
+  transferOverview,
+  defaultTransferDirection,
   additionalPassengerCount,
   transferPassengerCount,
   totalTransferSeats,
   suggestedMarsalaDeparture,
   transferTimingCheck,
-} from './transfer-ordering.js?v=20261009-ritorni-per-volo-v1';
+} from './transfer-ordering.js?v=20261010-andate-ritorni-v1';
 import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
 import {
   boatFromData,
@@ -244,6 +247,24 @@ const COPY = {
     runCancelledTitle: 'Annullati',
     runAssignment: 'Assegnazione',
     runVehicle: 'Mezzo',
+    tabOutbound: 'Andate',
+    tabReturn: 'Ritorni',
+    tabUpcoming: '{people} · {runs} fissate',
+    tabPending: '{count} da organizzare',
+    tabAllPast: 'tutte passate',
+    tabEmpty: 'nessuna richiesta',
+    nextRunLabel: 'Prossima corsa',
+    nextRunNone: 'Nessuna corsa fissata',
+    nextRunAllPast: 'Tutte le corse di questa scheda sono già passate.',
+    pastDayLabel: 'già passato',
+    pastDayRuns: '{count} corse',
+    pastDayOneRun: '1 corsa',
+    departedTitle: 'Già partite',
+    completePast: 'Segna concluse le {count} schede passate',
+    completePastConfirm: 'Segnare come concluse {count} schede di giorni già passati? Chi le vede nella propria area leggerà «transfer concluso».',
+    completePastWorking: 'Segno concluse…',
+    completePastDone: 'Segnate concluse {count} schede.',
+    completePastError: 'Non sono riuscito a segnarle concluse. Riprova tra poco.',
     flightBlockLabel: 'Volo parte',
     departByLabel: 'Partire entro',
     flightBandPrefix: 'Voli in partenza',
@@ -444,6 +465,24 @@ const COPY = {
     runCancelledTitle: 'Cancelled',
     runAssignment: 'Assignment',
     runVehicle: 'Vehicle',
+    tabOutbound: 'Outbound',
+    tabReturn: 'Returns',
+    tabUpcoming: '{people} · {runs} set',
+    tabPending: '{count} to organise',
+    tabAllPast: 'all in the past',
+    tabEmpty: 'no requests',
+    nextRunLabel: 'Next run',
+    nextRunNone: 'No run set yet',
+    nextRunAllPast: 'All runs in this tab are in the past.',
+    pastDayLabel: 'already past',
+    pastDayRuns: '{count} runs',
+    pastDayOneRun: '1 run',
+    departedTitle: 'Already left',
+    completePast: 'Mark the {count} past cards as completed',
+    completePastConfirm: 'Mark {count} cards from past days as completed? People who see them in their area will read “transfer completed”.',
+    completePastWorking: 'Marking as completed…',
+    completePastDone: '{count} cards marked as completed.',
+    completePastError: 'I could not mark them as completed. Try again shortly.',
     flightBlockLabel: 'Flight departs',
     departByLabel: 'Leave by',
     flightBandPrefix: 'Flights departing',
@@ -507,6 +546,11 @@ const state = {
   // ogni aggiornamento Firestore, che altrimenti cancellerebbero la
   // selezione a metà lavoro.
   selectedRecordIds: new Set(),
+  // La scheda aperta (andate o ritorni) la sceglie la pagina finché non la
+  // sceglie la persona; i giorni passati aperti a mano restano aperti.
+  directionChosen: false,
+  openPastDates: new Set(),
+  completingPast: false,
   // Il modulo di modifica di gruppo resta chiuso finché l'operatore non
   // preme esplicitamente "Gestisci insieme": deve essere un'azione voluta,
   // non un pannello che compare già aperto e passa inosservato se la pagina
@@ -1106,9 +1150,17 @@ function renderReturnBands(records, direction) {
   return bandsMarkup + untimedMarkup;
 }
 
-function renderAirportGroupBody(groupRecords, direction) {
-  const { runs, unscheduled, cancelled } = groupTransferRuns(groupRecords, direction);
+function renderAirportGroupBody(groupRecords, direction, nowMinutes = null) {
+  const { runs: allRuns, unscheduled, cancelled } = groupTransferRuns(groupRecords, direction);
+  // Mezz'ora di tolleranza: una navetta appena passata può ancora servire.
+  const minutesOf = (time) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+  const hasLeft = (run) => nowMinutes !== null && minutesOf(run.meetingTime) < nowMinutes - 30;
+  const runs = allRuns.filter((run) => !hasLeft(run));
+  const departed = allRuns.filter(hasLeft);
   const runsMarkup = runs.map((run) => renderRun(run, direction)).join('');
+  const departedMarkup = departed.length
+    ? `<h5 class="transfer-run-section">${escapeHtml(t('departedTitle'))} · ${departed.length}</h5><div class="transfer-runs-departed">${departed.map((run) => renderRun(run, direction)).join('')}</div>`
+    : '';
   const bands = direction === 'return' ? renderReturnBands(unscheduled, direction) : groupByTimeBand(unscheduled, direction).map((band) => `<div class="transfer-time-band"><h4 class="transfer-time-band-title">${escapeHtml(timeBandTitle(band, direction))}<span>${escapeHtml(peopleLabel(totalTransferSeats(band.records)))}</span>${bandAlertCount(band.records, direction) ? `<em class="transfer-time-band-alert">${escapeHtml(t('bandAlerts').replace('{count}', String(bandAlertCount(band.records, direction))))}</em>` : ''}</h4><div class="transfer-cluster" data-cluster>${renderClusterSelectAll(band.records)}<div class="transfer-operator-list">${band.records.map(renderRecord).join('')}</div></div></div>`).join('');
   // Il titolo "Da organizzare" serve solo quando sopra ci sono già delle
   // corse: finché nessuno ha un orario la schermata resta quella di prima.
@@ -1118,7 +1170,7 @@ function renderAirportGroupBody(groupRecords, direction) {
   const cancelledMarkup = cancelled.length
     ? `<h5 class="transfer-run-section">${escapeHtml(t('runCancelledTitle'))} · ${cancelled.length}</h5><div class="transfer-operator-list">${cancelled.map(renderRecord).join('')}</div>`
     : '';
-  return runsMarkup + pendingTitle + bands + cancelledMarkup;
+  return runsMarkup + pendingTitle + bands + departedMarkup + cancelledMarkup;
 }
 
 function dateGroupLabel(date) {
@@ -1133,13 +1185,25 @@ function dateGroupLabel(date) {
 }
 
 function renderDateGroup(group, direction) {
+  const now = operationalNow();
+  const isPast = Boolean(group.date) && group.date < now.today;
+  // Solo per oggi: l'ora di adesso, per mettere in fondo le corse già partite.
+  const nowMinutes = group.date === now.today ? new Date(now.timestamp).getUTCHours() * 60 + new Date(now.timestamp).getUTCMinutes() : null;
   const airports = group.airportGroups
-    .map(({ airport, records }) => `<div class="transfer-airport-group"><h4 class="transfer-airport-group-title">${escapeHtml(airportLabel(airport))}<span>${escapeHtml(peopleLabel(totalTransferSeats(records)))}</span></h4>${renderAirportGroupBody(records, direction)}</div>`)
+    .map(({ airport, records }) => `<div class="transfer-airport-group"><h4 class="transfer-airport-group-title">${escapeHtml(airportLabel(airport))}<span>${escapeHtml(peopleLabel(totalTransferSeats(records)))}</span></h4>${renderAirportGroupBody(records, direction, nowMinutes)}</div>`)
     .join('');
   const dateLabel = dateGroupLabel(group.date);
   const dateTitle = group.date
     ? `<time datetime="${escapeHtml(group.date)}">${escapeHtml(dateLabel)}</time>`
     : escapeHtml(dateLabel);
+  if (isPast) {
+    // Un giorno già trascorso è lavoro fatto: una riga sola, che si apre se
+    // serve. Lo decide la data, non lo stato delle schede.
+    const runCount = group.airportGroups.reduce((total, { records }) => total + groupTransferRuns(records, direction).runs.length, 0);
+    const runsLabel = runCount === 1 ? t('pastDayOneRun') : t('pastDayRuns').replace('{count}', String(runCount));
+    const open = state.openPastDates?.has(`${direction}:${group.date}`) ? ' open' : '';
+    return `<details class="transfer-date-group transfer-date-group--past" data-past-date="${escapeHtml(`${direction}:${group.date}`)}"${open}><summary><span class="transfer-date-group-title">${dateTitle}<span>${escapeHtml(peopleLabel(group.count))}</span></span><em>${escapeHtml(runsLabel)} · ${escapeHtml(t('pastDayLabel'))}</em></summary>${airports}</details>`;
+  }
   return `<section class="transfer-date-group"><h3 class="transfer-date-group-title">${dateTitle}<span>${escapeHtml(peopleLabel(group.count))}</span></h3>${airports}</section>`;
 }
 
@@ -1153,10 +1217,68 @@ function renderDirectionPanel(direction, records) {
   return `<section class="transfer-direction-panel"><h2>${escapeHtml(title)}<span class="transfer-direction-panel-count">${escapeHtml(peopleLabel(totalTransferSeats(records)))}</span></h2><p class="field-hint">${escapeHtml(hint)} ${escapeHtml(t('bandHint'))}</p>${body}</section>`;
 }
 
+// Le due schede. I numeri guardano tutte le richieste attive di quella
+// direzione, non i filtri: devono dire che cosa c'è dietro la scheda prima
+// di aprirla.
+function activeRecordsFor(direction) {
+  return state.records.filter((record) => (!record.recordState || record.recordState === 'active')
+    && normalizeDirection(record.direction || record.legDirection || record.travelDirection) === direction);
+}
+
+function directionTabSummary(overview, total) {
+  if (!total) return t('tabEmpty');
+  if (!overview.upcomingSeats) return t('tabAllPast');
+  const parts = [t('tabUpcoming').replace('{people}', peopleLabel(overview.upcomingSeats)).replace('{runs}', String(overview.runCount))];
+  if (overview.pendingSeats) parts.push(t('tabPending').replace('{count}', String(overview.pendingSeats)));
+  return parts.join(' · ');
+}
+
+function renderDirectionTabs(now) {
+  const tab = (direction) => {
+    const records = activeRecordsFor(direction);
+    const overview = transferOverview(records, direction, now);
+    const selected = state.filters.direction === direction;
+    return `<button class="transfer-tab${selected ? ' is-selected' : ''}" type="button" role="tab" aria-selected="${selected}" data-action="set-direction" data-direction="${direction}"><strong>${escapeHtml(t(direction === 'return' ? 'tabReturn' : 'tabOutbound'))}</strong><small>${escapeHtml(directionTabSummary(overview, records.length))}</small></button>`;
+  };
+  return `<div class="transfer-tabs" role="tablist">${tab('outbound')}${tab('return')}</div>`;
+}
+
+function renderDirectionOverview(direction, now) {
+  const overview = transferOverview(activeRecordsFor(direction), direction, now);
+  let headline;
+  if (overview.nextRun) {
+    headline = `<strong>${escapeHtml([dateGroupLabel(overview.nextRun.date), overview.nextRun.meetingTime, airportLabel(overview.nextRun.airport), peopleLabel(overview.nextRun.seats)].join(' · '))}</strong>`;
+  } else {
+    headline = `<strong>${escapeHtml(overview.upcomingSeats ? t('nextRunNone') : t('nextRunAllPast'))}</strong>`;
+  }
+  const pending = overview.pendingSeats ? `<span class="transfer-next-run-pending">${escapeHtml(t('tabPending').replace('{count}', String(overview.pendingSeats)))}</span>` : '';
+  const pastCount = overview.pastConfirmedIds.length;
+  const completeButton = pastCount
+    ? `<button class="button button-ghost transfer-complete-past" type="button" data-action="complete-past"${state.completingPast ? ' disabled' : ''}>${escapeHtml(state.completingPast ? t('completePastWorking') : t('completePast').replace('{count}', String(pastCount)))}</button>`
+    : '';
+  return `<div class="transfer-next-run"><div><small>${escapeHtml(t('nextRunLabel'))}</small>${headline}</div>${pending}${completeButton}<p class="form-message" data-message="direction-overview" role="status"></p></div>`;
+}
+
 function renderGroupedRecords(filtered) {
   const outboundRecords = filtered.filter((record) => normalizeDirection(record.direction || record.legDirection || record.travelDirection) === 'outbound');
   const returnRecords = filtered.filter((record) => normalizeDirection(record.direction || record.legDirection || record.travelDirection) === 'return');
-  return renderDirectionPanel('outbound', outboundRecords) + renderDirectionPanel('return', returnRecords);
+  // Andate e ritorni non stanno più uno sotto l'altro: una scheda alla volta.
+  // Senza una direzione scelta (le prove con dati fittizi) restano entrambe.
+  const direction = state.filters?.direction;
+  if (direction !== 'outbound' && direction !== 'return') {
+    return renderDirectionPanel('outbound', outboundRecords) + renderDirectionPanel('return', returnRecords);
+  }
+  const now = operationalNow();
+  return renderDirectionTabs(now) + renderDirectionOverview(direction, now)
+    + renderDirectionPanel(direction, direction === 'return' ? returnRecords : outboundRecords);
+}
+
+// Finché la persona non sceglie, la scheda aperta è quella dove c'è ancora
+// lavoro: oggi i ritorni, alla vigilia degli arrivi le andate.
+function ensureDirection() {
+  if (state.directionChosen && ['outbound', 'return'].includes(state.filters.direction)) return;
+  const active = state.records.filter((record) => !record.recordState || record.recordState === 'active');
+  state.filters.direction = defaultTransferDirection(active, operationalNow());
 }
 
 function recordStats(records) {
@@ -1701,6 +1823,7 @@ function boatFilterOptions() {
 }
 
 function renderOperatorDashboard() {
+  ensureDirection();
   const filtered = state.records.filter(recordMatchesFilters);
   const stats = recordStats(state.records);
   const sheetUrl = state.isOrganizer ? safeSheetUrl(state.event?.transferSheetUrl) : '';
@@ -1725,6 +1848,7 @@ function renderRoleSwitch() {
 function renderRecordListOnly() {
   const groups = root.querySelector('.transfer-operator-groups');
   if (!groups) return;
+  ensureDirection();
   const filtered = state.records.filter(recordMatchesFilters);
   groups.innerHTML = renderGroupedRecords(filtered);
 }
@@ -2186,6 +2310,53 @@ async function applyBulkUpdate(form) {
   }
 }
 
+// Le schede dei giorni passati ancora "confermato" diventano "concluso" con
+// un gesto solo, e solo su richiesta: lo stato lo vede anche il passeggero,
+// quindi non lo cambia mai la pagina da sola.
+async function completePastRecords() {
+  if (!state.user || state.completingPast || (!state.isOrganizer && state.operator?.active !== true)) return;
+  const direction = state.filters.direction;
+  const ids = transferOverview(activeRecordsFor(direction), direction, operationalNow()).pastConfirmedIds;
+  if (!ids.length) return;
+  if (!window.confirm(t('completePastConfirm').replace('{count}', String(ids.length)))) return;
+  state.completingPast = true;
+  renderRecordListOnly();
+  let message = '';
+  let failed = false;
+  try {
+    // Gli stessi campi dell'aggiornamento di gruppo: le Rules chiedono che
+    // chi scrive risulti l'operatore assegnato.
+    for (let index = 0; index < ids.length; index += 400) {
+      const batch = writeBatch(db);
+      ids.slice(index, index + 400).forEach((recordId) => {
+        batch.update(doc(db, 'events', EVENT_ID, 'transferOpsRecords', recordId), {
+          status: 'completed',
+          assignedOperatorUid: state.user.uid,
+          updatedAt: serverTimestamp(),
+          updatedBy: state.user.uid,
+        });
+      });
+      await batch.commit();
+    }
+    message = t('completePastDone').replace('{count}', String(ids.length));
+  } catch (error) {
+    console.error('Impossibile segnare concluse le schede passate.', error);
+    message = t('completePastError');
+    failed = true;
+  }
+  state.completingPast = false;
+  renderRecordListOnly();
+  displayMessage('direction-overview', message, failed);
+}
+
+// Un giorno passato aperto a mano resta aperto anche quando la pagina si
+// ridisegna per un salvataggio.
+document.addEventListener('toggle', (event) => {
+  const day = event.target?.closest?.('[data-past-date]');
+  if (!day || event.target !== day) return;
+  if (day.open) state.openPastDates.add(day.dataset.pastDate); else state.openPastDates.delete(day.dataset.pastDate);
+}, true);
+
 document.addEventListener('click', (event) => {
   const clusterToggle = event.target.closest('[data-select-cluster]');
   if (clusterToggle) {
@@ -2228,6 +2399,16 @@ document.addEventListener('click', async (event) => {
     state.bulkFormExpanded = !state.bulkFormExpanded;
     renderBulkToolbar();
   }
+  if (action === 'set-direction' && ['outbound', 'return'].includes(button.dataset.direction)) {
+    state.filters.direction = button.dataset.direction;
+    state.directionChosen = true;
+    // La selezione appartiene alla scheda che si lascia: non deve restare
+    // attiva su persone che non si vedono più.
+    state.selectedRecordIds.clear();
+    renderRecordListOnly();
+    renderBulkToolbar();
+  }
+  if (action === 'complete-past') await completePastRecords();
   // Un clic sulla corsa: seleziona tutte le sue persone e apre il modulo di
   // gruppo, lo stesso che il gestore usa già con "Seleziona tutti".
   if (action === 'edit-run') {
@@ -2247,7 +2428,6 @@ document.addEventListener('change', (event) => {
   const form = event.target.closest('[data-filter-form]');
   if (!form) return;
   const values = new FormData(form);
-  state.filters.direction = ['all', 'outbound', 'return'].includes(values.get('direction')) ? values.get('direction') : 'all';
   state.filters.status = ['all', ...FILTERABLE_STATUSES].includes(values.get('status')) ? values.get('status') : 'all';
   state.filters.search = text(values.get('search'), 120);
   if (values.has('boat')) {

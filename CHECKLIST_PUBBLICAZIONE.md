@@ -2,6 +2,15 @@
 
 Ultimo aggiornamento: 10 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
 
+## Transfer: andate e ritorni separati, il passato ripiegato · 10 ottobre 2026
+
+- [x] Sorgente: nel portale andate e ritorni non stanno più uno sotto l'altro ma in due schede, ciascuna con il suo quadro (persone, corse fissate, da organizzare, «tutte passate»). Si apre da sola quella dove c'è ancora lavoro; la scelta della persona viene poi rispettata. Richiesto dal titolare il 10/10/2026: quaranta andate già passate stavano in cima alla pagina.
+- [x] In testa alla scheda la prossima corsa (giorno, orario, aeroporto, persone) e quante persone restano da organizzare. I giorni già trascorsi si ripiegano in una riga che si apre a richiesta; nel giorno in corso le corse partite da oltre mezz'ora scendono sotto «Già partite». «Passato» lo decide la data in ora di Marsala (`operationalNow`, `transferOverview`), non lo stato delle schede.
+- [x] Lo stato non cambia mai da solo: il tasto «Segna concluse le N schede passate» lo fa su richiesta, con conferma, solo per le schede «confermato» di giorni passati, con gli stessi campi dell'aggiornamento di gruppo (nessuna Rules modificata).
+- [x] Finestra «Il tuo transfer»: non mostra più le tratte di giorni già trascorsi.
+- [x] Gate locale: 217 test unitari; renderer reali con dati fittizi a 375 e 1180 px, tre scenari (ritorni alla vigilia, andate tutte passate, domenica con una corsa già partita), nessuno sfondamento orizzontale. Nessuna modifica a Rules, Cloud Functions o dati.
+- [ ] Verifica autenticata nel portale: cambio scheda, apertura di un giorno passato, tasto «Segna concluse» (provato solo nel codice).
+
 ## Transfer: telefono mancante sulle schede · 10 ottobre 2026
 
 - [x] Causa: la funzione prendeva il numero da `member.phone` o da `invite.phone`, ma nell'invito il numero WhatsApp si chiama `whatsappNumber` e `invite.phone` non esiste. Chi non aveva il telefono nella Crew List (le persone inserite a mano dallo skipper di Carpe Diem ed entrate col link di barca) risultava «senza telefono» al gestore pur avendo dato numero e consenso. Segnalato dal titolare il 10/10/2026 su Stefano Arpini.

@@ -156,6 +156,71 @@ export function returnRunFlights(records) {
   };
 }
 
+// "Adesso", nello stesso orologio dei timestamp operativi: l'ora di Marsala
+// letta come se fosse UTC. Serve a dire che cosa è già passato senza
+// dipendere dal fuso di chi guarda la pagina.
+export function operationalNow(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('it-IT', {
+    timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date);
+  const part = (type) => Number(parts.find((item) => item.type === type)?.value);
+  const timestamp = Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'));
+  return { timestamp, today: new Date(timestamp).toISOString().slice(0, 10) };
+}
+
+// Il quadro di una direzione, per le due schede "Andate" e "Ritorni": quanto
+// c'è ancora da fare, qual è la prossima corsa, che cosa è già passato.
+// "Passato" lo decide la data, non lo stato: il gestore non segna quasi mai
+// "concluso", e il 10/10/2026 trentuno andate dell'8 ottobre risultavano
+// ancora "confermato" in cima alla pagina (segnalato da Silvio).
+const RUN_GRACE_MS = 30 * 60_000;
+
+export function transferOverview(records, direction, now) {
+  const live = records.filter((record) => transferSeatCount(record) > 0);
+  const upcoming = [];
+  const past = [];
+  live.forEach((record) => {
+    const date = transferOperationalDate(record, direction);
+    (date && date < now.today ? past : upcoming).push(record);
+  });
+  const runs = new Map();
+  upcoming.forEach((record) => {
+    if (timeToMinutes(record?.meetingTime) === null) return;
+    const timestamp = transferOperationalTimestamp(record, direction);
+    const key = `${timestamp}|${airportCode(record)}`;
+    if (!runs.has(key)) runs.set(key, { timestamp, date: transferOperationalDate(record, direction), meetingTime: record.meetingTime, airport: airportCode(record), records: [] });
+    runs.get(key).records.push(record);
+  });
+  const ordered = [...runs.values()].sort((left, right) => left.timestamp - right.timestamp);
+  const next = ordered.find((run) => run.timestamp >= now.timestamp - RUN_GRACE_MS) || null;
+  const pending = upcoming.filter((record) => timeToMinutes(record?.meetingTime) === null);
+  return {
+    upcomingSeats: totalTransferSeats(upcoming),
+    pendingSeats: totalTransferSeats(pending),
+    runCount: ordered.length,
+    pastSeats: totalTransferSeats(past),
+    pastConfirmedIds: past.filter((record) => record.status === 'confirmed').map((record) => record.id),
+    nextRun: next ? { date: next.date, meetingTime: next.meetingTime, airport: next.airport, seats: totalTransferSeats(next.records) } : null,
+  };
+}
+
+// Quale scheda aprire: quella dove c'è ancora lavoro. Se ce n'è in entrambe,
+// quella che viene prima nel tempo; se è tutto passato, i ritorni, che sono
+// l'ultima fase.
+export function defaultTransferDirection(records, now) {
+  const earliest = (direction) => {
+    const dates = records
+      .filter((record) => normalizedDirection(record?.direction) === direction && transferSeatCount(record) > 0)
+      .map((record) => transferOperationalDate(record, direction) || '9999-12-31')
+      .filter((date) => date >= now.today);
+    return dates.length ? dates.sort()[0] : '';
+  };
+  const outbound = earliest('outbound');
+  const back = earliest('return');
+  if (outbound && (!back || outbound <= back)) return 'outbound';
+  return 'return';
+}
+
 function normalizedDirection(value) {
   const normalized = String(value ?? '').trim().toLowerCase();
   return normalized === 'return' ? 'return' : 'outbound';
