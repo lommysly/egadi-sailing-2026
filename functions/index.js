@@ -31,6 +31,17 @@ function asText(value, maxLength = 180) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
+// Il numero di una persona dell'equipaggio. La Crew List può non averlo
+// (chi è stato inserito a mano dallo skipper, o chi lascia vuoto il campo),
+// ma l'invito ce l'ha sempre: è il numero WhatsApp con cui la persona è
+// entrata, e si chiama `whatsappNumber`, non `phone`. Fino al 10/10/2026 qui
+// si leggeva solo `invite.phone`, che non esiste: sei persone di Carpe Diem
+// risultavano «senza telefono» al gestore dei transfer pur avendo dato il
+// numero e il consenso (segnalato da Silvio su Stefano Arpini).
+function crewPhone(member, invite) {
+  return asText(member?.phone || invite?.phone || invite?.whatsappNumber, 40);
+}
+
 function asAirport(value) {
   const code = asText(value, 3).toUpperCase();
   return /^[A-Z]{3}$/.test(code) ? code : '';
@@ -469,7 +480,7 @@ function backupPayload({ recordId, boatId, boat, inviteId, invite, member, direc
   const airport = airportForTransfer(direction, leg);
   const timing = timeForTransfer(direction, leg);
   const { firstName, lastName } = splitDisplayName(member?.displayName || invite?.displayName, member?.firstName, member?.lastName);
-  const phone = transferConsent ? asText(member?.phone || invite?.phone, 40) : '';
+  const phone = transferConsent ? crewPhone(member, invite) : '';
   const email = transferConsent ? asText(member?.email, 160) : '';
   const operator = safeOperationalFields(existing);
   return {
@@ -874,7 +885,7 @@ exports.materializeCrewTravel = onDocumentWritten({
       boatName: asText(boat?.name, 70),
       participantName: asText(member?.displayName || invite?.displayName, 161),
       contactConsent: true,
-      phone: asText(member?.phone || invite?.phone, 40),
+      phone: crewPhone(member, invite),
       email: asText(member?.email, 160),
       // La società transfer parla italiano: chi ha scelto l'inglese nel
       // proprio invito va segnalato prima di scriverle, non scoperto durante
@@ -1530,7 +1541,7 @@ async function participantContact(side) {
   const invite = inviteSnapshot.exists ? inviteSnapshot.data() : null;
   return {
     name: asText(member?.displayName || invite?.displayName, 161) || 'Partecipante',
-    phone: asText(member?.phone || invite?.phone, 40),
+    phone: crewPhone(member, invite),
   };
 }
 

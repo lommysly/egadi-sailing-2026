@@ -354,3 +354,24 @@ test('andata: la scheda resta com’era, senza il riquadro del volo', () => {
   assert.doesNotMatch(html, /class="transfer-record-times"/);
   assert.match(html, /Voli in arrivo 12:55/);
 });
+
+// Stefano Arpini e altre cinque persone di Carpe Diem risultavano «senza
+// telefono» al gestore: il numero c'era, ma nell'invito sta in
+// `whatsappNumber` e la funzione leggeva `invite.phone` (10/10/2026).
+test('telefono dell’equipaggio: Crew List, poi il numero WhatsApp dell’invito', () => {
+  const ctx = context();
+  vm.runInContext(section('function crewPhone(', 'function asAirport('), ctx);
+  assert.equal(ctx.crewPhone({ phone: '+39111' }, { whatsappNumber: '+39222' }), '+39111');
+  assert.equal(ctx.crewPhone({ phone: '' }, { whatsappNumber: '+39222' }), '+39222');
+  assert.equal(ctx.crewPhone(null, { whatsappNumber: '+39222' }), '+39222');
+  assert.equal(ctx.crewPhone({}, { phone: '+39333', whatsappNumber: '+39222' }), '+39333');
+  assert.equal(ctx.crewPhone(null, null), '');
+});
+
+test('telefono dell’equipaggio: scheda transfer, backup e passaggi condivisi usano la stessa regola', () => {
+  // Tre usi, oltre alla definizione.
+  assert.equal((server.match(/(?<!function )crewPhone\(member, invite\)/g) || []).length, 3);
+  assert.doesNotMatch(server, /asText\(member\?\.phone \|\| invite\?\.phone, 40\)/);
+  // Il numero resta legato al consenso: senza consenso il backup non lo riceve.
+  assert.match(server, /const phone = transferConsent \? crewPhone\(member, invite\) : '';/);
+});

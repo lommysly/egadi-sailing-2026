@@ -1,6 +1,12 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 9 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+Ultimo aggiornamento: 10 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+
+## Transfer: telefono mancante sulle schede · 10 ottobre 2026
+
+- [x] Causa: la funzione prendeva il numero da `member.phone` o da `invite.phone`, ma nell'invito il numero WhatsApp si chiama `whatsappNumber` e `invite.phone` non esiste. Chi non aveva il telefono nella Crew List (le persone inserite a mano dallo skipper di Carpe Diem ed entrate col link di barca) risultava «senza telefono» al gestore pur avendo dato numero e consenso. Segnalato dal titolare il 10/10/2026 su Stefano Arpini.
+- [x] Sorgente: `crewPhone(member, invite)` in `functions/index.js`, usata per scheda transfer, backup e contatto dei passaggi condivisi. Il numero resta legato al consenso al contatto.
+- [x] Funzioni `materializeCrewTravel` e `respondToTravelMatch` pubblicate; le schede e le righe di backup già esistenti senza numero sono state completate dal numero dell'invito, solo dove c'era il consenso. Esito nella risposta al titolare.
 
 ## Transfer: al ritorno il volo in evidenza · 9 ottobre 2026
 
