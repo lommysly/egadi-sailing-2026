@@ -4,6 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 import { renderFixture } from './transfer-passengers-fixture.mjs';
 import party from '../functions/transfer-party.js';
+import runs from '../functions/transfer-runs.js';
 import sheetStatus from '../functions/sheet-status.js';
 import { totalTransferSeats } from '../transfer-ordering.js';
 
@@ -13,7 +14,7 @@ function section(start, end) {
 }
 function context(extra = {}) {
   const ctx = vm.createContext({
-    ...party, ...sheetStatus, ...extra,
+    ...party, ...runs, ...sheetStatus, ...extra,
     asText: (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '',
     safeStatus: (value) => ['new', 'planned', 'confirmed', 'completed', 'cancelled'].includes(value) ? value : 'new',
   });
@@ -41,6 +42,8 @@ test('trigger reale: copia +2 nel backup e ricalcola i posti; non tocca inviti o
   let handler;
   let changes;
   const refreshed = [];
+  const runRefreshed = [];
+  const runCleared = [];
   const ctx = context({
     exports: {}, EVENT_ID: 'egadi-2026', REGION: 'test', RUNTIME_SERVICE_ACCOUNT: 'test',
     onDocumentWritten: (_, callback) => { handler = callback; },
@@ -48,6 +51,8 @@ test('trigger reale: copia +2 nel backup e ricalcola i posti; non tocca inviti o
     FieldValue: { serverTimestamp: () => 'server' },
     writeCrewTransferOperationStatus: async () => {},
     refreshTransferCompanionCounts: async (...args) => refreshed.push(args),
+    refreshTransferRunCompanionCounts: async (...args) => runRefreshed.push(args),
+    clearTransferRunCompanionCount: async (...args) => runCleared.push(args),
     db: {
       doc: (path) => { assert.match(path, /travelBackupRecords\/test$/); return path; },
       runTransaction: async (callback) => callback({
@@ -68,6 +73,91 @@ test('trigger reale: copia +2 nel backup e ricalcola i posti; non tocca inviti o
   assert.equal(changes.status, 'cancelled');
   assert.equal(changes.additionalPassengers, 2);
   assert.deepEqual(refreshed, [['outbound', 'TPS', '2026-10-08']]);
+  // Un accompagnatore in più e un annullamento cambiano chi sale sul mezzo.
+  assert.deepEqual(runRefreshed, [['outbound', 'TPS', '2026-10-08'], ['outbound', 'TPS', '2026-10-08']]);
+  assert.deepEqual(runCleared, []);
+
+  // Una nota o il nome del veicolo non spostano nessuno: niente ricalcolo.
+  const fire = (from, to) => handler({ params: { recordId: 'test' }, data: { before: { data: () => from }, after: to ? { exists: true, data: () => to } : { exists: false } } });
+  runRefreshed.length = 0;
+  await fire(after, { ...after, operatorNotes: 'EURO 30 A PAX', vehicleName: 'Pulmino' });
+  assert.deepEqual(runRefreshed, []);
+  // Il gestore fissa l'orario: la corsa va ricontata.
+  await fire(after, { ...after, meetingTime: '14:30' });
+  assert.deepEqual(runRefreshed, [['outbound', 'TPS', '2026-10-08']]);
+  // La persona cambia aeroporto: si ricontano la corsa lasciata e quella nuova.
+  runRefreshed.length = 0;
+  await fire({ ...after, meetingTime: '14:30' }, { ...after, meetingTime: '14:30', airport: 'PMO' });
+  assert.deepEqual(runRefreshed, [['outbound', 'TPS', '2026-10-08'], ['outbound', 'PMO', '2026-10-08']]);
+  assert.deepEqual(runCleared, []);
+  // La scheda viene revocata: il suo numero va tolto, gli altri ricontati.
+  runRefreshed.length = 0;
+  const person = { ...after, meetingTime: '14:30', boatId: 'boat', inviteId: 'person' };
+  await fire(person, null);
+  assert.deepEqual(runRefreshed, [['outbound', 'TPS', '2026-10-08']]);
+  assert.deepEqual(runCleared, [['boat', 'person', 'outbound']]);
+});
+
+// Silvio, 11/10/2026: chi è salito da solo ha scoperto il prezzo al momento
+// di partire. "Da solo" si misura sulla corsa — stesso orario di ritrovo —
+// non su quanti hanno chiesto il transfer in quel giorno.
+test('corsa: conta chi ha lo stesso orario di ritrovo, accompagnatori compresi', () => {
+  const records = [
+    { status: 'confirmed', meetingTime: '18:00' },
+    { status: 'planned', meetingTime: '18:00', additionalPassengers: 1 },
+    { status: 'confirmed', meetingTime: '15:00' },
+    { status: 'cancelled', meetingTime: '18:00' },
+    { status: 'new', meetingTime: '' },
+    { status: 'confirmed', meetingTime: '15:00', recordState: 'revoked' },
+    { status: 'confirmed', meetingTime: '06:00', additionalPassengers: 2 },
+  ];
+  assert.deepEqual(runs.transferRunCompanions(records), [2, 2, 0, null, null, null, 2]);
+  assert.deepEqual(runs.transferRunCompanions([]), []);
+  assert.equal(runs.transferRunTime({ status: 'confirmed', meetingTime: 'presto' }), '');
+});
+
+test('corsa: la firma cambia solo quando cambia chi sale su quale mezzo', () => {
+  const base = { recordState: 'active', status: 'confirmed', direction: 'return', airport: 'PMO', date: '2026-10-11', meetingTime: '18:00' };
+  const signature = runs.transferRunSignature(base);
+  assert.equal(runs.transferRunSignature({ ...base, operatorNotes: 'x', vehicleName: 'y', meetingPoint: 'PORTO' }), signature);
+  assert.equal(runs.transferRunSignature({ ...base, status: 'planned' }), signature);
+  assert.notEqual(runs.transferRunSignature({ ...base, meetingTime: '19:15' }), signature);
+  assert.notEqual(runs.transferRunSignature({ ...base, additionalPassengers: 1 }), signature);
+  assert.equal(runs.transferRunSignature({ ...base, status: 'cancelled' }), '');
+  assert.equal(runs.transferRunSignature(undefined), '');
+});
+
+test('corsa: il server scrive solo un numero, e solo dove cambia', async () => {
+  const records = [
+    { boatId: 'boat', inviteId: 'a', status: 'confirmed', meetingTime: '18:00' },
+    { boatId: 'boat', inviteId: 'b', status: 'confirmed', meetingTime: '18:00' },
+    { boatId: 'boat', inviteId: 'c', status: 'confirmed', meetingTime: '15:00' },
+    { boatId: 'boat', inviteId: 'd', status: 'cancelled', meetingTime: '18:00' },
+    { boatId: 'boat', inviteId: 'e', status: 'new' },
+  ];
+  // "a" ha già il numero giusto, "d" ne ha uno vecchio, gli altri nessuno.
+  const stored = { a: { returnTransferRunCompanions: 1 }, d: { returnTransferRunCompanions: 7 } };
+  const writes = [];
+  const query = { where: () => query, get: async () => ({ docs: records.map((record) => ({ data: () => record })) }) };
+  const ctx = context({
+    EVENT_ID: 'egadi-2026', asUid: (value) => value,
+    FieldValue: { serverTimestamp: () => 'server', delete: () => 'DELETE' },
+    db: {
+      collection: () => query,
+      doc: (path) => ({
+        get: async () => ({ data: () => stored[path.split('/').at(-1)] }),
+        set: async (payload, options) => { assert.equal(options.merge, true); writes.push([path.split('/').at(-1), payload]); },
+      }),
+    },
+  });
+  vm.runInContext(section('async function refreshTransferRunCompanionCounts(', '// La persona vede lo stato della propria richiesta'), ctx);
+  await ctx.refreshTransferRunCompanionCounts('return', 'PMO', '2026-10-11');
+  assert.deepEqual(writes.map(([id, payload]) => [id, payload.returnTransferRunCompanions]).sort(), [['b', 1], ['c', 0], ['d', 'DELETE']]);
+  // Mai un nome, un contatto o una nota: solo il conteggio.
+  for (const [, payload] of writes) assert.deepEqual(Object.keys(payload).sort(), ['inviteId', 'returnTransferRunCompanions', 'updatedAt']);
+  writes.length = 0;
+  await ctx.clearTransferRunCompanionCount('boat', 'z', 'outbound');
+  assert.deepEqual(writes.map(([id, payload]) => [id, { ...payload }]), [['z', { inviteId: 'z', outboundTransferRunCompanions: 'DELETE', updatedAt: 'server' }]]);
 });
 
 test('stato equipaggio: l’annullamento si propaga solo alla tratta scelta, senza perdere il rientro', async () => {

@@ -11,6 +11,11 @@
 // della pagina, altrimenti diventa rumore e si chiude senza leggerla.
 // Mostra solo quello che il gestore ha deciso per quella persona; le note
 // interne del gestore non arrivano mai fin qui.
+//
+// Dall'11/10/2026 dice anche quando la persona è da sola sul mezzo: il prezzo
+// a persona vale se il mezzo è condiviso, e chi l'ha scoperto al momento di
+// salire si è lamentato con Silvio. La finestra non scrive una cifra: quella
+// vera la decide il gestore corsa per corsa.
 import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
 import { operationalNow, transferTimingCheck } from './transfer-ordering.js?v=20261010-andate-ritorni-v1';
 
@@ -24,6 +29,17 @@ function text(value, limit) {
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+}
+
+// 'run': il gestore ha fissato l'orario e su quella corsa non c'è nessun
+// altro. 'route': nessun altro ha chiesto il transfer per quell'aeroporto in
+// quel giorno, quindi la persona sarà sola qualunque orario venga fissato.
+// Senza un numero scritto dal server non si afferma niente.
+function aloneOnTransfer(status, direction, operation, meetingTime) {
+  if (operation === 'cancelled') return '';
+  const run = status[`${direction}TransferRunCompanions`];
+  if (meetingTime && Number.isInteger(run)) return run === 0 ? 'run' : '';
+  return status[`${direction}TransferCompanions`] === 0 ? 'route' : '';
 }
 
 // Le tratte per cui la persona ha chiesto il transfer e c'è ancora qualcosa
@@ -55,6 +71,7 @@ export function transferNoticeLegs(status, today = '') {
       // l'unico che può accorgersene in tempo è chi ha il biglietto in mano.
       beforeLanding: direction === 'outbound'
         && transferTimingCheck({ date, time, meetingTime, status: operation }, 'outbound').code === 'pickup_before_landing',
+      alone: aloneOnTransfer(status, direction, operation, meetingTime),
     };
   }).filter(Boolean);
 }
@@ -62,11 +79,12 @@ export function transferNoticeLegs(status, today = '') {
 // Il numero del gestore dei transfer, se il server lo ha messo nello stato di
 // viaggio. Si mostra solo a chi ha almeno una tratta già presa in carico:
 // chi ha appena chiesto il transfer non ha ancora niente da domandare, e il
-// gestore alla vigilia non deve ricevere cinquanta telefonate.
+// gestore alla vigilia non deve ricevere cinquanta telefonate. Chi è da solo
+// una domanda ce l'ha subito — quanto paga — e sono poche persone.
 export function transferNoticeContact(status, legs) {
   const phone = text(status?.transferContactPhone, 20);
   if (!/^\+[1-9]\d{7,14}$/.test(phone)) return null;
-  if (!legs.some((leg) => leg.operation === 'planned' || leg.operation === 'confirmed')) return null;
+  if (!legs.some((leg) => leg.operation === 'planned' || leg.operation === 'confirmed' || leg.alone)) return null;
   return { name: text(status?.transferContactName, 60), phone };
 }
 
@@ -78,7 +96,7 @@ function phoneLabel(phone) {
 // Cambia quando cambia qualcosa che la persona deve sapere: serve a decidere
 // se la finestra è già stata vista.
 export function transferNoticeSignature(legs) {
-  return JSON.stringify(legs.map((leg) => [leg.direction, leg.operation, leg.meetingTime, leg.meetingPoint, leg.date, leg.time]));
+  return JSON.stringify(legs.map((leg) => [leg.direction, leg.operation, leg.meetingTime, leg.meetingPoint, leg.date, leg.time, leg.alone]));
 }
 
 function copy(english) {
@@ -98,6 +116,8 @@ function copy(english) {
       departs: 'Your flight departs at',
       leaves: 'You leave at',
       beforeLanding: 'Careful: the pick-up is set before your landing time. Tell your skipper now.',
+      aloneRun: 'Careful: you are the only passenger on this run. The transfer price depends on how many people share the vehicle: alone, it costs more than the per-person fare. Ask the organiser for the exact amount before you travel.',
+      aloneRoute: 'Careful: for now you are the only person who asked for a transfer for this airport on this day. Without other passengers it costs more than the per-person fare: ask the organiser for the exact amount before you travel.',
       contact: 'For transfer information:',
       call: 'Call',
       footer: 'You can always find this under “Arrivals and departures on your boat”. If something looks wrong, message your skipper.',
@@ -118,11 +138,22 @@ function copy(english) {
       departs: 'Il tuo volo parte alle',
       leaves: 'Parti alle',
       beforeLanding: 'Attenzione: il ritrovo risulta prima del tuo atterraggio. Avvisa subito il tuo skipper.',
+      aloneRun: 'Attenzione: su questa corsa ci sei solo tu. Il prezzo del transfer dipende da quante persone condividono il mezzo: senza altri passeggeri costa più del prezzo a persona. Chiedi al gestore l’importo esatto prima di partire.',
+      aloneRoute: 'Attenzione: per ora sei l’unica persona ad aver chiesto il transfer per questo aeroporto in questo giorno. Senza altri passeggeri costa più del prezzo a persona: chiedi al gestore l’importo esatto prima di partire.',
       contact: 'Per informazioni sul transfer:',
       call: 'Chiama',
       footer: 'Lo ritrovi sempre in «Arrivi e partenze della barca». Se qualcosa non torna, scrivi al tuo skipper.',
       close: 'Ho capito',
     };
+}
+
+// Lo stesso avviso serve anche nella riga fissa dell'area riservata: la
+// finestra si chiude, la riga resta.
+export function transferAloneNote(status, direction, english = false) {
+  const leg = transferNoticeLegs(status).find((entry) => entry.direction === direction);
+  if (!leg?.alone) return '';
+  const labels = copy(english);
+  return leg.alone === 'run' ? labels.aloneRun : labels.aloneRoute;
 }
 
 function legMarkup(leg, labels, english) {
@@ -133,6 +164,7 @@ function legMarkup(leg, labels, english) {
     ? (flight ? labels.departs : labels.leaves)
     : (flight ? labels.lands : labels.arrives);
   const ownTime = leg.time ? `<p class="transfer-notice-own">${escapeHtml(ownTimeLabel)} ${escapeHtml(leg.time)}.</p>` : '';
+  const alone = leg.alone ? `<p class="transfer-notice-warning">${escapeHtml(leg.alone === 'run' ? labels.aloneRun : labels.aloneRoute)}</p>` : '';
   let body;
   if (leg.operation === 'cancelled') {
     body = `<p class="transfer-notice-text">${escapeHtml(labels.cancelled)}</p>`;
@@ -140,11 +172,13 @@ function legMarkup(leg, labels, english) {
     body = `<p class="transfer-notice-pickup"><small>${escapeHtml(labels.pickup)}</small><b>${escapeHtml(leg.meetingTime)}</b></p>`
       + (leg.meetingPoint ? `<p class="transfer-notice-point">${escapeHtml(leg.meetingPoint)}</p>` : '')
       + ownTime
-      + (leg.beforeLanding ? `<p class="transfer-notice-warning">${escapeHtml(labels.beforeLanding)}</p>` : '');
+      + (leg.beforeLanding ? `<p class="transfer-notice-warning">${escapeHtml(labels.beforeLanding)}</p>` : '')
+      + alone;
   } else {
     body = `<p class="transfer-notice-text">${escapeHtml(leg.operation === 'new' ? labels.requestPending : labels.pickupPending)}</p>`
       + (leg.meetingPoint ? `<p class="transfer-notice-point">${escapeHtml(leg.meetingPoint)}</p>` : '')
-      + ownTime;
+      + ownTime
+      + alone;
   }
   return `<section class="transfer-notice-leg transfer-notice-leg--${escapeHtml(leg.operation)}">
     <header><strong>${escapeHtml(heading)}</strong><span class="transfer-notice-status">${escapeHtml(labels.status[leg.operation])}</span></header>

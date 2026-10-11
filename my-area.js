@@ -4,7 +4,7 @@ import { canConfirmCrewBriefing, crewTravelNeedsAttention } from './crew-flow-st
 import { roleConfirmationText } from './crew-roles.js?v=20260914-en2';
 import { bindRulesDialog } from './rules-dialog.js?v=20260925-rules-dialog-v1';
 import { rosterEntries, rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-card-come-il-gestore-v1';
-import { showTransferNotice } from './transfer-notice.js?v=20261010-andate-ritorni-v1';
+import { showTransferNotice, transferAloneNote } from './transfer-notice.js?v=20261011-da-solo-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -566,6 +566,13 @@ function meetingDetailText(direction, operation) {
   return '';
 }
 
+// Da soli sul mezzo il prezzo a persona non vale: stessa frase della
+// finestra «Il tuo transfer», che si chiude mentre questa riga resta.
+function aloneDetailText(direction) {
+  const note = transferAloneNote(activeCrewTravelStatus, direction, activeLocale() === 'en');
+  return note ? ` ${note}` : '';
+}
+
 function crewTravelProgress(direction) {
   const name = direction === 'outbound' ? localized('Andata', 'Outbound') : localized('Rientro', 'Return');
   if (crewTravelStatusReadError) return { tone: 'attention', label: `${name} · ${localized('stato non disponibile', 'status unavailable')}`, detail: localized('Non riesco a leggere l’ultimo aggiornamento. Riprova tra poco.', 'I cannot read the latest update. Try again shortly.') };
@@ -595,11 +602,11 @@ function crewTravelProgress(direction) {
       : localized('all’aeroporto ci arrivi tu', 'you get to the airport on your own'),
     localized('Nessun transfer organizzato per questa tratta: se ti va bene così non devi fare niente. Se lo vuoi, aprilo da Arrivi e partenze.', 'No organised transfer for this leg: if that works for you there is nothing to do. If you want one, open Arrivals and departures.'),
   );
-  if (operation === 'planned') return item('update', localized('transfer in organizzazione', 'transfer being arranged'), `${localized('Il gestore sta preparando il collegamento.', 'The organiser is preparing the connection.')}${meetingDetailText(direction, operation)} ${crewTransferPaidNote()}`);
-  if (operation === 'confirmed') return item('complete', localized('transfer confermato', 'transfer confirmed'), `${localized('Il gestore ha confermato il collegamento.', 'The organiser confirmed the connection.')}${meetingDetailText(direction, operation)} ${crewTransferPaidNote()}`);
+  if (operation === 'planned') return item('update', localized('transfer in organizzazione', 'transfer being arranged'), `${localized('Il gestore sta preparando il collegamento.', 'The organiser is preparing the connection.')}${meetingDetailText(direction, operation)}${aloneDetailText(direction)} ${crewTransferPaidNote()}`);
+  if (operation === 'confirmed') return item('complete', localized('transfer confermato', 'transfer confirmed'), `${localized('Il gestore ha confermato il collegamento.', 'The organiser confirmed the connection.')}${meetingDetailText(direction, operation)}${aloneDetailText(direction)} ${crewTransferPaidNote()}`);
   if (operation === 'completed') return item('complete', localized('transfer concluso', 'transfer completed'), `${localized('Il gestore ha segnato il collegamento come concluso.', 'The organiser marked the connection as completed.')} ${crewTransferPaidNote()}`);
   if (operation === 'cancelled') return item('attention', localized('transfer annullato', 'transfer cancelled'), localized('Contatta lo skipper prima di partire.', 'Contact your skipper before travelling.'));
-  return item('waiting', localized('transfer richiesto', 'transfer requested'), `${localized('Richiesta salvata; il gestore non l’ha ancora confermata.', 'Request saved; the organiser has not confirmed it yet.')} ${crewTransferPaidNote()}`);
+  return item('waiting', localized('transfer richiesto', 'transfer requested'), `${localized('Richiesta salvata; il gestore non l’ha ancora confermata.', 'Request saved; the organiser has not confirmed it yet.')}${aloneDetailText(direction)} ${crewTransferPaidNote()}`);
 }
 
 // L'elenco è lo stesso che vede lo skipper: vive in boat-roster.js, così le

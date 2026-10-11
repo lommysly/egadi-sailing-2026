@@ -1,6 +1,15 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 10 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+Ultimo aggiornamento: 11 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+
+## Transfer: avviso a chi è da solo sul mezzo · 11 ottobre 2026
+
+- [x] Motivo: lamentele arrivate al titolare l'11/10/2026 da chi ha scoperto il costo al momento di salire, perché era l'unico passeggero. Il sito lo diceva solo nel modulo di richiesta e misurandolo su aeroporto e giorno, non sulla corsa.
+- [x] Sorgente: la finestra «Il tuo transfer» e la riga fissa del transfer nelle due aree (equipaggio e skipper) mostrano un avviso rosso quando sulla corsa c'è una persona sola, oppure — prima che l'orario sia fissato — quando è l'unica richiesta per quell'aeroporto in quel giorno. La finestra ricompare se una persona resta sola dopo averla già vista. Chi è solo vede anche il numero del gestore, pure con la richiesta non ancora presa in carico.
+- [x] Nessuna cifra nell'avviso, per scelta: i prezzi che il gestore applica a chi viaggia solo non coincidono con la formula del listino (`transferPricing/default`: minimo 3 persone fatturate) e stanno soltanto nelle sue note interne, che non arrivano mai ai passeggeri.
+- [x] Server: `functions/transfer-runs.js` conta chi ha lo stesso orario di ritrovo (stessa definizione di corsa del portale); `copyTransferOperationsToBackup` scrive `{andata|rientro}TransferRunCompanions` nello stato di viaggio della persona — solo un numero, e solo dove cambia — quando il gestore sposta un orario, annulla una scheda o aggiunge un accompagnatore. Nessuna Rules modificata: è un campo in più su un documento che la persona legge già.
+- [x] Gate locale: 227 test unitari; finestra provata con dati fittizi a 375 e 800 px nei tre casi (sola sulla corsa, unica richiesta del giorno, in compagnia), senza sfondamento orizzontale.
+- [ ] Verifica con un accesso reale di una persona sola su una corsa (provato nel codice e sui dati, non con un login).
 
 ## Transfer: andate e ritorni separati, il passato ripiegato · 10 ottobre 2026
 

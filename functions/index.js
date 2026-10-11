@@ -9,6 +9,7 @@ const { google } = require('googleapis');
 const { sheetDate, sheetTimestamp, sheetTransferRequestLabel, sheetTravelStatusLabel } = require('./sheet-status');
 const { additionalPassengerCount, transferPassengerCount, transferSeatCount } = require('./transfer-party');
 const { createTransferCancellationHandler } = require('./transfer-cancellation');
+const { transferRunCompanions, transferRunSignature } = require('./transfer-runs');
 
 initializeApp();
 
@@ -747,6 +748,48 @@ async function clearTransferCompanionCount(boatId, inviteId, direction) {
   }, { merge: true });
 }
 
+// Quante altre persone salgono sullo stesso mezzo (vedi transfer-runs.js):
+// solo un numero, mai nomi, sullo stesso documento minimo che la persona
+// legge già. Scrive solo dove il numero cambia: ogni scrittura risveglia
+// l'area riservata di quella persona e può riaprirle la finestra del
+// transfer.
+async function refreshTransferRunCompanionCounts(direction, airport, date) {
+  if (!['outbound', 'return'].includes(direction) || !airport || !date) return;
+  const snapshot = await db.collection(`events/${EVENT_ID}/transferOpsRecords`)
+    .where('direction', '==', direction)
+    .where('airport', '==', airport)
+    .where('date', '==', date)
+    .where('recordState', '==', 'active')
+    .get();
+  const records = snapshot.docs
+    .map((doc) => doc.data())
+    .filter((record) => asUid(record.boatId) && asUid(record.inviteId));
+  const key = `${direction}TransferRunCompanions`;
+  const counts = transferRunCompanions(records);
+  await Promise.all(records.map(async (record, index) => {
+    const statusRef = db.doc(`boats/${record.boatId}/crewTravelStatus/${record.inviteId}`);
+    const current = (await statusRef.get()).data()?.[key];
+    const next = counts[index];
+    if ((Number.isInteger(current) ? current : null) === next) return;
+    await statusRef.set({
+      inviteId: record.inviteId,
+      [key]: next === null ? FieldValue.delete() : next,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  }));
+}
+
+// Una scheda revocata non compare più nella ricerca qui sopra: il suo numero
+// va tolto a parte, altrimenti resterebbe quello dell'ultima corsa.
+async function clearTransferRunCompanionCount(boatId, inviteId, direction) {
+  if (!asUid(boatId) || !asUid(inviteId) || !['outbound', 'return'].includes(direction)) return;
+  await db.doc(`boats/${boatId}/crewTravelStatus/${inviteId}`).set({
+    inviteId,
+    [`${direction}TransferRunCompanions`]: FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
 // La persona vede lo stato della propria richiesta e, se il gestore lo ha
 // impostato, dove e quando presentarsi: mai nominativi, contatti, mezzo
 // assegnato o note interne della coda dell'operatore (quei campi restano
@@ -1059,6 +1102,19 @@ exports.copyTransferOperationsToBackup = onDocumentWritten({
   if (transferSeatCount(source) !== transferSeatCount(before)) {
     const record = source || before;
     if (record) await refreshTransferCompanionCounts(record.direction, record.airport, record.date);
+  }
+  // Chi sale sullo stesso mezzo cambia quando il gestore sposta un orario,
+  // annulla una scheda o aggiunge un accompagnatore: chi resta da solo su
+  // una corsa deve saperlo prima di salire, perché da solo il prezzo non si
+  // divide (lamentele arrivate a Silvio l'11/10/2026).
+  if (transferRunSignature(source) !== transferRunSignature(before)) {
+    const groups = new Map();
+    [before, source].forEach((record) => {
+      if (record?.direction && record.airport && record.date) groups.set(`${record.direction}|${record.airport}|${record.date}`, record);
+    });
+    for (const record of groups.values()) await refreshTransferRunCompanionCounts(record.direction, record.airport, record.date);
+    const gone = !source || source.recordState !== 'active' ? (source || before) : null;
+    if (gone) await clearTransferRunCompanionCount(gone.boatId, gone.inviteId, gone.direction);
   }
 });
 
