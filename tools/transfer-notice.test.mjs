@@ -282,11 +282,14 @@ test('chi resta da solo dopo aver già visto la finestra la rivede', () => {
 
 test('la stessa frase resta nella riga fissa delle due aree', () => {
   const alone = { ...confirmed, outboundTransferRunCompanions: 0 };
-  assert.match(transferAloneNote(alone, 'outbound'), /^Attenzione: su questa corsa ci sei solo tu\./);
-  assert.match(transferAloneNote(alone, 'outbound', true), /^Careful: you are the only passenger on this run\./);
-  assert.equal(transferAloneNote(alone, 'return'), '');
-  assert.equal(transferAloneNote({ ...confirmed, outboundTransferRunCompanions: 2 }, 'outbound'), '');
+  assert.match(transferAloneNote(alone, 'outbound', false, '2026-10-06'), /^Attenzione: su questa corsa ci sei solo tu\./);
+  assert.match(transferAloneNote(alone, 'outbound', true, '2026-10-08'), /^Careful: you are the only passenger on this run\./);
+  assert.equal(transferAloneNote(alone, 'return', false, '2026-10-06'), '');
+  assert.equal(transferAloneNote({ ...confirmed, outboundTransferRunCompanions: 2 }, 'outbound', false, '2026-10-06'), '');
   assert.equal(transferAloneNote(null, 'outbound'), '');
+  // Un'andata di giorni fa, mai segnata conclusa dal gestore, non avvisa più.
+  assert.equal(transferAloneNote(alone, 'outbound', false, '2026-10-11'), '');
+  assert.equal(transferAloneNote(alone, 'outbound'), '');
   assert.match(read('my-area.js'), /transferAloneNote\(activeCrewTravelStatus, direction, activeLocale\(\) === 'en'\)/);
   assert.match(read('area.js'), /transferAloneNote\(crewTravelStatusFor\('skipper'\), legId\)/);
 });

@@ -148,9 +148,11 @@ function copy(english) {
 }
 
 // Lo stesso avviso serve anche nella riga fissa dell'area riservata: la
-// finestra si chiude, la riga resta.
-export function transferAloneNote(status, direction, english = false) {
-  const leg = transferNoticeLegs(status).find((entry) => entry.direction === direction);
+// finestra si chiude, la riga resta. Come la finestra, tace sulle tratte di
+// giorni già trascorsi: un'andata fatta da soli tre giorni prima non è più
+// un avviso per nessuno.
+export function transferAloneNote(status, direction, english = false, today = operationalNow().today) {
+  const leg = transferNoticeLegs(status, today).find((entry) => entry.direction === direction);
   if (!leg?.alone) return '';
   const labels = copy(english);
   return leg.alone === 'run' ? labels.aloneRun : labels.aloneRoute;
