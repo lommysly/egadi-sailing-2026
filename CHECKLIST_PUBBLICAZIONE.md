@@ -1,6 +1,16 @@
 # Checklist di pubblicazione · Egadi Sailing Experience
 
-Ultimo aggiornamento: 11 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+Ultimo aggiornamento: 12 ottobre 2026. Le caselle descrivono lo stato verificato; l'area privata è stata attivata con autorizzazione esplicita del titolare.
+
+## Transfer: la nota del gestore arriva a chi viaggia · 12 ottobre 2026
+
+- [x] Decisione del titolare (12/10/2026): il partecipante deve leggere la nota che il gestore scrive sulla scheda, perché è lì che sta il prezzo. Fino all'11/10 la nota restava del gestore, per scelta e con un test che lo garantiva: quel test ora prova il contrario.
+- [x] Server: `functions/transfer-notes.js` decide cosa parte — solo la nota di una scheda attiva, in stato richiesta/in organizzazione/confermato, con data da oggi in poi (orologio di Marsala). Le note scritte prima della decisione erano appunti interni («non è venuta», «manca cell»): quelle di tratte passate, concluse o annullate non partono. `copyTransferOperationsToBackup` scrive `{andata|rientro}OperatorNote` nello stato di viaggio della persona. Mezzo assegnato e nome del gruppo restano del gestore. Nessuna Rules modificata.
+- [x] Sito: la nota compare nella finestra «Il tuo transfer» sotto orario e punto di ritrovo, con i suoi a capo, e nelle righe fisse di area equipaggio, area skipper e pagina Arrivi e partenze. Se il gestore la cambia la finestra ricompare. Chi è da solo sulla corsa viene mandato a leggerla per l'importo.
+- [x] Portale del gestore: il campo non si chiama più «Note operative» ma «Nota per il passeggero (la legge insieme all'orario)», in italiano e in inglese. Il gestore va comunque avvisato a voce: messaggio preparato per il titolare.
+- [x] Nella pagina Arrivi e partenze punto di ritrovo e nota — testo scritto dal gestore — entravano nella pagina come HTML: ora come testo.
+- [x] Gate locale: 235 test unitari; finestra provata con dati fittizi a 375 px (nota con a capo; nota più avviso «ci sei solo tu»), senza sfondamento orizzontale.
+- [ ] Verifica con un accesso reale di un partecipante con una nota sulla scheda (provato nel codice e sui dati, non con un login).
 
 ## Transfer: avviso a chi è da solo sul mezzo · 11 ottobre 2026
 

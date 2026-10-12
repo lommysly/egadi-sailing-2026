@@ -16,7 +16,7 @@ import { simplifyReservedAreaNavigation } from './reserved-area-nav.js?v=2026100
 import { crewTravelCardPresentation, crewTravelCardPriority, crewTravelOverviewGroup } from './crew-flow-state.js?v=20261002-transfer-su-richiesta-v1';
 import { rosterHeading, rosterMarkup } from './boat-roster.js?v=20261004-card-come-il-gestore-v1';
 import { formatIsoDay } from './date-format.js?v=20261007-date-italiane-v1';
-import { showTransferNotice, transferAloneNote } from './transfer-notice.js?v=20261011-da-solo-v2';
+import { showTransferNotice, transferAloneNote, transferOperatorNote } from './transfer-notice.js?v=20261012-nota-gestore-v1';
 import {
   boatFromData,
   boatSetupReadiness,
@@ -6385,10 +6385,14 @@ function renderSkipperTransferProgress(form, legId, isTransfer) {
   // finestra «Il tuo transfer», che si chiude mentre questa riga resta.
   const aloneNote = transferAloneNote(crewTravelStatusFor('skipper'), legId);
   const aloneDetail = aloneNote ? ` ${aloneNote}` : '';
+  // La nota del gestore, di solito il prezzo: dal 12/10/2026 la legge anche
+  // chi viaggia (decisione di Silvio).
+  const operatorNote = transferOperatorNote(crewTravelStatusFor('skipper'), legId);
+  const noteDetail = operatorNote ? ` Nota del gestore: «${operatorNote}».` : '';
   const icon = key === 'confirmed' || key === 'completed' ? '✓' : key === 'cancelled' ? '!' : '•';
   target.hidden = false;
   target.className = `crew-transfer-progress crew-transfer-progress--${key}`;
-  target.innerHTML = `<span class="crew-transfer-progress-icon" aria-hidden="true">${icon}</span><div><p class="eyebrow">Transfer organizzato · stato aggiornato</p><strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}${escapeHtml(meetingDetail)}${escapeHtml(aloneDetail)}</span></div>`;
+  target.innerHTML = `<span class="crew-transfer-progress-icon" aria-hidden="true">${icon}</span><div><p class="eyebrow">Transfer organizzato · stato aggiornato</p><strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}${escapeHtml(meetingDetail)}${escapeHtml(noteDetail)}${escapeHtml(aloneDetail)}</span></div>`;
 }
 
 function setSkipperTravelFormField(form, name, value) {

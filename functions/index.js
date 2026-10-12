@@ -10,6 +10,7 @@ const { sheetDate, sheetTimestamp, sheetTransferRequestLabel, sheetTravelStatusL
 const { additionalPassengerCount, transferPassengerCount, transferSeatCount } = require('./transfer-party');
 const { createTransferCancellationHandler } = require('./transfer-cancellation');
 const { transferRunCompanions, transferRunSignature } = require('./transfer-runs');
+const { passengerTransferNote } = require('./transfer-notes');
 
 initializeApp();
 
@@ -791,9 +792,10 @@ async function clearTransferRunCompanionCount(boatId, inviteId, direction) {
 }
 
 // La persona vede lo stato della propria richiesta e, se il gestore lo ha
-// impostato, dove e quando presentarsi: mai nominativi, contatti, mezzo
-// assegnato o note interne della coda dell'operatore (quei campi restano
-// solo suoi). Prima escludeva lo skipper: anche lui prende un transfer e
+// impostato, dove e quando presentarsi: mai nominativi, contatti o mezzo
+// assegnato (quei campi restano solo suoi). Dal 12/10/2026, per decisione di
+// Silvio, vede anche la nota del gestore — è lì che sta il prezzo — ma solo
+// per una tratta ancora da fare e non annullata (vedi transfer-notes.js). Prima escludeva lo skipper: anche lui prende un transfer e
 // aspettava "chiedigli i dettagli" come tutti gli altri, senza motivo
 // (richiesta di Silvio, 30/09/2026).
 // Il numero da chiamare per il transfer. Sta in un documento che il browser
@@ -833,6 +835,7 @@ async function writeCrewTransferOperationStatus(record, revision) {
   const status = isActive ? safeStatus(record.status) : 'revoked';
   const meetingPoint = isActive ? asText(record.meetingPoint, 160) : '';
   const meetingTime = isActive ? asText(record.meetingTime, 5) : '';
+  const note = isActive ? passengerTransferNote({ ...record, status }) : '';
   const contact = isActive ? await transferContact() : null;
   await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(statusRef);
@@ -843,6 +846,7 @@ async function writeCrewTransferOperationStatus(record, revision) {
       [revisionKey]: revision,
       [meetingPointKey]: meetingPoint,
       [meetingTimeKey]: meetingTime,
+      [`${direction}OperatorNote`]: note,
       ...(contact ? { transferContactName: contact.name, transferContactPhone: contact.phone } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });

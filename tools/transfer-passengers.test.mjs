@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import { renderFixture } from './transfer-passengers-fixture.mjs';
 import party from '../functions/transfer-party.js';
 import runs from '../functions/transfer-runs.js';
+import notes from '../functions/transfer-notes.js';
 import sheetStatus from '../functions/sheet-status.js';
 import { totalTransferSeats } from '../transfer-ordering.js';
 
@@ -14,7 +15,7 @@ function section(start, end) {
 }
 function context(extra = {}) {
   const ctx = vm.createContext({
-    ...party, ...runs, ...sheetStatus, ...extra,
+    ...party, ...runs, ...notes, ...sheetStatus, ...extra,
     asText: (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '',
     safeStatus: (value) => ['new', 'planned', 'confirmed', 'completed', 'cancelled'].includes(value) ? value : 'new',
   });
@@ -180,6 +181,43 @@ test('stato equipaggio: l’annullamento si propaga solo alla tratta scelta, sen
   assert.equal(changes.outboundOperationStatus, 'cancelled');
   assert.equal(changes.outboundOperationRevision, 2);
   assert.equal(Object.hasOwn(changes, 'returnOperationStatus'), false);
+  // Annullata: la nota del gestore non parte, e quella di prima viene tolta.
+  assert.equal(changes.outboundOperatorNote, '');
+  // Confermata e ancora da fare: la nota arriva a chi viaggia, il mezzo no.
+  await ctx.writeCrewTransferOperationStatus({ boatId: 'boat', inviteId: 'person', direction: 'outbound', recordState: 'active', status: 'confirmed', date: '2999-01-01', meetingTime: '15:00', operatorNotes: ' EURO 40 ', vehicleName: 'Pulmino' }, 3);
+  assert.equal(changes.outboundOperatorNote, 'EURO 40');
+  assert.equal(changes.outboundMeetingTime, '15:00');
+  assert.doesNotMatch(JSON.stringify(changes), /Pulmino/);
+  // Scheda revocata: non resta niente.
+  await ctx.writeCrewTransferOperationStatus({ boatId: 'boat', inviteId: 'person', direction: 'outbound', recordState: 'revoked', status: 'confirmed', date: '2999-01-01', operatorNotes: 'EURO 40' }, 4);
+  assert.equal(changes.outboundOperatorNote, '');
+});
+
+// Silvio, 12/10/2026: il partecipante deve leggere la nota del gestore. Le
+// note scritte prima erano appunti interni («non è venuta»): passa solo
+// quella di una tratta ancora da fare e non annullata.
+test('nota del gestore: solo per una tratta attiva, non annullata e non passata', () => {
+  const base = { recordState: 'active', status: 'confirmed', date: '2026-10-12', operatorNotes: 'EURO 40\nCONTANTI' };
+  const note = (record) => notes.passengerTransferNote(record, '2026-10-12');
+  assert.equal(note(base), 'EURO 40\nCONTANTI');
+  assert.equal(note({ ...base, status: 'planned' }), 'EURO 40\nCONTANTI');
+  assert.equal(note({ ...base, status: undefined }), 'EURO 40\nCONTANTI');
+  assert.equal(note({ ...base, date: '2026-10-13' }), 'EURO 40\nCONTANTI');
+  assert.equal(note({ ...base, date: '2026-10-11', operatorNotes: 'NON È VENUTA' }), '');
+  assert.equal(note({ ...base, status: 'cancelled', operatorNotes: 'EURO 120' }), '');
+  assert.equal(note({ ...base, status: 'completed' }), '');
+  assert.equal(note({ ...base, recordState: 'revoked' }), '');
+  assert.equal(note({ ...base, operatorNotes: undefined }), '');
+  assert.equal(note({ ...base, date: undefined }), '');
+  assert.equal(note(null), '');
+  assert.equal(note({ ...base, operatorNotes: 'x'.repeat(900) }).length, 500);
+});
+
+test('nota del gestore: il giorno è quello di Marsala, non quello del server', () => {
+  // Mezzanotte e mezza del 12 ottobre a Marsala: in UTC è ancora l'11.
+  assert.equal(notes.romeToday(new Date('2026-10-11T22:30:00Z')), '2026-10-12');
+  assert.equal(notes.romeToday(new Date('2026-10-11T21:30:00Z')), '2026-10-11');
+  assert.equal(notes.romeToday(new Date('2026-12-31T23:30:00Z')), '2027-01-01');
 });
 
 test('conteggio anonimo: considera anche gli accompagnatori propri e ignora gli annullati', async () => {

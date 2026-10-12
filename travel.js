@@ -3,6 +3,7 @@ import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/
 import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { crewAccessErrorMessage, crewSaveErrorMessage, crewAccessUrl, db, isScriptStale, personalAreaUrl, profileUrl, signOutCrew, startCrewAreaSession, watchForStaleScript, withSaveRetry } from './crew-session.js?v=20261004-messaggi-sinceri-v1';
 import { installTravelAutocomplete, setTravelAirportLookup } from './travel-autocomplete.js?v=20260925-foreign-airport-fallback-v1';
+import { transferOperatorNote } from './transfer-notice.js?v=20261012-nota-gestore-v1';
 
 watchForStaleScript(import.meta.url);
 
@@ -860,7 +861,8 @@ function updatePersistedLegState(card, direction, leg, copy) {
 // stesso documento (crewTravelStatus, via writeCrewTransferOperationStatus)
 // quindi si possono mostrare qui, invece di rimandare a un messaggio esterno
 // che l'operatore dovrebbe scrivere a mano a ogni persona (richiesta di
-// Silvio, 30/09/2026). Mezzo assegnato e note restano solo dell'operatore.
+// Silvio, 30/09/2026). Il mezzo assegnato resta solo dell'operatore; la sua
+// nota — di solito il prezzo — dal 12/10/2026 arriva anche qui.
 function meetingDetailText(direction, key) {
   const meetingPoint = String(currentTransferOperationStatus?.[`${direction}MeetingPoint`] || '').trim();
   const meetingTime = String(currentTransferOperationStatus?.[`${direction}MeetingTime`] || '').trim();
@@ -895,10 +897,12 @@ function renderTransferProgress(card, direction, leg, copy) {
   const terminalAirport = String(direction === 'return' ? leg.originAirport || '' : leg.destinationAirport || '').toUpperCase();
   const paidServiceDetail = transferPriceNote(terminalAirport, direction);
   const meetingDetail = meetingDetailText(direction, key);
+  const operatorNote = transferOperatorNote(currentTransferOperationStatus, direction);
+  const noteDetail = operatorNote ? ` ${isEnglish() ? 'Note from the organiser:' : 'Nota del gestore:'} «${operatorNote}».` : '';
   const icon = key === 'confirmed' || key === 'completed' ? '✓' : key === 'cancelled' || key === 'draft' ? '!' : '•';
   target.hidden = false;
   target.className = `crew-transfer-progress crew-transfer-progress--${key}`;
-  target.innerHTML = `<span class="crew-transfer-progress-icon" aria-hidden="true">${icon}</span><div><p class="eyebrow">${copy.transferProgress.eyebrow}</p><strong>${title}</strong><span>${detail}${meetingDetail} ${paidServiceDetail}</span></div>`;
+  target.innerHTML = `<span class="crew-transfer-progress-icon" aria-hidden="true">${icon}</span><div><p class="eyebrow">${copy.transferProgress.eyebrow}</p><strong>${title}</strong><span>${detail}${escapeHtml(meetingDetail)}${escapeHtml(noteDetail)} ${paidServiceDetail}</span></div>`;
 }
 
 function applySavedLegState(card, message, direction, leg, copy) {

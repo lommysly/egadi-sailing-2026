@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { showTransferNotice, transferAloneNote, transferNoticeContact, transferNoticeLegs, transferNoticeMarkup, transferNoticeSignature } from '../transfer-notice.js';
+import { showTransferNotice, transferAloneNote, transferNoticeContact, transferNoticeLegs, transferNoticeMarkup, transferNoticeSignature, transferOperatorNote } from '../transfer-notice.js';
 
 // Richiesta di Silvio alla vigilia degli arrivi (7/10/2026): chi entra
 // nell'area riservata deve trovarsi davanti il proprio transfer — orario e
@@ -139,17 +139,23 @@ test('se è aperto il regolamento, aspetta che venga chiuso', () => {
 
 test('le due aree la aprono quando arriva lo stato del transfer', () => {
   const myArea = read('my-area.js');
-  assert.match(myArea, /import \{ showTransferNotice, transferAloneNote \} from '\.\/transfer-notice\.js\?v=/);
+  assert.match(myArea, /import \{ showTransferNotice, transferAloneNote, transferOperatorNote \} from '\.\/transfer-notice\.js\?v=/);
   assert.match(myArea, /showTransferNotice\(\{\s*status: activeCrewTravelStatus,\s*english: activeLocale\(\) === 'en',\s*scope: `\$\{activeInvite\.boatId\}:\$\{activeInvite\.id\}`/);
   const area = read('area.js');
   assert.match(area, /showTransferNotice\(\{\s*status: activeCrewTravelStatus\.find\(\(entry\) => entry\.isSkipper === true \|\| entry\.id === 'skipper'\)/);
 });
 
-test('le note interne del gestore non arrivano mai all’equipaggio', () => {
+// Fino all'11/10/2026 qui si provava che le note del gestore non arrivassero
+// mai all'equipaggio. Il 12/10 Silvio ha deciso il contrario: il prezzo sta
+// lì, e chi viaggia lo deve leggere. Resta provato che passa solo la nota,
+// filtrata dal server, e mai il mezzo assegnato o il nome del gruppo.
+test('all’equipaggio arriva la nota del gestore, non il mezzo né il gruppo', () => {
   const functions = read('functions/index.js');
   const writer = functions.slice(functions.indexOf('async function writeCrewTransferOperationStatus'), functions.indexOf('exports.materializeCrewTravel'));
+  assert.match(writer, /const note = isActive \? passengerTransferNote\(\{ \.\.\.record, status \}\) : '';/);
+  assert.match(writer, /\[`\$\{direction\}OperatorNote`\]: note,/);
   assert.doesNotMatch(writer, /operatorNotes|vehicleName|groupName/);
-  assert.doesNotMatch(read('transfer-notice.js').replace(/\/\/.*$/gm, ''), /operatorNotes|Notes\b/);
+  assert.doesNotMatch(read('transfer-notice.js').replace(/\/\/.*$/gm, ''), /operatorNotes|vehicleName|groupName/);
 });
 
 // Silvio, 7/10/2026: nella finestra ci va il numero del gestore dei transfer.
@@ -299,3 +305,65 @@ test('la finestra non scrive una cifra: il prezzo vero lo decide il gestore cors
   assert.doesNotMatch(code, /€|\beuro\b|PricePerPerson|minimumBillablePersons/i);
 });
 
+// Silvio, 12/10/2026: «vorrei che il partecipante vedesse le note di
+// Giovanni». È lì che il gestore scrive il prezzo.
+test('la nota del gestore compare nella finestra, con i suoi a capo', () => {
+  const status = { ...confirmed, outboundOperatorNote: 'EURO 40\nPAGAMENTO IN CONTANTI' };
+  const legs = transferNoticeLegs(status);
+  assert.equal(legs[0].note, 'EURO 40\nPAGAMENTO IN CONTANTI');
+  const html = transferNoticeMarkup(legs);
+  assert.match(html, /transfer-notice-note"><strong>Nota del gestore:<\/strong> EURO 40<br>PAGAMENTO IN CONTANTI<\/p>/);
+  assert.match(transferNoticeMarkup(legs, true), /<strong>Note from the organiser:<\/strong> EURO 40/);
+  // Senza nota non compare nemmeno l'etichetta.
+  assert.doesNotMatch(transferNoticeMarkup(transferNoticeLegs(confirmed)), /transfer-notice-note|Nota del gestore/);
+  // Anche a richiesta non ancora confermata, se il gestore ha già scritto.
+  const pending = { returnTransfer: 'requested', returnDate: '2026-10-12', returnTime: '07:50', returnOperatorNote: 'EURO 40' };
+  assert.match(transferNoticeMarkup(transferNoticeLegs(pending)), /Nota del gestore:<\/strong> EURO 40/);
+});
+
+test('la nota è testo: non può iniettare codice nella pagina', () => {
+  const html = transferNoticeMarkup(transferNoticeLegs({ ...confirmed, outboundOperatorNote: '<script>alert(1)</script>' }));
+  assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /&lt;script&gt;/);
+});
+
+test('un transfer annullato o di un giorno passato non mostra la nota', () => {
+  const cancelled = { ...confirmed, outboundOperationStatus: 'cancelled', outboundOperatorNote: 'EURO 120' };
+  assert.equal(transferNoticeLegs(cancelled)[0].note, '');
+  assert.doesNotMatch(transferNoticeMarkup(transferNoticeLegs(cancelled)), /EURO 120/);
+  const noted = { ...confirmed, outboundOperatorNote: 'EURO 40' };
+  assert.equal(transferOperatorNote(noted, 'outbound', '2026-10-08'), 'EURO 40');
+  assert.equal(transferOperatorNote(noted, 'outbound', '2026-10-09'), '');
+  assert.equal(transferOperatorNote(noted, 'return', '2026-10-06'), '');
+  assert.equal(transferOperatorNote(cancelled, 'outbound', '2026-10-06'), '');
+  assert.equal(transferOperatorNote(null, 'outbound'), '');
+});
+
+test('se il gestore cambia la nota la finestra ricompare', () => {
+  const before = transferNoticeSignature(transferNoticeLegs({ ...confirmed, outboundOperatorNote: 'EURO 30 A PERSONA' }));
+  const after = transferNoticeSignature(transferNoticeLegs({ ...confirmed, outboundOperatorNote: 'EURO 40' }));
+  assert.notEqual(before, after);
+  assert.notEqual(before, transferNoticeSignature(transferNoticeLegs(confirmed)));
+});
+
+test('chi è da solo e ha la nota davanti viene mandato a leggerla', () => {
+  const alone = { ...confirmed, outboundTransferRunCompanions: 0 };
+  assert.match(transferNoticeMarkup(transferNoticeLegs(alone)), /costa più del prezzo a persona\. Chiedi al gestore l’importo esatto prima di partire\./);
+  const html = transferNoticeMarkup(transferNoticeLegs({ ...alone, outboundOperatorNote: 'EURO 40' }));
+  assert.match(html, /costa più del prezzo a persona\. L’importo è nella nota del gestore: se manca, chiediglielo prima di partire\./);
+  // La nota sta sopra l'avviso, che la richiama.
+  assert.ok(html.indexOf('transfer-notice-note') < html.indexOf('transfer-notice-warning'));
+});
+
+test('la stessa nota resta nelle righe fisse; il portale dice al gestore chi la legge', () => {
+  assert.match(read('my-area.js'), /transferOperatorNote\(activeCrewTravelStatus, direction\)/);
+  assert.match(read('area.js'), /transferOperatorNote\(crewTravelStatusFor\('skipper'\), legId\)/);
+  const travel = read('travel.js');
+  assert.match(travel, /transferOperatorNote\(currentTransferOperationStatus, direction\)/);
+  // Punto di ritrovo e nota li scrive il gestore: nella pagina entrano come testo.
+  assert.match(travel, /\$\{escapeHtml\(meetingDetail\)\}\$\{escapeHtml\(noteDetail\)\}/);
+  const portal = read('transfer.js');
+  assert.match(portal, /notes: 'Nota per il passeggero \(la legge insieme all’orario\)'/);
+  assert.match(portal, /notes: 'Note for the passenger \(shown with the pick-up time\)'/);
+  assert.doesNotMatch(portal, /Note operative|Operational notes/);
+});
